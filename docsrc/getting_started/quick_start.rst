@@ -39,8 +39,8 @@ Step 1: Optimize + serialize
     inputs = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of representative inputs here
 
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs)
-    torch_tensorrt.save(trt_gm, "trt.ep", inputs=inputs) # PyTorch only supports Python runtime for an ExportedProgram. For C++ deployment, use a TorchScript file
-    torch_tensorrt.save(trt_gm, "trt.ts", output_format="torchscript", inputs=inputs)
+    torch_tensorrt.save(trt_gm, "trt.ep", arg_inputs=inputs) # PyTorch only supports Python runtime for an ExportedProgram. For C++ deployment, use a TorchScript file
+    torch_tensorrt.save(trt_gm, "trt.ts", output_format="torchscript", arg_inputs=inputs)
 
 Step 2: Deploy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

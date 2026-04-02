@@ -34,7 +34,7 @@ In this example, we demonstrate how to:
     2. Capture and visualize FX graphs before and/or after specific lowering passes
     3. Configure logging directory and verbosity
 
-.. GENERATED FROM PYTHON SOURCE LINES 18-76
+.. GENERATED FROM PYTHON SOURCE LINES 18-75
 
 .. code-block:: python
 
@@ -73,7 +73,6 @@ In this example, we demonstrate how to:
             "remove_detach"
         ],  # fx graph visualization before certain lowering pass
     ):
-
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
             tuple(inputs),

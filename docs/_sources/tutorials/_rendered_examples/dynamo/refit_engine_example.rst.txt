@@ -118,7 +118,7 @@ refit the model with the pretrained weights. This is done by setting up another 
 with the target weights and exporting it as an ExportedProgram. Then the ``refit_module_weights``
 function is used to update the weights of the compiled module with the new weights.
 
-.. GENERATED FROM PYTHON SOURCE LINES 86-113
+.. GENERATED FROM PYTHON SOURCE LINES 86-114
 
 .. code-block:: python
 
@@ -139,8 +139,9 @@ function is used to update the weights of the compiled module with the new weigh
 
     # Check the output
     with torch.no_grad():
-        expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
-            *inputs
+        expected_outputs, refitted_outputs = (
+            exp_program2.module()(*inputs),
+            new_trt_gm(*inputs),
         )
         for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
             assert torch.allclose(
@@ -150,7 +151,7 @@ function is used to update the weights of the compiled module with the new weigh
     print("Refit successfully!")
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 114-142
+.. GENERATED FROM PYTHON SOURCE LINES 115-143
 
 Advanced Usage
 -----------------------------

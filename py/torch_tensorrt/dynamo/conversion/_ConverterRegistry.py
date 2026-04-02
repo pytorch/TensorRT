@@ -146,6 +146,13 @@ def _has_dynamic_shapes(
             meta_val = subnode.meta["val"]
             if isinstance(meta_val, (list, tuple)):
                 for val in meta_val:
+                    if val is None:
+                        continue
+                    if isinstance(val, (SymFloat, SymInt, SymBool)):
+                        is_shape_dynamic = True
+                        break
+                    if not hasattr(val, "size"):
+                        continue
                     shape = val.size()
                     if any(
                         isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape

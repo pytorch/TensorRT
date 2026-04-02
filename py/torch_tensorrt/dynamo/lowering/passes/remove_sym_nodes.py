@@ -29,7 +29,7 @@ def remove_sym_nodes(
         )
     ]
 
-    for idx, node in placeholder_idx_sym_ints:
+    for idx, node in reversed(placeholder_idx_sym_ints):
         gm.graph.erase_node(node)
         sample_inputs.pop(idx)
 

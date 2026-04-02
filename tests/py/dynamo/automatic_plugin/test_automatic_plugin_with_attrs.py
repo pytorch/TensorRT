@@ -1,31 +1,44 @@
+import platform
 import unittest
 from typing import Tuple
 
 import torch
 import torch.nn as nn
 import torch_tensorrt
-import triton
-import triton.language as tl
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
+# Triton is Linux-only, skip on Windows
+if platform.system() != "Windows":
+    import triton
+    import triton.language as tl
+else:
+    triton = None
+    tl = None
+
 from ..conversion.harness import DispatchTestCase
 
+if triton is not None:
 
-@triton.jit
-def elementwise_scale_mul_kernel(X, Y, Z, a, b, BLOCK_SIZE: tl.constexpr):
-    pid = tl.program_id(0)
-    # Compute the range of elements that this thread block will work on
-    block_start = pid * BLOCK_SIZE
-    # Range of indices this thread will handle
-    offsets = block_start + tl.arange(0, BLOCK_SIZE)
-    # Load elements from the X and Y tensors
-    x_vals = tl.load(X + offsets)
-    y_vals = tl.load(Y + offsets)
-    # Perform the element-wise multiplication
-    z_vals = x_vals * y_vals * a + b
-    # Store the result in Z
-    tl.store(Z + offsets, z_vals)
+    @triton.jit
+    def elementwise_scale_mul_kernel(X, Y, Z, a, b, BLOCK_SIZE: tl.constexpr):
+        pid = tl.program_id(0)
+        # Compute the range of elements that this thread block will work on
+        block_start = pid * BLOCK_SIZE
+        # Range of indices this thread will handle
+        offsets = block_start + tl.arange(0, BLOCK_SIZE)
+        # Load elements from the X and Y tensors
+        x_vals = tl.load(X + offsets)
+        y_vals = tl.load(Y + offsets)
+        # Perform the element-wise multiplication
+        z_vals = x_vals * y_vals * a + b
+        # Store the result in Z
+        tl.store(Z + offsets, z_vals)
+
+else:
+    # Dummy function for Windows
+    def elementwise_scale_mul_kernel(*args, **kwargs):
+        pass
 
 
 @torch.library.custom_op("torchtrt_ex::elementwise_scale_mul", mutates_args=())  # type: ignore[misc]
@@ -62,6 +75,10 @@ if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
     )
 
 
+@unittest.skipIf(
+    platform.system() == "Windows",
+    "Triton is not supported on Windows",
+)
 @unittest.skipIf(
     not torch_tensorrt.ENABLED_FEATURES.qdp_plugin,
     "QDP Plugin is not available",

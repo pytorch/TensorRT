@@ -1,3 +1,11 @@
+/* The pytorch_sphinx_theme2 theme positions .bd-header at top: 45px by default
+   to leave room for the pytorch.org LF top bar. Since we don't use that bar,
+   reset the variables so the navbar sits flush at the top of the page. */
+:root {
+    --header-height: 0px;
+    --header-height-desktop: 0px;
+}
+
 /* sphinx-design styles for cards/tabs
 */
 

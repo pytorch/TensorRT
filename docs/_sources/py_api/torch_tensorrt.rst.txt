@@ -3,11 +3,6 @@
 torch_tensorrt
 ===============
 
-.. automodule torch_tensorrt
-   :undoc-members:
-
-
-
 .. automodule:: torch_tensorrt
    :members:
    :undoc-members:
@@ -16,8 +11,6 @@ torch_tensorrt
 Functions
 ------------
 
-.. autofunction:: set_device
-
 .. autofunction:: compile
 
 .. autofunction:: convert_method_to_trt_engine
@@ -25,10 +18,6 @@ Functions
 .. autofunction:: cross_compile_for_windows
 
 .. autofunction:: load_cross_compiled_exported_program
-
-.. autofunction:: get_build_info
-
-.. autofunction:: dump_build_info
 
 .. autofunction:: save
 
@@ -70,12 +59,9 @@ Enums
 Submodules
 ----------
 
-.. toctree::
-   :maxdepth: 1
-
-   logging
-   ptq
-   ts
-   fx
-   dynamo
-   runtime
+:doc:`torch_tensorrt.logging <logging>` |
+:doc:`torch_tensorrt.dynamo <dynamo>` |
+:doc:`torch_tensorrt.runtime <runtime>` |
+:doc:`torch_tensorrt.ts <ts>` |
+:doc:`torch_tensorrt.ptq <ptq>` |
+:doc:`torch_tensorrt.fx <fx>`

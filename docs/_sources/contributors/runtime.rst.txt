@@ -3,83 +3,145 @@
 Runtime Phase
 ================
 
-The Runtime phase is responsible for constructing self standing TorchScript graphs with embedded TensorRT engines and serving as the runtime
-when these engines are called. The main interface accepts a serialized TensorRT engine. The execution phase
-will deserialize and wrap this engine in a class which maintains a execution context for each engine
-and some metadata about its inputs and outputs and is compatible with the TorchScript interpreter so that
-it can be moved around and used like other TorchScript IValues. The engine is run by providing it and inputs
-to the ``tensorrt::execute_engine`` operator which will take the engine and its inputs and return the results of engine execution.
+The runtime phase wraps the compiled TensorRT engines together with any remaining
+PyTorch subgraphs into a single callable module and provides the execution
+infrastructure for inference.
 
+Dynamo Runtime (Primary Path)
+-------------------------------
 
-Background
-------------
-PyTorch JIT's runtime is based around a stack machine, all operators pop off arguments from the stack, pass them to
-some implementation of the operator then push results back onto the stack. The actual elements of the stack
-are ``torch::jit::IValues``, the same type we evaluate in the conversion phase (the realization of the abstract
-torch::jit::Value type).
+Two runtime backends are available. The backend is selected via the
+``use_python_runtime`` compilation setting.
 
-TensorRT Engine Executor Op
-----------------------------
+C++ Runtime (default)
+^^^^^^^^^^^^^^^^^^^^^^^
 
-When the Torch-TensorRT is loaded, it registers an operator in the PyTorch JIT operator library called
-``trt::execute_engine(Tensor[] inputs, __torch__.torch.classes.tensorrt.Engine engine) -> Tensor[]`` which takes an
-instantiated engine and list of inputs. Compiled graphs store this engine in an attribute so that it is portable and serializable.
-When the op is called, an instnantiated engine and input tensors are popped off the runtime stack. These inputs are passed into a generic engine execution function which
-will run the tensors through the TensorRT engine and return new tensors as results. These tensors are pushed on to the
-stack so that the next op whatever it is can use it.
+The C++ runtime is more performant, fully serializable, and supports advanced features
+like CUDAGraphs and multi-device safety.
 
-Constructing the Resulting Graph
------------------------------------
+TensorRT engines are stored as ``torch.classes.tensorrt.Engine`` — a C++ TorchBind
+class that holds the serialized engine bytes plus metadata:
 
-Once the engine is deserialized and instantiated, the compiler will construct a graph that will execute the engine when the module is called.
-Here is an example:
+* Engine name
+* Refit map (PyTorch parameter name → TensorRT layer index)
+* Function signature (input/output names, dtypes, shapes)
+* Runtime requirements (e.g. whether an output allocator is needed for DDS ops)
+* Target TensorRT version and hardware compatibility flags
 
-.. code-block::
+Inference is triggered via the ``torch.ops.tensorrt.execute_engine`` custom op:
 
-    graph(%self_1 : __torch__.torchvision.models.resnet.___torch_mangle_4847.ResNet_trt,
-      %input_0 : Tensor):
-        %1 : __torch__.torch.classes.tensorrt.Engine = prim::GetAttr[name="__torch___torchvision_models_resnet____torch_mangle_4847_ResNet_trt_engine"](%self_1)
+.. code-block:: text
+
+    tensorrt::execute_engine(
+        Tensor[] input_tensors,
+        __torch__.torch.classes.tensorrt.Engine engine
+    ) -> Tensor[]
+
+This op pops inputs and the engine off the PyTorch dispatcher stack, runs the tensors
+through TensorRT, and pushes output tensors back. The compiled ``torch.fx.Graph``
+stores engine objects as attributes, making the whole module portable.
+
+Python Runtime
+^^^^^^^^^^^^^^^
+
+The Python runtime uses TensorRT's Python API directly for inference. It is useful when
+a C++ build is not available (e.g. in some CI environments) and is simpler to instrument
+for debugging. It does not support serialization to ``ExportedProgram``; the compiled
+graph is Python-only.
+
+Serialization Options
+----------------------
+
+`ExportedProgram <https://docs.pytorch.org/docs/stable/user_guide/torch_compiler/export.html>`_ (``torch.export``)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The default serialization path for the Dynamo AOT workflow. The compiled
+``torch.fx.GraphModule`` is wrapped in a
+`torch.export.ExportedProgram <https://docs.pytorch.org/docs/stable/user_guide/torch_compiler/export.html>`_
+container. TensorRT engines are stored as tensor attributes in the package; PyTrees
+capture input/output structure. Requires the C++ runtime and supports Python execution.
+
+.. code-block:: python
+
+    torch_tensorrt.save(trt_gm, "model.ep", arg_inputs=inputs)
+    # later:
+    trt_gm = torch_tensorrt.load("model.ep")
+
+AOTInductor (``torch._export.aot_compile``)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TensorRT engines can be baked into AOTInductor-generated shared objects alongside
+TorchInductor-compiled kernels. Any PyTorch-backed subgraphs become Inductor-generated
+Triton kernels. The result is deployable without Python — only
+``libtorchtrt_runtime.so`` is needed at runtime.
+
+See ``examples/torchtrt_aoti_example`` for a full example.
+
+Stand-alone TensorRT Engines
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Individual TensorRT engines can also be extracted and run standalone with ``trtexec``
+or any other TensorRT-compatible runtime, entirely outside of PyTorch.
+
+MutableTorchTensorRTModule
+---------------------------
+
+``MutableTorchTensorRTModule`` is a higher-level wrapper for use cases that require
+weight mutability (e.g. LoRA adapters on diffusion models).
+
+It maintains two graphs in parallel: the original PyTorch
+`nn.Module <https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html>`_
+and the compiled TRT graph. User interactions — including weight assignments via
+standard PyTorch APIs or HuggingFace ``diffusers`` — hit the PyTorch graph as normal. The
+module intercepts these and:
+
+* **Weight mutations** (same graph structure, different weights) → triggers a fast
+  refit using the refit map constructed during conversion. No recompilation needed.
+* **Structural mutations** (e.g. a new LoRA adapter changes the graph topology) →
+  triggers a full recompilation, using the engine cache to skip unchanged subgraphs.
+
+This gives the ergonomics of a regular ``nn.Module`` with TensorRT performance, and is
+compatible with HuggingFace ``diffusers`` LoRA workflows without any code changes.
+
+----
+
+TorchScript Runtime (Legacy ``ts`` Path)
+------------------------------------------
+
+.. note::
+
+   The following describes the legacy TorchScript runtime. For new development use
+   the Dynamo path above.
+
+The TorchScript runtime is based around a PyTorch JIT stack machine. All operators pop
+arguments off the stack, execute, and push results back. Stack elements are
+``torch::jit::IValue`` objects.
+
+When Torch-TensorRT is loaded it registers the
+``trt::execute_engine(Tensor[] inputs, Engine engine) -> Tensor[]`` operator in the
+JIT operator library. Compiled TorchScript graphs store the engine as an attribute so
+it is portable and serializable. A typical compiled graph looks like:
+
+.. code-block:: text
+
+    graph(%self_1 : ..., %input_0 : Tensor):
+        %1 : Engine = prim::GetAttr[name="...engine"](%self_1)
         %3 : Tensor[] = prim::ListConstruct(%input_0)
         %4 : Tensor[] = trt::execute_engine(%3, %1)
         %5 : Tensor = prim::ListUnpack(%4)
-    return (%5)
+        return (%5)
 
-You can see the engine attribute in the graph and the ``trt::execute_engine`` op taking a list of input tensors and an engine in
-and produces a list of output tensors which is returned. When ``forward`` is called on the module this graph is executed, thereby
-running the TensorRT engine.
+Serialization uses TorchBind. When a TorchScript module is saved the pickler
+serializes the engine bytes into the zip archive; the unpickler reconstructs the engine
+holder at load time.
 
-In the case of multiple outputs, the compiled graph may repack output tensors into a Tuple to return back to the user.
+ABI Versioning
+^^^^^^^^^^^^^^^
 
-.. code-block::
+Torch-TensorRT TorchScript programs are versioned with an ABI version number that tells
+the runtime about compatibility. The serialized format is a vector of strings encoding:
 
-    graph(%self_1 : __torch__.PyTorch.Detection.SSD.src.model.SSD300_trt,
-      %input_0 : Tensor):
-        %1 : __torch__.torch.classes.tensorrt.Engine = prim::GetAttr[name="__torch___PyTorch_Detection_SSD_src_model_SSD300_trt_engine"](%self_1)
-        %3 : Tensor[] = prim::ListConstruct(%input_0)
-        %4 : Tensor[] = trt::execute_engine(%3, %1)
-        %5 : Tensor, %6 : Tensor = prim::ListUnpack(%4)
-        %7 : (Tensor, Tensor) = prim::TupleConstruct(%5, %6)
-    return (%7)
-
-Serialization and Deserialization
-----------------------------------
-
-Serialization and deserialization of TensorRT engines embedded in TorchScript graphs are handled by the holder class for the engine and TorchBind.
-When a TorchScript module is saved, the pickler will run serilization on the cuda engine and store the serialized engine in the zip file created.
-When deserializing, the depickler will call a constructor for the engine holder class with the serialized engine so that it can be set up again for
-execution.
-
-ABI Versioning and Serialization Format
-=========================================
-
-Torch-TensorRT programs are standard TorchScript with TensorRT engines as objects embedded in the graph. Therefore there is a serialization format
-for the TensorRT engines. The format for Torch-TensorRT serialized programs are versioned with an "ABI" version which tells the runtime about runtime compatibility.
-
-> Current ABI version is 3
-
-The format is a vector of serialized strings. They encode the following information
-
-* ABI Version for the program
-* Name of the TRT engine
-* Device information: Includes the target device the engine was built on, SM capability and other device information. This information is used at deserialization time to select the correct device to run the engine
-* Serialized TensorRT engine
+* ABI version
+* Engine name
+* Device information (SM capability, device type)
+* Serialized TensorRT engine bytes

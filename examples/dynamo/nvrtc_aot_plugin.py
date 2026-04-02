@@ -1,4 +1,6 @@
 """
+.. _nvrtc_aot_plugin:
+
 Using Custom Kernels with NVRTC in TensorRT AOT Plugins
 =======================================================
 

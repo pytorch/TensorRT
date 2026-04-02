@@ -3,7 +3,6 @@ import os
 import unittest
 
 import pytest
-import tensorrt as trt
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
@@ -20,6 +19,8 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.logging import TRT_LOGGER
+
+import tensorrt as trt
 
 assertions = unittest.TestCase()
 
@@ -529,6 +530,10 @@ def test_refit_one_engine_bert_with_weightmap():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
 
@@ -580,6 +585,10 @@ def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
 )
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_with_weightmap():
@@ -772,6 +781,10 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_refit_one_engine_without_weightmap():
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -887,6 +900,10 @@ def test_refit_one_engine_bert_without_weightmap():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
     trt_ep_path = os.path.join(tmpdir, "compiled.ep")
@@ -935,6 +952,10 @@ def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
 )
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_without_weightmap():
@@ -1058,7 +1079,7 @@ def test_refit_multiple_engine_without_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
-def test_refit_cumsum_fallback():
+def test_refit_cumsum():
     class net(nn.Module):
         def __init__(self):
             super().__init__()
@@ -1074,9 +1095,11 @@ def test_refit_cumsum_fallback():
             return x
 
     model = net().eval().to("cuda")
+    model2 = net().eval().to("cuda")
     inputs = [torch.randn((1, 3, 16, 16)).to("cuda")]
     model(*inputs)
     exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
     with torchtrt.logging.debug():
         trt_gm = torchtrt.dynamo.compile(
             exp_program,
@@ -1086,22 +1109,20 @@ def test_refit_cumsum_fallback():
             immutable_weights=False,
         )
 
-    num_pyt_segments = len(
-        [1 for submod in list(trt_gm.named_children()) if "_run_on_gpu" in submod[0]]
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+        use_weight_map_cache=True,
     )
 
-    # Number of pyt segments should be 1 (because of cumsum being non-refitable)
-    assertions.assertTrue(
-        num_pyt_segments == 1,
-        f"test_refit_cumsum_fallback test found {num_pyt_segments} pytorch segments but expected 1",
+    model2.to("cuda")
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
     )
-
-    # Check the output
-    model.to("cuda")
-    pyt_outputs, trt_outputs = exp_program.module()(*inputs), trt_gm(*inputs)
-    for pyt_output, trt_output in zip(pyt_outputs, trt_outputs):
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
         assertions.assertTrue(
-            torch.allclose(pyt_output, trt_output, 1e-2, 1e-2),
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
             "Refit Result is not correct. Refit failed",
         )
         # Clean up model env

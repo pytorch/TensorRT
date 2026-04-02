@@ -264,6 +264,7 @@ TRTEngine::TRTEngine(
 }
 
 TRTEngine::~TRTEngine() {
+  torch::cuda::synchronize(device_info.id);
   trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
@@ -323,6 +324,10 @@ void TRTEngine::set_profile_format(std::string format) {
 std::string TRTEngine::get_engine_layer_info() {
   auto inspector = make_trt(cuda_engine->createEngineInspector());
   return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);
+}
+
+std::string TRTEngine::get_serialized_metadata() {
+  return this->serialized_metadata;
 }
 
 std::vector<at::Tensor> TRTEngine::infer_outputs(std::vector<std::vector<int64_t>> input_shapes) {

@@ -50,7 +50,6 @@ with torch_trt.dynamo.Debugger(
         "remove_detach"
     ],  # fx graph visualization before certain lowering pass
 ):
-
     trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),

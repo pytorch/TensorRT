@@ -26,6 +26,7 @@ def fx_dynamo_testing_backend(
     torch_executed_ops: Sequence[str] = set(),
     use_fast_partitioner: bool = True,
     use_fp32_acc: bool = False,
+    decompose_attention: bool = False,
 ):
     """Helper Dynamo backend exclusively for testing"""
     custom_backend = partial(
@@ -41,6 +42,7 @@ def fx_dynamo_testing_backend(
         torch_executed_ops=torch_executed_ops,
         use_fast_partitioner=use_fast_partitioner,
         use_fp32_acc=use_fp32_acc,
+        decompose_attention=decompose_attention,
     )
 
     fake_mode = detect_fake_mode(sample_inputs)
@@ -56,7 +58,7 @@ def fx_dynamo_testing_backend(
             gm,
             sample_inputs,
             trace_joint=False,
-            decompositions=get_decompositions(),
+            decompositions=get_decompositions(decompose_attention=decompose_attention),
         )
 
         gm = post_lowering(gm, settings)
@@ -163,6 +165,7 @@ def lower_graph_testing(
     testing_partitioning: bool = False,
     use_fast_partitioner: bool = True,
     use_fp32_acc: bool = False,
+    decompose_attention: bool = False,
 ):
     """Helper function to assist with graph lowering for testing of Dynamo compile
 
@@ -176,6 +179,7 @@ def lower_graph_testing(
         testing_partitioning: Whether partitioning is being tested (to analyze only TRT-supported ops)
         use_fast_partitioner: Whether to use the fast or global partitioner
         use_fp32_acc: This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        decompose_attention: Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
     Returns:
         If testing_partitioning:
             List[torch.fx.GraphModule], Set, Set: List of partitioned graph outputs, unexpected ops seen, expected ops unseen
@@ -191,6 +195,7 @@ def lower_graph_testing(
         torch_executed_ops=torch_executed_ops,
         use_fast_partitioner=use_fast_partitioner,
         use_fp32_acc=use_fp32_acc,
+        decompose_attention=decompose_attention,
     )
 
     # Invoke compilation

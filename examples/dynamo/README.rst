@@ -1,5 +1,8 @@
 .. _torch_tensorrt_examples:
 
+Dynamo Examples
+===============
+
 Here we provide examples of Torch-TensorRT compilation of popular computer vision and language models.
 
 Dependencies

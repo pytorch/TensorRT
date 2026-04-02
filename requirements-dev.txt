@@ -1,5 +1,5 @@
 pre-commit>=2.20.0
-black>=22.6.0
+black>=24.0.0
 clang-format==14.0.6
 mypy
 isort

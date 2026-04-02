@@ -16,12 +16,13 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
     CACHE_BUILT_ENGINES,
     CPU_MEMORY_BUDGET,
+    DECOMPOSE_ATTENTION,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
-    DYNAMICALLY_ALLOCATE_RESOURCES,
     DRYRUN,
+    DYNAMICALLY_ALLOCATE_RESOURCES,
     ENABLE_AUTOCAST,
     ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
@@ -118,6 +119,7 @@ class CompilationSettings:
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
+        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -175,8 +177,9 @@ class CompilationSettings:
         AUTOCAST_CALIBRATION_DATALOADER
     )
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
-    cpu_memory_budget: int = CPU_MEMORY_BUDGET
+    cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
+    decompose_attention: bool = DECOMPOSE_ATTENTION
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -216,6 +219,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "autocast_max_output_threshold",
     "autocast_max_depth_of_reduction",
     "autocast_calibration_dataloader",
+    "decompose_attention",
 }
 
 

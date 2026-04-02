@@ -6,7 +6,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
-from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
@@ -16,6 +15,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    ConverterPriority,
     dynamo_tensorrt_converter,
     has_static_shapes_in_args,
 )
@@ -26,6 +26,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+
+from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -568,10 +570,69 @@ def index_nonbool_validator(
     return True
 
 
+def index_has_bool_indices(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Returns True if any index tensor is boolean."""
+    index = node.args[1]
+    for ind in index:
+        if ind is not None:
+            val = ind.meta.get("val")
+            if val is None and ind.op == "get_attr":
+                # fx.symbolic_trace embeds constant tensors as get_attr nodes
+                # without meta["val"]; fetch the actual tensor from the module.
+                try:
+                    attr = ind.graph.owning_module
+                    for part in ind.target.split("."):
+                        attr = getattr(attr, part)
+                    val = attr
+                except AttributeError:
+                    pass
+            if val is not None and val.dtype == torch.bool:
+                return True
+    return False
+
+
+# Integer indexing: output shape is deterministic (depends on index tensor
+# shape, not values), so no output allocator is needed. This is the common
+# case and is checked first via HIGH priority.
 @dynamo_tensorrt_converter(
     torch.ops.aten.index.Tensor,
     capability_validator=lambda node, settings: index_dtype_validator(node, settings)
-    and index_nonbool_validator(node, settings),
+    and not index_has_bool_indices(node, settings),
+    priority=ConverterPriority.HIGH,
+    supports_dynamic_shapes=True,
+    requires_output_allocator=False,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_index(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.index(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+# Boolean indexing: internally uses nonzero() which produces data-dependent
+# output shapes, so an output allocator is required.
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index.Tensor,
+    capability_validator=lambda node, settings: index_dtype_validator(node, settings)
+    and index_nonbool_validator(node, settings)
+    and index_has_bool_indices(node, settings),
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
@@ -580,7 +641,7 @@ def index_nonbool_validator(
         0: (TRTTensor,),
     }
 )
-def aten_ops_index(
+def aten_ops_index_bool(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1088,16 +1149,8 @@ def aten_ops_slice(
     )
 
 
-def refit_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
-    # cumsum op is not refitable
-    if settings and not settings.immutable_weights:
-        return False
-    return True
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.cumsum.default,
-    capability_validator=refit_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
@@ -3799,4 +3852,230 @@ def aten_ops_linear(
         input=args[0],
         weight=args[1],
         bias=args_bounds_check(args, 2, None),
+    )
+
+
+def scaled_dot_product_attention_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if node.kwargs.get("enable_gqa", False):
+        _LOGGER.debug(
+            "enable_gqa is not yet supported by the converter. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+
+    query_shape, key_shape, value_shape = None, None, None
+    if "val" in node.args[0].meta:
+        query_shape = node.args[0].meta["val"].size()
+    if "val" in node.args[1].meta:
+        key_shape = node.args[1].meta["val"].size()
+    if "val" in node.args[2].meta:
+        value_shape = node.args[2].meta["val"].size()
+    if (
+        query_shape != key_shape
+        or query_shape != value_shape
+        or key_shape != value_shape
+    ):
+        _LOGGER.debug(
+            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.scaled_dot_product_attention.default,
+    supports_dynamic_shapes=True,
+    capability_validator=scaled_dot_product_attention_validator,
+)
+def aten_ops_scaled_dot_product_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # scaled_dot_product_attention(Tensor query, Tensor key, Tensor value, Tensor? attn_mask=None, float dropout_p=0.0, bool is_causal=False, *, float? scale=None, bool enable_gqa=False) -> Tensor
+    return impl.attention.scaled_dot_product_attention(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        query=args[0],
+        key=args[1],
+        value=args[2],
+        attn_mask=args_bounds_check(args, 3, None),
+        dropout_p=args_bounds_check(args, 4, 0.0),
+        is_causal=args_bounds_check(args, 5, False),
+        scale=kwargs.get("scale", None),
+        enable_gqa=kwargs.get("enable_gqa", False),
+    )
+
+
+def scaled_dot_product_flash_attention_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if args_bounds_check(node.args, 5, False):
+        _LOGGER.debug("return_debug_mask is not yet supported.")
+        return False
+
+    query_shape, key_shape, value_shape = None, None, None
+    if "val" in node.args[0].meta:
+        query_shape = node.args[0].meta["val"].size()
+    if "val" in node.args[1].meta:
+        key_shape = node.args[1].meta["val"].size()
+    if "val" in node.args[2].meta:
+        value_shape = node.args[2].meta["val"].size()
+    if (
+        query_shape != key_shape
+        or query_shape != value_shape
+        or key_shape != value_shape
+    ):
+        _LOGGER.debug(
+            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._scaled_dot_product_flash_attention.default,
+    supports_dynamic_shapes=True,
+    capability_validator=scaled_dot_product_flash_attention_validator,
+)
+def aten_ops_scaled_dot_product_flash_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # _scaled_dot_product_flash_attention(Tensor query, Tensor key, Tensor value, float dropout_p=0.0, bool is_causal=False, bool return_debug_mask=False, *, float? scale=None) -> (Tensor output, Tensor logsumexp, Tensor cum_seq_q, Tensor cum_seq_k, SymInt max_q, SymInt max_k, Tensor rng_state, Tensor unused, Tensor debug_attn_mask)
+    return impl.attention.scaled_dot_product_flash_attention(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        query=args[0],
+        key=args[1],
+        value=args[2],
+        dropout_p=args_bounds_check(args, 3, 0.0),
+        is_causal=args_bounds_check(args, 4, False),
+        return_debug_mask=args_bounds_check(args, 5, False),
+        scale=kwargs.get("scale", None),
+    )
+
+
+def scaled_dot_product_efficient_attention_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if args_bounds_check(node.args, 4, False):
+        _LOGGER.debug("compute_log_sumexp is not yet supported.")
+        return False
+
+    query_shape, key_shape, value_shape = None, None, None
+    if "val" in node.args[0].meta:
+        query_shape = node.args[0].meta["val"].size()
+    if "val" in node.args[1].meta:
+        key_shape = node.args[1].meta["val"].size()
+    if "val" in node.args[2].meta:
+        value_shape = node.args[2].meta["val"].size()
+    if (
+        query_shape != key_shape
+        or query_shape != value_shape
+        or key_shape != value_shape
+    ):
+        _LOGGER.debug(
+            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._scaled_dot_product_efficient_attention.default,
+    supports_dynamic_shapes=True,
+    capability_validator=scaled_dot_product_efficient_attention_validator,
+)
+def aten_ops_scaled_dot_product_efficient_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # _scaled_dot_product_efficient_attention(Tensor query, Tensor key, Tensor value, Tensor? attn_bias, bool compute_log_sumexp, float dropout_p=0.0, bool is_causal=False, *, float? scale=None) -> (Tensor output, Tensor log_sumexp, Tensor philox_seed, Tensor philox_offset)
+    return impl.attention.scaled_dot_product_efficient_attention(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        query=args[0],
+        key=args[1],
+        value=args[2],
+        attn_bias=args_bounds_check(args, 3, None),
+        compute_log_sumexp=args_bounds_check(args, 4, False),
+        dropout_p=args_bounds_check(args, 5, 0.0),
+        is_causal=args_bounds_check(args, 6, False),
+        scale=kwargs.get("scale", None),
+    )
+
+
+def scaled_dot_product_cudnn_attention_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if args_bounds_check(node.args, 4, False):
+        _LOGGER.debug("compute_log_sumexp is not yet supported.")
+        return False
+
+    if args_bounds_check(node.args, 7, False):
+        _LOGGER.debug("return_debug_mask is not yet supported.")
+        return False
+
+    query_shape, key_shape, value_shape = None, None, None
+    if "val" in node.args[0].meta:
+        query_shape = node.args[0].meta["val"].size()
+    if "val" in node.args[1].meta:
+        key_shape = node.args[1].meta["val"].size()
+    if "val" in node.args[2].meta:
+        value_shape = node.args[2].meta["val"].size()
+    if (
+        query_shape != key_shape
+        or query_shape != value_shape
+        or key_shape != value_shape
+    ):
+        _LOGGER.debug(
+            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._scaled_dot_product_cudnn_attention.default,
+    supports_dynamic_shapes=True,
+    capability_validator=scaled_dot_product_cudnn_attention_validator,
+)
+def aten_ops_scaled_dot_product_cudnn_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # _scaled_dot_product_cudnn_attention(Tensor query, Tensor key, Tensor value, Tensor? attn_bias, bool compute_log_sumexp, float dropout_p=0.0, bool is_causal=False, bool return_debug_mask=False, *, float? scale=None) -> (Tensor output, Tensor logsumexp, Tensor cum_seq_q, Tensor cum_seq_k, SymInt max_q, SymInt max_k, Tensor philox_seed, Tensor philox_offset, Tensor debug_attn_mask)
+    return impl.attention.scaled_dot_product_cudnn_attention(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        query=args[0],
+        key=args[1],
+        value=args[2],
+        attn_bias=args_bounds_check(args, 3, None),
+        compute_log_sumexp=args_bounds_check(args, 4, False),
+        dropout_p=args_bounds_check(args, 5, 0.0),
+        is_causal=args_bounds_check(args, 6, False),
+        return_debug_mask=args_bounds_check(args, 7, False),
+        scale=kwargs.get("scale", None),
     )

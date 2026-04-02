@@ -4,9 +4,11 @@ import operator
 from typing import Any, Dict, Optional, Sequence, Tuple, cast
 
 import torch
+from torch._export.non_strict_utils import make_constraints
 from torch._guards import detect_fake_mode
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export import ExportedProgram, ExportGraphSignature
+from torch.export._trace import _combine_args
 from torch.export.exported_program import (
     CustomObjArgument,
     InputKind,
@@ -22,7 +24,12 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_
 
 def export(
     gm: torch.fx.GraphModule,
+    *,
+    arg_inputs: Optional[Sequence[torch.Tensor]] = None,
+    kwarg_inputs: Optional[Dict[str, Any]] = None,
+    dynamic_shapes: Optional[Dict[str, Any]] = None,
     cross_compile_module: Optional[bool] = False,
+    use_legacy_exporter: Optional[bool] = False,
 ) -> ExportedProgram:
     """Export the result of TensorRT compilation into the desired output format.
 
@@ -32,8 +39,25 @@ def export(
         cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not
     """
     patched_module = transform(gm, cross_compile_module)
-    exp_program = create_trt_exp_program(patched_module)
-    return exp_program
+    if not use_legacy_exporter:
+        args = ()
+        if arg_inputs is not None:
+            args = arg_inputs if isinstance(arg_inputs, tuple) else tuple(arg_inputs)
+
+        return torch.export.export(
+            patched_module,
+            args=args,
+            kwargs=kwarg_inputs,
+            dynamic_shapes=dynamic_shapes,
+        )
+    else:
+        exp_program = create_trt_exp_program(
+            patched_module,
+            arg_inputs=arg_inputs,
+            kwarg_inputs=kwarg_inputs,
+            dynamic_shapes=dynamic_shapes,
+        )
+        return exp_program
 
 
 def transform(
@@ -144,7 +168,6 @@ def lift(
                 const_placeholder_node = gm.graph.placeholder(const_placeholder_name)
                 # Copy the node meta into this new placeholder node
                 const_placeholder_node.meta = node.meta
-
                 if isinstance(lift_val, torch.Tensor):
                     const_placeholder_node.meta["val"] = cast(
                         FakeTensor,
@@ -270,7 +293,26 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                         gm.graph.erase_node(gm_added_placeholder_inputs[idx])
 
                 # Replace the pytorch submodule node (call_module) with the inlined subgraph output
-                gm_node.replace_all_uses_with(submodule_output)
+                # Special handling when submodule returns multiple outputs (tuple)
+                if isinstance(submodule_output, tuple):
+                    # The fallback module has multiple outputs
+                    # Find getitem nodes that extract from this module call and replace them directly
+                    getitem_users = [
+                        user
+                        for user in list(gm_node.users.keys())
+                        if user.op == "call_function"
+                        and user.target is operator.getitem
+                    ]
+                    for user in getitem_users:
+                        # getitem extracts element idx from the tuple
+                        _, idx = user.args
+                        # Replace this getitem with the actual node from the tuple
+                        user.replace_all_uses_with(submodule_output[idx])
+                        # Erase the getitem node since it's no longer needed
+                        gm.graph.erase_node(user)
+                else:
+                    # Single output - normal replacement
+                    gm_node.replace_all_uses_with(submodule_output)
 
                 # copy the attributes of the submodule into gm (graph_copy doesn't do this)
                 copy_submodule_attributes(gm, submodule, gm_node.name)
@@ -303,6 +345,10 @@ def copy_submodule_attributes(
 
 def create_trt_exp_program(
     gm: torch.fx.GraphModule,
+    *,
+    arg_inputs: Optional[Sequence[torch.Tensor]] = None,
+    kwarg_inputs: Optional[Dict[str, torch.Tensor]] = None,
+    dynamic_shapes: Optional[Dict[str, Tuple[int, ...]]] = None,
 ) -> ExportedProgram:
     """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
     and constructs an Exported Program object with the new IO node names and state_dict
@@ -338,6 +384,65 @@ def create_trt_exp_program(
         )
     ]
 
+    # Compute range_constraints from the placeholder SymInt shapes before lift(),
+    # while the graph still has only user-input placeholders (num_lifted=0).
+    #
+    # Two paths:
+    #   1. dynamic_shapes + example inputs available: delegate to make_constraints()
+    #      from torch._export, which maps Dim(min, max) specs onto the SymInt
+    #      expressions from the fake tensors.  make_constraints() requires
+    #      gm.meta["inline_constraints"] to be a dict; TRT graph modules don't
+    #      set it so we default it to {} if absent.
+    #   2. No dynamic_shapes (or no example inputs): harvest every SymInt free
+    #      symbol from placeholder meta["val"] shapes and look up its bound
+    #      directly in the shape_env.  This is the retrace=False path where the
+    #      caller didn't supply inputs.
+    fake_mode = detect_fake_mode(
+        tuple(
+            node.meta["val"]
+            for node in gm.graph.nodes
+            if node.op == "placeholder" and "val" in node.meta
+        )
+    )
+    range_constraints: Dict[Any, Any] = {}
+    if fake_mode is not None and fake_mode.shape_env is not None:
+        has_inputs = (arg_inputs is not None and len(arg_inputs) > 0) or bool(
+            kwarg_inputs
+        )
+        if dynamic_shapes is not None and has_inputs:
+            # Path 1: use make_constraints to honor user-specified Dim bounds.
+            if "inline_constraints" not in gm.meta:
+                gm.meta["inline_constraints"] = {}
+            combined_args = _combine_args(
+                gm,
+                tuple(arg_inputs) if arg_inputs is not None else (),
+                kwarg_inputs or {},
+            )
+            range_constraints = make_constraints(
+                fake_mode,
+                gm,
+                combined_args,
+                dynamic_shapes,
+                num_lifted_inputs=0,
+            )
+        else:
+            # Path 2: harvest bounds from shape_env for any SymInt dims present.
+            shape_env = fake_mode.shape_env
+            for node in gm.graph.nodes:
+                if node.op != "placeholder" or "val" not in node.meta:
+                    continue
+                val = node.meta["val"]
+                if not isinstance(val, torch.Tensor):
+                    continue
+                for d in val.shape:
+                    if isinstance(d, torch.SymInt):
+                        for sym in d.node.expr.free_symbols:
+                            if (
+                                sym not in range_constraints
+                                and sym in shape_env.var_to_range
+                            ):
+                                range_constraints[sym] = shape_env.var_to_range[sym]
+
     # Lift parameters/buffers/constants in the graph
     # torch.export serialization expects them to be lifted
     gm, trt_graph_signature, state_dict, constants = lift(gm, trt_graph_signature)
@@ -347,7 +452,7 @@ def create_trt_exp_program(
         graph=gm.graph,
         graph_signature=trt_graph_signature,
         state_dict=state_dict,
-        range_constraints={},
+        range_constraints=range_constraints,
         module_call_graph=module_call_graph,
         constants=constants,
     )
@@ -392,6 +497,8 @@ def inline_trt_modules(
             else:
                 # for the normal workflow: use the execute_engine node
                 engine_name = f"{name}_engine"
+                # TODO: THROWS SOME WARNING ABOUT A LACK OF UNDERLYING REFERENCE TO THE OWNING GRAPH MODULE
+                # SAYS THERES 3 OPTIONS, SUBMODULE, PARAMETER, OR BUFFER, BUFFER SEEMS THE BEST BUT I THINK ITS KEYED TO TENSORS
                 setattr(gm, engine_name, trt_module.engine)
                 engine_node = gm.graph.get_attr(engine_name)
 

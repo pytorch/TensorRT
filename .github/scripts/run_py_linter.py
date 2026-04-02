@@ -17,7 +17,7 @@ pr = repo.get_pull(pr_number)
 commit = repo.get_commit(pr.base.sha)
 
 check_output = subprocess.run(
-    ["python3", "-m", "black", "--check", "."],
+    ["black", "--check", "."],
     stdout=subprocess.PIPE,
 )
 
@@ -25,7 +25,7 @@ comment = """Code conforms to Python style guidelines"""
 approval = "APPROVE"
 if check_output.returncode != 0:
     diff_output = subprocess.run(
-        ["python3", "-m", "black", "--diff", "--no-color", "."],
+        ["black", "--diff", "--no-color", "."],
         stdout=subprocess.PIPE,
     )
     out_text = diff_output.stdout.decode("utf-8")

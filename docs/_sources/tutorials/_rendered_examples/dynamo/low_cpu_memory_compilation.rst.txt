@@ -36,7 +36,7 @@ Key notes:
 - Performance impact varies by model. When the number of TensorRT engines
   created is small, the impact is typically minimal.
 
-.. GENERATED FROM PYTHON SOURCE LINES 22-131
+.. GENERATED FROM PYTHON SOURCE LINES 22-130
 
 .. code-block:: python
 
@@ -94,7 +94,6 @@ Key notes:
         logging_dir="/home/profile/logging/moe",
         engine_builder_monitor=False,
     ):
-
         exp_program = torch.export.export(model, tuple(inputs))
         trt_gm = torchtrt.dynamo.compile(
             exp_program,

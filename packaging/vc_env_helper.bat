@@ -23,18 +23,10 @@ if "%VSDEVCMD_ARGS%" == "" (
 
 set DISTUTILS_USE_SDK=1
 
-set args=%1
-shift
-:start
-if [%1] == [] goto done
-set args=%args% %1
-shift
-goto start
-
-:done
-if "%args%" == "" (
+if "%1"=="" (
     echo Usage: vc_env_helper.bat [command] [args]
     echo e.g. vc_env_helper.bat cl /c test.cpp
+    exit /b 1
 )
 
-%args% || exit /b 1
+%* || exit /b 1

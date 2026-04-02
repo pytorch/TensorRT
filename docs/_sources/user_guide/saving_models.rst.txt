@@ -42,6 +42,98 @@ Here's an example usage
     model = torch.export.load("trt.ep").module()
     model(*inputs)
 
+
+Saving Models with Dynamic Shapes
+""""""""""""""""""""""""""""""""""
+
+When saving models compiled with dynamic shapes, you have two methods to preserve
+the dynamic shape specifications:
+
+**Method 1: Using torch.export.Dim (explicit)**
+
+Provide explicit ``dynamic_shapes`` parameter following torch.export's pattern:
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+
+    model = MyModel().eval().cuda()
+    example_input = torch.randn((2, 3, 224, 224)).cuda()
+
+    # Define dynamic batch dimension
+    dyn_batch = torch.export.Dim("batch", min=1, max=32)
+    dynamic_shapes = {"x": {0: dyn_batch}}
+
+    # Export with dynamic shapes
+    exp_program = torch.export.export(
+        model, (example_input,),
+        dynamic_shapes=dynamic_shapes,
+        strict=False
+    )
+
+    # Compile with dynamic input specifications
+    trt_gm = torch_tensorrt.dynamo.compile(
+        exp_program,
+        inputs=[torch_tensorrt.Input(
+            min_shape=(1, 3, 224, 224),
+            opt_shape=(8, 3, 224, 224),
+            max_shape=(32, 3, 224, 224),
+        )]
+    )
+
+    # Save with dynamic_shapes to preserve dynamic behavior
+    torch_tensorrt.save(
+        trt_gm,
+        "trt_dynamic.ep",
+        arg_inputs=[example_input],
+        dynamic_shapes=dynamic_shapes  # Same as used during export
+    )
+
+    # Load and use with different batch sizes
+    loaded_model = torch_tensorrt.load("trt_dynamic.ep").module()
+    output_bs4 = loaded_model(torch.randn(4, 3, 224, 224).cuda())
+    output_bs16 = loaded_model(torch.randn(16, 3, 224, 224).cuda())
+
+**Method 2: Using torch_tensorrt.Input**
+
+Pass ``torch_tensorrt.Input`` objects with min/opt/max shapes directly, and the
+dynamic shapes will be inferred automatically:
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+
+    model = MyModel().eval().cuda()
+
+    # Define Input with dynamic shapes
+    inputs = [
+        torch_tensorrt.Input(
+            min_shape=(1, 3, 224, 224),
+            opt_shape=(8, 3, 224, 224),
+            max_shape=(32, 3, 224, 224),
+            dtype=torch.float32,
+            name="x"  # Optional: provides better dimension naming
+        )
+    ]
+
+    # Compile with Torch-TensorRT
+    trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
+
+    # Save with Input objects - dynamic_shapes inferred automatically!
+    torch_tensorrt.save(
+        trt_gm,
+        "trt_dynamic.ep",
+        arg_inputs=inputs  # Dynamic shapes inferred from Input objects
+    )
+
+    # Load and use with different batch sizes
+    loaded_model = torch_tensorrt.load("trt_dynamic.ep").module()
+    output_bs4 = loaded_model(torch.randn(4, 3, 224, 224).cuda())
+    output_bs16 = loaded_model(torch.randn(16, 3, 224, 224).cuda())
+
+
 b) Torchscript
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

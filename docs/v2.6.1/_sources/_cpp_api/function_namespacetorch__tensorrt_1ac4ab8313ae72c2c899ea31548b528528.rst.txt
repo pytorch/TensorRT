@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1ac4ab8313ae72c2c899ea31548b528528:
+
+Function torch_tensorrt::get_build_info
+=======================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::get_build_info()
+   :project: Torch-TensorRT

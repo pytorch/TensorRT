@@ -5,9 +5,6 @@ torch_tensorrt.dynamo
 
 .. currentmodule:: torch_tensorrt.dynamo
 
-.. automodule torch_tensorrt.ts
-   :undoc-members:
-
 .. automodule:: torch_tensorrt.dynamo
    :members:
    :undoc-members:

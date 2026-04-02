@@ -48,6 +48,7 @@ optimized_model = torch_tensorrt.compile(
     model,
     ir="torch_compile",
     inputs=inputs,
+    use_explicit_typing=False,
     enabled_precisions=enabled_precisions,
     workspace_size=workspace_size,
     min_block_size=min_block_size,
@@ -86,6 +87,7 @@ optimized_model = torch_tensorrt.compile(
     model,
     ir="torch_compile",
     inputs=inputs_bs8,
+    use_explicit_typing=False,
     enabled_precisions=enabled_precisions,
     workspace_size=workspace_size,
     min_block_size=min_block_size,
@@ -111,6 +113,7 @@ compile_spec = {
             dtype=torch.half,
         )
     ],
+    "use_explicit_typing": False,
     "enabled_precisions": enabled_precisions,
     "ir": "dynamo",
 }

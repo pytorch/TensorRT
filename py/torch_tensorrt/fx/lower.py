@@ -137,7 +137,6 @@ class LowerTrtInterpreter:
             max_workspace_size=self.lower_setting.max_workspace_size,
             lower_precision=self.lower_setting.lower_precision,
             strict_type_constraints=self.lower_setting.strict_type_constraints,
-            algorithm_selector=algo_selector,
             timing_cache=cache_data,
             profiling_verbosity=(
                 trt.ProfilingVerbosity.DETAILED

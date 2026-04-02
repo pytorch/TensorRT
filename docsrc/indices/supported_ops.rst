@@ -5,281 +5,234 @@
 Operators Supported
 =================================
 
+.. note::
 
-Operators Currently Supported Through Converters
--------------------------------------------------
+   This page reflects operator coverage for the **Dynamo** (``torch_tensorrt.dynamo``) frontend.
+   Operators marked *Converted* have a native Dynamo converter.
+   Operators marked *Lowered* are handled via ATen decompositions before reaching TensorRT.
 
-- aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled, bool allow_tf32) -> (Tensor)
-- aten::_convolution.deprecated(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled) -> (Tensor)
-- aten::abs(Tensor self) -> (Tensor)
-- aten::acos(Tensor self) -> (Tensor)
-- aten::acosh(Tensor self) -> (Tensor)
-- aten::adaptive_avg_pool1d(Tensor self, int[1] output_size) -> (Tensor)
-- aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -> (Tensor)
-- aten::adaptive_avg_pool3d(Tensor self, int[3] output_size) -> (Tensor)
-- aten::adaptive_max_pool1d(Tensor self, int[2] output_size) -> (Tensor, Tensor)
-- aten::adaptive_max_pool2d(Tensor self, int[2] output_size) -> (Tensor, Tensor)
-- aten::adaptive_max_pool3d(Tensor self, int[3] output_size) -> (Tensor, Tensor)
-- aten::add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)
-- aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> (Tensor)
-- aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> (Tensor(a!))
-- aten::argmax(Tensor self, int dim, bool keepdim=False) -> (Tensor)
-- aten::argmin(Tensor self, int dim, bool keepdim=False) -> (Tensor)
-- aten::asin(Tensor self) -> (Tensor)
-- aten::asinh(Tensor self) -> (Tensor)
-- aten::atan(Tensor self) -> (Tensor)
-- aten::atanh(Tensor self) -> (Tensor)
-- aten::avg_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=[0], bool ceil_mode=False, bool count_include_pad=True) -> (Tensor)
-- aten::avg_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=[0, 0], bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -> (Tensor)
-- aten::avg_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=[], bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -> (Tensor)
-- aten::batch_norm(Tensor input, Tensor? gamma, Tensor? beta, Tensor? mean, Tensor? var, bool training, float momentum, float eps, bool cudnn_enabled) -> (Tensor)
-- aten::bitwise_not(Tensor self) -> (Tensor)
-- aten::bmm(Tensor self, Tensor mat2) -> (Tensor)
-- aten::cat(Tensor[] tensors, int dim=0) -> (Tensor)
-- aten::ceil(Tensor self) -> (Tensor)
-- aten::clamp(Tensor self, Scalar? min=None, Scalar? max=None) -> (Tensor)
-- aten::clamp_max(Tensor self, Scalar max) -> (Tensor)
-- aten::clamp_min(Tensor self, Scalar min) -> (Tensor)
-- aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> (Tensor)
-- aten::cos(Tensor self) -> (Tensor)
-- aten::cosh(Tensor self) -> (Tensor)
-- aten::cumsum(Tensor self, int dim, *, int? dtype=None) -> (Tensor)
-- aten::div.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::div.Tensor(Tensor self, Tensor other) -> (Tensor)
-- aten::div.Tensor_mode(Tensor self, Tensor other, *, str? rounding_mode) -> (Tensor)
-- aten::div_.Scalar(Tensor(a!) self, Scalar other) -> (Tensor(a!))
-- aten::div_.Tensor(Tensor(a!) self, Tensor other) -> (Tensor(a!))
-- aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> (Tensor)
-- aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> (Tensor)
-- aten::eq.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::eq.Tensor(Tensor self, Tensor other) -> (Tensor)
-- aten::erf(Tensor self) -> (Tensor)
-- aten::exp(Tensor self) -> (Tensor)
-- aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) -> (Tensor(a))
-- aten::expand_as(Tensor(a) self, Tensor other) -> (Tensor(a))
-- aten::fake_quantize_per_channel_affine(Tensor self, Tensor scale, Tensor zero_point, int axis, int quant_min, int quant_max) -> (Tensor)
-- aten::fake_quantize_per_tensor_affine(Tensor self, float scale, int zero_point, int quant_min, int quant_max) -> (Tensor)
-- aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -> (Tensor)
-- aten::floor(Tensor self) -> (Tensor)
-- aten::floor_divide(Tensor self, Tensor other) -> (Tensor)
-- aten::floor_divide.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::ge.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::ge.Tensor(Tensor self, Tensor other) -> (Tensor)
-- aten::gru_cell(Tensor input, Tensor hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -> (Tensor)
-- aten::gt.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::gt.Tensor(Tensor self, Tensor other) -> (Tensor)
-- aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> (Tensor)
-- aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -> (Tensor(a!))
-- aten::index.Tensor(Tensor self, Tensor?[] indices) -> (Tensor)
-- aten::instance_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool use_input_stats, float momentum, float eps, bool cudnn_enabled) -> (Tensor)
-- aten::layer_norm(Tensor input, int[] normalized_shape, Tensor? gamma, Tensor? beta, float eps, bool cudnn_enabled) -> (Tensor)
-- aten::le.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::le.Tensor(Tensor self, Tensor other) -> (Tensor)
-- aten::leaky_relu(Tensor self, Scalar negative_slope=0.01) -> (Tensor)
-- aten::leaky_relu_(Tensor(a!) self, Scalar negative_slope=0.01) -> (Tensor(a!))
-- aten::linear(Tensor input, Tensor weight, Tensor? bias=None) -> (Tensor)
-- aten::log(Tensor self) -> (Tensor)
-- aten::lstm_cell(Tensor input, Tensor[] hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -> (Tensor, Tensor)
-- aten::lt.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::lt.Tensor(Tensor self, Tensor other) -> (Tensor)
-- aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)
-- aten::matmul(Tensor self, Tensor other) -> (Tensor)
-- aten::max(Tensor self) -> (Tensor)
-- aten::max.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
-- aten::max.other(Tensor self, Tensor other) -> (Tensor)
-- aten::max_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=[], int[1] dilation=[], bool ceil_mode=False) -> (Tensor)
-- aten::max_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=[0, 0], int[2] dilation=[1, 1], bool ceil_mode=False) -> (Tensor)
-- aten::max_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=[], int[3] dilation=[], bool ceil_mode=False) -> (Tensor)
-- aten::mean(Tensor self, *, int? dtype=None) -> (Tensor)
-- aten::mean.dim(Tensor self, int[] dim, bool keepdim=False, *, int? dtype=None) -> (Tensor)
-- aten::min(Tensor self) -> (Tensor)
-- aten::min.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
-- aten::min.other(Tensor self, Tensor other) -> (Tensor)
-- aten::mul.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::mul.Tensor(Tensor self, Tensor other) -> (Tensor)
-- aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> (Tensor(a!))
-- aten::narrow(Tensor(a) self, int dim, int start, int length) -> (Tensor(a))
-- aten::narrow.Tensor(Tensor(a) self, int dim, Tensor start, int length) -> (Tensor(a))
-- aten::ne.Scalar(Tensor self, Scalar other) -> (Tensor)
-- aten::ne.Tensor(Tensor self, Tensor other) -> (Tensor)
-- aten::neg(Tensor self) -> (Tensor)
-- aten::norm.ScalarOpt_dim(Tensor self, Scalar? p, int[1] dim, bool keepdim=False) -> (Tensor)
-- aten::permute(Tensor(a) self, int[] dims) -> (Tensor(a))
-- aten::pixel_shuffle(Tensor self, int upscale_factor) -> (Tensor)
-- aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> (Tensor)
-- aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> (Tensor)
-- aten::prelu(Tensor self, Tensor weight) -> (Tensor)
-- aten::prod(Tensor self, *, int? dtype=None) -> (Tensor)
-- aten::prod.dim_int(Tensor self, int dim, bool keepdim=False, *, int? dtype=None) -> (Tensor)
-- aten::reciprocal(Tensor self) -> (Tensor)
-- aten::reflection_pad1d(Tensor self, int[2] padding) -> (Tensor)
-- aten::reflection_pad2d(Tensor self, int[4] padding) -> (Tensor)
-- aten::relu(Tensor input) -> (Tensor)
-- aten::relu_(Tensor(a!) self) -> (Tensor(a!))
-- aten::repeat(Tensor self, int[] repeats) -> (Tensor)
-- aten::repeat_interleave.self_int(Tensor self, int repeats, int? dim=None, *, int? output_size=None) -> (Tensor)
-- aten::replication_pad1d(Tensor self, int[2] padding) -> (Tensor)
-- aten::replication_pad2d(Tensor self, int[4] padding) -> (Tensor)
-- aten::replication_pad3d(Tensor self, int[6] padding) -> (Tensor)
-- aten::reshape(Tensor self, int[] shape) -> (Tensor)
-- aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> (Tensor)
-- aten::rsub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)
-- aten::rsub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> (Tensor)
-- aten::scatter.src(Tensor self, int dim, Tensor index, Tensor src) -> (Tensor)
-- aten::scatter.value(Tensor self, int dim, Tensor index, Scalar value) -> (Tensor)
-- aten::select.int(Tensor(a) self, int dim, int index) -> (Tensor(a))
-- aten::sigmoid(Tensor input) -> (Tensor)
-- aten::sigmoid_(Tensor(a!) self) -> (Tensor(a!))
-- aten::sin(Tensor self) -> (Tensor)
-- aten::sinh(Tensor self) -> (Tensor)
-- aten::slice.Tensor(Tensor(a) self, int dim=0, int? start=None, int? end=None, int step=1) -> (Tensor(a))
-- aten::softmax.int(Tensor self, int dim, int? dtype=None) -> (Tensor)
-- aten::split(Tensor self, int[] split_sizes, int dim=0) -> (Tensor[])
-- aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -> (Tensor[])
-- aten::split.sizes(Tensor(a -> *) self, int[] split_size, int dim=0) -> (Tensor[])
-- aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -> (Tensor[])
-- aten::sqrt(Tensor self) -> (Tensor)
-- aten::square(Tensor self) -> (Tensor)
-- aten::squeeze.dim(Tensor(a) self, int dim) -> (Tensor(a))
-- aten::stack(Tensor[] tensors, int dim=0) -> (Tensor)
-- aten::sub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)
-- aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> (Tensor)
-- aten::sub_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> (Tensor(a!))
-- aten::sum(Tensor self, *, int? dtype=None) -> (Tensor)
-- aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False, *, int? dtype=None) -> (Tensor)
-- aten::t(Tensor self) -> (Tensor)
-- aten::tan(Tensor self) -> (Tensor)
-- aten::tanh(Tensor input) -> (Tensor)
-- aten::tanh_(Tensor(a!) self) -> (Tensor(a!))
-- aten::to.device(Tensor(a) self, Device device, int dtype, bool non_blocking=False, bool copy=False, int? memory_format=None) -> (Tensor(a))
-- aten::to.dtype(Tensor self, int dtype, bool non_blocking=False, bool copy=False, int? memory_format=None) -> (Tensor)
-- aten::to.other(Tensor self, Tensor other, bool non_blocking=False, bool copy=False, int? memory_format=None) -> (Tensor)
-- aten::to.prim_Device(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -> (Tensor(a|b))
-- aten::topk(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True) -> (Tensor values, Tensor indices)
-- aten::transpose.int(Tensor(a) self, int dim0, int dim1) -> (Tensor(a))
-- aten::unbind.int(Tensor(a -> *) self, int dim=0) -> (Tensor[])
-- aten::unsqueeze(Tensor(a) self, int dim) -> (Tensor(a))
-- aten::upsample_bilinear2d(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None) -> (Tensor)
-- aten::upsample_bilinear2d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -> (Tensor)
-- aten::upsample_linear1d(Tensor self, int[1] output_size, bool align_corners, float? scales=None) -> (Tensor)
-- aten::upsample_linear1d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -> (Tensor)
-- aten::upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> (Tensor)
-- aten::upsample_nearest1d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -> (Tensor)
-- aten::upsample_nearest2d(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None) -> (Tensor)
-- aten::upsample_nearest2d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -> (Tensor)
-- aten::upsample_nearest3d(Tensor self, int[3] output_size, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> (Tensor)
-- aten::upsample_nearest3d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -> (Tensor)
-- aten::upsample_trilinear3d(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> (Tensor)
-- aten::upsample_trilinear3d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -> (Tensor)
-- aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
-- trt::const(Tensor self) -> (Tensor)
+ATen Core Ops — Converted
+-------------------------
 
-Operators Currently Supported Through Evaluators
--------------------------------------------------
+*156 operators with native Dynamo converters.*
 
-- aten::Bool.float(float b) -> (bool)
-- aten::Bool.int(int a) -> (bool)
-- aten::Float.Scalar(Scalar a) -> float
-- aten::Float.bool(bool a) -> float
-- aten::Float.int(int a) -> float
-- aten::Int.Scalar(Scalar a) -> int
-- aten::Int.bool(bool a) -> int
-- aten::Int.float(float a) -> int
-- aten::Int.int(int a) -> int
-- aten::__and__(int a, int b) -> (bool)
-- aten::__and__.bool(bool a, bool b) -> (bool)
-- aten::__derive_index(int idx, int start, int step) -> int
-- aten::__getitem__.t(t[](a) list, int idx) -> (t(*))
-- aten::__is__(t1 self, t2 obj) -> bool
-- aten::__isnot__(t1 self, t2 obj) -> bool
-- aten::__not__(bool self) -> bool
-- aten::__or__(int a, int b) -> (bool)
-- aten::__range_length(int lo, int hi, int step) -> int
-- aten::__round_to_zero_floordiv(int a, int b) -> (int)
-- aten::__xor__(int a, int b) -> (bool)
-- aten::add.float(float a, float b) -> (float)
-- aten::add.int(int a, int b) -> (int)
-- aten::add.str(str a, str b) -> (str)
-- aten::add_.t(t[](a!) self, t[] b) -> (t[])
-- aten::append.t(t[](a!) self, t(c -> *) el) -> (t[](a!))
-- aten::arange(Scalar end, *, int? dtype=None, int? layout=None,
-                            Device? device=None, bool? pin_memory=None) -> (Tensor)
-- aten::arange.start(Scalar start, Scalar end, *, ScalarType? dtype=None,
-                            Layout? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor)
-- aten::arange.start_step(Scalar start, Scalar end, Scalar step, *, ScalarType? dtype=None,
-                        Layout? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor)
-- aten::clone(Tensor self, *, int? memory_format=None) -> (Tensor)
-- aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> (Tensor(a!))
-- aten::dim(Tensor self) -> int
-- aten::div.float(float a, float b) -> (float)
-- aten::div.int(int a, int b) -> (float)
-- aten::eq.bool(bool a, bool b) -> (bool)
-- aten::eq.float(float a, float b) -> (bool)
-- aten::eq.float_int(float a, int b) -> (bool)
-- aten::eq.int(int a, int b) -> (bool)
-- aten::eq.int_float(int a, float b) -> (bool)
-- aten::eq.str(str a, str b) -> (bool)
-- aten::extend.t(t[](a!) self, t[] other) -> ()
-- aten::floor.float(float a) -> (int)
-- aten::floor.int(int a) -> (int)
-- aten::floordiv.float(float a, float b) -> (int)
-- aten::floordiv.int(int a, int b) -> (int)
-- aten::format(str self, ...) -> (str)
-- aten::ge.bool(bool a, bool b) -> (bool)
-- aten::ge.float(float a, float b) -> (bool)
-- aten::ge.float_int(float a, int b) -> (bool)
-- aten::ge.int(int a, int b) -> (bool)
-- aten::ge.int_float(int a, float b) -> (bool)
-- aten::gt.bool(bool a, bool b) -> (bool)
-- aten::gt.float(float a, float b) -> (bool)
-- aten::gt.float_int(float a, int b) -> (bool)
-- aten::gt.int(int a, int b) -> (bool)
-- aten::gt.int_float(int a, float b) -> (bool)
-- aten::is_floating_point(Tensor self) -> (bool)
-- aten::le.bool(bool a, bool b) -> (bool)
-- aten::le.float(float a, float b) -> (bool)
-- aten::le.float_int(float a, int b) -> (bool)
-- aten::le.int(int a, int b) -> (bool)
-- aten::le.int_float(int a, float b) -> (bool)
-- aten::len.t(t[] a) -> (int)
-- aten::lt.bool(bool a, bool b) -> (bool)
-- aten::lt.float(float a, float b) -> (bool)
-- aten::lt.float_int(float a, int b) -> (bool)
-- aten::lt.int(int a, int b) -> (bool)
-- aten::lt.int_float(int a, float b) -> (bool)
-- aten::mul.float(float a, float b) -> (float)
-- aten::mul.int(int a, int b) -> (int)
-- aten::ne.bool(bool a, bool b) -> (bool)
-- aten::ne.float(float a, float b) -> (bool)
-- aten::ne.float_int(float a, int b) -> (bool)
-- aten::ne.int(int a, int b) -> (bool)
-- aten::ne.int_float(int a, float b) -> (bool)
-- aten::neg.int(int a) -> (int)
-- aten::numel(Tensor self) -> int
-- aten::pow.float(float a, float b) -> (float)
-- aten::pow.float_int(float a, int b) -> (float)
-- aten::pow.int(int a, int b) -> (float)
-- aten::pow.int_float(int a, float b) -> (float)
-- aten::size(Tensor self) -> (int[])
-- aten::size.int(Tensor self, int dim) -> (int)
-- aten::slice.t(t[] l, int start, int end=9223372036854775807, int step=1) -> (t[])
-- aten::sqrt.float(float a) -> (float)
-- aten::sqrt.int(int a) -> (float)
-- aten::sub.float(float a, float b) -> (float)
-- aten::sub.int(int a, int b) -> (int)
-- aten::tensor(t[] data, *, int? dtype=None, Device? device=None, bool requires_grad=False) -> (Tensor)
-- prim::TupleIndex(Any tup, int i) -> (Any)
-- prim::dtype(Tensor a) -> (int)
-- prim::max.bool(bool a, bool b) -> (bool)
-- prim::max.float(float a, float b) -> (bool)
-- prim::max.float_int(float a, int b) -> (bool)
-- prim::max.int(int a, int b) -> (bool)
-- prim::max.int_float(int a, float b) -> (bool)
-- prim::max.self_int(int[] self) -> (int)
-- prim::min.bool(bool a, bool b) -> (bool)
-- prim::min.float(float a, float b) -> (bool)
-- prim::min.float_int(float a, int b) -> (bool)
-- prim::min.int(int a, int b) -> (bool)
-- prim::min.int_float(int a, float b) -> (bool)
-- prim::min.self_int(int[] self) -> (int)
-- prim::shape(Tensor a) -> (int[])
+- aten._adaptive_avg_pool2d(Tensor self, SymInt[2] output_size) -> Tensor
+- aten._adaptive_avg_pool3d(Tensor self, SymInt[3] output_size) -> Tensor
+- aten._cdist_forward(Tensor x1, Tensor x2, float p, int? compute_mode) -> Tensor
+- aten._embedding_bag(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq=False, int mode=0, bool sparse=False, Tensor? per_sample_weights=None, bool include_last_offset=False, int padding_idx=-1) -> (Tensor, Tensor, Tensor, Tensor)
+- aten._native_batch_norm_legit.no_stats(Tensor input, Tensor? weight, Tensor? bias, bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)
+- aten._native_batch_norm_legit_no_training(Tensor input, Tensor? weight, Tensor? bias, Tensor running_mean, Tensor running_var, float momentum, float eps) -> (Tensor, Tensor, Tensor)
+- aten._pdist_forward(Tensor self, float p=2) -> Tensor
+- aten._softmax(Tensor self, int dim, bool half_to_float) -> Tensor
+- aten._to_copy(Tensor self, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, bool non_blocking=False, MemoryFormat? memory_format=None) -> Tensor
+- aten.abs(Tensor self) -> Tensor
+- aten.acos(Tensor self) -> Tensor
+- aten.acosh(Tensor self) -> Tensor
+- aten.add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> Tensor
+- aten.add.Tensor(Tensor self, Tensor other, \*, Scalar alpha=1) -> Tensor
+- aten.addmm(Tensor self, Tensor mat1, Tensor mat2, \*, Scalar beta=1, Scalar alpha=1) -> Tensor
+- aten.amax(Tensor self, int[1] dim=[], bool keepdim=False) -> Tensor
+- aten.amin(Tensor self, int[1] dim=[], bool keepdim=False) -> Tensor
+- aten.any(Tensor self) -> Tensor
+- aten.any.dim(Tensor self, int dim, bool keepdim=False) -> Tensor
+- aten.any.dims(Tensor self, int[]? dim=None, bool keepdim=False) -> Tensor
+- aten.arange.start_step(Scalar start, Scalar end, Scalar step=1, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- aten.argmax(Tensor self, int? dim=None, bool keepdim=False) -> Tensor
+- aten.argmin(Tensor self, int? dim=None, bool keepdim=False) -> Tensor
+- aten.as_strided(Tensor(a) self, SymInt[] size, SymInt[] stride, SymInt? storage_offset=None) -> Tensor(a)
+- aten.asin(Tensor self) -> Tensor
+- aten.asinh(Tensor self) -> Tensor
+- aten.atan(Tensor self) -> Tensor
+- aten.atan2(Tensor self, Tensor other) -> Tensor
+- aten.atan2.out(Tensor self, Tensor other, \*, Tensor(a!) out) -> Tensor(a!)
+- aten.atanh(Tensor self) -> Tensor
+- aten.avg_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=0, bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -> Tensor
+- aten.avg_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=0, bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -> Tensor
+- aten.bitwise_and.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.bitwise_and.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.bitwise_not(Tensor self) -> Tensor
+- aten.bitwise_or.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.bitwise_or.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.bitwise_xor.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.bitwise_xor.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.bmm(Tensor self, Tensor mat2) -> Tensor
+- aten.cat(Tensor[] tensors, int dim=0) -> Tensor
+- aten.ceil(Tensor self) -> Tensor
+- aten.clamp(Tensor self, Scalar? min=None, Scalar? max=None) -> Tensor
+- aten.clamp.Tensor(Tensor self, Tensor? min=None, Tensor? max=None) -> Tensor
+- aten.clone(Tensor self, \*, MemoryFormat? memory_format=None) -> Tensor
+- aten.constant_pad_nd(Tensor self, SymInt[] pad, Scalar value=0) -> Tensor
+- aten.convolution(Tensor input, Tensor weight, Tensor? bias, SymInt[] stride, SymInt[] padding, SymInt[] dilation, bool transposed, SymInt[] output_padding, SymInt groups) -> Tensor
+- aten.copy(Tensor self, Tensor src, bool non_blocking=False) -> Tensor
+- aten.cos(Tensor self) -> Tensor
+- aten.cosh(Tensor self) -> Tensor
+- aten.cumsum(Tensor self, int dim, \*, ScalarType? dtype=None) -> Tensor
+- aten.diagonal(Tensor(a) self, int offset=0, int dim1=0, int dim2=1) -> Tensor(a)
+- aten.div.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.div.Scalar_mode(Tensor self, Scalar other, \*, str? rounding_mode) -> Tensor
+- aten.div.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.div.Tensor_mode(Tensor self, Tensor other, \*, str? rounding_mode) -> Tensor
+- aten.elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> Tensor
+- aten.embedding(Tensor weight, Tensor indices, SymInt padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> Tensor
+- aten.empty.memory_format(SymInt[] size, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
+- aten.eq.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.eq.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.erf(Tensor self) -> Tensor
+- aten.exp(Tensor self) -> Tensor
+- aten.expand(Tensor(a) self, SymInt[] size, \*, bool implicit=False) -> Tensor(a)
+- aten.expm1(Tensor self) -> Tensor
+- aten.flip(Tensor self, int[] dims) -> Tensor
+- aten.floor(Tensor self) -> Tensor
+- aten.fmod.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.fmod.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.full(SymInt[] size, Scalar fill_value, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- aten.gather(Tensor self, int dim, Tensor index, \*, bool sparse_grad=False) -> Tensor
+- aten.ge.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.ge.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.gelu(Tensor self, \*, str approximate='none') -> Tensor
+- aten.grid_sampler_2d(Tensor input, Tensor grid, int interpolation_mode, int padding_mode, bool align_corners) -> Tensor
+- aten.gt.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.gt.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.index.Tensor(Tensor self, Tensor?[] indices) -> Tensor
+- aten.index_put(Tensor self, Tensor?[] indices, Tensor values, bool accumulate=False) -> Tensor
+- aten.index_select(Tensor self, int dim, Tensor index) -> Tensor
+- aten.isinf(Tensor self) -> Tensor
+- aten.isnan(Tensor self) -> Tensor
+- aten.le.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.le.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.leaky_relu(Tensor self, Scalar negative_slope=0.01) -> Tensor
+- aten.log(Tensor self) -> Tensor
+- aten.log10(Tensor self) -> Tensor
+- aten.log1p(Tensor self) -> Tensor
+- aten.log2(Tensor self) -> Tensor
+- aten.logical_and(Tensor self, Tensor other) -> Tensor
+- aten.logical_not(Tensor self) -> Tensor
+- aten.logical_or(Tensor self, Tensor other) -> Tensor
+- aten.logical_xor(Tensor self, Tensor other) -> Tensor
+- aten.lt.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.lt.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.max.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
+- aten.maximum(Tensor self, Tensor other) -> Tensor
+- aten.mean(Tensor self, \*, ScalarType? dtype=None) -> Tensor
+- aten.mean.dim(Tensor self, int[1]? dim, bool keepdim=False, \*, ScalarType? dtype=None) -> Tensor
+- aten.min.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
+- aten.minimum(Tensor self, Tensor other) -> Tensor
+- aten.mm(Tensor self, Tensor mat2) -> Tensor
+- aten.mul.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.mul.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.native_dropout(Tensor input, float p, bool? train) -> (Tensor, Tensor)
+- aten.native_group_norm(Tensor input, Tensor? weight, Tensor? bias, SymInt N, SymInt C, SymInt HxW, int group, float eps) -> (Tensor, Tensor, Tensor)
+- aten.native_layer_norm(Tensor input, SymInt[] normalized_shape, Tensor? weight, Tensor? bias, float eps) -> (Tensor, Tensor, Tensor)
+- aten.ne.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.ne.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.neg(Tensor self) -> Tensor
+- aten.nonzero(Tensor self) -> Tensor
+- aten.permute(Tensor(a) self, int[] dims) -> Tensor(a)
+- aten.pow.Scalar(Scalar self, Tensor exponent) -> Tensor
+- aten.pow.Tensor_Scalar(Tensor self, Scalar exponent) -> Tensor
+- aten.pow.Tensor_Tensor(Tensor self, Tensor exponent) -> Tensor
+- aten.prod(Tensor self, \*, ScalarType? dtype=None) -> Tensor
+- aten.prod.dim_int(Tensor self, int dim, bool keepdim=False, \*, ScalarType? dtype=None) -> Tensor
+- aten.rand(SymInt[] size, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- aten.randn(SymInt[] size, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- aten.randperm(SymInt n, \*, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- aten.reflection_pad1d(Tensor self, SymInt[2] padding) -> Tensor
+- aten.reflection_pad2d(Tensor self, SymInt[4] padding) -> Tensor
+- aten.reflection_pad3d(Tensor self, SymInt[6] padding) -> Tensor
+- aten.relu(Tensor self) -> Tensor
+- aten.remainder.Scalar(Tensor self, Scalar other) -> Tensor
+- aten.remainder.Tensor(Tensor self, Tensor other) -> Tensor
+- aten.replication_pad2d(Tensor self, SymInt[4] padding) -> Tensor
+- aten.replication_pad3d(Tensor self, SymInt[6] padding) -> Tensor
+- aten.resize_(Tensor(a!) self, SymInt[] size, \*, MemoryFormat? memory_format=None) -> Tensor(a!)
+- aten.round(Tensor self) -> Tensor
+- aten.scalar_tensor(Scalar s, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- aten.scatter.src(Tensor self, int dim, Tensor index, Tensor src) -> Tensor
+- aten.scatter.value(Tensor self, int dim, Tensor index, Scalar value) -> Tensor
+- aten.select.int(Tensor(a) self, int dim, SymInt index) -> Tensor(a)
+- aten.sigmoid(Tensor self) -> Tensor
+- aten.sign(Tensor self) -> Tensor
+- aten.sin(Tensor self) -> Tensor
+- aten.sinh(Tensor self) -> Tensor
+- aten.slice.Tensor(Tensor(a) self, int dim=0, SymInt? start=None, SymInt? end=None, SymInt step=1) -> Tensor(a)
+- aten.sort(Tensor self, int dim=-1, bool descending=False) -> (Tensor values, Tensor indices)
+- aten.split_with_sizes(Tensor(a -> \*) self, SymInt[] split_sizes, int dim=0) -> Tensor(a)[]
+- aten.sqrt(Tensor self) -> Tensor
+- aten.squeeze.dim(Tensor(a) self, int dim) -> Tensor(a)
+- aten.squeeze.dims(Tensor(a) self, int[] dim) -> Tensor(a)
+- aten.sub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> Tensor
+- aten.sub.Tensor(Tensor self, Tensor other, \*, Scalar alpha=1) -> Tensor
+- aten.sum.dim_IntList(Tensor self, int[1]? dim, bool keepdim=False, \*, ScalarType? dtype=None) -> Tensor
+- aten.sym_numel(Tensor self) -> SymInt
+- aten.tan(Tensor self) -> Tensor
+- aten.tanh(Tensor self) -> Tensor
+- aten.topk(Tensor self, SymInt k, int dim=-1, bool largest=True, bool sorted=True) -> (Tensor values, Tensor indices)
+- aten.trunc(Tensor self) -> Tensor
+- aten.unsqueeze(Tensor(a) self, int dim) -> Tensor(a)
+- aten.upsample_bilinear2d.vec(Tensor input, SymInt[]? output_size, bool align_corners, float[]? scale_factors) -> Tensor
+- aten.upsample_nearest2d.vec(Tensor input, SymInt[]? output_size, float[]? scale_factors) -> Tensor
+- aten.where.self(Tensor condition, Tensor self, Tensor other) -> Tensor
+
+ATen Core Ops — Lowered via Decomposition
+-----------------------------------------
+
+*26 operators decomposed into supported primitives before TensorRT compilation.*
+
+- aten._log_softmax(Tensor self, int dim, bool half_to_float) -> Tensor
+- aten.adaptive_avg_pool1d(Tensor self, int[1] output_size) -> Tensor
+- aten.alias(Tensor(a) self) -> Tensor(a)
+- aten.avg_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=0, bool ceil_mode=False, bool count_include_pad=True) -> Tensor
+- aten.col2im(Tensor self, SymInt[2] output_size, int[2] kernel_size, int[2] dilation, int[2] padding, int[2] stride) -> Tensor
+- aten.embedding_dense_backward(Tensor grad_output, Tensor indices, SymInt num_weights, SymInt padding_idx, bool scale_grad_by_freq) -> Tensor
+- aten.empty_strided(SymInt[] size, SymInt[] stride, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- aten.fill.Scalar(Tensor self, Scalar value) -> Tensor
+- aten.full_like(Tensor self, Scalar fill_value, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
+- aten.hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> Tensor
+- aten.masked_scatter(Tensor self, Tensor mask, Tensor source) -> Tensor
+- aten.native_group_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, SymInt N, SymInt C, SymInt HxW, int group, bool[3] output_mask) -> (Tensor, Tensor, Tensor)
+- aten.native_layer_norm_backward(Tensor grad_out, Tensor input, SymInt[] normalized_shape, Tensor mean, Tensor rstd, Tensor? weight, Tensor? bias, bool[3] output_mask) -> (Tensor, Tensor, Tensor)
+- aten.reciprocal(Tensor self) -> Tensor
+- aten.repeat(Tensor self, SymInt[] repeats) -> Tensor
+- aten.rsqrt(Tensor self) -> Tensor
+- aten.scatter_add(Tensor self, int dim, Tensor index, Tensor src) -> Tensor
+- aten.scatter_reduce.two(Tensor self, int dim, Tensor index, Tensor src, str reduce, \*, bool include_self=True) -> Tensor
+- aten.select_scatter(Tensor self, Tensor src, int dim, SymInt index) -> Tensor
+- aten.slice_scatter(Tensor self, Tensor src, int dim=0, SymInt? start=None, SymInt? end=None, SymInt step=1) -> Tensor
+- aten.sym_is_contiguous(Tensor self, MemoryFormat memory_format=contiguous_format) -> SymBool
+- aten.sym_size.int(Tensor self, int dim) -> SymInt
+- aten.sym_stride.int(Tensor self, int dim) -> SymInt
+- aten.var.correction(Tensor self, int[1]? dim=None, \*, Scalar? correction=None, bool keepdim=False) -> Tensor
+- aten.var.dim(Tensor self, int[1]? dim, bool unbiased=True, bool keepdim=False) -> Tensor
+- aten.view(Tensor(a) self, SymInt[] size) -> Tensor(a)
+
+Python Builtin Ops — Converted
+------------------------------
+
+*9 Python-level operators supported.*
+
+- _operator.add
+- _operator.eq
+- _operator.floordiv
+- _operator.getitem
+- _operator.mod
+- _operator.mul
+- _operator.pow
+- _operator.sub
+- _operator.truediv
+
+Prims Ops — Converted
+---------------------
+
+*3 prims operators with native Dynamo converters.*
+
+- prims.broadcast_in_dim(Tensor(a) a, SymInt[] shape, int[] broadcast_dimensions) -> Tensor(a)
+- prims.div(Tensor self, Tensor other) -> Tensor
+- prims.sum(Tensor inp, int[]? dims, \*, ScalarType? output_dtype=None) -> Tensor
+
+Prims Ops — Lowered via Decomposition
+-------------------------------------
+
+*1 prims operators decomposed into supported primitives.*
+
+- prims.var(Tensor inp, int[]? dims, float? correction=1, \*, ScalarType? output_dtype=None) -> Tensor
+

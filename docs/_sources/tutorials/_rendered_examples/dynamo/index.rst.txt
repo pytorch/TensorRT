@@ -1,8 +1,9 @@
-
-
-.. _sphx_glr_tutorials__rendered_examples_dynamo:
+:orphan:
 
 .. _torch_tensorrt_examples:
+
+Dynamo Examples
+===============
 
 Here we provide examples of Torch-TensorRT compilation of popular computer vision and language models.
 
@@ -48,6 +49,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Compiling Stable Diffusion model using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This script demonstrates how to use dynamic memory allocation with Torch-TensorRT to reduce GPU...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_dynamic_memory_allocation_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_dynamic_memory_allocation.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Dynamic Memory Allocation</div>
     </div>
 
 
@@ -138,6 +156,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="Dynamic shapes are essential when your model needs to handle varying batch sizes or sequence le...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_compile_with_dynamic_inputs_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_compile_with_dynamic_inputs.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling Models with Dynamic Input Shapes</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.compi...">
 
 .. only:: html
@@ -201,6 +236,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to register a custom Triton kernel as a TensorRT plugin using the...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_auto_generate_plugins_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugins.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
     </div>
 
 
@@ -274,23 +326,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a plugin for a custom kernel using To...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_auto_generate_plugins_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugins.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch...">
 
 .. only:: html
@@ -308,18 +343,18 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="In some cases there isn&#x27;t a great way to do either of these, perhaps because the operator is a ...">
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates BOTH methods for saving Torch-TensorRT compiled models with dynamic i...">
 
 .. only:: html
 
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_aot_plugin_thumb.png
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_save_dynamic_shapes_both_methods_thumb.png
     :alt:
 
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_aot_plugin.py`
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_save_dynamic_shapes_both_methods.py`
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT</div>
+      <div class="sphx-glr-thumbnail-title">Saving Models with Dynamic Shapes - Both Methods</div>
     </div>
 
 
@@ -337,6 +372,40 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to save and load Torch-TensorRT compiled models with dynamic inpu...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_save_dynamic_shapes_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_save_dynamic_shapes_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Saving and Loading Models with Dynamic Shapes</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="JIT vs AOT — the key difference:">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_aot_plugin_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_aot_plugin.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">This example builds on auto_generate_plugins by showing the AOT (Ahead-of-Time)</div>
     </div>
 
 
@@ -502,23 +571,27 @@ Model Zoo
    :hidden:
 
    /tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
+   /tutorials/_rendered_examples/dynamo/dynamic_memory_allocation
    /tutorials/_rendered_examples/dynamo/debugger_example
    /tutorials/_rendered_examples/dynamo/cross_runtime_compilation_for_windows
    /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    /tutorials/_rendered_examples/dynamo/torch_compile_gpt2
+   /tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
+   /tutorials/_rendered_examples/dynamo/auto_generate_plugins
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    /tutorials/_rendered_examples/dynamo/autocast_example
    /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    /tutorials/_rendered_examples/dynamo/auto_generate_converters
-   /tutorials/_rendered_examples/dynamo/auto_generate_plugins
    /tutorials/_rendered_examples/dynamo/low_cpu_memory_compilation
-   /tutorials/_rendered_examples/dynamo/aot_plugin
+   /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods
    /tutorials/_rendered_examples/dynamo/converter_overloading
+   /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example
+   /tutorials/_rendered_examples/dynamo/aot_plugin
    /tutorials/_rendered_examples/dynamo/hierarchical_partitioner_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/weight_streaming_example
@@ -529,3 +602,22 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/llama2_flashinfer_rmsnorm
    /tutorials/_rendered_examples/dynamo/custom_kernel_plugins
 
+
+.. only:: html
+
+  .. container:: sphx-glr-footer sphx-glr-footer-gallery
+
+    .. container:: sphx-glr-download sphx-glr-download-python
+
+      :download:`Download all examples in Python source code: dynamo_python.zip </tutorials/_rendered_examples/dynamo/dynamo_python.zip>`
+
+    .. container:: sphx-glr-download sphx-glr-download-jupyter
+
+      :download:`Download all examples in Jupyter notebooks: dynamo_jupyter.zip </tutorials/_rendered_examples/dynamo/dynamo_jupyter.zip>`
+
+
+.. only:: html
+
+ .. rst-class:: sphx-glr-signature
+
+    `Gallery generated by Sphinx-Gallery <https://sphinx-gallery.github.io>`_
