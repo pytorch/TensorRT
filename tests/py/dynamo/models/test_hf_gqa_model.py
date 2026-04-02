@@ -6,8 +6,9 @@ from transformers import AutoModelForCausalLM
 
 @pytest.mark.unit
 @pytest.mark.critical
+@pytest.mark.parametrize("dtype", [torch.float16, torch.float32])
 @pytest.mark.parametrize("decompose_attention", [True, False])
-def test_dynamic_head_dim_with_hf_model(decompose_attention):
+def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
     model_name = "Qwen/Qwen2.5-0.5B-Instruct"
 
     model = (
@@ -16,7 +17,7 @@ def test_dynamic_head_dim_with_hf_model(decompose_attention):
         )
         .eval()
         .cuda()
-        .to(torch.float16)
+        .to(dtype)
     )
 
     input_ids = torch.randint(1, 10000, (1, 64), dtype=torch.int64, device="cuda")
