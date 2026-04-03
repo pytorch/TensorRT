@@ -875,7 +875,8 @@ class TestIndexPutConverter(DispatchTestCase):
     # ------------------------------------------------------------------
 
     @pytest.mark.skipif(
-        ENABLED_FEATURES.tensorrt_rtx, reason="ScatterAdd plugin not available in TRT RTX"
+        ENABLED_FEATURES.tensorrt_rtx,
+        reason="ScatterAdd plugin not available in TRT RTX",
     )
     def test_kv_cache_duplicate_slot_writes(self):
         """KV-cache style: linear projection → index_put(accumulate=True) into
@@ -916,7 +917,8 @@ class TestIndexPutConverter(DispatchTestCase):
         )
 
     @pytest.mark.skipif(
-        ENABLED_FEATURES.tensorrt_rtx, reason="ScatterAdd plugin not available in TRT RTX"
+        ENABLED_FEATURES.tensorrt_rtx,
+        reason="ScatterAdd plugin not available in TRT RTX",
     )
     def test_sparse_embedding_duplicate_seq_ids(self):
         """Sparse embedding accumulation: embedding lookup → index_put(accumulate=True)
@@ -960,7 +962,8 @@ class TestIndexPutConverter(DispatchTestCase):
         )
 
     @pytest.mark.skipif(
-        ENABLED_FEATURES.tensorrt_rtx, reason="ScatterAdd plugin not available in TRT RTX"
+        ENABLED_FEATURES.tensorrt_rtx,
+        reason="ScatterAdd plugin not available in TRT RTX",
     )
     def test_histogram_conv_duplicate_bin_ids(self):
         """Histogram accumulation: Conv1d → index_put(accumulate=True) into histogram
