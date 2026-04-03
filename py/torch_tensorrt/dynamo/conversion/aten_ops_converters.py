@@ -1095,6 +1095,9 @@ def aten_ops_select(
 def _scatter_add_plugin_available() -> bool:
     import tensorrt as trt
 
+    # ScatterAdd plugin is not built for Jetpack (TRT 10.3.x) or TRT-RTX builds
+    if trt.__version__.startswith("10.3.") or trt._package_name == "tensorrt_rtx":
+        return False
     return (
         trt.get_plugin_registry().get_creator("ScatterAdd", "1", "torch_tensorrt")
         is not None

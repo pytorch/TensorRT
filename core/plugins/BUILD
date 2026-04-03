@@ -62,6 +62,11 @@ config_setting(
 cc_library(
     name = "torch_tensorrt_plugins",
     srcs = select({
+        ":jetpack": [
+            "impl/interpolate_plugin.cpp",
+            "impl/normalize_plugin.cpp",
+            "register_plugins.cpp",
+        ],
         ":rtx_win": [],
         ":rtx_x86_64": [],
         "//conditions:default": [
@@ -72,6 +77,11 @@ cc_library(
         ],
     }),
     hdrs = select({
+        ":jetpack": [
+            "impl/interpolate_plugin.h",
+            "impl/normalize_plugin.h",
+            "plugins.h",
+        ],
         ":rtx_win": [],
         ":rtx_x86_64": [],
         "//conditions:default": [

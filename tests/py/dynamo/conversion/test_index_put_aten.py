@@ -1,7 +1,9 @@
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import ENABLED_FEATURES
 
 from .harness import DispatchTestCase
 
@@ -409,6 +411,9 @@ class TestIndexPutConverter(DispatchTestCase):
     def test_index_put(
         self, test_name, source_tensor, indices_tensor, value_tensor, accumulate=False
     ):
+        if accumulate and ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("ScatterAdd plugin not available in TRT RTX")
+
         @torch._dynamo.assume_constant_result
         def get_indices_tensor():
             return indices_tensor
@@ -425,6 +430,7 @@ class TestIndexPutConverter(DispatchTestCase):
             inputs=[source_tensor, value_tensor],
             enable_passes=True,
             use_dynamo_tracer=True,
+            use_explicit_typing=True,
         )
 
     def test_index_add_dynamic_shape(self):
@@ -868,6 +874,9 @@ class TestIndexPutConverter(DispatchTestCase):
     # duplicate positions when index_put is embedded in a larger graph.
     # ------------------------------------------------------------------
 
+    @pytest.mark.skipif(
+        ENABLED_FEATURES.tensorrt_rtx, reason="ScatterAdd plugin not available in TRT RTX"
+    )
     def test_kv_cache_duplicate_slot_writes(self):
         """KV-cache style: linear projection → index_put(accumulate=True) into
         a flat cache with duplicate slot indices → output projection.
@@ -903,8 +912,12 @@ class TestIndexPutConverter(DispatchTestCase):
             inputs=[tokens, cache],
             use_dynamo_tracer=True,
             enable_passes=True,
+            use_explicit_typing=True,
         )
 
+    @pytest.mark.skipif(
+        ENABLED_FEATURES.tensorrt_rtx, reason="ScatterAdd plugin not available in TRT RTX"
+    )
     def test_sparse_embedding_duplicate_seq_ids(self):
         """Sparse embedding accumulation: embedding lookup → index_put(accumulate=True)
         into per-sequence accumulators where many tokens map to the same sequence → ReLU.
@@ -943,8 +956,12 @@ class TestIndexPutConverter(DispatchTestCase):
             inputs=[token_ids, accum],
             use_dynamo_tracer=True,
             enable_passes=True,
+            use_explicit_typing=True,
         )
 
+    @pytest.mark.skipif(
+        ENABLED_FEATURES.tensorrt_rtx, reason="ScatterAdd plugin not available in TRT RTX"
+    )
     def test_histogram_conv_duplicate_bin_ids(self):
         """Histogram accumulation: Conv1d → index_put(accumulate=True) into histogram
         bins where many frames land in the same bin → mean pool → linear.
@@ -983,6 +1000,7 @@ class TestIndexPutConverter(DispatchTestCase):
             inputs=[signal, hist],
             use_dynamo_tracer=True,
             enable_passes=True,
+            use_explicit_typing=True,
         )
 
 
