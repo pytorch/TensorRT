@@ -61,9 +61,12 @@ cc_library(
         ":windows": ["lib/c10_cuda.lib"],
         "//conditions:default": ["lib/libc10_cuda.so"],
     }),
-    hdrs = glob([
-        "include/c10/**/*.h",
-    ]),
+    hdrs = glob(
+        [
+            "include/c10/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     strip_include_prefix = "include",
     deps = [
         ":c10",
