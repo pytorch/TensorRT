@@ -39,9 +39,12 @@ cc_library(
         exclude = [
             "include/torch/csrc/api/include/**/*.h",
         ],
-    ) + glob([
-        "include/torch/csrc/api/include/**/*.h",
-    ]),
+    ) + glob(
+        [
+            "include/torch/csrc/api/include/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     includes = [
         "include",
         "include/torch/csrc/api/include/",
