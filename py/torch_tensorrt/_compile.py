@@ -1057,6 +1057,94 @@ def save(
                     )
 
 
+def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
+    """Replace execute_engine nodes with no_op_placeholder_for_execute_engine.
+
+    ExecuTorch's to_edge_transform_and_lower runs ExportPass subclasses that
+    dispatch through the C++ schema validator.  The validator rejects the
+    ScriptObject engine arg (it arrives as a CustomObjArgument placeholder
+    rather than a real FakeScriptObject).  Converting each execute_engine node
+    to no_op_placeholder_for_execute_engine (which carries all engine info as
+    plain strings) avoids the ScriptObject entirely so the passes succeed.
+    """
+    import base64
+
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        ENGINE_IDX,
+        SERIALIZATION_LEN,
+    )
+
+    gm = exp_program.graph_module
+    execute_engine_op = torch.ops.tensorrt.execute_engine.default
+    no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
+
+    nodes_to_replace = [
+        n
+        for n in gm.graph.nodes
+        if n.op == "call_function" and n.target is execute_engine_op
+    ]
+    if not nodes_to_replace:
+        return exp_program
+
+    for node in nodes_to_replace:
+        inputs_arg = node.args[0]
+        engine_node = node.args[1]
+
+        # Retrieve the engine ScriptObject from the graph module or constants.
+        if engine_node.op == "get_attr":
+            engine_obj = getattr(gm, engine_node.target, None)
+            if engine_obj is None:
+                raise RuntimeError(
+                    f"execute_engine node '{node.name}': get_attr target "
+                    f"'{engine_node.target}' not found on graph module"
+                )
+        elif engine_node.op == "placeholder":
+            constants = getattr(exp_program, "constants", {})
+            engine_obj = constants.get(engine_node.name) or constants.get(
+                engine_node.target
+            )
+            if engine_obj is None:
+                raise RuntimeError(
+                    f"execute_engine node '{node.name}': placeholder engine "
+                    f"'{engine_node.name}' not found in exp_program.constants"
+                )
+        else:
+            raise RuntimeError(
+                f"execute_engine node '{node.name}': unexpected engine arg op "
+                f"'{engine_node.op}'"
+            )
+
+        engine_info = list(engine_obj.__getstate__())
+        engine_info = engine_info[0]
+        # Ensure the engine bytes slot is a base64 string (no_op takes str args).
+        engine_bytes = engine_info[ENGINE_IDX]
+        if isinstance(engine_bytes, (bytes, bytearray)):
+            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+
+        engine_info_strs = [
+            str(x) if x is not None else "" for x in engine_info[:SERIALIZATION_LEN]
+        ]
+        with gm.graph.inserting_before(node):
+            no_op_node = gm.graph.call_function(
+                no_op,
+                (inputs_arg, *engine_info_strs),
+            )
+            no_op_node.meta["val"] = node.meta.get("val")
+
+        node.replace_all_uses_with(no_op_node)
+        gm.graph.erase_node(node)
+
+        # Erase the engine get_attr node if it is now unused.
+        if engine_node.op == "get_attr" and not engine_node.users:
+            gm.graph.erase_node(engine_node)
+
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+    gm.recompile()
+
+    return exp_program
+
+
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an ExportedProgram (with TensorRT execute_engine nodes) as an ExecuTorch .pte file.
 
@@ -1083,6 +1171,11 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
 
     extra_partitioners = kwargs.get("partitioners", [])
     partitioners = [TensorRTPartitioner()] + extra_partitioners
+
+    # Replace execute_engine nodes (ScriptObject arg) with no_op_placeholder_for_execute_engine
+    # (string args only) before to_edge_transform_and_lower runs ExportPass subclasses that
+    # would fail trying to cast the CustomObjArgument placeholder to a real C++ Engine object.
+    exp_program = _replace_execute_engine_for_executorch(exp_program)
 
     edge_program = to_edge_transform_and_lower(
         exp_program,

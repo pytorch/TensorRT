@@ -15,49 +15,56 @@ from torch_tensorrt.executorch.serialization import serialize_engine_info
 
 
 def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[Any]:
-    """Extract engine info (list of strings/bytes) from the partition's execute_engine node.
+    """Extract engine info (list of strings/bytes) from the partition's TRT node.
 
-    The partition contains a single execute_engine node whose second argument is
-    either a get_attr node (engine on the graph module) or a placeholder node
-    (engine lifted into edge_program.constants by torch.export).  Either way,
-    the engine object's __getstate__() returns the SERIALIZATION_LEN-item list
-    used by the TRT runtime blob format.
+    Handles two cases:
+    - no_op_placeholder_for_execute_engine: engine info is embedded directly as
+      string args (args[1:]) — used when _replace_execute_engine_for_executorch
+      converted the graph before to_edge_transform_and_lower.
+    - execute_engine: engine info is extracted from the ScriptObject via
+      __getstate__() — fallback for graphs not yet converted.
     """
     gm = edge_program.graph_module
     execute_engine_op = torch.ops.tensorrt.execute_engine.default
+    no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
 
     for node in gm.graph.nodes:
-        if node.op != "call_function" or node.target is not execute_engine_op:
+        if node.op != "call_function":
             continue
 
-        engine_node = node.args[1]
-        if engine_node.op == "get_attr":
-            engine_obj = getattr(gm, engine_node.target, None)
-            if engine_obj is None:
-                raise RuntimeError(
-                    f"execute_engine node '{node.name}': get_attr target "
-                    f"'{engine_node.target}' not found on graph module"
-                )
-        elif engine_node.op == "placeholder":
-            constants = getattr(edge_program, "constants", {})
-            engine_obj = constants.get(engine_node.name) or constants.get(
-                engine_node.target
-            )
-            if engine_obj is None:
-                raise RuntimeError(
-                    f"execute_engine node '{node.name}': placeholder engine "
-                    f"'{engine_node.name}' not found in edge_program.constants"
-                )
-        else:
-            raise RuntimeError(
-                f"execute_engine node '{node.name}': unexpected engine arg op "
-                f"'{engine_node.op}'"
-            )
+        if node.target is no_op:
+            # Engine info is stored directly as string args (indices 0-9).
+            return list(node.args[1:])
 
-        return list(engine_obj.__getstate__())
+        if node.target is execute_engine_op:
+            engine_node = node.args[1]
+            if engine_node.op == "get_attr":
+                engine_obj = getattr(gm, engine_node.target, None)
+                if engine_obj is None:
+                    raise RuntimeError(
+                        f"execute_engine node '{node.name}': get_attr target "
+                        f"'{engine_node.target}' not found on graph module"
+                    )
+            elif engine_node.op == "placeholder":
+                constants = getattr(edge_program, "constants", {})
+                engine_obj = constants.get(engine_node.name) or constants.get(
+                    engine_node.target
+                )
+                if engine_obj is None:
+                    raise RuntimeError(
+                        f"execute_engine node '{node.name}': placeholder engine "
+                        f"'{engine_node.name}' not found in edge_program.constants"
+                    )
+            else:
+                raise RuntimeError(
+                    f"execute_engine node '{node.name}': unexpected engine arg op "
+                    f"'{engine_node.op}'"
+                )
+            return list(engine_obj.__getstate__())
 
     raise RuntimeError(
-        "TensorRT ExecuTorch backend: no execute_engine node found in partition."
+        "TensorRT ExecuTorch backend: no execute_engine or "
+        "no_op_placeholder_for_execute_engine node found in partition."
     )
 
 
