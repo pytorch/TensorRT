@@ -3,7 +3,6 @@
 import base64
 from typing import Any, List, final
 
-import torch
 from executorch.exir.backend.backend_details import (
     BackendDetails,
     CompileSpec,
@@ -12,6 +11,13 @@ from executorch.exir.backend.backend_details import (
 from torch.export.exported_program import ExportedProgram
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX
 from torch_tensorrt.executorch.serialization import serialize_engine_info
+
+
+def _schema_name(target: Any) -> str:
+    """Return the qualified op schema name for an OpOverload or EdgeOpOverload."""
+    if hasattr(target, "_schema"):
+        return str(target._schema.name)
+    return ""
 
 
 def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[Any]:
@@ -23,20 +29,23 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
       converted the graph before to_edge_transform_and_lower.
     - execute_engine: engine info is extracted from the ScriptObject via
       __getstate__() — fallback for graphs not yet converted.
+
+    Uses schema name comparison (not object identity) so it works for both
+    OpOverload and EdgeOpOverload targets.
     """
     gm = edge_program.graph_module
-    execute_engine_op = torch.ops.tensorrt.execute_engine.default
-    no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
 
     for node in gm.graph.nodes:
         if node.op != "call_function":
             continue
 
-        if node.target is no_op:
+        name = _schema_name(node.target)
+
+        if name == "tensorrt::no_op_placeholder_for_execute_engine":
             # Engine info is stored directly as string args (indices 0-9).
             return list(node.args[1:])
 
-        if node.target is execute_engine_op:
+        if name == "tensorrt::execute_engine":
             engine_node = node.args[1]
             if engine_node.op == "get_attr":
                 engine_obj = getattr(gm, engine_node.target, None)
