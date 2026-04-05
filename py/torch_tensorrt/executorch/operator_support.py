@@ -14,16 +14,21 @@ class TensorRTOperatorSupport(OperatorSupportBase):  # type: ignore[misc]
     which serializes the engine to the same blob format as the TRT runtime.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._execute_engine_op = torch.ops.tensorrt.execute_engine.default
-        self._no_op_placeholder_op = (
-            torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
-        )
+    _SUPPORTED_OPS = frozenset(
+        [
+            "tensorrt::execute_engine",
+            "tensorrt::no_op_placeholder_for_execute_engine",
+        ]
+    )
 
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
         if node.op != "call_function":
             return False
-        return node.target in (self._execute_engine_op, self._no_op_placeholder_op)
+        # After ExecuTorch edge lowering the op is wrapped as EdgeOpOverload, so
+        # compare by schema name rather than by op object identity.
+        target = node.target
+        if hasattr(target, "_schema"):
+            return target._schema.name in self._SUPPORTED_OPS
+        return False
