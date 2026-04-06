@@ -7,11 +7,11 @@ Torch-TensorRT uses a single module type, :class:`~torch_tensorrt.runtime.TorchT
 to run TensorRT engines inside PyTorch. The **execution path** (which code actually drives
 ``execute_async``) is selected at runtime:
 
-* **C++ path** — ``torch.classes.tensorrt.Engine`` and ``torch.ops.tensorrt.execute_engine``.
+* **C++ path (default)** — ``torch.classes.tensorrt.Engine`` and ``torch.ops.tensorrt.execute_engine``.
   Preferred for production when the Torch-TensorRT C++ extension is available: TorchScript-friendly,
   and integrates with the full C++ runtime stack.
-* **Python path** — internal ``PythonTRTEngine`` plus
-  ``torch.ops.tensorrt.execute_engine_python``. Useful when the C++ extension is absent, or when
+* **Python path** — When the C++ runtime is absent, use the internal ``TRTEngine`` plus
+  ``torch.ops.tensorrt.execute_engine`` (registered from Python when the C++ runtime is absent). Useful when the C++ extension is absent, or when
   you want easier Python-level debugging and instrumentation.
 
 :class:`~torch_tensorrt.runtime.PythonTorchTensorRTModule` is a **thin subclass** of

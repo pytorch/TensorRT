@@ -12,7 +12,7 @@ from torch.export import ExportedProgram
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
-from torch_tensorrt._features import needs_cross_compile
+from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults, partitioning
 from torch_tensorrt.dynamo._DryRunTracker import (
@@ -42,10 +42,6 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
-)
-from torch_tensorrt.dynamo.runtime._RuntimeBackendSelection import (
-    RuntimeBackend,
-    get_runtime_backend,
 )
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
@@ -1054,7 +1050,7 @@ def compile_module(
 
             if _debugger_config:
                 if _debugger_config.save_engine_profile:
-                    if get_runtime_backend() is RuntimeBackend.PYTHON:
+                    if not ENABLED_FEATURES.torch_tensorrt_runtime:
                         if _debugger_config.profile_format != "cudagraph":
                             raise ValueError(
                                 "Profiling with TREX can only be enabled when using the C++ runtime. Python runtime profiling only support cudagraph visualization."

@@ -1,8 +1,9 @@
-"""Python-side TensorRT engine: deserialize, execute, and drive ``execute_engine_python``.
+"""Python-side TensorRT engine: deserialize and execute TRT engines without the C++ runtime.
 
 Serialization layout lives in :mod:`torch_tensorrt.dynamo.runtime._serialized_engine_layout`.
-The engine is passed into ``tensorrt::execute_engine_python`` as an opaque reference (see
-``register_opaque_type``), analogous to ``tensorrt::Engine`` for the C++ ``execute_engine`` op.
+When the C++ Torch-TensorRT runtime is unavailable, :class:`TRTEngine` is registered as an
+opaque type and ``tensorrt::execute_engine`` is registered as a Python custom op so that the
+same compiled graph can run on either the C++ or Python runtime transparently.
 """
 
 from __future__ import annotations
@@ -127,12 +128,19 @@ class TorchTRTRuntimeStates:
 
 
 # ---------------------------------------------------------------------------
-# PythonTRTEngine
+# TRTEngine (Python implementation)
 # ---------------------------------------------------------------------------
 
 
-class PythonTRTEngine:
-    """TensorRT engine + execution context, driven from Python TRT APIs."""
+class TRTEngine:
+    """TensorRT engine + execution context, driven from Python TRT APIs.
+
+    Exposes the same surface as the C++ ``torch.classes.tensorrt.Engine`` TorchBind
+    class so that :class:`~torch_tensorrt.dynamo.runtime.TorchTensorRTModule` can use
+    either implementation without branching.  When the C++ runtime is unavailable this
+    class is registered as an opaque type and ``tensorrt::execute_engine`` is registered
+    as a Python custom op pointing to :func:`execute_engine`.
+    """
 
     # --- construction / teardown ---
 
@@ -166,7 +174,10 @@ class PythonTRTEngine:
         self._load_serialized_info(serialized_info)
         self._setup_engine()
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> PythonTRTEngine:
+    def __del__(self) -> None:
+        self.reset_captured_graph()
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> "TRTEngine":
         """Rebuild from serialized layout so ``copy.deepcopy`` skips unpickleable TRT handles."""
         if id(self) in memo:
             return memo[id(self)]  # type: ignore
@@ -174,6 +185,21 @@ class PythonTRTEngine:
         dup = type(self)(serialized_copy, profile_execution=self._profile_execution)
         memo[id(self)] = dup
         return dup
+
+    def __str__(self) -> str:
+        return f"TRTEngine(name={self.name}, device={self.serialized_device_info})"
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __getstate__(self) -> List[Any]:
+        """Return serialized engine info list for ``torch.save`` / pickling."""
+        return list(self.serialized_info)
+
+    def __setstate__(self, serialized_info: List[Any]) -> None:
+        """Restore engine from serialized info list (``torch.load`` / unpickling)."""
+        self._load_serialized_info(serialized_info)
+        self._setup_engine()
 
     def tracing_mode(self) -> str:
         """Return ``"real"`` so FakeTensor/export pass the real engine into meta kernels.
@@ -243,6 +269,7 @@ class PythonTRTEngine:
         return self.serialized_metadata
 
     def close(self) -> None:
+        """Release CUDA graph resources (called explicitly or via __del__)."""
         self.reset_captured_graph()
 
     def _create_execution_context(self) -> trt.IExecutionContext:
@@ -369,6 +396,20 @@ class PythonTRTEngine:
     def dump_engine_layer_info(self) -> None:
         print(self.get_engine_layer_info())
 
+    def dump_engine_layer_info_to_file(self, path: str) -> None:
+        with open(path, "w") as f:
+            f.write(self.get_engine_layer_info())
+
+    def infer_outputs(self, input_shapes: List[Any]) -> List[Any]:
+        """Return output shapes inferred for the given input shapes."""
+        results = []
+        for i, input_name in enumerate(self.in_binding_names):
+            if i < len(input_shapes):
+                self.context.set_input_shape(input_name, tuple(input_shapes[i]))
+        for output_name in self.out_binding_names:
+            results.append(tuple(self.context.get_tensor_shape(output_name)))
+        return results
+
     # --- tensor binding helpers ---
 
     def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
@@ -479,7 +520,7 @@ class PythonTRTEngine:
             self._input_buffers = [None] * len(self.in_binding_names)
             self._output_buffers = [None] * len(self.out_binding_names)
 
-        with self._profile_section("PythonTRTEngine:ProcessInputs"):
+        with self._profile_section("TRTEngine:ProcessInputs"):
             self.setup_input_tensors(
                 contiguous_inputs,
                 torch_tensorrt.runtime.get_cudagraphs_mode(),
@@ -492,7 +533,7 @@ class PythonTRTEngine:
                         f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior."
                     )
 
-        with self._profile_section("PythonTRTEngine:ProcessOutputs"):
+        with self._profile_section("TRTEngine:ProcessOutputs"):
             if can_use_pre_allocated_outputs:
                 outputs = self.pre_allocated_outputs
             else:
@@ -516,7 +557,7 @@ class PythonTRTEngine:
                 else:
                     self.context.set_tensor_address(output_name, outputs[o].data_ptr())
 
-        with self._profile_section("PythonTRTEngine:TensorRTRuntime"):
+        with self._profile_section("TRTEngine:TensorRTRuntime"):
             self._caller_stream = torch.cuda.current_stream()
             if (
                 self._engine_stream == torch.cuda.default_stream()
@@ -579,10 +620,10 @@ class PythonTRTEngine:
                 "incompatible runtime modes. Please disable one of the two."
             )
 
-        with self._profile_section("PythonTRTEngine:ProcessInputs"):
+        with self._profile_section("TRTEngine:ProcessInputs"):
             self.setup_input_tensors(contiguous_inputs, False, False)
 
-        with self._profile_section("PythonTRTEngine:SetupOutputAllocator"):
+        with self._profile_section("TRTEngine:SetupOutputAllocator"):
             self.create_output_allocator()
             for output_name in self.out_binding_names:
                 if not self.context.set_output_allocator(
@@ -592,7 +633,7 @@ class PythonTRTEngine:
                         f"Failed to set output allocator for {output_name}"
                     )
 
-        with self._profile_section("PythonTRTEngine:TensorRTRuntime"):
+        with self._profile_section("TRTEngine:TensorRTRuntime"):
             self._caller_stream = torch.cuda.current_stream()
             if (
                 self._engine_stream == torch.cuda.default_stream()
@@ -655,14 +696,14 @@ class PythonTRTEngine:
         return self._execute_standard(contiguous_inputs)
 
 
-register_opaque_type(PythonTRTEngine, typ="reference")
+if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+    register_opaque_type(TRTEngine, typ="reference")
 
-
-@torch.library.custom_op(  # type: ignore[misc]
-    "tensorrt::execute_engine_python", mutates_args=()
-)
-def execute_engine_python(
-    input_tensors: List[torch.Tensor], engine: PythonTRTEngine
-) -> List[torch.Tensor]:
-    outputs = engine.execute(input_tensors)
-    return [outputs] if isinstance(outputs, torch.Tensor) else list(outputs)
+    @torch.library.custom_op(  # type: ignore[misc]
+        "tensorrt::execute_engine", mutates_args=()
+    )
+    def execute_engine(
+        input_tensors: List[torch.Tensor], engine: TRTEngine
+    ) -> List[torch.Tensor]:
+        outputs = engine.execute(input_tensors)
+        return [outputs] if isinstance(outputs, torch.Tensor) else list(outputs)

@@ -260,31 +260,6 @@ def fake_tensorrt_execute_engine(
         )
 
 
-@torch.library.register_fake("tensorrt::execute_engine_python")  # type: ignore
-def fake_tensorrt_execute_engine_python(inputs: List[torch.Tensor], engine: Any) -> Any:
-    shape_info = _shape_info_from_trt_engine(engine)
-
-    if shape_info:
-        return _apply_symbolic_shape_expressions(inputs, shape_info)
-
-    real = getattr(engine, "real_obj", None)
-    for o in (engine, real):
-        if o is None:
-            continue
-        shapes, dtypes = getattr(o, "output_shapes", None), getattr(
-            o, "output_dtypes", None
-        )
-        if shapes and dtypes:
-            return [
-                torch.empty(s, dtype=d, device=inputs[0].device)
-                for s, d in zip(shapes, dtypes)
-            ]
-
-    raise RuntimeError(
-        "No output shape information found for tensorrt::execute_engine_python."
-    )
-
-
 @torch._library.register_fake_class("tensorrt::Engine")
 class FakeTRTEngine:
     def __init__(self, engine_info: List[str]) -> None:

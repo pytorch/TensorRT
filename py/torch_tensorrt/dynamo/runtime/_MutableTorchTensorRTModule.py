@@ -14,7 +14,6 @@ from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
-from torch_tensorrt.dynamo.runtime._RuntimeBackendSelection import RuntimeBackend
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import (
     check_output_equal,
@@ -699,13 +698,12 @@ class MutableTorchTensorRTModule(object):
 
     @staticmethod
     def _compiled_graph_uses_python_runtime(gm: Any) -> bool:
-        for m in gm.modules():
-            if (
-                isinstance(m, TorchTensorRTModule)
-                and m._runtime_backend is RuntimeBackend.PYTHON
-            ):
-                return True
-        return False
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(
+            any(isinstance(m, TorchTensorRTModule) for m in gm.modules())
+            and not ENABLED_FEATURES.torch_tensorrt_runtime
+        )
 
     @staticmethod
     def save(module: Any, path: str) -> None:

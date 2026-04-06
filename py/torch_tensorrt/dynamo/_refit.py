@@ -32,7 +32,7 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
-from torch_tensorrt.dynamo.runtime._PythonTRTEngine import PythonTRTEngine
+from torch_tensorrt.dynamo.runtime._PythonTRTEngine import TRTEngine
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
     SERIALIZED_METADATA_IDX,
@@ -477,7 +477,7 @@ def refit_module_weights(
                             # Torch retrace module
                             assert not isinstance(
                                 compiled_submodule.engine,
-                                PythonTRTEngine,
+                                TRTEngine,
                             ), (
                                 "Refitting a torch retraced module is only supported when "
                                 "the engine uses the C++ Torch-TensorRT runtime"
@@ -505,7 +505,7 @@ def refit_module_weights(
 
                 # Rexporting the TRT compiled graph module and loading it back doesn't preserve
                 # the instance type; choose the engine handle based on the actual engine object.
-                if isinstance(compiled_submodule.engine, PythonTRTEngine):
+                if isinstance(compiled_submodule.engine, TRTEngine):
                     engine = compiled_submodule.engine.cuda_engine
                 else:
                     engine_info = compiled_submodule.engine.__getstate__()[0]
@@ -568,7 +568,7 @@ def refit_module_weights(
             if compiled_submodule._is_python_runtime:
                 # Refit already updated ``cuda_engine`` in place; avoid deserialize (slow).
                 py_eng = compiled_submodule.engine
-                if isinstance(py_eng, PythonTRTEngine):
+                if isinstance(py_eng, TRTEngine):
                     py_eng.serialized_info[ENGINE_IDX] = new_serialized_engine
                     py_eng.serialized_engine = new_serialized_engine
             else:

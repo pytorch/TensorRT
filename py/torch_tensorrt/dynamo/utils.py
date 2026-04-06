@@ -140,16 +140,11 @@ def deallocate_module(module: torch.fx.GraphModule) -> None:
 
 def _log_torch_compile_runtime_backend() -> None:
     """Log which TRT runtime backend applies for a ``torch.compile`` / Dynamo compile."""
-    from torch_tensorrt.dynamo.runtime._RuntimeBackendSelection import (
-        RuntimeBackend,
-        get_runtime_backend,
-    )
+    from torch_tensorrt._features import ENABLED_FEATURES
 
-    backend = get_runtime_backend()
-    using_python = backend is RuntimeBackend.PYTHON
+    using_python = not ENABLED_FEATURES.torch_tensorrt_runtime
     logger.info(
-        f"Using {'Python-only' if using_python else 'Default'} Torch-TRT Runtime "
-        f"(from runtime backend selection: {backend})"
+        f"Using {'Python-only' if using_python else 'Default'} Torch-TRT Runtime"
     )
 
 
@@ -577,7 +572,7 @@ def parse_dynamo_kwargs(
         if "use_python_runtime" in kwargs:
             warnings.warn(
                 'torch.compile option "use_python_runtime" was removed; use '
-                'torch_tensorrt.runtime.set_runtime_backend("python"|"cpp") instead.',
+                "the Python runtime is now selected automatically when the C++ extension is unavailable.",
                 DeprecationWarning,
                 stacklevel=2,
             )
