@@ -3,7 +3,7 @@
 set -x
 
 # Install dependencies
-python3 -m pip install pyyaml
+python3 -m pip install pyyaml packaging
 
 if [[ $(uname -m) == "aarch64" ]]; then
   IS_AARCH64=true
