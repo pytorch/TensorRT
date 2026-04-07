@@ -82,11 +82,6 @@ fi
 
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
-# Clear any stale Bazel external-repo cache so the freshly-generated MODULE.bazel
-# is evaluated against the current third_party/libtorch/BUILD, not a cached copy
-# from a previous build or a pre-baked container image.
-bazel clean --expunge || true
-
 if [[ ${TENSORRT_VERSION} != "" ]]; then
     sed -i -e "s/strip_prefix = \"TensorRT-.*\"/strip_prefix = \"${TENSORRT_STRIP_PREFIX}\"/g" MODULE.bazel
     sed -i -e "s#\"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/.*\"#\"${TENSORRT_URLS}\"#g" MODULE.bazel
