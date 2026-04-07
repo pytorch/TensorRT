@@ -90,9 +90,12 @@ cc_library(
 
 cc_library(
     name = "ATen",
-    hdrs = glob([
-        "include/ATen/**/*.h",
-    ]),
+    hdrs = glob(
+        [
+            "include/ATen/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     strip_include_prefix = "include",
 )
 
@@ -106,8 +109,11 @@ cc_library(
             "lib/libcaffe2_nvrtc.so",
         ],
     }),
-    hdrs = glob([
-        "include/caffe2/**/*.h",
-    ]),
+    hdrs = glob(
+        [
+            "include/caffe2/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     strip_include_prefix = "include",
 )
