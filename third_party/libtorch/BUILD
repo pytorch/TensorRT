@@ -79,9 +79,12 @@ cc_library(
         ":windows": ["lib/c10.lib"],
         "//conditions:default": ["lib/libc10.so"],
     }),
-    hdrs = glob([
-        "include/c10/**/*.h",
-    ]),
+    hdrs = glob(
+        [
+            "include/c10/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     strip_include_prefix = "include",
 )
 
