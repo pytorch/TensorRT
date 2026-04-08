@@ -251,17 +251,14 @@ std::string InterpolatePlugin::serializeToString() const {
   return data_str.str();
 }
 
-size_t InterpolatePlugin::getSerializationSize() const noexcept {
-  return serializeToString().size();
-}
-
-int32_t InterpolatePlugin::serialize(void* buffer, size_t length) const noexcept {
-  std::string data = serializeToString();
-  if (data.size() > length) {
-    return -1;
-  }
-  data.copy(static_cast<char*>(buffer), data.size());
-  return 0;
+nvinfer1::PluginFieldCollection const* InterpolatePlugin::getFieldsToSerialize() noexcept {
+  mSerializedData = serializeToString();
+  mSerializationFields.clear();
+  mSerializationFields.emplace_back(
+      "data", mSerializedData.data(), nvinfer1::PluginFieldType::kCHAR, mSerializedData.size());
+  mSerializationFC.nbFields = static_cast<int32_t>(mSerializationFields.size());
+  mSerializationFC.fields = mSerializationFields.data();
+  return &mSerializationFC;
 }
 
 // IPluginV3OneRuntime
@@ -338,9 +335,8 @@ int32_t InterpolatePlugin::enqueue(
   return 0;
 }
 
-nvinfer1::IPluginV3OneRuntime* InterpolatePlugin::attachToContext(nvinfer1::IPluginResourceContext* context) noexcept {
-  return static_cast<nvinfer1::IPluginV3OneRuntime*>(
-      new InterpolatePlugin(in_shape_, out_shape_, size_, scales_, mode_, align_corners_, use_scales_));
+nvinfer1::IPluginV3* InterpolatePlugin::attachToContext(nvinfer1::IPluginResourceContext* context) noexcept {
+  return new InterpolatePlugin(in_shape_, out_shape_, size_, scales_, mode_, align_corners_, use_scales_);
 }
 
 /*

@@ -31,6 +31,11 @@ class NormalizePlugin : public nvinfer1::IPluginV3,
 
   std::string serializeToString() const noexcept;
 
+  // For getFieldsToSerialize()
+  mutable std::string mSerializedData;
+  mutable std::vector<nvinfer1::PluginField> mSerializationFields;
+  mutable nvinfer1::PluginFieldCollection mSerializationFC{};
+
  public:
   NormalizePlugin(int32_t order, std::vector<int32_t> axes, int32_t keep_dims);
   NormalizePlugin(const char* data, size_t length);
@@ -77,8 +82,7 @@ class NormalizePlugin : public nvinfer1::IPluginV3,
       int32_t nbOutputs) const noexcept override;
 
   // IPluginV3OneRuntime
-  size_t getSerializationSize() const noexcept override;
-  int32_t serialize(void* buffer, size_t length) const noexcept override;
+  nvinfer1::PluginFieldCollection const* getFieldsToSerialize() noexcept override;
   int32_t onShapeChange(
       const nvinfer1::PluginTensorDesc* in,
       int32_t nbInputs,
@@ -91,7 +95,7 @@ class NormalizePlugin : public nvinfer1::IPluginV3,
       void* const* outputs,
       void* workspace,
       cudaStream_t stream) noexcept override;
-  nvinfer1::IPluginV3OneRuntime* attachToContext(nvinfer1::IPluginResourceContext* context) noexcept override;
+  nvinfer1::IPluginV3* attachToContext(nvinfer1::IPluginResourceContext* context) noexcept override;
 };
 
 class NormalizePluginCreator : public nvinfer1::IPluginCreatorV3One {

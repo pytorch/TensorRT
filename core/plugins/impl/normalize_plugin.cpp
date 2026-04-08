@@ -178,17 +178,14 @@ std::string NormalizePlugin::serializeToString() const noexcept {
   return data_str.str();
 }
 
-size_t NormalizePlugin::getSerializationSize() const noexcept {
-  return serializeToString().size();
-}
-
-int32_t NormalizePlugin::serialize(void* buffer, size_t length) const noexcept {
-  std::string data = serializeToString();
-  if (data.size() > length) {
-    return -1;
-  }
-  data.copy(static_cast<char*>(buffer), data.size());
-  return 0;
+nvinfer1::PluginFieldCollection const* NormalizePlugin::getFieldsToSerialize() noexcept {
+  mSerializedData = serializeToString();
+  mSerializationFields.clear();
+  mSerializationFields.emplace_back(
+      "data", mSerializedData.data(), nvinfer1::PluginFieldType::kCHAR, mSerializedData.size());
+  mSerializationFC.nbFields = static_cast<int32_t>(mSerializationFields.size());
+  mSerializationFC.fields = mSerializationFields.data();
+  return &mSerializationFC;
 }
 
 // IPluginV3OneRuntime
@@ -237,8 +234,8 @@ int32_t NormalizePlugin::enqueue(
   return 0;
 }
 
-nvinfer1::IPluginV3OneRuntime* NormalizePlugin::attachToContext(nvinfer1::IPluginResourceContext* context) noexcept {
-  return static_cast<nvinfer1::IPluginV3OneRuntime*>(new NormalizePlugin(order_, axes_, keep_dims_));
+nvinfer1::IPluginV3* NormalizePlugin::attachToContext(nvinfer1::IPluginResourceContext* context) noexcept {
+  return new NormalizePlugin(order_, axes_, keep_dims_);
 }
 
 /*
