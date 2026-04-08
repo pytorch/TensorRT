@@ -160,7 +160,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         sparse_weights=False,
         force_fp32_output=False,
         strict_type_constraints=False,
-        algorithm_selector=None,
         timing_cache=None,
         profiling_verbosity=None,
         tactic_sources=None,
@@ -174,7 +173,6 @@ class TRTInterpreter(torch.fx.Interpreter):
             sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
             force_fp32_output: force output to be fp32
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
-            algorithm_selector: set up algorithm selection for certain layer
             timing_cache: enable timing cache for TensorRT
             profiling_verbosity: TensorRT logging level
         Return:
@@ -246,10 +244,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         if self.optimization_profiles:
             for optimization_profile in self.optimization_profiles:
                 builder_config.add_optimization_profile(optimization_profile)
-
-        if algorithm_selector:
-            builder_config.set_flag(trt.BuilderFlag.DISABLE_TIMING_CACHE)
-            builder_config.algorithm_selector = algorithm_selector
 
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)

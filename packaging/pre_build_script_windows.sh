@@ -35,12 +35,12 @@ unzip fmt.zip
 cp -r fmt-12.0.0/include/fmt/ $TORCH_INSTALL_PATH/include/
 ls -lart $TORCH_INSTALL_PATH/include/fmt/
 
-# CU_UPPERBOUND eg:13.1 or 12.9
+# CU_UPPERBOUND eg:13.2 or 12.9
 
 # tensorrt tar for linux and windows are different across cuda version
 # for sbsa it is the same tar across cuda version
 if [[ ${CU_VERSION:2:2} == "13" ]]; then
-    export CU_UPPERBOUND="13.1"
+    export CU_UPPERBOUND="13.2"
 else
     export CU_UPPERBOUND="12.9"
 fi
@@ -53,9 +53,3 @@ fi
 
 cat MODULE.bazel
 echo "RELEASE=1" >> ${GITHUB_ENV}
-
-if [[ ${USE_TRT_RTX} == true ]]; then
-    source .github/scripts/install-tensorrt-rtx.sh
-    install_wheel_or_not=true
-    install_tensorrt_rtx ${install_wheel_or_not}
-fi

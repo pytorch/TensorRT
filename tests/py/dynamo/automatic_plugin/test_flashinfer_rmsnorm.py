@@ -1,4 +1,5 @@
 import importlib
+import platform
 import unittest
 
 import pytest
@@ -32,6 +33,10 @@ if _flashinfer_available:
         )
 
 
+@unittest.skipIf(
+    platform.system() == "Windows",
+    "flashinfer RMSNorm automatic plugin test is not supported on Windows",
+)
 @unittest.skipIf(
     not _flashinfer_available or not torch_tensorrt.ENABLED_FEATURES.qdp_plugin,
     "flashinfer not installed or QDP Plugin is not available",

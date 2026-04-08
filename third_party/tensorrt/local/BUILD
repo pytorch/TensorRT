@@ -83,7 +83,7 @@ cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer_static.a",
-        ":ci_rhel_x86_64_linux": "lib64/libnvinfer_static.a",
+        ":ci_rhel_x86_64_linux": "lib/libnvinfer_static.a",
         ":windows": "lib/nvinfer_10.lib",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer_static.a",
     }),
@@ -94,7 +94,7 @@ cc_import(
     name = "nvinfer_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer.so",
-        ":ci_rhel_x86_64_linux": "lib64/libnvinfer.so",
+        ":ci_rhel_x86_64_linux": "lib/libnvinfer.so",
         ":windows": "bin/nvinfer_10.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer.so",
     }),
@@ -122,7 +122,7 @@ cc_import(
     name = "nvparsers_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvparsers.so",
-        ":ci_rhel_x86_64_linux": "lib64/libnvparsers.so",
+        ":ci_rhel_x86_64_linux": "lib/libnvparsers.so",
         ":windows": "lib/nvparsers.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvparsers.so",
     }),
@@ -186,7 +186,7 @@ cc_import(
     name = "nvonnxparser_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvonnxparser.so",
-        ":ci_rhel_x86_64_linux": "lib64/libnvonnxparser.so",
+        ":ci_rhel_x86_64_linux": "lib/libnvonnxparser.so",
         ":windows": "lib/nvonnxparser.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvonnxparser.so",
     }),
@@ -242,7 +242,7 @@ cc_import(
     name = "nvonnxparser_runtime_lib",
     shared_library = select({
         ":aarch64_linux": "lib/x86_64-linux-gnu/libnvonnxparser_runtime.so",
-        ":ci_rhel_x86_64_linux": "lib64/libnvonnxparser_runtime.so",
+        ":ci_rhel_x86_64_linux": "lib/libnvonnxparser_runtime.so",
         ":windows": "lib/nvonnxparser_runtime.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvonnxparser_runtime.so",
     }),
@@ -290,7 +290,7 @@ cc_import(
     name = "nvcaffeparser_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvcaffe_parsers.so",
-        ":ci_rhel_x86_64_linux": "lib64/libnvcaffe_parsers.so",
+        ":ci_rhel_x86_64_linux": "lib/libnvcaffe_parsers.so",
         ":windows": "lib/nvcaffe_parsers.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvcaffe_parsers.so",
     }),
@@ -338,7 +338,7 @@ cc_library(
     name = "nvinferplugin",
     srcs = select({
         ":aarch64_linux": ["lib/aarch64-linux-gnu/libnvinfer_plugin.so"],
-        ":ci_rhel_x86_64_linux": ["lib64/libnvinfer_plugin.so"],
+        ":ci_rhel_x86_64_linux": ["lib/libnvinfer_plugin.so"],
         ":windows": ["lib/nvinfer_plugin_10.lib"],
         "//conditions:default": ["lib/x86_64-linux-gnu/libnvinfer_plugin.so"],
     }),
