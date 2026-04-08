@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=dae753c2"></script>
+    <script src="../_static/documentation_options.js?v=d2cc9f21"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -506,15 +506,58 @@ document.write(`
 </section>
 <section id="quick-start-capture">
 <h2>Quick start: Capture<a class="headerlink" href="#quick-start-capture" title="Link to this heading">#</a></h2>
+<p>Example <code class="docutils literal notranslate"><span class="pre">test.py</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">torchtrt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MyModule</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModule</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+<span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="n">torchtrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+            <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+            <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+            <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">],</span>
+    <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;use_python_runtime&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="k">with</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">Debugger</span><span class="p">(</span>
+        <span class="s2">&quot;graphs&quot;</span><span class="p">,</span>
+        <span class="n">logging_dir</span><span class="o">=</span><span class="s2">&quot;debuglogs&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">compile_spec</span><span class="p">)</span>
+
+<span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="n">e</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;done.....&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TORCHTRT_ENABLE_TENSORRT_API_CAPTURE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>test.py
 </pre></div>
 </div>
-<p>You should see <code class="docutils literal notranslate"><span class="pre">shim.json</span></code> and <code class="docutils literal notranslate"><span class="pre">shim.bin</span></code> generated in <code class="docutils literal notranslate"><span class="pre">/tmp/torch_tensorrt_{current_user}/shim</span></code>.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">TORCHTRT_ENABLE_TENSORRT_API_CAPTURE=1</span></code> is set, capture and replay files are automatically saved under <code class="docutils literal notranslate"><span class="pre">debuglogs/capture_replay/</span></code> (i.e., the <code class="docutils literal notranslate"><span class="pre">capture_replay</span></code> subdirectory of <code class="docutils literal notranslate"><span class="pre">logging_dir</span></code>). You should see <code class="docutils literal notranslate"><span class="pre">capture.json</span></code> and associated <code class="docutils literal notranslate"><span class="pre">.bin</span></code> files generated there.</p>
 </section>
 <section id="replay-build-the-engine-from-the-capture">
 <h2>Replay: Build the engine from the capture<a class="headerlink" href="#replay-build-the-engine-from-the-capture" title="Link to this heading">#</a></h2>
 <p>Use <code class="docutils literal notranslate"><span class="pre">tensorrt_player</span></code> to replay the captured build without the original framework:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tensorrt_player<span class="w"> </span>-j<span class="w"> </span>/absolute/path/to/shim.json<span class="w"> </span>-o<span class="w"> </span>/absolute/path/to/output_engine
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tensorrt_player<span class="w"> </span>-j<span class="w"> </span>debuglogs/capture_replay/capture.json<span class="w"> </span>-o<span class="w"> </span>/absolute/path/to/output_engine
 </pre></div>
 </div>
 <p>This produces a serialized TensorRT engine at <code class="docutils literal notranslate"><span class="pre">output_engine</span></code>.</p>

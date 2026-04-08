@@ -39,9 +39,12 @@ cc_library(
         exclude = [
             "include/torch/csrc/api/include/**/*.h",
         ],
-    ) + glob([
-        "include/torch/csrc/api/include/**/*.h",
-    ]),
+    ) + glob(
+        [
+            "include/torch/csrc/api/include/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     includes = [
         "include",
         "include/torch/csrc/api/include/",
@@ -58,9 +61,12 @@ cc_library(
         ":windows": ["lib/c10_cuda.lib"],
         "//conditions:default": ["lib/libc10_cuda.so"],
     }),
-    hdrs = glob([
-        "include/c10/**/*.h",
-    ]),
+    hdrs = glob(
+        [
+            "include/c10/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     strip_include_prefix = "include",
     deps = [
         ":c10",
@@ -73,17 +79,23 @@ cc_library(
         ":windows": ["lib/c10.lib"],
         "//conditions:default": ["lib/libc10.so"],
     }),
-    hdrs = glob([
-        "include/c10/**/*.h",
-    ]),
+    hdrs = glob(
+        [
+            "include/c10/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     strip_include_prefix = "include",
 )
 
 cc_library(
     name = "ATen",
-    hdrs = glob([
-        "include/ATen/**/*.h",
-    ]),
+    hdrs = glob(
+        [
+            "include/ATen/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     strip_include_prefix = "include",
 )
 
@@ -97,8 +109,11 @@ cc_library(
             "lib/libcaffe2_nvrtc.so",
         ],
     }),
-    hdrs = glob([
-        "include/caffe2/**/*.h",
-    ]),
+    hdrs = glob(
+        [
+            "include/caffe2/**/*.h",
+        ],
+        allow_empty = True,
+    ),
     strip_include_prefix = "include",
 )

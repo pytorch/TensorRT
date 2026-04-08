@@ -236,7 +236,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if is_tensorrt_version_supported("8.2"):
             builder_config.profiling_verbosity = (
                 trt.ProfilingVerbosity.DETAILED
-                if self._debugger_config and self._debugger_config.save_engine_profile
+                if self._debugger_config
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
 
