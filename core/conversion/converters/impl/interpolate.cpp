@@ -54,7 +54,8 @@ void create_plugin(
 
   fc.nbFields = f.size();
   fc.fields = f.data();
-  auto creator = getPluginRegistry()->getPluginCreatorV3One("Interpolate", "1", "torch_tensorrt");
+  auto creator = static_cast<nvinfer1::IPluginCreatorV3One*>(
+      getPluginRegistry()->getCreator("Interpolate", "1", "torch_tensorrt"));
   auto interpolate_plugin = creator->createPlugin(name, &fc, nvinfer1::TensorRTPhase::kBUILD);
 
   auto resize_layer =

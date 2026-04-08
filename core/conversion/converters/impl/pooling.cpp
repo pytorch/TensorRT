@@ -97,7 +97,8 @@ bool AdaptivePoolingConverter(
   LOG_WARNING(
       "Adaptive pooling layer will be using Aten library kernels in pytorch for execution. TensorRT does not support adaptive pooling natively. Consider switching to non-adaptive pooling if this is an issue");
 
-  auto creator = getPluginRegistry()->getPluginCreatorV3One("Interpolate", "1", "torch_tensorrt");
+  auto creator = static_cast<nvinfer1::IPluginCreatorV3One*>(
+      getPluginRegistry()->getCreator("Interpolate", "1", "torch_tensorrt"));
   auto interpolate_plugin = creator->createPlugin(mode.c_str(), &fc, nvinfer1::TensorRTPhase::kBUILD);
 
   new_layer =
