@@ -76,6 +76,15 @@ def _local_torch_impl(ctx):
 
     torch_path = ctx.path(torch_dir)
 
+    # Validate that the installation has the expected C++ headers.
+    c10_include = torch_path.get_child("include").get_child("c10")
+    if not c10_include.exists:
+        fail(
+            "torch at '" + torch_dir + "' is missing include/c10/ C++ headers. " +
+            "Install a full PyTorch wheel (pip install torch) that includes dev headers, " +
+            "or set TORCH_PATH to the correct directory.",
+        )
+
     # Symlink the subdirectories the BUILD file references into the synthetic repo
     for sub in ["include", "lib", "share"]:
         child = torch_path.get_child(sub)

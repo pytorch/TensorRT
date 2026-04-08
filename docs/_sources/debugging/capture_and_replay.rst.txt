@@ -13,11 +13,56 @@ Prerequisites
 Quick start: Capture
 --------------------
 
+Example ``test.py``:
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt as torchtrt
+    import torchvision.models as models
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv1d(3, 3, 3, padding=1, stride=1, bias=True)
+
+        def forward(self, x):
+            return self.conv(x)
+
+    model = MyModule().eval().to("cuda")
+    input = torch.randn((1, 3, 3)).to("cuda").to(torch.float32)
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                min_shape=(1, 3, 3),
+                opt_shape=(2, 3, 3),
+                max_shape=(3, 3, 3),
+                dtype=torch.float32,
+            )
+        ],
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+        "use_python_runtime": True,
+    }
+
+    try:
+        with torchtrt.dynamo.Debugger(
+            "graphs",
+            logging_dir="debuglogs",
+        ):
+            trt_mod = torchtrt.compile(model, **compile_spec)
+
+    except Exception as e:
+        raise e
+
+    print("done.....")
+
 .. code-block:: bash
 
     TORCHTRT_ENABLE_TENSORRT_API_CAPTURE=1 python test.py
 
-You should see ``shim.json`` and ``shim.bin`` generated in ``/tmp/torch_tensorrt_{current_user}/shim``.
+When ``TORCHTRT_ENABLE_TENSORRT_API_CAPTURE=1`` is set, capture and replay files are automatically saved under ``debuglogs/capture_replay/`` (i.e., the ``capture_replay`` subdirectory of ``logging_dir``). You should see ``capture.json`` and associated ``.bin`` files generated there.
 
 Replay: Build the engine from the capture
 -----------------------------------------
@@ -26,7 +71,7 @@ Use ``tensorrt_player`` to replay the captured build without the original framew
 
 .. code-block:: bash
 
-    tensorrt_player -j /absolute/path/to/shim.json -o /absolute/path/to/output_engine
+    tensorrt_player -j debuglogs/capture_replay/capture.json -o /absolute/path/to/output_engine
 
 This produces a serialized TensorRT engine at ``output_engine``.
 

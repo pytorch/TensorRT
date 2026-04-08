@@ -3,7 +3,7 @@
 set -x
 
 # Install dependencies
-python3 -m pip install pyyaml
+python3 -m pip install pyyaml packaging
 
 if [[ $(uname -m) == "aarch64" ]]; then
   IS_AARCH64=true
@@ -58,6 +58,18 @@ fi
 
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
 export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
+
+if [[ -z "${TORCH_INSTALL_PATH}" ]]; then
+    echo "ERROR: TORCH_INSTALL_PATH is empty — could not locate torch installation."
+    echo "Ensure the active Python environment has torch installed, or set TORCH_PATH explicitly."
+    exit 1
+fi
+
+if [[ ! -d "${TORCH_INSTALL_PATH}/include/c10" ]]; then
+    echo "ERROR: torch at '${TORCH_INSTALL_PATH}' is missing include/c10/ C++ headers."
+    echo "Install a full PyTorch wheel (pip install torch) that includes dev headers."
+    exit 1
+fi
 
 # CU_UPPERBOUND eg:13.2 or 12.9
 # tensorrt tar for linux and windows are different across cuda version
