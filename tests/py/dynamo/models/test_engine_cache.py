@@ -172,7 +172,7 @@ class TestHashFunction(TestCase):
             torch_trt.Input(
                 min_shape=(1, 3, 224, 224),
                 opt_shape=(100, 3, 224, 224),
-                max_shape=(200, 3, 224, 224),
+                max_shape=(400, 3, 224, 224),
             ),
         )
         settings2 = CompilationSettings(
