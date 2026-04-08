@@ -545,7 +545,7 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(
+        return dynamo_convert_exported_program_to_serialized_trt_engine(  # type: ignore[no-any-return]
             exp_program,
             arg_inputs=tuple(arg_inputs),
             kwarg_inputs=torchtrt_kwarg_inputs,
@@ -594,35 +594,43 @@ def load(
     Raises:
         ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file
     """
+    from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
 
     try:
-        logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
-        ts_module = function_overload_with_kwargs(
+        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
+        exp_program = function_overload_with_kwargs(
             torch.export.load,
             file_path,
             extra_files=extra_files,
             **kwargs,
         )
-        return ts_module
+        gm = exp_program.graph_module
+        if any(
+            "no_op_placeholder_for_execute_engine" in n.name for n in gm.graph.nodes
+        ):
+            return replace_execute_engine_no_op_node(exp_program)
+        return exp_program
     except Exception:
+        import traceback
+
+        traceback.print_exc()
         logger.info(
             f"Loading the provided file {file_path} via torch.export.load() failed with the following error",
             exc_info=True,
         )
-        pass
 
     try:
-        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
-        exp_program = function_overload_with_kwargs(
+        logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
+        ts_module = function_overload_with_kwargs(
             torch.jit.load,
             file_path,
             _extra_files=extra_files,
             **kwargs,
         )
-        return exp_program
-    except Exception:
+        return ts_module
+    except Exception as e:
         logger.info(
-            f"Loading the provided file {file_path} via torch.jit.load() (after failing to load with torch.export.load()) failed with the following error",
+            f"Loading the provided file {file_path} via torch.jit.load() (after failing to load with torch.export.load()) failed with the following error: {e}",
             exc_info=True,
         )
         raise ValueError(
@@ -805,8 +813,8 @@ def save(
                     f"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: {dynamic_shapes}"
                 )
 
-        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))  # type: ignore
-        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())  # type: ignore
+        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))
+        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())
 
     else:
         # Mixed case: some inputs are Tensors, some are Input objects

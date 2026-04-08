@@ -707,3 +707,25 @@ if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
     ) -> List[torch.Tensor]:
         outputs = engine.execute(input_tensors)
         return [outputs] if isinstance(outputs, torch.Tensor) else list(outputs)
+
+    @torch.library.custom_op(  # type: ignore[misc]
+        "tensorrt::no_op_placeholder_for_execute_engine", mutates_args=()
+    )
+    def no_op_placeholder_for_execute_engine(
+        inputs: List[torch.Tensor],
+        abi_version: str,
+        name: str,
+        serialized_device_info: str,
+        serialized_engine: str,
+        serialized_in_binding_names: str,
+        serialized_out_binding_names: str,
+        serialized_hardware_compatible: str,
+        serialized_metadata: str,
+        serialized_target_platform: str,
+        serialized_require_output_allocator: str,
+        serialized_resource_allocation_strategy: str,
+    ) -> List[torch.Tensor]:
+        raise RuntimeError(
+            "TensorRT engine placeholder reached eager execution; load this artifact with "
+            "torch_tensorrt.load() so placeholders are lowered to execute_engine."
+        )
