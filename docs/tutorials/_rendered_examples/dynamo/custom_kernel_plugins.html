@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=d2cc9f21"></script>
+    <script src="../../../_static/documentation_options.js?v=5f3acbe4"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -586,7 +586,7 @@ document.write(`
 in terms of PyTorch ops that are supported in Torch-TensorRT or a converter (see: <a class="reference external" href="https://pytorch.org/TensorRT/contributors/dynamo_converters.html">Writing converters for the Dynamo frontend</a>) - which defines the operator in terms of TensorRT operators.</p>
 <p>In some cases there isn’t a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or TensorRT cannot support it natively.</p>
 <p>For these cases, it is possible to use a TensorRT plugin to replace the operator <strong>inside</strong> the TensorRT engine, thereby avoiding the performance and resource overhead from a graph break. For the sake of demonstration, consider the operation circular padding. Circular padding is useful for ops like circular convolution in deep learning. The following image denotes how the original image (red) is circular padded once (green) and twice (blue):</p>
-<p><img alt="2c5c971385cc4ee3a186181ed975c00f" class="no-scaled-link" src="file://tutorials/images/circ_pad_example.png" style="width: 512px; height: 512px;" /></p>
+<p><img alt="b24757fe642146b19d9f686d514471f9" class="no-scaled-link" src="file://tutorials/images/circ_pad_example.png" style="width: 512px; height: 512px;" /></p>
 <section id="Writing-Custom-Operators-in-PyTorch">
 <h2>Writing Custom Operators in PyTorch<a class="headerlink" href="#Writing-Custom-Operators-in-PyTorch" title="Link to this heading">#</a></h2>
 <p>Assume for whatever reason we would like to use a custom implementation of circular padding. In this case as implemented using a kernel written in <a class="reference external" href="https://openai.com/index/triton">OpenAI Triton</a></p>
