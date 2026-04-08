@@ -381,7 +381,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     )
                     # this calls self.engine.set_process_group(process_group)
                     pg = dist.group.WORLD
-                    self.int_nccl_comm(pg)
+                    self.init_nccl_comm(pg)
                     self._nccl_setup_done = True
                     logger.debug(f"NCCL setup complete (rank={self.engine.rank})")
                 else:
