@@ -28,7 +28,7 @@ template <typename T>
 class PluginRegistrarV3 {
  public:
   PluginRegistrarV3() {
-    getPluginRegistry()->registerCreatorV3One(instance, "torch_tensorrt");
+    getPluginRegistry()->registerCreator(instance, "torch_tensorrt");
   }
 
  private:

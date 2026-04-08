@@ -91,10 +91,10 @@ class InterpolatePlugin : public nvinfer1::IPluginV3,
       int32_t nbInputs,
       const nvinfer1::DynamicPluginTensorDesc* outputs,
       int32_t nbOutputs) const noexcept override;
-  int32_t getSerializationSize() const noexcept override;
-  int32_t serialize(void* buffer, size_t length) const noexcept override;
 
   // IPluginV3OneRuntime
+  size_t getSerializationSize() const noexcept override;
+  int32_t serialize(void* buffer, size_t length) const noexcept override;
   int32_t onShapeChange(
       const nvinfer1::PluginTensorDesc* in,
       int32_t nbInputs,

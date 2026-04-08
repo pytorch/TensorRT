@@ -178,8 +178,8 @@ std::string NormalizePlugin::serializeToString() const noexcept {
   return data_str.str();
 }
 
-int32_t NormalizePlugin::getSerializationSize() const noexcept {
-  return static_cast<int32_t>(serializeToString().size());
+size_t NormalizePlugin::getSerializationSize() const noexcept {
+  return serializeToString().size();
 }
 
 int32_t NormalizePlugin::serialize(void* buffer, size_t length) const noexcept {
