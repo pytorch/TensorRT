@@ -28,10 +28,6 @@
 #define ENABLE_TRT_NCCL_COLLECTIVES 1
 #endif
 
-#ifdef ENABLE_TRT_NCCL_COLLECTIVES
-#include <nccl.h>
-#endif
-
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
@@ -218,7 +214,7 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t world_size = -1;
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-  ncclComm_t nccl_comm = nullptr;
+  void* nccl_comm = nullptr;
 
   // Detect rank and world_size from ProcessGroup
   void detect_distributed_context(const std::string& group_name);

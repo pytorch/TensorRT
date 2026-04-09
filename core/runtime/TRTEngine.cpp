@@ -573,7 +573,7 @@ void TRTEngine::setup_nccl_comm(const std::string& group_name) {
       "NCCL communicator not initialized for device " << this->device_info.id
                                                       << ". Ensure a collective operation has been performed first.");
 
-  this->nccl_comm = reinterpret_cast<ncclComm_t>(comm_ptr);
+  this->nccl_comm = reinterpret_cast<void*>(comm_ptr);
   set_nccl_communicator_to_trt_context();
   LOG_INFO("NCCL comm set up (rank=" << this->rank << ", device=" << this->device_info.id << ")");
 }
@@ -582,8 +582,7 @@ bool TRTEngine::set_nccl_communicator_to_trt_context() {
   TORCHTRT_CHECK(exec_ctx != nullptr, "Cannot set NCCL communicator: execution context is null");
   TORCHTRT_CHECK(this->nccl_comm != nullptr, "NCCL communicator is not set");
 
-  void* comm_ptr = static_cast<void*>(this->nccl_comm);
-  exec_ctx->setCommunicator(comm_ptr);
+  exec_ctx->setCommunicator(this->nccl_comm);
 
   LOG_INFO(
       "NCCL communicator set on TensorRT execution context "
