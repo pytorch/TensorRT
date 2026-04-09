@@ -332,8 +332,11 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
   // ------------------------------------------------------------------
   // 3. Bind output addresses
-  // ExecuTorch pre-allocates output tensors, but they may be CPU buffers.
-  // If so, allocate a temporary CUDA buffer and copy back after inference.
+  // ExecuTorch pre-allocates output tensors at the maximum shape for
+  // dynamic models.  After inferShapes() TRT knows the actual output
+  // dims, so update the ExecuTorch TensorImpl's sizes before computing
+  // nbytes() and before the Python binding reads back the shape.
+  // If the buffer is CPU, stage through a temporary CUDA allocation.
   // ------------------------------------------------------------------
   for (size_t o = 0; o < num_outputs; ++o) {
     EValue* arg = args[num_inputs + o];
@@ -345,12 +348,24 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
     exec_aten::Tensor et_out = arg->toTensor();
     const std::string& name = engine->out_binding_names[o];
+
+    // Update the ExecuTorch tensor shape to the actual TRT output shape.
+    // getTensorShape() is valid after inferShapes() has been called.
+    nvinfer1::Dims actual_dims = ctx->getTensorShape(name.c_str());
+    if (actual_dims.nbDims > 0) {
+      exec_aten::SizesType new_sizes[nvinfer1::Dims::MAX_DIMS];
+      for (int d = 0; d < actual_dims.nbDims; ++d) {
+        new_sizes[d] = static_cast<exec_aten::SizesType>(actual_dims.d[d]);
+      }
+      et_out.unsafeGetTensorImpl()->set_sizes_contiguous({new_sizes, static_cast<size_t>(actual_dims.nbDims)});
+    }
+
     void* dst_ptr = et_out.mutable_data_ptr();
     void* trt_ptr = dst_ptr;
 
     if (!is_cuda_ptr(dst_ptr)) {
       // CPU output buffer: allocate temporary CUDA memory for TRT to write into
-      size_t nbytes = et_out.nbytes();
+      size_t nbytes = et_out.nbytes(); // uses updated shape
       if (cudaMalloc(&temp_output_bufs[o], nbytes) != cudaSuccess) {
         ET_LOG(Error, "TensorRTBackend::execute: cudaMalloc failed for output %zu", o);
         free_temp();
