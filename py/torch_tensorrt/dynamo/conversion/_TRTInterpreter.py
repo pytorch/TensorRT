@@ -632,6 +632,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             serialized_engine = self.builder.build_serialized_network(
                 self.ctx.net, builder_config
             )
+            if serialized_engine is None:
+                raise RuntimeError(
+                    "TensorRT build_serialized_network returned None; engine build failed."
+                )
             runtime = trt.Runtime(TRT_LOGGER)
             cuda_engine = runtime.deserialize_cuda_engine(serialized_engine)
         else:
