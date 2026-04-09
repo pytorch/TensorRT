@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
@@ -26,8 +27,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-
-from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -2755,8 +2754,39 @@ def aten_ops_le(
     )
 
 
+def depthwise_bf16_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject depthwise conv/deconv with BF16 on TensorRT-RTX.
+
+    TensorRT-RTX does not support depthwise convolutions in BF16. Returning
+    False causes the partitioner to fall back to PyTorch for these specific
+    nodes, while all other convolutions remain on TRT.
+    """
+    if not ENABLED_FEATURES.tensorrt_rtx:
+        return True
+    # Check if the input tensor is BF16 (via FX node metadata)
+    input_node = node.args[0]
+    input_meta = getattr(input_node, "meta", {}).get("tensor_meta")
+    if input_meta is None or input_meta.dtype != torch.bfloat16:
+        return True
+    groups = args_bounds_check(node.args, 8)
+    if groups is not None and groups > 1:
+        weight_node = node.args[1]
+        weight_meta = getattr(weight_node, "meta", {}).get("tensor_meta")
+        if weight_meta is not None and groups == weight_meta.shape[0]:
+            _LOGGER.debug(
+                "Depthwise convolution '%s' with BF16 is not supported on "
+                "TensorRT-RTX. Falling back to PyTorch for this layer.",
+                node.name,
+            )
+            return False
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.convolution.default,
+    capability_validator=depthwise_bf16_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(

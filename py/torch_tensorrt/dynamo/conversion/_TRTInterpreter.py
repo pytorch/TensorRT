@@ -202,8 +202,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     def validate_compile_settings(self) -> None:
         if ENABLED_FEATURES.tensorrt_rtx:
-            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
-                raise RuntimeError("TensorRT-RTX does not support bfloat16!")
+            # NOTE: bfloat16 check disabled — depthwise conv BF16 limitation
+            # is now handled per-layer via capability_validator
             return
 
         if (
