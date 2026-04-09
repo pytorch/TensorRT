@@ -7,6 +7,7 @@ import pickle
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
+import torch.distributed as dist
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform
 from torch_tensorrt._features import (
@@ -209,8 +210,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[RESOURCE_ALLOCATION_STRATEGY_IDX] = str(
             int(self.dynamically_allocate_resources)
         )
-        import torch.distributed as dist
-
         is_md = dist.is_initialized() and dist.get_world_size() > 1
         engine_info[IS_MD_ENGINE_IDX] = str(int(is_md))
         # serialized engine info for build time rank and world size
@@ -255,8 +254,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def _get_default_group_name(self) -> str:
         """Get the group name of the default ProcessGroup."""
-        import torch.distributed as dist
-
         if dist.is_available() and dist.is_initialized():
             pg = dist.group.WORLD
             if pg is not None and hasattr(pg, "group_name"):

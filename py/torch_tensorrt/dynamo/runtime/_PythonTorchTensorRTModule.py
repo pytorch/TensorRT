@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
+import torch.distributed as dist
 import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
@@ -230,8 +231,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.setup_engine()
 
         # Auto-detect distributed context
-        import torch.distributed as dist
-
         if dist.is_initialized():
             self.rank = dist.get_rank()
             self.world_size = dist.get_world_size()
@@ -314,8 +313,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             return
 
         setup_nccl_library()
-
-        import torch.distributed as dist
 
         if not dist.is_initialized():
             raise RuntimeError(
@@ -428,10 +425,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_names = state_dict[prefix + "output_names"]
         self.target_platform = state_dict[prefix + "platform"]
 
+        # Same rule as C++ TRTEngine: serialized rank/world_size are build-time
+        # metadata for logging. Runtime rank is auto-detected from ProcessGroup.
         build_rank = state_dict.get(prefix + "rank", -1)
         build_world_size = state_dict.get(prefix + "world_size", -1)
-        import torch.distributed as dist
-
         if dist.is_initialized():
             self.rank = dist.get_rank()
             self.world_size = dist.get_world_size()
