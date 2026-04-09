@@ -19,6 +19,11 @@
 #include <executorch/runtime/backend/interface.h>
 #include <executorch/runtime/platform/log.h>
 
+// RTDevice and Platform must be included before TRTEngine.h because TRTEngine.h
+// references them without including their headers directly (Bazel handles this
+// via transitive deps, but a standalone compile needs them explicit).
+#include "core/runtime/Platform.h"
+#include "core/runtime/RTDevice.h"
 #include "core/runtime/TRTEngine.h"
 #include "core/util/prelude.h"
 
@@ -116,7 +121,18 @@ bool TensorRTBackend::is_available() const {
 // provided by the ExecuTorch MemoryAllocator so that ExecuTorch owns the
 // lifetime; destroy() calls the destructor explicitly.
 // ---------------------------------------------------------------------------
-Result<DelegateHandle*> TensorRTBackend::init(BackendInitContext& context, FreeableBuffer* processed) const {
+Result<DelegateHandle*> TensorRTBackend::init(
+    BackendInitContext& context,
+    FreeableBuffer* processed,
+    ArrayRef<CompileSpec> compile_specs) const {
+  (void)compile_specs;
+  ET_LOG(Info, "TensorRTBackend::init: enter");
+
+  if (!is_available()) {
+    ET_LOG(Error, "TensorRT backend is not available");
+    return Error::NotSupported;
+  }
+
   if (processed == nullptr || processed->data() == nullptr) {
     ET_LOG(Error, "TensorRTBackend::init: null processed buffer");
     return Error::InvalidArgument;
@@ -125,19 +141,31 @@ Result<DelegateHandle*> TensorRTBackend::init(BackendInitContext& context, Freea
   auto serialized_info = deserialize_engine_info(processed->data(), processed->size());
 
   if (serialized_info.empty()) {
+    fprintf(stderr, "[TensorRTBackend::init] FAIL: deserialize_engine_info returned empty\n");
     ET_LOG(Error, "TensorRTBackend::init: failed to deserialize engine blob");
     return Error::InvalidArgument;
   }
+  ET_LOG(Info, "TensorRTBackend::init: deserialized %zu entries", serialized_info.size());
 
   // Validate the vector length before handing to TRTEngine
   // (verify_serialization_fmt throws on mismatch)
-  core::runtime::TRTEngine::verify_serialization_fmt(serialized_info);
+  ET_LOG(Info, "TensorRTBackend::init: calling verify_serialization_fmt");
+  try {
+    core::runtime::TRTEngine::verify_serialization_fmt(serialized_info);
+  } catch (const std::exception& e) {
+    ET_LOG(Error, "TensorRTBackend::init: verify_serialization_fmt threw: %s", e.what());
+    return Error::InvalidArgument;
+  } catch (...) {
+    ET_LOG(Error, "TensorRTBackend::init: verify_serialization_fmt threw unknown exception");
+    return Error::InvalidArgument;
+  }
 
   MemoryAllocator* allocator = context.get_runtime_allocator();
   if (allocator == nullptr) {
     ET_LOG(Error, "TensorRTBackend::init: null runtime allocator");
     return Error::InvalidState;
   }
+  ET_LOG(Info, "TensorRTBackend::init: got allocator");
 
   // Allocate raw storage for TRTEngine from ExecuTorch's arena
   core::runtime::TRTEngine* engine = allocator->allocateInstance<core::runtime::TRTEngine>();
@@ -145,11 +173,23 @@ Result<DelegateHandle*> TensorRTBackend::init(BackendInitContext& context, Freea
     ET_LOG(Error, "TensorRTBackend::init: allocateInstance failed");
     return Error::MemoryAllocationFailed;
   }
+  ET_LOG(Info, "TensorRTBackend::init: allocated engine storage at %p", (void*)engine);
 
   // Construct in-place; TRTEngine(std::vector<std::string>) deserializes the
   // engine bytes, builds the IRuntime/ICudaEngine/IExecutionContext, and
   // populates in_binding_names / out_binding_names / num_io.
-  new (engine) core::runtime::TRTEngine(std::move(serialized_info));
+  ET_LOG(Info, "TensorRTBackend::init: constructing TRTEngine in-place");
+  try {
+    new (engine) core::runtime::TRTEngine(std::move(serialized_info));
+  } catch (const std::exception& e) {
+    fprintf(stderr, "[TensorRTBackend::init] FAIL: TRTEngine constructor threw: %s\n", e.what());
+    ET_LOG(Error, "TensorRTBackend::init: TRTEngine constructor threw: %s", e.what());
+    return Error::InvalidArgument;
+  } catch (...) {
+    fprintf(stderr, "[TensorRTBackend::init] FAIL: TRTEngine constructor threw unknown exception\n");
+    ET_LOG(Error, "TensorRTBackend::init: TRTEngine constructor threw unknown exception");
+    return Error::InvalidArgument;
+  }
 
   // Release the blob; we no longer need it
   processed->Free();
@@ -178,27 +218,57 @@ Result<DelegateHandle*> TensorRTBackend::init(BackendInitContext& context, Freea
 // ---------------------------------------------------------------------------
 Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle* handle, Span<EValue*> args) const {
   (void)context;
+  fprintf(stderr, "[TensorRTBackend::execute] enter: handle=%p args.size()=%zu\n", (void*)handle, args.size());
+  ET_LOG(Info, "TensorRTBackend::execute: enter");
 
   if (handle == nullptr) {
     ET_LOG(Error, "TensorRTBackend::execute: null delegate handle");
     return Error::InvalidArgument;
   }
-
+  ET_LOG(Info, "TensorRTBackend::execute: got delegate handle");
   auto* engine = static_cast<core::runtime::TRTEngine*>(handle);
 
   const size_t num_inputs = engine->num_io.first;
   const size_t num_outputs = engine->num_io.second;
+  ET_LOG(Info, "TensorRTBackend::execute: got num_inputs %zu and num_outputs %zu", num_inputs, num_outputs);
 
   if (args.size() < num_inputs + num_outputs) {
     ET_LOG(
         Error, "TensorRTBackend::execute: expected at least %zu args, got %zu", num_inputs + num_outputs, args.size());
     return Error::InvalidArgument;
   }
-
+  ET_LOG(Info, "TensorRTBackend::execute: got engine");
   // IExecutionContext::enqueueV3 is not thread-safe; use the engine mutex
   std::unique_lock<std::mutex> lock(engine->mu);
 
   nvinfer1::IExecutionContext* ctx = engine->exec_ctx.get();
+
+  cudaStream_t stream = c10::cuda::getCurrentCUDAStream(static_cast<c10::DeviceIndex>(engine->device_info.id));
+
+  // ExecuTorch's portable runtime pre-allocates output tensors as CPU buffers.
+  // TRT requires CUDA device pointers for all bindings.  We use
+  // cudaPointerGetAttributes to detect CPU pointers and stage them through
+  // temporary CUDA allocations, copying back after inference.
+  auto is_cuda_ptr = [](const void* ptr) -> bool {
+    if (ptr == nullptr)
+      return false;
+    cudaPointerAttributes attrs{};
+    cudaError_t err = cudaPointerGetAttributes(&attrs, ptr);
+    return err == cudaSuccess && attrs.type == cudaMemoryTypeDevice;
+  };
+
+  std::vector<void*> temp_input_bufs(num_inputs, nullptr);
+  std::vector<void*> temp_output_bufs(num_outputs, nullptr);
+
+  // Cleanup helper – called on every return path.
+  auto free_temp = [&]() {
+    for (void* p : temp_input_bufs)
+      if (p)
+        cudaFree(p);
+    for (void* p : temp_output_bufs)
+      if (p)
+        cudaFree(p);
+  };
 
   // ------------------------------------------------------------------
   // 1. Bind input shapes and addresses
@@ -207,6 +277,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     EValue* arg = args[i];
     if (arg == nullptr || !arg->isTensor()) {
       ET_LOG(Error, "TensorRTBackend::execute: input %zu is not a tensor", i);
+      free_temp();
       return Error::InvalidArgument;
     }
 
@@ -216,18 +287,31 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
     if (!ctx->setInputShape(name.c_str(), dims)) {
       ET_LOG(Error, "TensorRTBackend::execute: setInputShape failed for '%s'", name.c_str());
+      free_temp();
       return Error::InvalidState;
     }
 
-    void* ptr = et_in.mutable_data_ptr();
-    // TRT requires a non-null address even for 0-element tensors
+    void* src_ptr = et_in.mutable_data_ptr();
+    void* trt_ptr = src_ptr;
+
     static char placeholder[16] = {};
-    if (ptr == nullptr || et_in.numel() == 0) {
-      ptr = placeholder;
+    if (src_ptr == nullptr || et_in.numel() == 0) {
+      trt_ptr = placeholder;
+    } else if (!is_cuda_ptr(src_ptr)) {
+      // CPU input: stage to a temporary CUDA buffer
+      size_t nbytes = et_in.nbytes();
+      if (cudaMalloc(&temp_input_bufs[i], nbytes) != cudaSuccess) {
+        ET_LOG(Error, "TensorRTBackend::execute: cudaMalloc failed for input %zu", i);
+        free_temp();
+        return Error::MemoryAllocationFailed;
+      }
+      cudaMemcpyAsync(temp_input_bufs[i], src_ptr, nbytes, cudaMemcpyHostToDevice, stream);
+      trt_ptr = temp_input_bufs[i];
     }
 
-    if (!ctx->setTensorAddress(name.c_str(), ptr)) {
+    if (!ctx->setTensorAddress(name.c_str(), trt_ptr)) {
       ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for input '%s'", name.c_str());
+      free_temp();
       return Error::InvalidState;
     }
   }
@@ -241,26 +325,43 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     const int32_t n_unresolved = ctx->inferShapes(io_size, unresolved.data());
     if (n_unresolved != 0) {
       ET_LOG(Error, "TensorRTBackend::execute: inferShapes could not resolve %d tensor(s)", n_unresolved);
+      free_temp();
       return Error::InvalidState;
     }
   }
 
   // ------------------------------------------------------------------
-  // 3. Bind output addresses (ExecuTorch pre-allocates the buffers)
+  // 3. Bind output addresses
+  // ExecuTorch pre-allocates output tensors, but they may be CPU buffers.
+  // If so, allocate a temporary CUDA buffer and copy back after inference.
   // ------------------------------------------------------------------
   for (size_t o = 0; o < num_outputs; ++o) {
     EValue* arg = args[num_inputs + o];
     if (arg == nullptr || !arg->isTensor()) {
       ET_LOG(Error, "TensorRTBackend::execute: output %zu is not a tensor", o);
+      free_temp();
       return Error::InvalidArgument;
     }
 
     exec_aten::Tensor et_out = arg->toTensor();
     const std::string& name = engine->out_binding_names[o];
-    void* ptr = et_out.mutable_data_ptr();
+    void* dst_ptr = et_out.mutable_data_ptr();
+    void* trt_ptr = dst_ptr;
 
-    if (!ctx->setTensorAddress(name.c_str(), ptr)) {
+    if (!is_cuda_ptr(dst_ptr)) {
+      // CPU output buffer: allocate temporary CUDA memory for TRT to write into
+      size_t nbytes = et_out.nbytes();
+      if (cudaMalloc(&temp_output_bufs[o], nbytes) != cudaSuccess) {
+        ET_LOG(Error, "TensorRTBackend::execute: cudaMalloc failed for output %zu", o);
+        free_temp();
+        return Error::MemoryAllocationFailed;
+      }
+      trt_ptr = temp_output_bufs[o];
+    }
+
+    if (!ctx->setTensorAddress(name.c_str(), trt_ptr)) {
       ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for output '%s'", name.c_str());
+      free_temp();
       return Error::InvalidState;
     }
   }
@@ -268,16 +369,26 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // 4. Enqueue inference on the current CUDA stream
   // ------------------------------------------------------------------
-  cudaStream_t stream = c10::cuda::getCurrentCUDAStream(static_cast<c10::DeviceIndex>(engine->device_info.id));
-
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(Error, "TensorRTBackend::execute: enqueueV3 failed");
+    free_temp();
     return Error::InvalidState;
   }
 
-  // Synchronize so that outputs are visible to downstream ExecuTorch ops
+  // ------------------------------------------------------------------
+  // 5. Copy temporary CUDA outputs back to the ExecuTorch CPU buffers
+  // ------------------------------------------------------------------
+  for (size_t o = 0; o < num_outputs; ++o) {
+    if (temp_output_bufs[o] != nullptr) {
+      exec_aten::Tensor et_out = args[num_inputs + o]->toTensor();
+      cudaMemcpyAsync(et_out.mutable_data_ptr(), temp_output_bufs[o], et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
+    }
+  }
+
+  // Synchronize so outputs are visible to downstream ExecuTorch ops
   cudaStreamSynchronize(stream);
 
+  free_temp();
   return Error::Ok;
 }
 

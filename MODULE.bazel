@@ -90,7 +90,7 @@ local_torch(name = "libtorch")
 #new_local_repository(
 #    name = "executorch",
 #    build_file = "@//third_party/executorch:BUILD",
-#    path = "/home/lanl/git/lan_fork/",
+#    path = "/home/lanl/git/executorch",
 #)
 
 #new_local_repository(

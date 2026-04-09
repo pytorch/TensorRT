@@ -17,8 +17,28 @@ Prerequisites
 # Imports
 # ^^^^^^^
 
+import ctypes
+import os
+
 import torch
-import torch_tensorrt  # noqa: F401  -- loads libtorchtrt_runtime.so, which registers TensorRTBackend with the ExecuTorch runtime via its static initializer
+import torch_tensorrt  # noqa: F401  -- loads libtorchtrt.so / libtorchtrt_runtime.so
+
+# libqnn_executorch_backend.so carries the ExecuTorch runtime (including
+# executorch::runtime::internal::vlogf and register_backend). It must be
+# loaded with RTLD_GLOBAL so its symbols are visible to subsequently
+# dlopen'd libraries (libtrt_executorch_backend.so and portable_lib).
+_executorch_path = os.environ.get("EXECUTORCH_PATH", "/home/lanl/git/executorch")
+ctypes.CDLL(
+    os.path.join(_executorch_path, "backends/qualcomm/libqnn_executorch_backend.so"),
+    mode=ctypes.RTLD_GLOBAL,
+)
+
+# Load the TensorRT ExecuTorch backend shared library, which runs a static
+# initializer that calls executorch::runtime::register_backend("TensorRTBackend").
+# Resolves runtime symbols from libqnn_executorch_backend.so loaded above.
+_lib_dir = os.path.join(os.path.dirname(torch_tensorrt.__file__), "lib")
+ctypes.CDLL(os.path.join(_lib_dir, "libtrt_executorch_backend.so"))
+
 from executorch.extension.pybindings import portable_lib as runtime
 
 # %%
@@ -28,14 +48,15 @@ from executorch.extension.pybindings import portable_lib as runtime
 # original model's exported methods (e.g. "forward").
 
 executorch_module = runtime._load_for_executorch("model.pte")
-
 # %%
 # Run inference
 # ^^^^^^^^^^^^^
 # Inputs must be passed as a list of tensors matching the static shapes used
 # at export time: (2, 3, 4, 4) float32 on CUDA.
 
-example_input = torch.randn((2, 3, 4, 4)).cuda()
+example_input = torch.randn(
+    (2, 3, 4, 4)
+)  # CPU tensor; execute() stages it to CUDA internally
 outputs = executorch_module.forward([example_input])
 
 print("Output shape:", outputs[0].shape)
@@ -51,7 +72,7 @@ class MyModel(torch.nn.Module):
         return x + 1
 
 
-model = MyModel().eval().cuda()
+model = MyModel().eval()
 with torch.no_grad():
     expected = model(example_input)
 

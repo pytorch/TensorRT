@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -11,18 +11,16 @@ package(default_visibility = ["//visibility:public"])
 # In both cases the repo root contains runtime/, extension/, and cmake-out/.
 # include_prefix = "executorch" remaps runtime/... → <executorch/runtime/...>.
 
-cc_import(
-    name = "executorch_core_lib",
-    static_library = "cmake-out/libexecutorch_core.a",
-    visibility = ["//visibility:private"],
-)
-
+# Headers-only: provides include paths for compilation but does NOT link any
+# static ExecuTorch library.  ExecuTorch runtime symbols (register_backend,
+# find_backend, FreeableBuffer, …) are left undefined and resolved at dlopen()
+# time from libqnn_executorch_backend.so, which _portable_lib.so loads with
+# RTLD_GLOBAL.  This ensures all backends share the same registry instance.
 cc_library(
-    name = "executorch_core",
+    name = "executorch_headers",
     hdrs = glob([
         "runtime/**/*.h",
         "extension/**/*.h",
     ]),
     include_prefix = "executorch",
-    deps = [":executorch_core_lib"],
 )

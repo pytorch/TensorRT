@@ -2,20 +2,14 @@
 
 Discovery order:
   1. EXECUTORCH_PATH env var — absolute path to the executorch source root
-                               (the directory containing runtime/, extension/, cmake-out/)
+                               (the directory containing runtime/, extension/)
   2. import executorch from the active Python interpreter — walks up from the
      package directory to find the source root that contains runtime/backend/
   3. VIRTUAL_ENV / CONDA_PREFIX / .venv / system python3
 
-The synthetic repo is structured with a single `executorch/` symlink pointing
-at the source root so that headers resolve as <executorch/runtime/...> with
-`includes = ["."]` in the BUILD file.
-
-Requires a cmake-out/ build inside the executorch source tree containing
-libexecutorch_core.a.  Run cmake from the source root first:
-
-    cmake -S . -B cmake-out <options>
-    cmake --build cmake-out
+Only the header files under runtime/ and extension/ are used; no cmake build
+of libexecutorch_core.a is required.  ExecuTorch runtime symbols are resolved
+at dlopen() time from libqnn_executorch_backend.so (loaded by _portable_lib.so).
 """
 
 def _find_python(ctx):
@@ -93,7 +87,8 @@ def _local_executorch_impl(ctx):
     # Symlink the subdirectories referenced by the BUILD file into the synthetic
     # repo root, mirroring the new_local_repository(path=EXECUTORCH_PATH) layout.
     # include_prefix = "executorch" in the BUILD file handles the header remapping.
-    for sub in ["runtime", "extension", "cmake-out"]:
+    # Note: cmake-out is no longer needed (executorch_core static lib was removed).
+    for sub in ["runtime", "extension"]:
         child = et_dir.get_child(sub)
         if child.exists:
             ctx.symlink(child, sub)

@@ -447,6 +447,29 @@ TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
 }
 
 void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& serialized_info) {
+  static const char* kIndexNames[] = {
+      "ABI_TARGET_IDX",
+      "NAME_IDX",
+      "DEVICE_IDX",
+      "ENGINE_IDX",
+      "INPUT_BINDING_NAMES_IDX",
+      "OUTPUT_BINDING_NAMES_IDX",
+      "HW_COMPATIBLE_IDX",
+      "SERIALIZED_METADATA_IDX",
+      "TARGET_PLATFORM_IDX",
+      "REQUIRES_OUTPUT_ALLOCATOR_IDX",
+      "RESOURCE_ALLOCATION_STRATEGY_IDX",
+  };
+  fprintf(stderr, "[verify_serialization_fmt] %zu entries (expected %d):\n", serialized_info.size(), SERIALIZATION_LEN);
+  for (size_t i = 0; i < serialized_info.size(); ++i) {
+    const char* name = (i < sizeof(kIndexNames) / sizeof(kIndexNames[0])) ? kIndexNames[i] : "?";
+    if (i == ENGINE_IDX) {
+      fprintf(stderr, "  [%zu] %-35s = <binary, %zu bytes>\n", i, name, serialized_info[i].size());
+    } else {
+      fprintf(stderr, "  [%zu] %-35s = \"%s\"\n", i, name, serialized_info[i].c_str());
+    }
+  }
+
   TORCHTRT_CHECK(
       serialized_info.size() == SERIALIZATION_LEN,
       "Program to be deserialized targets an incompatible Torch-TensorRT ABI");

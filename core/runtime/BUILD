@@ -1,6 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -58,8 +59,13 @@ config_setting(
     ],
 )
 
+# runtime_base: TRTEngine + device management + serialization utilities.
+# Does NOT include register_jit_hooks.cpp (TorchScript torch::class_ /
+# TORCH_LIBRARY registrations), so it can be linked into
+# libtrt_executorch_backend.so without causing a duplicate-registration
+# crash when libtorchtrt.so is also loaded in the same process.
 cc_library(
-    name = "runtime",
+    name = "runtime_base",
     srcs = [
         "DeviceList.cpp",
         "Platform.cpp",
@@ -67,8 +73,8 @@ cc_library(
         "TRTEngine.cpp",
         "TRTEngineProfiler.cpp",
         "execute_engine.cpp",
-        "register_jit_hooks.cpp",
         "runtime.cpp",
+        "runtime_utils.cpp",
     ],
     hdrs = [
         "Platform.h",
@@ -100,6 +106,26 @@ cc_library(
     alwayslink = True,
 )
 
+# runtime: full runtime including TorchScript torch::class_ / TORCH_LIBRARY
+# registrations. Used by the main libtorchtrt.so.
+cc_library(
+    name = "runtime",
+    srcs = [
+        "register_jit_hooks.cpp",
+    ],
+    hdrs = [
+        "Platform.h",
+        "RTDevice.h",
+        "TRTEngine.h",
+        "TRTEngineProfiler.h",
+        "runtime.h",
+    ],
+    deps = [
+        ":runtime_base",
+    ],
+    alwayslink = True,
+)
+
 filegroup(
     name = "include_files",
     srcs = [
@@ -121,6 +147,6 @@ pkg_tar(
 pkg_files(
     name = "include_pkg_files",
     srcs = [":include_files"],
-    visibility = ["//visibility:public"],
     prefix = "include/torch_tensorrt/core/runtime/",
+    visibility = ["//visibility:public"],
 )
