@@ -16,7 +16,6 @@ from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_library
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
@@ -311,8 +310,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         """
         if not self.is_distributed:
             return
-
-        setup_nccl_library()
 
         if not dist.is_initialized():
             raise RuntimeError(
