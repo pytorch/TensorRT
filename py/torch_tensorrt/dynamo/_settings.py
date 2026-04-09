@@ -28,7 +28,6 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENABLE_RESOURCE_PARTITIONING,
     ENABLE_WEIGHT_STREAMING,
-    ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
     IMMUTABLE_WEIGHTS,
@@ -49,7 +48,6 @@ from torch_tensorrt.dynamo._defaults import (
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_DISTRIBUTED_MODE_TRACE,
-    USE_EXPLICIT_TYPING,
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
     USE_PYTHON_RUNTIME,
@@ -64,8 +62,6 @@ class CompilationSettings:
     """Compilation settings for Torch-TensorRT Dynamo Paths
 
     Args:
-        enabled_precisions (Set[dtype]): Available kernel dtype precisions
-        debug (bool): Whether to print out verbose debugging information
         workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
         min_block_size (int): Minimum number of operators per TRT-Engine Block
         torch_executed_ops (Collection[Target]): Collection of operations to run in Torch, regardless of converter coverage
@@ -99,8 +95,7 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
-        use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
         refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
         strip_engine_weights (bool): Whether to strip the engine weights
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
@@ -110,7 +105,7 @@ class CompilationSettings:
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
-        enable_autocast (bool): Whether to enable autocast. If enabled, use_explicit_typing will be set to True.
+        enable_autocast (bool): Whether to enable autocast.
         autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
         autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
         autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
@@ -122,7 +117,6 @@ class CompilationSettings:
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
     """
 
-    enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE
     torch_executed_ops: Collection[Target] = field(default_factory=set)
@@ -152,7 +146,6 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
-    use_explicit_typing: bool = USE_EXPLICIT_TYPING
     use_fp32_acc: bool = USE_FP32_ACC
     refit_identical_engine_weights: bool = REFIT_IDENTICAL_ENGINE_WEIGHTS
     strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
@@ -199,7 +192,6 @@ class CompilationSettings:
 
 # If any of the following setting is changed, the engine should be rebuilt.
 _SETTINGS_TO_BE_ENGINE_INVARIANT = {
-    "enabled_precisions",
     "max_aux_streams",
     "version_compatible",
     "optimization_level",

@@ -41,7 +41,6 @@ def test_unbounded_symint_torch_compile_single_dim():
 
     compile_spec = {
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": True,
     }
@@ -108,7 +107,6 @@ def test_unbounded_symint_conv_model():
 
     compile_spec = {
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": True,
     }
@@ -151,7 +149,6 @@ def test_unbounded_symint_multiple_dims(tmp_path):
 
     compile_spec = {
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": True,
     }
@@ -216,7 +213,6 @@ def test_unbounded_symint_with_reshape():
 
     compile_spec = {
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": False,
     }
@@ -285,7 +281,6 @@ def test_unbounded_symint_cat_operation():
 
     compile_spec = {
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": False,
     }
@@ -338,7 +333,6 @@ def test_unbounded_symint_reasonable_default():
 
     compile_spec = {
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": False,
     }
@@ -388,7 +382,6 @@ def test_unbounded_symint_fallback():
 
     compile_spec = {
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "torch_executed_ops": [torch.ops.aten.relu.default],
         "pass_through_build_failures": False,

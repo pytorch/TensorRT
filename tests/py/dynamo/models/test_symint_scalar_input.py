@@ -46,7 +46,6 @@ def test_symint_from_size_used_in_reshape(use_python_runtime):
     torch._dynamo.mark_dynamic(targets, 0, min=1, max=2048)
 
     compile_spec = {
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": True,
         "use_python_runtime": use_python_runtime,
@@ -84,7 +83,6 @@ def test_scalar_tensor_input(use_python_runtime):
     offset = torch.tensor(5.0).cuda()
 
     compile_spec = {
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": True,
         "use_python_runtime": use_python_runtime,
@@ -137,7 +135,6 @@ def test_symint_with_index_and_reshape(use_python_runtime):
     torch._dynamo.mark_dynamic(x, 0, min=1, max=2048)
 
     compile_spec = {
-        "enabled_precisions": {torch.float, torch.half},
         "min_block_size": 1,
         "truncate_double": True,
         "pass_through_build_failures": True,
@@ -180,7 +177,6 @@ def test_symint_with_different_batch_sizes(use_python_runtime):
     torch._dynamo.mark_dynamic(targets, 0, min=1, max=2048)
 
     compile_spec = {
-        "enabled_precisions": {torch.float},
         "min_block_size": 1,
         "pass_through_build_failures": True,
         "use_python_runtime": use_python_runtime,

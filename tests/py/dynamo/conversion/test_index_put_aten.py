@@ -314,9 +314,7 @@ class TestIndexPutConverter(DispatchTestCase):
         trt_mod = torchtrt.dynamo.compile(
             ep,
             inputs,
-            enabled_precisions={torch.float16},
             min_block_size=1,
-            use_explicit_typing=False,
             use_fp32_acc=False,
             disable_tf32=True,
         )
@@ -348,9 +346,7 @@ class TestIndexPutConverter(DispatchTestCase):
         trt_engine = torchtrt.dynamo.compile(
             ep,
             inputs=(source_tensor, indices_tensor, value_tensor),
-            enabled_precisions={torch.float32},
             min_block_size=1,
-            use_explicit_typing=False,
             use_fp32_acc=False,
             disable_tf32=True,
             use_python_runtime=True,
