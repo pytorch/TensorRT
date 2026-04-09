@@ -311,19 +311,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
       }
 
-      // Distributed setup - set NCCL communicator on TensorRT execution context
+      // Distributed setup - bind NCCL communicator to TRT execution context
+      // setup_nccl_comm must have been called from Python before first forward
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-      if (compiled_engine->rank >= 0 && compiled_engine->world_size > 1) {
-        bool result = compiled_engine->set_nccl_communicator_to_trt_context();
-        if (!result) {
-          LOG_ERROR("Failed to set NCCL communicator on TRT context");
-          LOG_ERROR("This will cause collective operations to fail at runtime");
-          LOG_ERROR("Make sure to call module.init_nccl_comm() after compilation");
-        }
-      } else {
-        LOG_DEBUG(
-            "Single-device mode (rank=" << compiled_engine->rank << ", world_size=" << compiled_engine->world_size
-                                        << ") - skipping NCCL setup");
+      if (compiled_engine->world_size > 1 && compiled_engine->nccl_comm != nullptr) {
+        compiled_engine->set_nccl_communicator_to_trt_context();
       }
 #endif
 

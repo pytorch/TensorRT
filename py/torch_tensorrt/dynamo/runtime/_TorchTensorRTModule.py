@@ -15,7 +15,6 @@ from torch_tensorrt._features import (
     needs_torch_tensorrt_runtime,
 )
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_library
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +36,9 @@ SERIALIZED_METADATA_IDX = -1  # Not implemented
 TARGET_PLATFORM_IDX = -1  # Not implemented
 REQUIRES_OUTPUT_ALLOCATOR_IDX = -1  # Not implemented
 SERIALIZATION_LEN = -1  # Not implemented
+IS_MD_ENGINE_IDX = -1  # Not implemented
+OPTIONAL_RANK_IDX = -1  # Not implemented
+OPTIONAL_WORLD_SIZE_IDX = -1  # Not implemented
 
 if ENABLED_FEATURES.torch_tensorrt_runtime:
     ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()  # 0
@@ -54,9 +56,10 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
     RESOURCE_ALLOCATION_STRATEGY_IDX = (
         torch.ops.tensorrt.RESOURCE_ALLOCATION_STRATEGY_IDX()
     )  # 10
-    RANK_IDX = torch.ops.tensorrt.RANK_IDX()  # 11
-    WORLD_SIZE_IDX = torch.ops.tensorrt.WORLD_SIZE_IDX()  # 12
-    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 13
+    IS_MD_ENGINE_IDX = torch.ops.tensorrt.IS_MD_ENGINE_IDX()  # 11
+    OPTIONAL_RANK_IDX = torch.ops.tensorrt.OPTIONAL_RANK_IDX()  # 12
+    OPTIONAL_WORLD_SIZE_IDX = torch.ops.tensorrt.OPTIONAL_WORLD_SIZE_IDX()  # 13
+    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 14
 
 
 @for_all_methods(needs_torch_tensorrt_runtime)
@@ -91,8 +94,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
-        rank: int = -1,
-        world_size: int = 1,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -151,11 +152,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
         self.symbolic_shape_expressions = symbolic_shape_expressions
-        self.rank = rank
-        self.world_size = world_size
-        self._nccl_setup_done = (
-            False  # Track if NCCL has been setup for distributed mode
-        )
 
         if (
             serialized_engine
@@ -213,8 +209,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[RESOURCE_ALLOCATION_STRATEGY_IDX] = str(
             int(self.dynamically_allocate_resources)
         )
-        engine_info[RANK_IDX] = str(self.rank)
-        engine_info[WORLD_SIZE_IDX] = str(self.world_size)
+        import torch.distributed as dist
+
+        is_md = dist.is_initialized() and dist.get_world_size() > 1
+        engine_info[IS_MD_ENGINE_IDX] = str(int(is_md))
+        # serialized engine info for build time rank and world size
+        if is_md:
+            engine_info[OPTIONAL_RANK_IDX] = str(dist.get_rank())
+            engine_info[OPTIONAL_WORLD_SIZE_IDX] = str(dist.get_world_size())
 
         return engine_info
 
@@ -251,6 +253,16 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.dynamically_allocate_resources
         )
 
+    def _get_default_group_name(self) -> str:
+        """Get the group name of the default ProcessGroup."""
+        import torch.distributed as dist
+
+        if dist.is_available() and dist.is_initialized():
+            pg = dist.group.WORLD
+            if pg is not None and hasattr(pg, "group_name"):
+                return str(pg.group_name)
+        return ""
+
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.
@@ -263,6 +275,18 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is not None:
             return
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+
+        # Distributed setup is split into two calls for TorchTensorRTModule (C++ runtime):
+        # 1. detect_distributed_context: sets rank/world_size on C++ engine (here, at setup time)
+        #    Needed so rank/world_size are available for serialization before any forward call.
+        # 2. setup_nccl_comm: gets NCCL comm and binds to TRT context (lazily, in forward)
+        #    Deferred because NCCL comm is only needed at execution time.
+        #
+        # In PythonTorchTensorRTModule, this is a single setup_nccl_comm() call in forward
+        # because rank/world_size are set in __init__ via dist.get_rank().
+        group_name = self._get_default_group_name()
+        if group_name:
+            self.engine.detect_distributed_context(group_name)
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
@@ -341,159 +365,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def set_use_output_allocator(self, enable: bool) -> None:
         self.engine.use_output_allocator_outputs = enable
 
-    def _auto_init_distributed(self) -> None:
-        """
-        Automatically initialize distributed inference if the engine was compiled with
-        rank and world_size set (from torch.distributed).
-
-        This is called automatically after setup_engine() to configure NCCL communicators
-        for distributed inference without requiring manual setup.
-        """
-        if self.engine is None:
-            return
-
-        logger.debug(
-            f"In _auto_init_distributed:  _nccl_setup_done={self._nccl_setup_done}"
-        )
-
-        if not ENABLED_FEATURES.native_trt_collectives:
-            logger.debug(
-                "TRT native NCCL collectives not available, skipping distributed setup"
-            )
-            return
-
-        # Check if the engine has distributed info set (rank >= 0 and world_size > 1)
-        if (
-            self.engine.rank >= 0
-            and self.engine.world_size > 1
-            and not self._nccl_setup_done
-        ):
-            try:
-                import torch.distributed as dist
-
-                self.set_distributed_info()
-
-                # Only auto-initialize if torch.distributed is initialized
-                if dist.is_available() and dist.is_initialized():
-                    logger.debug(
-                        f"Auto-initializing distributed inference "
-                        f"(rank={self.engine.rank}, world_size={self.engine.world_size})"
-                    )
-                    # this calls self.engine.set_process_group(process_group)
-                    pg = dist.group.WORLD
-                    self.init_nccl_comm(pg)
-                    self._nccl_setup_done = True
-                    logger.debug(f"NCCL setup complete (rank={self.engine.rank})")
-                else:
-                    logger.warning(
-                        f"Engine has distributed info (rank={self.engine.rank}, world_size={self.engine.world_size}) "
-                        f"but torch.distributed is not initialized. "
-                        f"Call dist.init_process_group() and then module.set_process_group() manually."
-                    )
-            except RuntimeError as e:
-                # Catch tracing errors specifically (e.g., "Tracer cannot infer type of ProcessGroup")
-                if "Tracer cannot infer" in str(e) or "traced functions" in str(e):
-                    logger.debug("Skipping NCCL auto-init during tracing/compilation")
-                else:
-                    logger.warning(
-                        f"Failed to auto-initialize distributed inference: {e}. "
-                        f"Call module.set_process_group() manually if needed."
-                    )
-
-    def set_distributed_info(
-        self, rank: Optional[int] = None, world_size: Optional[int] = None
-    ) -> None:
-        """
-        Set rank and world_size for distributed inference.
-
-        This method sets the rank and world_size on the TensorRT engine. If not provided,
-        they will be auto-detected from torch.distributed.
-
-        Args:
-            rank: Rank of the current process (auto-detects if None)
-            world_size: Total number of processes (auto-detects if None)
-
-        """
-        if self.engine is None:
-            raise RuntimeError(
-                "Engine has not been setup yet. Call setup_engine() first."
-            )
-
-        # Auto-detect if not provided
-        if rank is None or world_size is None:
-            import torch.distributed as dist
-
-            if dist.is_available() and dist.is_initialized():
-                if rank is None:
-                    rank = dist.get_rank()
-                if world_size is None:
-                    world_size = dist.get_world_size()
-            else:
-                raise RuntimeError(
-                    "torch.distributed is not initialized and rank/world_size not provided. "
-                    "Call dist.init_process_group() first or provide rank/world_size explicitly."
-                )
-
-        # Set on C++ TRTEngine
-        self.engine.set_rank(rank)
-        self.engine.set_world_size(world_size)
-        logger.debug(
-            f"Distributed info set on TRTEngine: rank={rank}, world_size={world_size}"
-        )
-
-    def init_nccl_comm(self, process_group: Optional[Any] = None) -> None:
-        """
-        Initialize NCCL communicator for distributed execution.
-
-        This method initializes the NCCL communicator from the C++ ProcessGroup registry.
-        The ProcessGroup must be registered in PyTorch's native registry (which happens
-        automatically when using torch.distributed).
-        """
-        if not ENABLED_FEATURES.native_trt_collectives:
-            raise RuntimeError(
-                "Native TRT NCCL collectives are not available. "
-                "Requires TensorRT 10.16+ and PyTorch built with NCCL support."
-            )
-        if self.engine is None:
-            raise RuntimeError(
-                "Engine has not been setup yet. Call setup_engine() first."
-            )
-
-        setup_nccl_library()
-
-        # Get the process group if not provided
-        if process_group is None:
-            try:
-                import torch.distributed as dist
-
-                if not dist.is_initialized():
-                    raise RuntimeError(
-                        "torch.distributed is not initialized. Call dist.init_process_group() first."
-                    )
-                process_group = dist.distributed_c10d._get_default_group()
-                logger.debug("Using default ProcessGroup from torch.distributed")
-            except Exception as e:
-                raise RuntimeError(f"Failed to get default process group: {e}")
-
-        # Get the group name from the ProcessGroup
-        # This is the name used to register the group in the C++ registry
-        group_name = "default"
-        if (
-            hasattr(process_group, "group_name")
-            and process_group.group_name is not None
-        ):
-            group_name = process_group.group_name
-        logger.debug(f"Using ProcessGroup with group_name: {group_name}")
-
-        # Initialize NCCL communicator from C++ registry
-        # This uses c10d::resolve_process_group() to get the ProcessGroup and extract the NCCL comm
-        self.engine.init_nccl_comm(group_name)
-
-        self._nccl_setup_done = True
-        logger.debug(
-            f"NCCL comm initialized from ProcessGroup (rank={self.engine.rank}, world_size={self.engine.world_size})"
-        )
-
     def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         """Implementation of the forward pass for a TensorRT engine
 
@@ -506,8 +377,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is None:
             raise RuntimeError("Engine has not been setup yet.")
 
-        if not self._nccl_setup_done:
-            self._auto_init_distributed()
+        # Lazy NCCL setup on first forward
+        if self.engine.world_size > 1 and not hasattr(self, "_nccl_initialized"):
+            group_name = self._get_default_group_name()
+            if group_name:
+                self.engine.setup_nccl_comm(group_name)
+                self._nccl_initialized = True
 
         assert len(inputs) == len(
             self.input_binding_names

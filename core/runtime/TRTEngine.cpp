@@ -96,12 +96,17 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]))
                ? ResourceAllocationStrategy::kDynamic
                : ResourceAllocationStrategy::kStatic)) {
-  // Load distributed info if available (backward compatible with older ABI versions)
-  if (serialized_info.size() > RANK_IDX && !serialized_info[RANK_IDX].empty()) {
-    this->rank = std::stoll(serialized_info[RANK_IDX]);
-  }
-  if (serialized_info.size() > WORLD_SIZE_IDX && !serialized_info[WORLD_SIZE_IDX].empty()) {
-    this->world_size = std::stoll(serialized_info[WORLD_SIZE_IDX]);
+  if (std::stoi(serialized_info[IS_MD_ENGINE_IDX])) {
+    int64_t build_rank = std::stoll(serialized_info[OPTIONAL_RANK_IDX]);
+    int64_t build_world_size = std::stoll(serialized_info[OPTIONAL_WORLD_SIZE_IDX]);
+    if (build_rank != this->rank) {
+      LOG_INFO(
+          "Distributed engine originally built on rank " << build_rank << " of " << build_world_size
+                                                         << ", now running on rank " << this->rank << " of "
+                                                         << this->world_size);
+    } else {
+      LOG_INFO("Distributed engine: rank " << this->rank << " of " << this->world_size);
+    }
   }
 }
 
@@ -512,6 +517,12 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[TARGET_PLATFORM_IDX] = this->target_platform.serialize();
   serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
+  bool is_md = this->world_size > 1;
+  serialized_info[IS_MD_ENGINE_IDX] = is_md ? "1" : "0";
+  if (is_md) {
+    serialized_info[OPTIONAL_RANK_IDX] = std::to_string(this->rank);
+    serialized_info[OPTIONAL_WORLD_SIZE_IDX] = std::to_string(this->world_size);
+  }
 
   return serialized_info;
 }
@@ -534,60 +545,19 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
   }
 }
 
-void TRTEngine::set_rank(int64_t rank_val) {
-  this->rank = rank_val;
-  LOG_DEBUG("Rank set on TRTEngine: " << this->rank);
-}
-
-void TRTEngine::set_world_size(int64_t world_size_val) {
-  this->world_size = world_size_val;
-  LOG_DEBUG("World size set on TRTEngine: " << this->world_size);
-}
-
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-void TRTEngine::set_nccl_comm(int64_t comm_ptr) {
-  this->nccl_comm = reinterpret_cast<ncclComm_t>(comm_ptr);
-  LOG_DEBUG("NCCL communicator stored on TRTEngine (rank=" << this->rank << ")");
-
-  // Also set on TensorRT execution context
-  set_nccl_communicator_to_trt_context();
+void TRTEngine::detect_distributed_context(const std::string& group_name) {
+  auto pg = c10d::resolve_process_group(group_name);
+  if (pg) {
+    this->rank = pg->getRank();
+    this->world_size = pg->getSize();
+    LOG_DEBUG("Detected distributed context: rank=" << this->rank << ", world_size=" << this->world_size);
+  }
 }
 
-bool TRTEngine::set_nccl_communicator_to_trt_context() {
-  TORCHTRT_CHECK(exec_ctx != nullptr, "Cannot set NCCL communicator: execution context is null");
-  TORCHTRT_CHECK(
-      this->nccl_comm != nullptr,
-      "Distributed inference enabled but no NCCL communicator set. "
-      "Call set_process_group() or set_nccl_comm() from Python first.");
-
-  void* comm_ptr = static_cast<void*>(this->nccl_comm);
-  exec_ctx->setCommunicator(comm_ptr);
-
-  LOG_INFO(
-      "NCCL communicator set on TensorRT execution context "
-      "(rank="
-      << this->rank << ", device=" << this->device_info.id << ")");
-  return true;
-}
-
-void TRTEngine::init_nccl_comm(const std::string& group_name) {
-  // Use C++ registry to get NCCL communicator
-  set_process_group_from_registry(group_name);
-}
-
-bool TRTEngine::set_process_group_from_registry(const std::string& group_name) {
-  LOG_INFO("TRTEngine::set_process_group_from_registry() called with group_name: " << group_name);
-
+void TRTEngine::setup_nccl_comm(const std::string& group_name) {
   auto pg = c10d::resolve_process_group(group_name);
   TORCHTRT_CHECK(pg != nullptr, "ProcessGroup '" << group_name << "' not found in registry");
-  LOG_INFO("   Resolved ProcessGroup: rank=" << pg->getRank() << ", size=" << pg->getSize());
-
-  if (this->rank < 0) {
-    this->rank = pg->getRank();
-  }
-  if (this->world_size < 0) {
-    this->world_size = pg->getSize();
-  }
 
   auto backend = pg->getBackend(c10d::ProcessGroup::BackendType::NCCL);
   TORCHTRT_CHECK(backend != nullptr, "ProcessGroup '" << group_name << "' has no NCCL backend");
@@ -604,7 +574,21 @@ bool TRTEngine::set_process_group_from_registry(const std::string& group_name) {
                                                       << ". Ensure a collective operation has been performed first.");
 
   this->nccl_comm = reinterpret_cast<ncclComm_t>(comm_ptr);
-  LOG_INFO("   NCCL communicator set: " << (void*)this->nccl_comm);
+  set_nccl_communicator_to_trt_context();
+  LOG_INFO("NCCL comm set up (rank=" << this->rank << ", device=" << this->device_info.id << ")");
+}
+
+bool TRTEngine::set_nccl_communicator_to_trt_context() {
+  TORCHTRT_CHECK(exec_ctx != nullptr, "Cannot set NCCL communicator: execution context is null");
+  TORCHTRT_CHECK(this->nccl_comm != nullptr, "NCCL communicator is not set");
+
+  void* comm_ptr = static_cast<void*>(this->nccl_comm);
+  exec_ctx->setCommunicator(comm_ptr);
+
+  LOG_INFO(
+      "NCCL communicator set on TensorRT execution context "
+      "(rank="
+      << this->rank << ", device=" << this->device_info.id << ")");
   return true;
 }
 #endif // ENABLE_TRT_NCCL_COLLECTIVES

@@ -217,15 +217,14 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t rank = -1;
   int64_t world_size = -1;
 
-  // Set rank and world_size for distributed inference
-  void set_rank(int64_t rank_val);
-  void set_world_size(int64_t world_size_val);
-
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
   ncclComm_t nccl_comm = nullptr;
-  void set_nccl_comm(int64_t comm_ptr);
-  void init_nccl_comm(const std::string& group_name = "default");
-  bool set_process_group_from_registry(const std::string& group_name = "default");
+
+  // Detect rank and world_size from ProcessGroup
+  void detect_distributed_context(const std::string& group_name);
+
+  // Resolve ProcessGroup, get NCCL communicator, and bind to TRT context
+  void setup_nccl_comm(const std::string& group_name);
   bool set_nccl_communicator_to_trt_context();
 #endif
 
