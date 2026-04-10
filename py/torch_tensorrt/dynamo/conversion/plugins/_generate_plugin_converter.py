@@ -102,7 +102,9 @@ def _generate_plugin_converter(
             f"Adding generated plugin for {namespace}::{name} to tensorrt network"
         )
         layer.name = f"[{target}]-[{name}]"
-        return layer.get_output(0)
+        if layer.num_outputs == 1:
+            return layer.get_output(0)
+        return tuple(layer.get_output(i) for i in range(layer.num_outputs))
 
     custom_kernel_converter = dynamo_tensorrt_converter(
         torch_overload,
