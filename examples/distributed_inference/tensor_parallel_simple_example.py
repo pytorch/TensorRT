@@ -119,8 +119,8 @@ python_result = tp_model(inp)
 if args.mode == "load":
     # Load per-rank model: /tmp/tp_model.ep -> /tmp/tp_model_rank0_of_2.ep
     logger.info(f"Loading from {args.save_path}")
-    loaded_model = torch_tensorrt.load(args.save_path)
-    output = loaded_model(inp)
+    loaded_program = torch_tensorrt.load(args.save_path)
+    output = loaded_program.module()(inp)
     assert (python_result - output).std() < 0.01, "Result mismatch"
     logger.info("Load successful!")
 
@@ -164,7 +164,7 @@ elif args.mode == "export":
         inputs=[inp],
         # enabled_precisions={torch.float32, torch.float16},
         truncate_double=True,
-        use_python_runtime=True,
+        use_python_runtime=False,
         min_block_size=1,
         use_distributed_mode_trace=True,
     )

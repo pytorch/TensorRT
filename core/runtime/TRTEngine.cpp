@@ -96,17 +96,11 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]))
                ? ResourceAllocationStrategy::kDynamic
                : ResourceAllocationStrategy::kStatic)) {
-  if (std::stoi(serialized_info[IS_MD_ENGINE_IDX])) {
-    int64_t build_rank = std::stoll(serialized_info[OPTIONAL_RANK_IDX]);
-    int64_t build_world_size = std::stoll(serialized_info[OPTIONAL_WORLD_SIZE_IDX]);
-    if (build_rank != this->rank) {
-      LOG_INFO(
-          "Distributed engine originally built on rank " << build_rank << " of " << build_world_size
-                                                         << ", now running on rank " << this->rank << " of "
-                                                         << this->world_size);
-    } else {
-      LOG_INFO("Distributed engine: rank " << this->rank << " of " << this->world_size);
-    }
+  this->is_md = std::stoi(serialized_info[IS_MD_ENGINE_IDX]);
+  if (this->is_md) {
+    LOG_INFO(
+        "Loaded distributed engine (built on rank " << serialized_info[OPTIONAL_RANK_IDX] << " of "
+                                                    << serialized_info[OPTIONAL_WORLD_SIZE_IDX] << ")");
   }
 }
 
@@ -517,9 +511,8 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[TARGET_PLATFORM_IDX] = this->target_platform.serialize();
   serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
-  bool is_md = this->world_size > 1;
-  serialized_info[IS_MD_ENGINE_IDX] = is_md ? "1" : "0";
-  if (is_md) {
+  serialized_info[IS_MD_ENGINE_IDX] = this->is_md ? "1" : "0";
+  if (this->is_md) {
     serialized_info[OPTIONAL_RANK_IDX] = std::to_string(this->rank);
     serialized_info[OPTIONAL_WORLD_SIZE_IDX] = std::to_string(this->world_size);
   }
@@ -551,6 +544,7 @@ void TRTEngine::detect_distributed_context(const std::string& group_name) {
   if (pg) {
     this->rank = pg->getRank();
     this->world_size = pg->getSize();
+    this->is_md = this->world_size > 1;
     LOG_DEBUG("Detected distributed context: rank=" << this->rank << ", world_size=" << this->world_size);
   }
 }
@@ -558,6 +552,13 @@ void TRTEngine::detect_distributed_context(const std::string& group_name) {
 void TRTEngine::setup_nccl_comm(const std::string& group_name) {
   auto pg = c10d::resolve_process_group(group_name);
   TORCHTRT_CHECK(pg != nullptr, "ProcessGroup '" << group_name << "' not found in registry");
+
+  // Set rank/world_size if not already set (e.g. load from disk without setup_engine)
+  if (this->rank < 0) {
+    this->rank = pg->getRank();
+    this->world_size = pg->getSize();
+    LOG_DEBUG("Set distributed context in setup_nccl_comm: rank=" << this->rank << ", world_size=" << this->world_size);
+  }
 
   auto backend = pg->getBackend(c10d::ProcessGroup::BackendType::NCCL);
   TORCHTRT_CHECK(backend != nullptr, "ProcessGroup '" << group_name << "' has no NCCL backend");
