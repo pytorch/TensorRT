@@ -9,6 +9,10 @@ from torch.testing._internal.common_utils import run_tests
 from .harness import DispatchTestCase
 
 
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "cumsum errors out on TensorRT-RTX",
+)
 class TestCumsumConverter(DispatchTestCase):
     @parameterized.expand(
         [
