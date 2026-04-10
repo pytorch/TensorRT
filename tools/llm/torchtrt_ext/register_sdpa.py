@@ -9,6 +9,7 @@ from torch_tensorrt.dynamo.conversion.aten_ops_converters import args_bounds_che
 from torch_tensorrt.dynamo.lowering import TORCH_TRT_DECOMPOSITIONS
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
     _aten_lowering_pass,
+    get_lowering_pass_config,
 )
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
@@ -42,14 +43,12 @@ def _remove_decompositions():
 
 
 REPLACEABLE_ATEN_OPS = {
+    torch.ops.aten.scaled_dot_product_attention.default,
     torch.ops.aten._scaled_dot_product_efficient_attention.default,
     torch.ops.aten._scaled_dot_product_flash_attention.default,
     torch.ops.aten._scaled_dot_product_cudnn_attention.default,
 }
 
-from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
-    get_lowering_pass_config,
-)
 
 
 def _process_sdpa_node(
@@ -81,7 +80,42 @@ def _process_sdpa_node(
         ValueError: If the SDPA node has an unexpected number of arguments
     """
 
-    if node.target in [
+    if node.target == torch.ops.aten.scaled_dot_product_attention.default:
+        # Standard aten SDPA: (query, key, value[, attn_mask, dropout_p, is_causal, scale])
+        # After aot_autograd this is the most common form when SDPA is not decomposed.
+        query, key, value = node.args[0], node.args[1], node.args[2]
+        attn_mask = node.args[3] if len(node.args) > 3 else node.kwargs.get("attn_mask", None)
+        dropout_p = node.args[4] if len(node.args) > 4 else node.kwargs.get("dropout_p", 0.0)
+        is_causal = node.args[5] if len(node.args) > 5 else node.kwargs.get("is_causal", False)
+        # Always force causal=True, no mask, no dropout for TRT path
+        attn_mask = None
+        is_causal = True
+        dropout_p = 0.0
+
+        logger.debug(
+            f"SDPA converter configuration (aten.sdpa): attn_mask={attn_mask}, "
+            f"dropout_p={dropout_p}, is_causal={is_causal}, "
+            f"sliding_window_size={sliding_window_size}, use_gqa={use_gqa}"
+        )
+
+        modified_input_args = (query, key, value, attn_mask, dropout_p, is_causal)
+        with gm.graph.inserting_after(node):
+            new_node = gm.graph.call_function(
+                torch.nn.functional.scaled_dot_product_attention,
+                args=modified_input_args,
+                kwargs={
+                    "scale": node.kwargs.get("scale", None),
+                    "use_fp32_acc": settings.use_fp32_acc,
+                    "sliding_window_size": sliding_window_size,
+                },
+            )
+            new_node.meta = copy.copy(node.meta)
+            node.replace_all_uses_with(new_node)
+
+        gm.graph.erase_node(node)
+        return gm
+
+    elif node.target in [
         torch.ops.aten._scaled_dot_product_efficient_attention.default,
         torch.ops.aten._scaled_dot_product_cudnn_attention.default,
     ]:

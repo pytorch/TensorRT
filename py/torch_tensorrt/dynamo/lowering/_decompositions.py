@@ -684,6 +684,7 @@ def get_decompositions(
             decomp: decomp_table[decomp]
             for decomp in decomp_table
             if decomp not in discard_decompositions
+            and decomp not in ATTENTION_DECOMPOSITION_OPS
         }
 
         return {

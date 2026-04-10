@@ -21,6 +21,9 @@ from torch_tensorrt.dynamo.lowering import (
     remove_sym_nodes,
     repair_input_aliasing,
 )
+from torch_tensorrt.dynamo.lowering.passes.fold_get_attr_item_calls import (
+    fold_get_attr_item_calls,
+)
 from torch_tensorrt.dynamo.utils import (
     parse_dynamo_kwargs,
     prepare_inputs,
@@ -112,7 +115,75 @@ def aot_torch_tensorrt_aten_backend(
         logger.warning(
             "The offload_module_to_cpu option is set, but it is being ignored since the torch_compile backend does not support this feature"
         )
+
+    # If the dynamo-traced graph contains higher-order ops (vmap, etc.) that are
+    # incompatible with aot_export_joint_simple, fall back to the aot_autograd
+    # path which handles them correctly.
+    if _graph_has_higher_order_ops(gm):
+        logger.debug(
+            "Graph contains higher-order ops (e.g. vmap); "
+            "using aot_autograd path instead of aot_export_joint_simple"
+        )
+        import copy
+
+        aot_settings = copy.copy(settings)
+        aot_settings.use_distributed_mode_trace = True
+        _pretraced_backend_autograd = functools.partial(
+            _pretraced_backend, settings=aot_settings, engine_cache=engine_cache
+        )
+        aot_decomps = get_decompositions(
+            settings.enable_experimental_decompositions, settings.decompose_attention
+        )
+        # Remove detach decompositions to avoid alias node errors.
+        to_delete = {k for k in aot_decomps if "detach" in k._name}
+        for k in to_delete:
+            del aot_decomps[k]
+        return aot_autograd(
+            fw_compiler=_pretraced_backend_autograd,
+            decompositions=aot_decomps,
+        )(gm, sample_inputs)
+
     return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
+
+
+def _strip_trt_sdpa_kwargs(gm: torch.fx.GraphModule) -> None:
+    """Remove TRT-specific kwargs (use_fp32_acc, sliding_window_size) from SDPA nodes.
+
+    When TRT compilation fails and we return the plain graph for PyTorch execution,
+    these custom kwargs must be stripped because ``torch.nn.functional.
+    scaled_dot_product_attention`` does not accept them.
+    """
+    _TRT_SDPA_KWARGS = frozenset({"use_fp32_acc", "sliding_window_size"})
+    modified = False
+    for node in gm.graph.nodes:
+        if (
+            node.op == "call_function"
+            and node.target is torch.nn.functional.scaled_dot_product_attention
+        ):
+            bad_kwargs = {k: v for k, v in node.kwargs.items() if k in _TRT_SDPA_KWARGS}
+            if bad_kwargs:
+                node.kwargs = {
+                    k: v for k, v in node.kwargs.items() if k not in _TRT_SDPA_KWARGS
+                }
+                modified = True
+    if modified:
+        gm.graph.lint()
+        gm.recompile()
+
+
+def _graph_has_higher_order_ops(gm: torch.fx.GraphModule) -> bool:
+    """Return True if the graph contains vmap or other higher-order ops."""
+    for node in gm.graph.nodes:
+        if node.op != "call_function":
+            continue
+        name = str(node.target)
+        if (
+            "_vmap_increment_nesting" in name
+            or "_add_batch_dim" in name
+            or "_remove_batch_dim" in name
+        ):
+            return True
+    return False
 
 
 def _pretraced_backend(
@@ -131,10 +202,24 @@ def _pretraced_backend(
     Returns:
         Compiled FX GraphModule
     """
+    # Save the original graph for use in the failure fallback path.  Lowering
+    # passes (pre_aot_lowering, post_lowering) modify the graph in-place; if TRT
+    # compilation later fails we must return an unmodified graph so that the
+    # PyTorch fallback can execute it without encountering custom TRT-only kwargs
+    # (e.g. use_fp32_acc) that standard torch ops don't accept.
+    original_gm = gm
+
     try:
         logger.debug("Pre-AOT Autograd graph:\n" + str(gm.graph))
 
         fake_mode = detect_fake_mode(sample_inputs)
+
+        # Fold get_attr(...).item() / placeholder(...).item() patterns into Python
+        # scalars BEFORE entering FakeTensorMode.  Inside FakeTensorMode, even
+        # real-tensor .item() calls raise DataDependentOutputException.  We access
+        # the actual values via grapharg.example (weakref held by dynamo) which is
+        # safe to dereference outside of fake mode.
+        gm = fold_get_attr_item_calls(gm, sample_inputs)
 
         # Place backend tracing within FakeTensor context allowing nonfake Tensors
         with (
@@ -199,7 +284,8 @@ def _pretraced_backend(
                 + "Returning GraphModule forward instead.",
                 exc_info=True,
             )
-            return gm
+            _strip_trt_sdpa_kwargs(original_gm)
+            return original_gm
         else:
             logger.critical(
                 "Halting compilation on build failure since "
