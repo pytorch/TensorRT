@@ -209,20 +209,20 @@ struct TRTEngine : torch::CustomClassHolder {
   bool use_output_allocator_outputs = false; // users specify to use output allocator
   std::shared_ptr<DynamicOutputAllocator> output_allocator;
 
-  // Member variables for distributed inference (-1 indicates non-distributed mode)
-  bool is_md = false;
-  int64_t rank = -1;
-  int64_t world_size = -1;
+  // Member variables for distributed inference
+  bool is_md = false; // compile-time flag: engine contains NCCL collectives
+  int64_t rank = -1; // populated at runtime by setup_nccl_comm()
+  int64_t world_size = -1; // populated at runtime by setup_nccl_comm()
+  std::string group_name = ""; // c10d registry name; "" = default world group
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-  void* nccl_comm = nullptr;
+  bool nccl_initialized = false; // guards lazy one-shot NCCL setup in execute_engine
 
-  // Detect rank and world_size from ProcessGroup
-  void detect_distributed_context(const std::string& group_name);
-
-  // Resolve ProcessGroup, get NCCL communicator, and bind to TRT context
-  void setup_nccl_comm(const std::string& group_name);
-  bool set_nccl_communicator_to_trt_context();
+  // Resolve ProcessGroup via group_name, fetch the NCCL comm from PyTorch,
+  // and bind it to exec_ctx.  Returns true on success.  Returns false (without
+  // throwing) when the process group or NCCL communicator is not yet available
+  // so callers can retry later.  Throws on hard misconfiguration (wrong backend).
+  bool bind_nccl_comm();
 #endif
 
   // TODO: Implement a call method

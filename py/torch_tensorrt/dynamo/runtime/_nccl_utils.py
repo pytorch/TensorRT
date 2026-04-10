@@ -28,6 +28,7 @@ TensorRT 11.0 will support TRT_NCCL_LIBRARY env var, eliminating the need for
 symlink workarounds.
 """
 
+import ctypes
 import logging
 import os
 from typing import Optional
@@ -115,19 +116,25 @@ def check_nccl_library_path() -> bool:
     return nccl_lib_dir in ld_library_path
 
 
-def setup_nccl_library() -> None:
+def setup_nccl_for_torch_tensorrt() -> None:
     """
-    Setup NCCL library path for TensorRT distributed inference.
+    Setup NCCL library for TensorRT distributed inference.
 
     This function:
     1. Detects if nvidia.nccl pip package is installed
     2. Creates libnccl.so symlink if needed
-    3. Warns if LD_LIBRARY_PATH is not configured
+    3. Pre-loads libnccl.so via ctypes (helps Python runtime path)
+    4. Updates LD_LIBRARY_PATH for dynamic loaders
 
-    Call this before initializing NCCL communicators for TensorRT.
+    Note: TRT's internal loader (libLoader.cpp) reads LD_LIBRARY_PATH at
+    process launch time, not when updated via os.environ. For the C++ TRT
+    runtime path, LD_LIBRARY_PATH must be set before the process starts:
+
+        NCCL_LIB=$(python -c "from torch_tensorrt.dynamo.runtime._nccl_utils \\
+            import get_nccl_library_path; print(get_nccl_library_path())")
+        LD_LIBRARY_PATH="$NCCL_LIB:$LD_LIBRARY_PATH" python script.py
 
     For NGC containers (system NCCL), this is a no-op.
-    For pip-installed PyTorch, this ensures TensorRT can find the correct NCCL.
     """
     global _nccl_setup_checked
 
@@ -151,26 +158,27 @@ def setup_nccl_library() -> None:
     # Ensure symlink exists
     symlink_ok = ensure_nccl_symlink(nccl_lib_dir)
 
-    # Check LD_LIBRARY_PATH
+    # Ensure LD_LIBRARY_PATH includes the NCCL directory so TRT's dlopen("libnccl.so")
+    # finds the same library PyTorch already loaded.  dlopen() reads LD_LIBRARY_PATH
+    # dynamically, so updating os.environ here takes effect for subsequent loads.
     ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
     if nccl_lib_dir not in ld_library_path:
-        logger.warning(
-            f"\n"
-            f"{'=' * 70}\n"
-            f"NCCL LIBRARY PATH WARNING\n"
-            f"{'=' * 70}\n"
-            f"PyTorch's NCCL library directory is not in LD_LIBRARY_PATH.\n"
-            f"TensorRT may load a different NCCL library than PyTorch,\n"
-            f"causing distributed inference to fail.\n"
-            f"\n"
-            f"NCCL directory: {nccl_lib_dir}\n"
-            f"\n"
-            f"Please set before running:\n"
-            f"  export LD_LIBRARY_PATH={nccl_lib_dir}:$LD_LIBRARY_PATH\n"
-            f"{'=' * 70}\n"
+        os.environ["LD_LIBRARY_PATH"] = (
+            f"{nccl_lib_dir}:{ld_library_path}" if ld_library_path else nccl_lib_dir
         )
+        logger.debug(f"Added NCCL directory to LD_LIBRARY_PATH: {nccl_lib_dir}")
     else:
-        logger.debug(f"LD_LIBRARY_PATH includes NCCL directory: {nccl_lib_dir}")
+        logger.debug(f"LD_LIBRARY_PATH already includes NCCL directory: {nccl_lib_dir}")
 
     if symlink_ok:
+        # Pre-load libnccl.so into the process with RTLD_GLOBAL so that TRT's
+        # subsequent dlopen("libnccl.so") inside setCommunicator() finds the
+        # already-loaded library rather than searching LD_LIBRARY_PATH again.
+        nccl_so = os.path.join(nccl_lib_dir, "libnccl.so")
+        try:
+            ctypes.CDLL(nccl_so, mode=ctypes.RTLD_GLOBAL)
+            logger.debug(f"Pre-loaded NCCL library: {nccl_so}")
+        except OSError as e:
+            logger.warning(f"Failed to pre-load NCCL library {nccl_so}: {e}")
+
         logger.debug("NCCL library setup complete")

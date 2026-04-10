@@ -378,7 +378,7 @@ def _get_default_group_name(self) -> str:
 - `_auto_init_distributed()` — replaced by lazy setup in forward
 - `set_distributed_info()` — called removed `set_rank`/`set_world_size`
 - `init_nccl_comm()` — replaced by `setup_nccl_comm` in forward
-- `setup_nccl_library` import — no longer needed
+- `setup_nccl_for_torch_tensorrt` import — no longer needed
 
 ---
 
@@ -428,7 +428,7 @@ def setup_nccl_comm(self) -> None:
     if not self.is_distributed:
         return
 
-    setup_nccl_library()
+    setup_nccl_for_torch_tensorrt()
 
     import torch.distributed as dist
     if not dist.is_initialized():
@@ -707,16 +707,16 @@ def setup_nccl_comm(self) -> None:
     """
 ```
 
-## 12. Move `setup_nccl_library()` to user scripts
+## 12. Move `setup_nccl_for_torch_tensorrt()` to user scripts
 
-**Rationale:** `setup_nccl_library()` sets `LD_LIBRARY_PATH` so TensorRT can find `libnccl.so`.
+**Rationale:** `setup_nccl_for_torch_tensorrt()` sets `LD_LIBRARY_PATH` so TensorRT can find `libnccl.so`.
 This is a one-time environment setup, not an engine-level concern. The reviewer said this
 should be a utility the user calls, not hidden inside engine code.
 
 ### `_PythonTorchTensorRTModule.py` — removed call and import
 
 ```diff
--from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_library
+-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
 ```
 
 ```diff
@@ -724,7 +724,7 @@ should be a utility the user calls, not hidden inside engine code.
      if not self.is_distributed:
          return
 
--    setup_nccl_library()
+-    setup_nccl_for_torch_tensorrt()
 -
      if not dist.is_initialized():
 ```
@@ -734,18 +734,18 @@ should be a utility the user calls, not hidden inside engine code.
 `examples/distributed_inference/tensor_parallel_simple_example.py`:
 ```python
 import torch_tensorrt
-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_library
+from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
 
-setup_nccl_library()
+setup_nccl_for_torch_tensorrt()
 ```
 
 `tools/llm/tensor_parallel_llama_llm.py`:
 ```python
 import torch_tensorrt
-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_library
+from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
 
-setup_nccl_library()
+setup_nccl_for_torch_tensorrt()
 ```
 
-The user is now responsible for calling `setup_nccl_library()` once before
+The user is now responsible for calling `setup_nccl_for_torch_tensorrt()` once before
 distributed TRT inference. The function remains in `_nccl_utils` as a public utility.

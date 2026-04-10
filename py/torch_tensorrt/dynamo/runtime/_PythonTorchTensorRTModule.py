@@ -4,7 +4,6 @@ import logging
 from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-import tensorrt as trt
 import torch
 import torch.distributed as dist
 import torch_tensorrt
@@ -23,6 +22,8 @@ from torch_tensorrt.runtime._utils import (
     _select_rt_device,
     multi_gpu_device_check,
 )
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -229,13 +230,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
-        # Auto-detect distributed context
-        if dist.is_initialized():
-            self.rank = dist.get_rank()
-            self.world_size = dist.get_world_size()
-        else:
-            self.rank = -1
-            self.world_size = -1
         self._nccl_comm: Optional[Any] = None
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
@@ -292,34 +286,29 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     # Distributed functions
     @property
     def is_distributed(self) -> bool:
-        """Check if this module is configured for distributed execution."""
-        return bool(self.world_size > 1)
+        """Check if this module is running inside an active distributed context."""
+        return bool(
+            dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1
+        )
 
     def setup_nccl_comm(self) -> None:
-        """Set up NCCL communicator from PyTorch's ProcessGroup.
+        """Set up NCCL communicator from the active ProcessGroup.
 
-        In PythonTorchTensorRTModule, this is a single call that gets the NCCL comm
-        and binds it to the TRT context. rank/world_size are already set in __init__
-        via dist.get_rank().
-
-        In TorchTensorRTModule (C++ runtime), this is split into two calls:
-        - detect_distributed_context(group_name): sets rank/world_size on the C++ engine
-          (called in setup_engine, needed for serialization before forward)
-        - setup_nccl_comm(group_name): gets NCCL comm and binds to TRT context
-          (called lazily on first forward)
+        Uses the process group set by torch_tensorrt.distributed_group() if
+        active, otherwise falls back to the default world group.
+        Called lazily on first forward pass for distributed engines.
         """
+        from torch_tensorrt.dynamo.runtime._distributed import get_active_group
+
         if not self.is_distributed:
             return
 
-        if not dist.is_initialized():
-            raise RuntimeError(
-                "torch.distributed must be initialized before calling setup_nccl_comm(). "
-                "Call dist.init_process_group('nccl') first."
-            )
-
-        pg = dist.group.WORLD
+        pg = get_active_group()
         if pg is None or dist.get_backend(pg) != "nccl":
-            raise RuntimeError("Default ProcessGroup must use NCCL backend")
+            raise RuntimeError(
+                "Active ProcessGroup must use NCCL backend. "
+                "Use torch_tensorrt.distributed_group(group) to select a non-default group."
+            )
 
         backend = pg._get_backend(torch.device("cuda"))
 
@@ -347,13 +336,17 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.context.set_communicator(comm_capsule)
 
         logger.info(
-            f"NCCL comm set up (rank={self.rank}, world_size={self.world_size})"
+            f"NCCL comm set up (rank={dist.get_rank()}, world_size={dist.get_world_size()})"
         )
 
     def setup_engine(self) -> None:
         assert (
             self.target_platform == Platform.current_platform()
         ), f"TensorRT engine was not built to target current platform (target: {self.target_platform}, current: {Platform.current_platform()})"
+
+        from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+
+        setup_nccl_for_torch_tensorrt()
 
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
@@ -403,9 +396,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         state_dict[prefix + "input_names"] = self.input_names
         state_dict[prefix + "output_names"] = self.output_names
         state_dict[prefix + "platform"] = self.target_platform
-        # Distributed info (always saved, -1 indicates non-distributed)
-        state_dict[prefix + "rank"] = self.rank
-        state_dict[prefix + "world_size"] = self.world_size
 
     def _load_from_state_dict(
         self,
@@ -421,27 +411,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.input_names = state_dict[prefix + "input_names"]
         self.output_names = state_dict[prefix + "output_names"]
         self.target_platform = state_dict[prefix + "platform"]
-
-        # Same rule as C++ TRTEngine: serialized rank/world_size are build-time
-        # metadata for logging. Runtime rank is auto-detected from ProcessGroup.
-        build_rank = state_dict.get(prefix + "rank", -1)
-        build_world_size = state_dict.get(prefix + "world_size", -1)
-        if dist.is_initialized():
-            self.rank = dist.get_rank()
-            self.world_size = dist.get_world_size()
-        else:
-            self.rank = -1
-            self.world_size = -1
-        if build_world_size > 1:
-            if build_rank != self.rank:
-                logger.info(
-                    f"Distributed engine originally built on rank {build_rank} of {build_world_size}, "
-                    f"now running on rank {self.rank} of {self.world_size}"
-                )
-            else:
-                logger.info(
-                    f"Distributed engine: rank {self.rank} of {self.world_size}"
-                )
 
         # Run multi-gpu device check to validate engine instantiation
         multi_gpu_device_check()
@@ -809,7 +778,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 )
                 logger.info(
                     f"Setting up NCCL for distributed execution using {nccl_type} "
-                    f"(rank={self.rank}, world_size={self.world_size})"
+                    f"(rank={dist.get_rank()}, world_size={dist.get_world_size()})"
                 )
                 self.setup_nccl_comm()
                 logger.info(f"NCCL setup complete, comm={self._nccl_comm}")

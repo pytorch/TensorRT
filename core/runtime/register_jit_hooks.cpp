@@ -113,13 +113,19 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def_readonly("world_size", &TRTEngine::world_size)
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
         .def(
-            "detect_distributed_context",
+            "set_group_name",
             [](c10::intrusive_ptr<TRTEngine> self, std::string group_name) {
-              self->detect_distributed_context(group_name);
+              self->group_name = group_name;
+              // Reset nccl_initialized so execute_engine() re-binds with the
+              // correct communicator.  This matters when distributed_group() is
+              // used to select a TP subgroup: the constructor may have already
+              // bound to the default world group before set_group_name() was
+              // called.  Clearing the flag causes a re-bind on the first forward.
+              self->nccl_initialized = false;
+              LOG_DEBUG("TRTEngine group_name set to '" << group_name << "'");
             })
-        .def(
-            "setup_nccl_comm",
-            [](c10::intrusive_ptr<TRTEngine> self, std::string group_name) { self->setup_nccl_comm(group_name); })
+        .def("bind_nccl_comm", [](c10::intrusive_ptr<TRTEngine> self) { self->bind_nccl_comm(); })
+        .def_readonly("nccl_initialized", &TRTEngine::nccl_initialized)
 #endif
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },
@@ -164,8 +170,6 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
   m.def("RESOURCE_ALLOCATION_STRATEGY_IDX", []() -> int64_t { return RESOURCE_ALLOCATION_STRATEGY_IDX; });
   m.def("IS_MD_ENGINE_IDX", []() -> int64_t { return IS_MD_ENGINE_IDX; });
-  m.def("OPTIONAL_RANK_IDX", []() -> int64_t { return OPTIONAL_RANK_IDX; });
-  m.def("OPTIONAL_WORLD_SIZE_IDX", []() -> int64_t { return OPTIONAL_WORLD_SIZE_IDX; });
   m.def("NATIVE_TRT_COLLECTIVES_AVAIL", []() -> bool {
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
     return true;

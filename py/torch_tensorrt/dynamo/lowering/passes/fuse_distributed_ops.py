@@ -34,12 +34,10 @@ def tensorrt_fused_nccl_reduce_scatter_op(
 
 
 def tensorrt_fused_nccl_all_reduce_op(
-    inp: Any, reduce_op: str, group_size: int, group_name: str
+    inp: Any, reduce_op: str, group_name: str
 ) -> torch.Tensor:
     return torch.ops._c10d_functional.wait_tensor.default(
-        torch.ops._c10d_functional.all_reduce.default(
-            inp, reduce_op, group_size, group_name
-        )
+        torch.ops._c10d_functional.all_reduce.default(inp, reduce_op, group_name)
     )
 
 
@@ -81,7 +79,7 @@ def fuse_distributed_ops(
                     fused_node = gm.graph.create_node(
                         op="call_function",
                         target=tensorrt_fused_nccl_all_reduce_op,
-                        args=(node.args[0], node.args[1], node.args[2], node.args[3]),
+                        args=(node.args[0], node.args[1], node.args[2]),
                     )
 
             wait_tensor_node.replace_all_uses_with(fused_node)

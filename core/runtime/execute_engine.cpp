@@ -162,9 +162,7 @@ void setup_input_tensors(
       // Get tensor address, using placeholder for empty tensors
       // TensorRT requires non-null address even if numel() = 0
       // empty_tensor_placeholder is pre-allocated in TRTEngine constructor
-      void* input_addr = (final_input.numel() == 0 || final_input.data_ptr() == nullptr)
-          ? compiled_engine->empty_tensor_placeholder
-          : final_input.data_ptr();
+      void* input_addr = final_input.numel() == 0 ? compiled_engine->empty_tensor_placeholder : final_input.data_ptr();
 
       TORCHTRT_CHECK(
           compiled_engine->exec_ctx->setTensorAddress(name.c_str(), input_addr),
@@ -209,6 +207,27 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  // All inputs are expected to be on CUDA. Warn and move any that are not.
+  for (auto& inp : inputs) {
+    if (inp.defined() && !inp.is_cuda()) {
+      LOG_WARNING(
+          "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
+          "For best performance, ensure all inputs are on the correct CUDA device before "
+          "calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device)).");
+      inp = inp.cuda();
+    }
+  }
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // Lazy one-shot NCCL bind: fires on the first real execute_engine call when
+  // the constructor-time bind was deferred (e.g. no collective had been issued
+  // at construction time, or for serialized programs loaded inline where there
+  // is no Python _TorchTensorRTModule.forward wrapper).
+  if (compiled_engine->is_md && !compiled_engine->nccl_initialized) {
+    compiled_engine->bind_nccl_comm();
+  }
+#endif
+
   torch::Tensor dynamic_workspace;
   if (compiled_engine->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
     dynamic_workspace = torch::empty(compiled_engine->cuda_engine->getDeviceMemorySizeV2(), {torch::kCUDA});
@@ -311,11 +330,19 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
       }
 
-      // Distributed setup - bind NCCL communicator to TRT execution context
-      // setup_nccl_comm must have been called from Python before first forward
+      // Distributed setup - set NCCL communicator on TensorRT execution context
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-      if (compiled_engine->is_md && compiled_engine->nccl_comm != nullptr) {
-        compiled_engine->set_nccl_communicator_to_trt_context();
+      if (compiled_engine->rank >= 0 && compiled_engine->world_size > 1) {
+        bool result = compiled_engine->set_nccl_communicator_to_trt_context();
+        if (!result) {
+          LOG_ERROR("Failed to set NCCL communicator on TRT context");
+          LOG_ERROR("This will cause collective operations to fail at runtime");
+          LOG_ERROR("Make sure to call module.init_nccl_comm() after compilation");
+        }
+      } else {
+        LOG_DEBUG(
+            "Single-device mode (rank=" << compiled_engine->rank << ", world_size=" << compiled_engine->world_size
+                                        << ") - skipping NCCL setup");
       }
 #endif
 

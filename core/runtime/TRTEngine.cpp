@@ -98,9 +98,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
                : ResourceAllocationStrategy::kStatic)) {
   this->is_md = std::stoi(serialized_info[IS_MD_ENGINE_IDX]);
   if (this->is_md) {
-    LOG_INFO(
-        "Loaded distributed engine (built on rank " << serialized_info[OPTIONAL_RANK_IDX] << " of "
-                                                    << serialized_info[OPTIONAL_WORLD_SIZE_IDX] << ")");
+    LOG_INFO("Loaded distributed TRT engine (contains NCCL collectives); NCCL comm will be bound on first execution");
   }
 }
 
@@ -275,6 +273,18 @@ TRTEngine::TRTEngine(
   this->enable_profiling();
 #endif
   LOG_DEBUG(*this);
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // Attempt to bind the NCCL communicator immediately after exec_ctx is ready.
+  // This handles the common case where dist.init_process_group() and an initial
+  // collective have already been called before the engine is constructed.
+  // If the communicator isn't available yet (e.g. engine constructed before the
+  // first collective), bind_nccl_comm returns false and execute_engine() will
+  // retry on its first invocation.
+  if (this->is_md) {
+    bind_nccl_comm();
+  }
+#endif
 }
 
 TRTEngine::~TRTEngine() {
@@ -397,6 +407,13 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
   if (profile_execution) {
     enable_profiling();
   }
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // exec_ctx was recreated — re-bind the NCCL communicator if this is a
+  // distributed engine that has already been set up.
+  if (nccl_initialized) {
+    bind_nccl_comm();
+  }
+#endif
   // Indicates to reevaluate the runtime settings
   runtime_states.context_changed = true;
 
@@ -512,10 +529,7 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
   serialized_info[IS_MD_ENGINE_IDX] = this->is_md ? "1" : "0";
-  if (this->is_md) {
-    serialized_info[OPTIONAL_RANK_IDX] = std::to_string(this->rank);
-    serialized_info[OPTIONAL_WORLD_SIZE_IDX] = std::to_string(this->world_size);
-  }
+  // rank/world_size are runtime facts (may differ at load time); not serialized.
 
   return serialized_info;
 }
@@ -539,29 +553,20 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
 }
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-void TRTEngine::detect_distributed_context(const std::string& group_name) {
-  auto pg = c10d::resolve_process_group(group_name);
-  if (pg) {
-    this->rank = pg->getRank();
-    this->world_size = pg->getSize();
-    this->is_md = this->world_size > 1;
-    LOG_DEBUG("Detected distributed context: rank=" << this->rank << ", world_size=" << this->world_size);
+bool TRTEngine::bind_nccl_comm() {
+  // Soft-return when the process group isn't available yet (e.g. at engine
+  // construction time when the caller hasn't called dist.init_process_group()).
+  auto pg = c10d::resolve_process_group(this->group_name);
+  if (pg == nullptr) {
+    LOG_DEBUG("ProcessGroup '" << this->group_name << "' not yet registered in c10d; NCCL bind deferred.");
+    return false;
   }
-}
 
-void TRTEngine::setup_nccl_comm(const std::string& group_name) {
-  auto pg = c10d::resolve_process_group(group_name);
-  TORCHTRT_CHECK(pg != nullptr, "ProcessGroup '" << group_name << "' not found in registry");
-
-  // Set rank/world_size if not already set (e.g. load from disk without setup_engine)
-  if (this->rank < 0) {
-    this->rank = pg->getRank();
-    this->world_size = pg->getSize();
-    LOG_DEBUG("Set distributed context in setup_nccl_comm: rank=" << this->rank << ", world_size=" << this->world_size);
-  }
+  this->rank = pg->getRank();
+  this->world_size = pg->getSize();
 
   auto backend = pg->getBackend(c10d::ProcessGroup::BackendType::NCCL);
-  TORCHTRT_CHECK(backend != nullptr, "ProcessGroup '" << group_name << "' has no NCCL backend");
+  TORCHTRT_CHECK(backend != nullptr, "ProcessGroup '" << this->group_name << "' has no NCCL backend");
 
   auto* nccl_pg = dynamic_cast<c10d::ProcessGroupNCCL*>(backend.get());
   TORCHTRT_CHECK(nccl_pg != nullptr, "Backend is not ProcessGroupNCCL");
@@ -569,26 +574,21 @@ void TRTEngine::setup_nccl_comm(const std::string& group_name) {
   at::cuda::set_device(this->device_info.id);
 
   int64_t comm_ptr = nccl_pg->getCommPtr();
-  TORCHTRT_CHECK(
-      comm_ptr != 0,
-      "NCCL communicator not initialized for device " << this->device_info.id
-                                                      << ". Ensure a collective operation has been performed first.");
+  // Soft-return when NCCL hasn't run a collective yet.  The communicator is
+  // created lazily by PyTorch on the first collective — callers should ensure
+  // at least one collective (e.g. dist.barrier()) has been issued before the
+  // first TRT forward pass.
+  if (comm_ptr == 0) {
+    LOG_DEBUG(
+        "NCCL communicator not yet initialized for device " << this->device_info.id
+                                                            << "; NCCL bind deferred until first execute_engine call.");
+    return false;
+  }
 
-  this->nccl_comm = reinterpret_cast<void*>(comm_ptr);
-  set_nccl_communicator_to_trt_context();
-  LOG_INFO("NCCL comm set up (rank=" << this->rank << ", device=" << this->device_info.id << ")");
-}
-
-bool TRTEngine::set_nccl_communicator_to_trt_context() {
-  TORCHTRT_CHECK(exec_ctx != nullptr, "Cannot set NCCL communicator: execution context is null");
-  TORCHTRT_CHECK(this->nccl_comm != nullptr, "NCCL communicator is not set");
-
-  exec_ctx->setCommunicator(this->nccl_comm);
-
-  LOG_INFO(
-      "NCCL communicator set on TensorRT execution context "
-      "(rank="
-      << this->rank << ", device=" << this->device_info.id << ")");
+  TORCHTRT_CHECK(exec_ctx.get() != nullptr, "Cannot bind NCCL communicator: execution context is null");
+  exec_ctx->setCommunicator(reinterpret_cast<void*>(comm_ptr));
+  this->nccl_initialized = true;
+  LOG_INFO("NCCL comm bound (rank=" << this->rank << ", device=" << this->device_info.id << ")");
   return true;
 }
 #endif // ENABLE_TRT_NCCL_COLLECTIVES

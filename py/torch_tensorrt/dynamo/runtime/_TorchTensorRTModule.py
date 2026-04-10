@@ -38,8 +38,6 @@ TARGET_PLATFORM_IDX = -1  # Not implemented
 REQUIRES_OUTPUT_ALLOCATOR_IDX = -1  # Not implemented
 SERIALIZATION_LEN = -1  # Not implemented
 IS_MD_ENGINE_IDX = -1  # Not implemented
-OPTIONAL_RANK_IDX = -1  # Not implemented
-OPTIONAL_WORLD_SIZE_IDX = -1  # Not implemented
 
 if ENABLED_FEATURES.torch_tensorrt_runtime:
     ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()  # 0
@@ -58,9 +56,7 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
         torch.ops.tensorrt.RESOURCE_ALLOCATION_STRATEGY_IDX()
     )  # 10
     IS_MD_ENGINE_IDX = torch.ops.tensorrt.IS_MD_ENGINE_IDX()  # 11
-    OPTIONAL_RANK_IDX = torch.ops.tensorrt.OPTIONAL_RANK_IDX()  # 12
-    OPTIONAL_WORLD_SIZE_IDX = torch.ops.tensorrt.OPTIONAL_WORLD_SIZE_IDX()  # 13
-    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 14
+    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 12
 
 
 @for_all_methods(needs_torch_tensorrt_runtime)
@@ -212,10 +208,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         )
         is_md = dist.is_initialized() and dist.get_world_size() > 1
         engine_info[IS_MD_ENGINE_IDX] = str(int(is_md))
-        # serialized engine info for build time rank and world size
-        if is_md:
-            engine_info[OPTIONAL_RANK_IDX] = str(dist.get_rank())
-            engine_info[OPTIONAL_WORLD_SIZE_IDX] = str(dist.get_world_size())
+        # rank/world_size are runtime facts; queried from ProcessGroup at execution time
 
         return engine_info
 
@@ -252,14 +245,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.dynamically_allocate_resources
         )
 
-    def _get_default_group_name(self) -> str:
-        """Get the group name of the default ProcessGroup."""
-        if dist.is_available() and dist.is_initialized():
-            pg = dist.group.WORLD
-            if pg is not None and hasattr(pg, "group_name"):
-                return str(pg.group_name)
-        return ""
-
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.
@@ -271,19 +256,19 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """
         if self.engine is not None:
             return
+        from torch_tensorrt.dynamo.runtime._distributed import get_active_group_name
+        from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+
+        setup_nccl_for_torch_tensorrt()
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
 
-        # Distributed setup is split into two calls for TorchTensorRTModule (C++ runtime):
-        # 1. detect_distributed_context: sets rank/world_size on C++ engine (here, at setup time)
-        #    Needed so rank/world_size are available for serialization before any forward call.
-        # 2. setup_nccl_comm: gets NCCL comm and binds to TRT context (lazily, in forward)
-        #    Deferred because NCCL comm is only needed at execution time.
-        #
-        # In PythonTorchTensorRTModule, this is a single setup_nccl_comm() call in forward
-        # because rank/world_size are set in __init__ via dist.get_rank().
-        group_name = self._get_default_group_name()
-        if group_name:
-            self.engine.detect_distributed_context(group_name)
+        # Store the active process group name on the C++ engine so that the
+        # lazy NCCL setup in execute_engine() can find the right communicator
+        # without needing any further Python involvement.
+        if ENABLED_FEATURES.torch_tensorrt_runtime:
+            group_name = get_active_group_name()
+            if group_name and hasattr(self.engine, "set_group_name"):
+                self.engine.set_group_name(group_name)
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
@@ -374,17 +359,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is None:
             raise RuntimeError("Engine has not been setup yet.")
 
-        # Lazy NCCL setup on first forward
-        if (
-            not torch.compiler.is_exporting()
-            and self.engine.is_md
-            and not hasattr(self, "_nccl_initialized")
-        ):
-            group_name = self._get_default_group_name()
-            if group_name:
-                self.engine.setup_nccl_comm(group_name)
-                self._nccl_initialized = True
-
         assert len(inputs) == len(
             self.input_binding_names
         ), f"Wrong number of inputs, expected {len(self.input_binding_names)} got {len(inputs)}."
@@ -394,10 +368,19 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # directly cast the input to a Torch Tensor.
         #
         # This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors
-        input_tensors: List[torch.Tensor] = [
-            (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
-            for i in inputs
-        ]
+        input_tensors: List[torch.Tensor] = []
+        for i in inputs:
+            if isinstance(i, torch.Tensor):
+                if not i.is_cuda:
+                    logger.warning(
+                        "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
+                        "For best performance, ensure all inputs are on the correct CUDA device "
+                        "before calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device))."
+                    )
+                    i = i.cuda()
+                input_tensors.append(i)
+            else:
+                input_tensors.append(torch.tensor(i).cuda())
 
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine

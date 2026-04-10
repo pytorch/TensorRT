@@ -6,12 +6,20 @@ works correctly with torchrun or plain env-var injection across nodes.
 
 Usage
 -----
-# Rank 0 (spirit):
-  RANK=0 WORLD_SIZE=2 MASTER_ADDR=169.254.204.57 MASTER_PORT=29500 \\
+TRT's dlopen("libnccl.so") reads LD_LIBRARY_PATH at process start, so the
+NCCL directory must be in LD_LIBRARY_PATH before the process launches.
+Use setup_nccl_for_torch_tensorrt() to locate the path, then pass it at launch time.
+
+  NCCL_LIB=$(python -c "from torch_tensorrt.dynamo.runtime._nccl_utils import get_nccl_library_path; print(get_nccl_library_path())")
+
+# Rank 0:
+  LD_LIBRARY_PATH="$NCCL_LIB:$LD_LIBRARY_PATH" \\
+    RANK=0 WORLD_SIZE=2 MASTER_ADDR=<rank0_ip> MASTER_PORT=29500 \\
     uv run python examples/distributed_inference/test_multinode_nccl.py
 
-# Rank 1 (opportunity):
-  RANK=1 WORLD_SIZE=2 MASTER_ADDR=169.254.204.57 MASTER_PORT=29500 \\
+# Rank 1:
+  LD_LIBRARY_PATH="$NCCL_LIB:$LD_LIBRARY_PATH" \\
+    RANK=1 WORLD_SIZE=2 MASTER_ADDR=<rank0_ip> MASTER_PORT=29500 \\
     uv run python examples/distributed_inference/test_multinode_nccl.py
 """
 
@@ -22,6 +30,7 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.utils._pytree
+import torch_tensorrt
 from torch.distributed._tensor import Shard
 from torch.distributed._tensor.device_mesh import init_device_mesh
 from torch.distributed.tensor.parallel import (
@@ -29,15 +38,13 @@ from torch.distributed.tensor.parallel import (
     RowwiseParallel,
     parallelize_module,
 )
-
-import torch_tensorrt
-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_library
+from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
 
 torch.utils._pytree.register_constant(
     torch.distributed.tensor._dtensor_spec.DTensorSpec
 )
 
-setup_nccl_library()
+setup_nccl_for_torch_tensorrt()
 
 rank = int(os.environ["RANK"])
 world_size = int(os.environ["WORLD_SIZE"])
@@ -92,10 +99,9 @@ for runtime, use_python in [("cpp", False), ("python", True)]:
             backend="torch_tensorrt",
             options={
                 "truncate_long_and_double": True,
-                "enabled_precisions": {torch.float32, torch.float16},
+                "enabled_precisions": {torch.float32},
                 "use_python_runtime": use_python,
                 "min_block_size": 1,
-                "use_distributed_mode_trace": True,
             },
         )
         output = trt_model(inp)
@@ -104,7 +110,10 @@ for runtime, use_python in [("cpp", False), ("python", True)]:
             print(f"[Rank {rank}] PASS  {runtime} runtime  (std={std:.6f})", flush=True)
             PASSED.append(runtime)
         else:
-            print(f"[Rank {rank}] FAIL  {runtime} runtime  (std={std:.6f} >= 0.01)", flush=True)
+            print(
+                f"[Rank {rank}] FAIL  {runtime} runtime  (std={std:.6f} >= 0.01)",
+                flush=True,
+            )
             FAILED.append(runtime)
     except Exception as e:
         print(f"[Rank {rank}] ERROR {runtime} runtime: {e}", flush=True)

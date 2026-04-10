@@ -51,7 +51,24 @@ def torch_tensorrt_backend(
 def aot_torch_tensorrt_aten_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
+    import torch.distributed as dist
+
     settings, engine_cache = parse_dynamo_kwargs(kwargs)
+
+    # Auto-enable distributed tracing when running inside an active distributed
+    # context — mirrors how DistributedDataParallel works: no explicit flag needed.
+    if (
+        not settings.use_distributed_mode_trace
+        and dist.is_available()
+        and dist.is_initialized()
+        and dist.get_world_size() > 1
+    ):
+        logger.debug(
+            "Detected active distributed context (world_size=%d); "
+            "enabling use_distributed_mode_trace automatically.",
+            dist.get_world_size(),
+        )
+        settings.use_distributed_mode_trace = True
 
     if settings.use_distributed_mode_trace:
         logger.debug(

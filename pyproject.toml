@@ -434,3 +434,4 @@ extend-ignore-identifiers-re = [
 
 [tool.typos.default.extend-words]
 arange = "arange"
+thw = "thw"
