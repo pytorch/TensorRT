@@ -351,7 +351,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         #
         # This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors
         input_tensors: List[torch.Tensor] = [
-            (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
+            (
+                i.cuda()
+                if isinstance(i, torch.Tensor) and not i.is_cuda
+                else (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
+            )
             for i in inputs
         ]
 
