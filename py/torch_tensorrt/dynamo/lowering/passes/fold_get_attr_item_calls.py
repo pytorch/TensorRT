@@ -5,8 +5,8 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-# call_method / call_function ops that are transparent when resolving to the
-# underlying source of a 0-dim tensor for .item() folding.
+# Identity ops that produce an alias / copy of their single input.
+# Removing them before folding means .item() nodes will see placeholder/get_attr directly.
 _IDENTITY_METHODS = frozenset({"clone", "contiguous", "detach", "to"})
 _IDENTITY_FUNCTIONS = frozenset(
     {
@@ -18,27 +18,26 @@ _IDENTITY_FUNCTIONS = frozenset(
 )
 
 
-def _resolve_source(node: torch.fx.Node) -> Optional[torch.fx.Node]:
-    """Walk back through identity-like ops to the underlying placeholder / get_attr.
+def _remove_identity_ops(gm: torch.fx.GraphModule) -> bool:
+    """Replace identity op nodes with their single input, in-place.
 
-    Returns the source node (placeholder or get_attr) if found, else None.
+    Returns True if any nodes were removed.
     """
-    visited = set()
-    cur = node
-    while cur is not None and id(cur) not in visited:
-        visited.add(id(cur))
-        if cur.op in ("placeholder", "get_attr"):
-            return cur
-        if cur.op == "call_method" and cur.target in _IDENTITY_METHODS:
-            if len(cur.args) >= 1 and isinstance(cur.args[0], torch.fx.Node):
-                cur = cur.args[0]
-                continue
-        if cur.op == "call_function" and cur.target in _IDENTITY_FUNCTIONS:
-            if len(cur.args) >= 1 and isinstance(cur.args[0], torch.fx.Node):
-                cur = cur.args[0]
-                continue
-        break
-    return None
+    modified = False
+    for node in list(gm.graph.nodes):
+        is_identity = (
+            node.op == "call_method" and node.target in _IDENTITY_METHODS
+        ) or (
+            node.op == "call_function" and node.target in _IDENTITY_FUNCTIONS
+        )
+        if not is_identity:
+            continue
+        if len(node.args) < 1 or not isinstance(node.args[0], torch.fx.Node):
+            continue
+        node.replace_all_uses_with(node.args[0])
+        gm.graph.erase_node(node)
+        modified = True
+    return modified
 
 
 def _get_actual_tensor(
@@ -47,15 +46,7 @@ def _get_actual_tensor(
     sample_inputs: Optional[Sequence[Any]],
     placeholder_index: dict,
 ) -> Optional[torch.Tensor]:
-    """Return the actual (non-fake) tensor for a placeholder or get_attr node.
-
-    For ``get_attr`` nodes: look up the attribute on the GraphModule.
-    For ``placeholder`` nodes: try (in order):
-      1. ``node.meta["grapharg"].example`` — holds a weakref to the real tensor
-         from dynamo's tracing context.
-      2. ``sample_inputs[index]`` — works when sample_inputs are real tensors
-         (``torch_tensorrt.dynamo.compile`` path).
-    """
+    """Return the actual (non-fake) tensor for a placeholder or get_attr node."""
     from torch._subclasses.fake_tensor import FakeTensor
 
     if origin.op == "get_attr":
@@ -110,9 +101,13 @@ def fold_get_attr_item_calls(
     graphs they appear as ``get_attr`` nodes and are resolved directly from the
     module.
 
-    Both paths also handle intermediate identity ops (clone, detach, contiguous,
-    to) that dynamo may insert between the parameter and the ``.item()`` call.
+    Identity ops (clone, detach, contiguous, alias) that dynamo may insert between
+    the parameter and the ``.item()`` call are removed first so the fold step sees
+    placeholder/get_attr directly.
     """
+    # Strip identity ops so .item() inputs point directly at placeholder/get_attr.
+    _remove_identity_ops(gm)
+
     # Build placeholder → positional index map (for sample_inputs fallback).
     placeholder_index: dict = {}
     ph_idx = 0
@@ -128,24 +123,19 @@ def fold_get_attr_item_calls(
         if len(node.args) != 1:
             continue
         src = node.args[0]
-
-        # Walk through identity ops to reach the underlying source.
-        origin = _resolve_source(src)
-        if origin is None:
+        if src.op not in ("placeholder", "get_attr"):
             continue
 
-        val = _get_actual_tensor(origin, gm, sample_inputs, placeholder_index)
+        val = _get_actual_tensor(src, gm, sample_inputs, placeholder_index)
         if val is None or val.numel() != 1:
             continue
 
         scalar = val.item()
         logger.debug(
             f"fold_get_attr_item_calls: folding {node.name} "
-            f"({src.name}.item() via {origin.name}) → {scalar}"
+            f"({src.name}.item()) → {scalar}"
         )
 
-        # Replace every use of this node with the Python scalar.
-        # FX allows Python scalars as node arguments.
         for user in list(node.users):
             user.args = _replace_in_args(user.args, node, scalar)
             user.kwargs = {k: scalar if v is node else v for k, v in user.kwargs.items()}
