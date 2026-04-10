@@ -110,9 +110,18 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
     else:
         max_seq_len = seq_len
 
-    from torch.fx.experimental.symbolic_shapes import ShapeEnv
+    # Get the ShapeEnv from the existing fake tensors in the graph rather than
+    # creating a new one. Using a fresh ShapeEnv causes a KeyError in
+    # FakeTensorUpdater because the unbacked symints (u0, u1) are unknown to
+    # the FakeTensorMode's ShapeEnv.
+    fake_tensors = [
+        node.meta["val"]
+        for node in gm.graph.nodes
+        if "val" in node.meta
+        and isinstance(node.meta["val"], torch._subclasses.fake_tensor.FakeTensor)
+    ]
+    shape_env = fake_tensors[0].fake_mode.shape_env
 
-    shape_env = ShapeEnv()
     # Create symbolic ints for start_idx and end_idx with range [0, seq_len] inclusive
     start_idx_unbacked_symint = shape_env.create_unbacked_symint()
     torch._check(start_idx_unbacked_symint >= 0)
@@ -124,6 +133,12 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
     # Set the symbolic ints as the metadata for start_idx and end_idx inputs
     start_idx_input.meta["val"] = start_idx_unbacked_symint
     end_idx_input.meta["val"] = end_idx_unbacked_symint
+
+    # u0/u1 are scalar index values, not tensor shape dimensions, so they will
+    # never appear in any output tensor shape. Clear them from the pending list
+    # so FakeTensorUpdater doesn't raise PendingUnbackedSymbolNotFound when
+    # processing subsequent call_function nodes (placeholder nodes are skipped).
+    shape_env.pending_fresh_unbacked_symbols.clear()
 
     return kv_inputs, start_idx_input, end_idx_input
 

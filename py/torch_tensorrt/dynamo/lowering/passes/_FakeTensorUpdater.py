@@ -7,6 +7,7 @@ import sympy
 import torch
 import torch.fx
 from torch._dispatch.python import enable_python_dispatcher
+import torch._inductor.fx_passes.reinplace
 from torch._inductor.fx_utils import get_fake_args_kwargs, get_node_storage, get_storage
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import (
