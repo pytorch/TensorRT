@@ -360,7 +360,9 @@ def refit_module_weights(
     new_weight_module = pre_export_lowering(new_weight_module, settings)
     new_weight_module = new_weight_module.run_decompositions(
         get_decompositions(
-            settings.enable_experimental_decompositions, settings.decompose_attention
+            settings.enable_experimental_decompositions,
+            settings.decompose_attention,
+            settings.use_distributed_mode_trace,
         )
     )
     new_gm = new_weight_module.module()

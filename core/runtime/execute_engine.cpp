@@ -314,7 +314,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       // Distributed setup - bind NCCL communicator to TRT execution context
       // setup_nccl_comm must have been called from Python before first forward
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-      if (compiled_engine->world_size > 1 && compiled_engine->nccl_comm != nullptr) {
+      if (compiled_engine->is_md && compiled_engine->nccl_comm != nullptr) {
         compiled_engine->set_nccl_communicator_to_trt_context();
       }
 #endif

@@ -108,6 +108,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             &TRTEngine::set_device_memory_budget)
         .def_property("streamable_device_memory_budget", &TRTEngine::get_streamable_device_memory_budget)
         .def_property("automatic_device_memory_budget", &TRTEngine::get_automatic_device_memory_budget)
+        .def_readonly("is_md", &TRTEngine::is_md)
         .def_readonly("rank", &TRTEngine::rank)
         .def_readonly("world_size", &TRTEngine::world_size)
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES

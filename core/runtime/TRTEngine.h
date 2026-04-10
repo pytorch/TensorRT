@@ -210,6 +210,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::shared_ptr<DynamicOutputAllocator> output_allocator;
 
   // Member variables for distributed inference (-1 indicates non-distributed mode)
+  bool is_md = false;
   int64_t rank = -1;
   int64_t world_size = -1;
 

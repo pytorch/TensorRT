@@ -62,7 +62,9 @@ def aot_torch_tensorrt_aten_backend(
         )
         settings_aot_autograd = {}
         settings_aot_autograd["decompositions"] = get_decompositions(
-            settings.enable_experimental_decompositions, settings.decompose_attention
+            settings.enable_experimental_decompositions,
+            settings.decompose_attention,
+            settings.use_distributed_mode_trace,
         )
         # This is added since detach lowering leads to alias nodes
         # Error - View operation returned a tensor that is the same as the input base tensor
@@ -143,6 +145,7 @@ def _pretraced_backend(
                     decompositions=get_decompositions(
                         settings.enable_experimental_decompositions,
                         settings.decompose_attention,
+                        settings.use_distributed_mode_trace,
                     ),
                 )
 

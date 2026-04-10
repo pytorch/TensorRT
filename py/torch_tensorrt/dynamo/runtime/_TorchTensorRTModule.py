@@ -375,7 +375,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             raise RuntimeError("Engine has not been setup yet.")
 
         # Lazy NCCL setup on first forward
-        if self.engine.world_size > 1 and not hasattr(self, "_nccl_initialized"):
+        if (
+            not torch.compiler.is_exporting()
+            and self.engine.is_md
+            and not hasattr(self, "_nccl_initialized")
+        ):
             group_name = self._get_default_group_name()
             if group_name:
                 self.engine.setup_nccl_comm(group_name)

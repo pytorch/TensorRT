@@ -86,7 +86,7 @@ cc_library(
     deps = [
         "//core/plugins:torch_tensorrt_plugins",
         "//core/util:prelude",
-    ] + select({
+    ] + if_torch_nccl(["@torch_nccl//:nccl_headers"]) + select({
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],
         ":rtx_win": ["@tensorrt_rtx_win//:nvinfer"],
         ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
