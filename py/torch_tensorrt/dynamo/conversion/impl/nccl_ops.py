@@ -325,12 +325,15 @@ def nccl_reduce_scatter_native(
     trt_reduce_op = reduce_op_map[reduce_op.lower()]
 
     try:
+        # Explicit rank array to ensure TRT performs the scatter across all ranks.
+        groups = np.arange(world_size, dtype=np.int64)
+
         layer = ctx.net.add_dist_collective(
             input_tensor,
             trt.CollectiveOperation.REDUCE_SCATTER,
             trt_reduce_op,
             -1,
-            None,  # None means all ranks participate
+            groups,
         )
 
         set_layer_name(layer, target, name, source_ir)
@@ -338,7 +341,7 @@ def nccl_reduce_scatter_native(
         output = layer.get_output(0)
         layer.num_ranks = world_size
         logger.debug(
-            f"Successfully created native REDUCE_SCATTER layer: {name}, reduce_op={reduce_op}"
+            f"Successfully created native REDUCE_SCATTER layer: {name}, reduce_op={reduce_op}, groups={groups.tolist()}"
         )
 
         return output
@@ -409,12 +412,17 @@ def nccl_all_reduce_native(
     trt_reduce_op = reduce_op_map[reduce_op.lower()]
 
     try:
+        # Create array of all participating rank IDs [0, 1, ..., world_size-1]
+        # Passing None for groups can be treated as a no-op by TRT; use an explicit
+        # rank array (same as ALL_GATHER) to ensure the reduction is performed.
+        groups = np.arange(world_size, dtype=np.int64)
+
         layer = ctx.net.add_dist_collective(
             input_tensor,
             trt.CollectiveOperation.ALL_REDUCE,
             trt_reduce_op,
             -1,
-            None,
+            groups,
         )
 
         set_layer_name(layer, target, name, source_ir)
@@ -422,7 +430,7 @@ def nccl_all_reduce_native(
         output = layer.get_output(0)
         layer.num_ranks = world_size
         logger.debug(
-            f"Successfully created native ALL_REDUCE layer: {name}, reduce_op={reduce_op}"
+            f"Successfully created native ALL_REDUCE layer: {name}, reduce_op={reduce_op}, groups={groups.tolist()}"
         )
 
         return output

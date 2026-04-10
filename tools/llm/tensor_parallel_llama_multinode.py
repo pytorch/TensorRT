@@ -1,22 +1,25 @@
 """
-Tensor Parallel Qwen inference across two nodes with Torch-TensorRT.
+Tensor Parallel Llama inference across two nodes with Torch-TensorRT (C++ runtime).
 
 Reads RANK, WORLD_SIZE, MASTER_ADDR, MASTER_PORT from the environment.
 Each node must have exactly one GPU (cuda:0). LOCAL_RANK is used for
-device selection and defaults to 0 when not set (e.g. plain env injection).
+device selection and defaults to 0 when not set.
+
+TP plan uses ColwiseParallel / RowwiseParallel (megatron-style column/row
+linear sharding). Native TRT attention handles SDPA — no external converter.
 
 Usage
 -----
 # Node 0 (rank 0) — run from /home/naren/tensorrt:
   RANK=0 WORLD_SIZE=2 MASTER_ADDR=<node0-ip> MASTER_PORT=29500 LOCAL_RANK=0 \\
-    uv run python tools/llm/tensor_parallel_qwen_multinode.py
+    uv run python tools/llm/tensor_parallel_llama_multinode.py
 
 # Node 1 (rank 1):
   RANK=1 WORLD_SIZE=2 MASTER_ADDR=<node0-ip> MASTER_PORT=29500 LOCAL_RANK=0 \\
-    uv run python tools/llm/tensor_parallel_qwen_multinode.py
+    uv run python tools/llm/tensor_parallel_llama_multinode.py
 
 Optional args:
-  --model   Qwen/Qwen2.5-0.5B-Instruct  (default)
+  --model   meta-llama/Llama-3.2-1B-Instruct  (default)
   --prompt  "Your prompt here"
   --precision FP16|BF16|FP32
   --num_tokens 64
@@ -46,8 +49,7 @@ local_rank = int(os.environ.get("LOCAL_RANK", 0))
 torch.cuda.set_device(local_rank)
 DEVICE = torch.device(f"cuda:{local_rank}")
 
-# Use a 2-hour timeout so TRT engine building (which can take many minutes
-# for complex dynamic-shape models) does not trigger the NCCL watchdog.
+# Use a 2-hour timeout so TRT engine building does not trigger the NCCL watchdog.
 dist.init_process_group(
     backend="nccl", timeout=datetime.timedelta(hours=2)
 )
@@ -59,13 +61,11 @@ from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tenso
 
 setup_nccl_for_torch_tensorrt()
 
-from torch.distributed._tensor import Replicate, Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
     RowwiseParallel,
     parallelize_module,
 )
-from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import generate, record_stats, time_generate
 
@@ -90,7 +90,9 @@ def get_model(args, device_mesh):
             .to(DEVICE)
         )
 
-    register_sdpa.enable_sdpa_converter(args.model, model.config)
+    # Native TRT attention handles SDPA correctly for TP models — no external
+    # SDPA converter needed (and the custom converter's causal mask logic is
+    # incorrect in the tensor-parallel setting).
 
     if args.precision == "FP16":
         model = model.to(torch.float16)
@@ -106,6 +108,7 @@ def get_model(args, device_mesh):
         f"divisible by world_size ({world_size})"
     )
 
+    # Megatron-style column/row parallel sharding via PyTorch DTensor.
     tp_plan = {}
     for i in range(model.config.num_hidden_layers):
         tp_plan.update(
@@ -122,7 +125,7 @@ def get_model(args, device_mesh):
     parallelize_module(model, device_mesh, tp_plan)
 
     # After column-sharding Q/K/V, each rank holds num_heads // world_size
-    # heads. Patch these attributes so HuggingFace attention reshapes correctly.
+    # heads. Patch these so HuggingFace attention reshapes correctly.
     for layer in model.model.layers:
         layer.self_attn.num_heads = model.config.num_attention_heads // world_size
         layer.self_attn.num_key_value_heads = (
@@ -134,18 +137,12 @@ def get_model(args, device_mesh):
 
 
 def compile_torchtrt(model, args):
-    use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float16}
-        use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
-        use_explicit_typing = True
     else:
         enabled_precisions = {torch.float32}
-        use_explicit_typing = True
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_model = torch.compile(
@@ -154,11 +151,11 @@ def compile_torchtrt(model, args):
             dynamic=True,
             options={
                 "enabled_precisions": enabled_precisions,
-                "use_explicit_typing": use_explicit_typing,
-                "use_fp32_acc": use_fp32_acc,
+                "use_explicit_typing": True,
+                "use_fp32_acc": True,
                 "device": DEVICE,
                 "disable_tf32": True,
-                "use_python_runtime": not args.cpp_runtime,
+                "use_python_runtime": False,
                 "debug": args.debug,
                 "min_block_size": 1,
                 "assume_dynamic_shape_support": True,
@@ -169,10 +166,10 @@ def compile_torchtrt(model, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Two-node Qwen TP inference with Torch-TensorRT"
+        description="Two-node Llama TP inference with Torch-TensorRT (C++ runtime)"
     )
     parser.add_argument(
-        "--model", default="Qwen/Qwen2.5-0.5B-Instruct", help="HF model name"
+        "--model", default="meta-llama/Llama-3.2-1B-Instruct", help="HF model name"
     )
     parser.add_argument(
         "--prompt", default="What is tensor parallelism?", help="Input prompt"
@@ -185,7 +182,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num_tokens", type=int, default=64)
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--cpp_runtime", action="store_true")
     args = parser.parse_args()
 
     device_mesh = init_device_mesh("cuda", (world_size,))
@@ -207,24 +203,26 @@ if __name__ == "__main__":
         if rank == 0:
             print("\n===== PyTorch-TP (uncompiled) =====")
             print(tokenizer.decode(torch_tokens[0], skip_special_tokens=True))
+            sys.stdout.flush()
 
-        logger.info("Compiling with Torch-TensorRT ...")
+        logger.info("Compiling with Torch-TensorRT (C++ runtime)...")
         trt_model = compile_torchtrt(model, args)
 
-        # Trigger TRT engine building explicitly and wait for all ranks to
-        # finish before starting the generation loop.  Without this barrier,
-        # a slow TRT build on one rank causes the other rank to timeout at
-        # the next NCCL collective (NCCL default watchdog = 10 min).
+        # Trigger TRT engine build explicitly and barrier so all ranks finish
+        # compilation before the generation loop starts.  Without this, a slow
+        # build on one rank causes the other to timeout at the next NCCL collective.
+        # Warmup: mark seq-len dim dynamic to match the generate() loop so the
+        # compilation artifacts (TRT engine) are reused there without a recompile.
         logger.info("Warming up TRT model (triggering engine build)...")
-        _position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
-        _ = trt_model(input_ids.clone(), position_ids=_position_ids)
+        _warmup_ids = input_ids.clone()
+        torch._dynamo.mark_dynamic(_warmup_ids, 1)
+        _position_ids = torch.arange(_warmup_ids.shape[1]).unsqueeze(0).to(DEVICE)
+        torch._dynamo.mark_dynamic(_position_ids, 1)
+        _ = trt_model(_warmup_ids, position_ids=_position_ids)
         dist.barrier()
-        logger.info("All ranks finished TRT compilation, starting inference...")
+        logger.info("All ranks compiled. Starting TRT inference...")
 
         logger.info("Running TRT-compiled model ...")
-        # dynamic_seqlen_range=(1, max_len) tells dynamo the full range of
-        # sequence lengths upfront so TRT builds one engine covering all steps
-        # instead of recompiling for every new length during generation.
         trt_tokens = generate(
             trt_model,
             input_ids.clone(),
@@ -233,8 +231,9 @@ if __name__ == "__main__":
             dynamic_seqlen_range=(1, max_len),
         )
         if rank == 0:
-            print("\n===== TensorRT-TP =====")
+            print("\n===== TensorRT-TP (C++ runtime) =====")
             print(tokenizer.decode(trt_tokens[0], skip_special_tokens=True))
+            sys.stdout.flush()
 
     dist.destroy_process_group()
     logger.info("Done.")

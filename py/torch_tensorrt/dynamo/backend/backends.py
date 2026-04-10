@@ -149,10 +149,17 @@ def aot_torch_tensorrt_aten_backend(
 def _strip_trt_sdpa_kwargs(gm: torch.fx.GraphModule) -> None:
     """Remove TRT-specific kwargs (use_fp32_acc, sliding_window_size) from SDPA nodes.
 
-    When TRT compilation fails and we return the plain graph for PyTorch execution,
-    these custom kwargs must be stripped because ``torch.nn.functional.
-    scaled_dot_product_attention`` does not accept them.
+    Called both on the failure fallback path (original_gm) and on the compiled
+    result (trt_compiled) to clean up any SDPA nodes that escaped TRT compilation
+    and will be executed by PyTorch.  Recurses into all submodules so that nodes
+    inside nested GraphModules (e.g. from aot_autograd subgraph splitting) are
+    also cleaned up.
     """
+    # Recurse into submodules first.
+    for _, submod in gm.named_children():
+        if isinstance(submod, torch.fx.GraphModule):
+            _strip_trt_sdpa_kwargs(submod)
+
     _TRT_SDPA_KWARGS = frozenset({"use_fp32_acc", "sliding_window_size"})
     modified = False
     for node in gm.graph.nodes:
@@ -228,17 +235,13 @@ def _pretraced_backend(
         ):
             repair_input_aliasing(gm, settings)
 
-            # Remove sym_int placeholders and inputs
-            remove_sym_nodes(gm, sample_inputs, settings)
-
-            torch_inputs = [
-                input for input in sample_inputs if isinstance(input, torch.Tensor)
-            ]
-
             # Remove detach nodes
             remove_detach(gm, settings)
 
-            # Invoke AOTAutograd to translate operators to aten
+            # Invoke AOTAutograd to translate operators to aten.
+            # SymInt placeholders are kept so that aot_export_joint_simple
+            # can handle dynamic shapes natively (mirroring how torch
+            # inductor lets aot_autograd resolve them).
             if not settings.use_distributed_mode_trace:
                 gm = aot_export_joint_simple(
                     gm,
@@ -250,6 +253,14 @@ def _pretraced_backend(
                         settings.use_distributed_mode_trace,
                     ),
                 )
+
+            # Remove sym_int placeholders and inputs *after* AOT tracing
+            # so we don't inject sym_size nodes that confuse the tracer.
+            remove_sym_nodes(gm, sample_inputs, settings)
+
+            torch_inputs = [
+                input for input in sample_inputs if isinstance(input, torch.Tensor)
+            ]
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
@@ -276,6 +287,11 @@ def _pretraced_backend(
                 settings=settings,
                 engine_cache=engine_cache,
             )
+            # Strip TRT-only SDPA kwargs from any nodes that were not captured
+            # into a TRT engine (e.g. because a subgraph fell back to PyTorch
+            # due to an unsupported op).  These nodes will be executed by
+            # PyTorch which does not accept use_fp32_acc / sliding_window_size.
+            _strip_trt_sdpa_kwargs(trt_compiled)
             return trt_compiled
     except (AssertionError, RuntimeError, TypeError):
         if not settings.pass_through_build_failures:

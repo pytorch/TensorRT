@@ -105,11 +105,10 @@ def _process_sdpa_node(
                 args=modified_input_args,
                 kwargs={
                     "scale": node.kwargs.get("scale", None),
-                    "use_fp32_acc": settings.use_fp32_acc,
-                    "sliding_window_size": sliding_window_size,
                 },
             )
             new_node.meta = copy.copy(node.meta)
+            new_node.meta["trt_sliding_window_size"] = sliding_window_size
             node.replace_all_uses_with(new_node)
 
         gm.graph.erase_node(node)
@@ -178,17 +177,25 @@ def _process_sdpa_node(
         is_causal,
     )
 
-    # Create a new node with torch.nn.functional.scaled_dot_product_attention
+    # Create a new node with torch.nn.functional.scaled_dot_product_attention.
+    # use_fp32_acc and sliding_window_size are intentionally NOT passed as
+    # kwargs here: torch.nn.functional.scaled_dot_product_attention does not
+    # accept them, so they would cause a TypeError if this node falls back to
+    # PyTorch execution (e.g. when the TRT subgraph build fails).
+    # The TRT SDPA converter reads use_fp32_acc from
+    # ctx.compilation_settings.use_fp32_acc and sliding_window_size from
+    # node.meta["trt_sliding_window_size"] instead.
     with gm.graph.inserting_after(node):
         new_node = gm.graph.call_function(
             torch.nn.functional.scaled_dot_product_attention,
             args=modified_input_args,
             kwargs={
                 "scale": node.kwargs.get("scale", None),
-                "use_fp32_acc": settings.use_fp32_acc,
-                "sliding_window_size": sliding_window_size,
             },
         )
+        # Store TRT-only metadata in node.meta so the converter can access it
+        # without polluting the function signature.
+        new_node.meta["trt_sliding_window_size"] = sliding_window_size
 
         # Deep copy encounters RuntimeError: Cannot access data pointer of Tensor (e.g. FakeTensor, FunctionalTensor). So we use copy instead.
         new_node.meta = copy.copy(node.meta)

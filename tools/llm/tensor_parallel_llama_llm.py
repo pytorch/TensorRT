@@ -52,7 +52,8 @@ os.environ.setdefault("MASTER_PORT", "29501")
 dist.init_process_group(backend="nccl")
 rank = dist.get_rank()
 world_size = dist.get_world_size()
-DEVICE = torch.device(f"cuda:{rank}")
+local_rank = int(os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count()))
+DEVICE = torch.device(f"cuda:{local_rank}")
 torch.cuda.set_device(DEVICE)
 
 
@@ -102,7 +103,6 @@ from torch.distributed.tensor.parallel import (
     RowwiseParallel,
     parallelize_module,
 )
-from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import generate, record_stats, time_generate
 
@@ -119,7 +119,10 @@ def get_model(args, device_mesh):
             .eval()
             .to(DEVICE)
         )
-        register_sdpa.enable_sdpa_converter(args.model, model.config)
+        # NOTE: The custom SDPA converter's dynamic causal mask computation is
+        # incorrect for tensor-parallel models. TRT correctly handles the native
+        # aten.scaled_dot_product_attention without the custom converter.
+        # register_sdpa.enable_sdpa_converter(args.model, model.config)
 
     if args.model_precision == "FP16":
         model = model.to(torch.float16)
@@ -176,17 +179,16 @@ def compile_torchtrt(model, input_ids, args):
         trt_model = torch.compile(
             model,
             backend="torch_tensorrt",
-            dynamic=False,
+            dynamic=True,
             options={
-                "enabled_precisions": enabled_precisions,
-                "use_explicit_typing": use_explicit_typing,
+                "use_explicit_typing": True,
                 "use_fp32_acc": use_fp32_acc,
                 "device": DEVICE,
                 "disable_tf32": True,
-                "use_python_runtime": True,
+                "use_python_runtime": False,
                 "use_distributed_mode_trace": True,
                 "debug": args.debug,
-                "min_block_size": args.min_block_size,
+                "min_block_size": 1,
                 "assume_dynamic_shape_support": True,
             },
         )
@@ -309,11 +311,16 @@ if __name__ == "__main__":
 
         trt_model = compile_torchtrt(model, input_ids, args)
 
+        # Pass dynamic_seqlen_range so torch.compile traces once with a
+        # dynamic seq-len dimension and reuses the same TRT engine for all
+        # generation steps, avoiding per-step recompilation that would race
+        # with distributed setup_nccl_comm() barriers across ranks.
         trt_gen_tokens = generate(
             trt_model,
             input_ids.clone(),
             MAX_OUTPUT_SEQ_LENGTH,
             tokenizer.eos_token_id,
+            dynamic_seqlen_range=(1, MAX_OUTPUT_SEQ_LENGTH),
         )
 
         if args.benchmark:
