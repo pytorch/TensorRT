@@ -1,5 +1,4 @@
 import copy
-import importlib
 import unittest
 from typing import Dict
 
@@ -7,15 +6,17 @@ import torch
 import torch_tensorrt as torchtrt
 from utils import COSINE_THRESHOLD, cosine_similarity
 
-if importlib.util.find_spec("torchvision"):
+try:
     import timm
     import torchvision.models as models
 
+    HAS_TORCHVISION = True
+except (ImportError, RuntimeError):
+    HAS_TORCHVISION = False
+
 
 class TestModelToEngineToModel(unittest.TestCase):
-    @unittest.skipIf(
-        not importlib.util.find_spec("torchvision"), "torchvision not installed"
-    )
+    @unittest.skipIf(not HAS_TORCHVISION, "torchvision not available")
     @unittest.skipIf(
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
@@ -49,9 +50,8 @@ class TestModelToEngineToModel(unittest.TestCase):
         )
 
     @unittest.skipIf(
-        not importlib.util.find_spec("timm")
-        or not importlib.util.find_spec("torchvision"),
-        "timm or torchvision not installed",
+        not HAS_TORCHVISION,
+        "timm or torchvision not available",
     )
     @unittest.skipIf(
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,

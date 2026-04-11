@@ -8,6 +8,6 @@ parameterized>=0.2.0
 pytest>=8.2.1
 pytest-xdist>=3.6.1
 pyyaml
-transformers==4.53.1
+transformers==5.0.0rc3
 timm
 # torchvision nvidia-modelopt should use the one already installed inside the dlfw docker container

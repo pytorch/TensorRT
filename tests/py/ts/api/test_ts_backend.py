@@ -1,5 +1,4 @@
 import copy
-import importlib.util
 import unittest
 from typing import Dict
 
@@ -7,13 +6,15 @@ import torch
 import torch_tensorrt as torchtrt
 from utils import COSINE_THRESHOLD, cosine_similarity
 
-if importlib.util.find_spec("torchvision"):
+try:
     import torchvision.models as models
 
+    HAS_TORCHVISION = True
+except (ImportError, RuntimeError):
+    HAS_TORCHVISION = False
 
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"), "torchvision not installed"
-)
+
+@unittest.skipIf(not HAS_TORCHVISION, "torchvision not available")
 class TestCompile(unittest.TestCase):
     def test_compile_traced(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -128,9 +129,7 @@ class TestCompile(unittest.TestCase):
     torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
 )
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"), "torchvision not installed"
-)
+@unittest.skipIf(not HAS_TORCHVISION, "torchvision not available")
 class TestCheckMethodOpSupport(unittest.TestCase):
     def test_check_support(self):
         module = models.alexnet(pretrained=True).eval().to("cuda")
@@ -139,6 +138,7 @@ class TestCheckMethodOpSupport(unittest.TestCase):
         self.assertTrue(torchtrt.ts.check_method_op_support(self.module, "forward"))
 
 
+@unittest.skipIf(not HAS_TORCHVISION, "torchvision not available")
 class TestModuleIdentification(unittest.TestCase):
     def test_module_type(self):
         nn_module = models.alexnet(pretrained=True).eval().to("cuda")

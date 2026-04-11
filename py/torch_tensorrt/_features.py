@@ -5,13 +5,13 @@ from collections import namedtuple
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 
 import tensorrt
+
+from packaging import version
 from torch_tensorrt._utils import (
     check_cross_compile_trt_win_lib,
     load_tensorrt_llm_for_nccl,
     sanitized_torch_version,
 )
-
-from packaging import version
 
 FeatureSet = namedtuple(
     "FeatureSet",
@@ -51,7 +51,6 @@ _FX_FE_AVAIL = False if _TENSORRT_RTX else True
 _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
 _TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
-
 
 if _TENSORRT_RTX:
     _QDP_PLUGIN_AVAIL = False

@@ -4,6 +4,7 @@ add_library(${lib_name} OBJECT)
 target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/impl/interpolate_plugin.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/normalize_plugin.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/impl/scatter_add_plugin.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/register_plugins.cpp"
     PUBLIC  $<TARGET_OBJECTS:core_util>
 )
@@ -33,6 +34,7 @@ install(
     FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/impl/interpolate_plugin.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/impl/normalize_plugin.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/impl/scatter_add_plugin.h"
     DESTINATION
         "${CMAKE_INSTALL_INCLUDEDIR}/torch_tensorrt/core/plugins/impl"
 )
