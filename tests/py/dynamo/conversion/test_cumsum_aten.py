@@ -1,5 +1,7 @@
+import sys
 import unittest
 
+import pytest
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -9,9 +11,9 @@ from torch.testing._internal.common_utils import run_tests
 from .harness import DispatchTestCase
 
 
-@unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-    "cumsum errors out on TensorRT-RTX",
+@pytest.mark.xfail(
+    condition=torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx and sys.platform == "win32",
+    reason="cumsum errors out on TensorRT-RTX",
 )
 class TestCumsumConverter(DispatchTestCase):
     @parameterized.expand(
