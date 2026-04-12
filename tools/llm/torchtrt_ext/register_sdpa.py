@@ -20,6 +20,7 @@ from .sdpa_converter import *
 
 logger = logging.getLogger(__name__)
 
+
 _SDPA_OPS_TO_REMOVE = (
     torch.ops.aten.scaled_dot_product_attention.default,
     torch.ops.aten._scaled_dot_product_efficient_attention.default,
@@ -48,7 +49,6 @@ REPLACEABLE_ATEN_OPS = {
     torch.ops.aten._scaled_dot_product_flash_attention.default,
     torch.ops.aten._scaled_dot_product_cudnn_attention.default,
 }
-
 
 
 def _process_sdpa_node(
@@ -84,9 +84,15 @@ def _process_sdpa_node(
         # Standard aten SDPA: (query, key, value[, attn_mask, dropout_p, is_causal, scale])
         # After aot_autograd this is the most common form when SDPA is not decomposed.
         query, key, value = node.args[0], node.args[1], node.args[2]
-        attn_mask = node.args[3] if len(node.args) > 3 else node.kwargs.get("attn_mask", None)
-        dropout_p = node.args[4] if len(node.args) > 4 else node.kwargs.get("dropout_p", 0.0)
-        is_causal = node.args[5] if len(node.args) > 5 else node.kwargs.get("is_causal", False)
+        attn_mask = (
+            node.args[3] if len(node.args) > 3 else node.kwargs.get("attn_mask", None)
+        )
+        dropout_p = (
+            node.args[4] if len(node.args) > 4 else node.kwargs.get("dropout_p", 0.0)
+        )
+        is_causal = (
+            node.args[5] if len(node.args) > 5 else node.kwargs.get("is_causal", False)
+        )
         # Always force causal=True, no mask, no dropout for TRT path
         attn_mask = None
         is_causal = True

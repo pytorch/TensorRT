@@ -54,14 +54,14 @@ def compile_torchtrt(model, args):
             dynamic=True,
             options={
                 "use_explicit_typing": True,
-                #"use_fp32_acc": True,
+                # "use_fp32_acc": True,
                 "device": DEVICE,
                 "disable_tf32": True,
                 "use_python_runtime": False,
                 "debug": args.debug,
                 "min_block_size": 1,
                 "assume_dynamic_shape_support": True,
-                "use_distributed_trace": True
+                "use_distributed_trace": True,
             },
         )
     return trt_model
@@ -98,7 +98,9 @@ if __name__ == "__main__":
         max_len = input_ids.shape[1] + args.num_tokens
 
         logger.info("Running uncompiled PyTorch baseline ...")
-        torch_tokens = generate(model, input_ids.clone(), max_len, tokenizer.eos_token_id)
+        torch_tokens = generate(
+            model, input_ids.clone(), max_len, tokenizer.eos_token_id
+        )
         print("\n===== PyTorch (uncompiled) =====")
         print(tokenizer.decode(torch_tokens[0], skip_special_tokens=True))
 

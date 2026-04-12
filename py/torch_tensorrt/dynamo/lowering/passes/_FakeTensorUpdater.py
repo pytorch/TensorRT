@@ -6,7 +6,6 @@ from typing import Any, Optional
 import sympy
 import torch
 import torch.fx
-import torch._inductor.fx_passes.reinplace  # ensure submodule is importable via attribute access
 from torch._dispatch.python import enable_python_dispatcher
 import torch._inductor.fx_passes.reinplace  # ensure submodule is loaded as attribute
 from torch._inductor.fx_utils import get_fake_args_kwargs, get_node_storage, get_storage

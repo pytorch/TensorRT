@@ -1,9 +1,4 @@
 import torch_tensorrt
-from torch_tensorrt.dynamo.runtime._nccl_utils import (  # noqa: F401
-    check_nccl_library_path,
-    get_nccl_library_path,
-    setup_nccl_for_torch_tensorrt,
-)
 from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (  # noqa: F401
     PythonTorchTensorRTModule,
 )

@@ -290,6 +290,15 @@ TRTEngine::TRTEngine(
 TRTEngine::~TRTEngine() {
   torch::cuda::synchronize(device_info.id);
   trt_engine_profiler.reset();
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // Null out the NCCL communicator before destroying the execution context.
+  // dist.destroy_process_group() may have already freed the ncclComm_t; if we
+  // let IExecutionContext::~IExecutionContext() run with a dangling pointer it
+  // will segfault.
+  if (nccl_initialized && exec_ctx) {
+    exec_ctx->setCommunicator(nullptr);
+  }
+#endif
   exec_ctx.reset();
   cuda_engine.reset();
   if (empty_tensor_placeholder) {
@@ -554,6 +563,34 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
 bool TRTEngine::bind_nccl_comm() {
+  // When group_name is empty (e.g. engine loaded from a serialized
+  // ExportedProgram where the Python TorchTensorRTModule wrapper was
+  // inlined and set_group_name() was never called), auto-resolve the
+  // process group from the c10d registry.  PyTorch assigns sequential
+  // numeric names ("0", "1", ...) to process groups; probe until we
+  // find one with an NCCL backend.
+  if (this->group_name.empty() && this->is_md) {
+    // PyTorch assigns sequential numeric names ("0", "1", ...) to process
+    // groups.  In practice most jobs create fewer than 10 groups; we probe
+    // up to 20 to allow for destroyed-and-recreated groups.
+    for (int i = 0; i < 20; ++i) {
+      auto candidate = std::to_string(i);
+      auto probe = c10d::resolve_process_group(candidate);
+      if (probe != nullptr && probe->getBackendType() == c10d::ProcessGroup::BackendType::NCCL) {
+        this->group_name = candidate;
+        LOG_INFO("Auto-resolved distributed group name to '" << candidate << "'");
+        break;
+      }
+    }
+    if (this->group_name.empty()) {
+      LOG_WARNING(
+          "This TRT engine requires NCCL (is_md=true) but no NCCL process group "
+          "was found in the c10d registry. Ensure dist.init_process_group(backend='nccl') "
+          "has been called before loading the engine. You can also set the group name "
+          "manually via: engine.set_group_name(NCCL_GROUP_NAME)");
+    }
+  }
+
   // Soft-return when the process group isn't available yet (e.g. at engine
   // construction time when the caller hasn't called dist.init_process_group()).
   auto pg = c10d::resolve_process_group(this->group_name);

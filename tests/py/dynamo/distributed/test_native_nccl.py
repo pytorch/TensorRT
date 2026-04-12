@@ -19,11 +19,18 @@ Run single-rank pytest tests
     cd tests/py/dynamo
     pytest distributed/test_native_nccl.py -v
 
-Run multi-rank tests (2 GPUs required)
----------------------------------------
-    torchrun --nproc_per_node=2 tests/py/dynamo/distributed/test_native_nccl.py --multirank
-    # or
-    mpirun -n 2 python tests/py/dynamo/distributed/test_native_nccl.py --multirank
+Run multi-rank tests (single-node, 2 GPUs via torchrun)
+---------------------------------------------------------
+    torchrun --nproc_per_node=2 distributed/test_native_nccl.py --multirank
+
+Run multi-rank tests (multinode, 1 GPU per node — run on each node)
+--------------------------------------------------------------------
+    # Node 0:
+    RANK=0 WORLD_SIZE=2 LOCAL_RANK=0 MASTER_ADDR=<node0-ip> MASTER_PORT=29500 \\
+        python distributed/test_native_nccl.py --multinode
+    # Node 1:
+    RANK=1 WORLD_SIZE=2 LOCAL_RANK=0 MASTER_ADDR=<node0-ip> MASTER_PORT=29500 \\
+        python distributed/test_native_nccl.py --multinode
 """
 
 from __future__ import annotations
@@ -63,6 +70,33 @@ def is_trtllm_for_nccl() -> bool:
         return False
 
 
+# ---------------------------------------------------------------------------
+# Shared test fakes
+# ---------------------------------------------------------------------------
+
+
+class _FakeEngine:
+    """Minimal duck-type for torch.classes.tensorrt.Engine in unit tests.
+
+    Has ``is_md`` and ``set_group_name`` so it passes the duck-type check
+    inside set_distributed_group() without needing a real TRT build.
+    """
+
+    def __init__(self, is_md: bool = True) -> None:
+        self.is_md = is_md
+        self.group_name_calls: list = []
+
+    def set_group_name(self, name: str) -> None:
+        self.group_name_calls.append(name)
+
+
+class _FakeGroup:
+    """Minimal duck-type for a c10d ProcessGroup."""
+
+    def __init__(self, name: str = "test_group") -> None:
+        self.group_name = name
+
+
 # ============================================================================
 # Section 1 — distributed_group() context manager (no GPU / no dist init)
 # ============================================================================
@@ -76,7 +110,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
     """
 
     def setUp(self) -> None:
-        from torch_tensorrt.dynamo.runtime._distributed import (
+        from torch_tensorrt.distributed._distributed import (
             _state,
             distributed_group,
             get_active_group,
@@ -257,9 +291,257 @@ class TestDistributedGroupContextManager(unittest.TestCase):
             # Restored to fake
             self.assertIs(self.get_active_group(), fake)
 
+    # -- module argument --------------------------------------------------------
+
+    def test_with_module_yields_module(self) -> None:
+        """distributed_group(group, module) yields the module as the context value."""
+        group = MagicMock()
+        group.group_name = "tp0"
+        module = nn.Linear(4, 4)
+        with self.distributed_group(group, module) as handle:
+            self.assertIs(handle, module)
+
+    def test_without_module_yields_none(self) -> None:
+        """distributed_group(group) without module yields None."""
+        group = MagicMock()
+        group.group_name = "tp0"
+        with self.distributed_group(group) as handle:
+            self.assertIsNone(handle)
+
+    def test_with_module_pre_pins_engines(self) -> None:
+        """distributed_group(group, module) calls set_group_name on md engines."""
+        eng = _FakeEngine(is_md=True)
+
+        class M(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self._run_on_acc_0_engine = eng
+
+        group = _FakeGroup("tp0")
+        module = M()
+        with self.distributed_group(group, module):
+            pass
+        self.assertEqual(eng.group_name_calls, ["tp0"])
+
+    def test_with_module_state_active_inside_block(self) -> None:
+        """_state.pg is set for the duration of the with block."""
+        group = _FakeGroup("tp0")
+
+        class M(nn.Module):
+            pass
+
+        captured = []
+        with self.distributed_group(group, M()):
+            captured.append(getattr(self._state, "pg", None))
+        self.assertIs(captured[0], group)
+
+    def test_with_module_state_restored_after_block(self) -> None:
+        """_state.pg is restored after the with block exits."""
+        group = _FakeGroup("tp0")
+
+        class M(nn.Module):
+            pass
+
+        with self.distributed_group(group, M()):
+            pass
+        self.assertIsNone(getattr(self._state, "pg", None))
+
+    def test_with_module_state_restored_on_exception(self) -> None:
+        """_state.pg is restored even when the body raises."""
+        group = _FakeGroup("tp0")
+
+        class M(nn.Module):
+            pass
+
+        with self.assertRaises(ValueError):
+            with self.distributed_group(group, M()):
+                raise ValueError("boom")
+        self.assertIsNone(getattr(self._state, "pg", None))
+
 
 # ============================================================================
-# Section 2 — NCCL library utilities (no GPU)
+# Section 2 — set_distributed_group() (no GPU / no dist init)
+# ============================================================================
+
+
+class TestSetDistributedGroup(unittest.TestCase):
+    """Unit tests for set_distributed_group().
+
+    All tests avoid dist.init_process_group so they run in any environment,
+    including CI without GPUs.  The ``_FakeEngine`` and ``_FakeGroup`` helpers
+    duck-type the real objects so we can verify call behaviour without TRT.
+    """
+
+    def setUp(self) -> None:
+        from torch_tensorrt.distributed._distributed import _state
+
+        # Ensure no leftover pg from a previous test.
+        if hasattr(_state, "pg"):
+            del _state.pg
+        self._state = _state
+
+    def _call(self, module: nn.Module, group: Any) -> None:
+        from torch_tensorrt.distributed import set_distributed_group
+
+        set_distributed_group(module, group)
+
+    # ---- helpers ----------------------------------------------------------------
+
+    def _inlined_module(self, *engines: _FakeEngine) -> nn.Module:
+        """Return an nn.Module with each engine as a plain instance attribute."""
+
+        class M(nn.Module):
+            pass
+
+        m = M()
+        for i, eng in enumerate(engines):
+            setattr(m, f"_run_on_acc_{i}_engine", eng)
+        return m
+
+    # ---- inlined-engine tests ---------------------------------------------------
+
+    def test_inlined_md_engine_receives_group_name(self) -> None:
+        """An inlined is_md engine gets set_group_name called with the group name."""
+        eng = _FakeEngine(is_md=True)
+        self._call(self._inlined_module(eng), _FakeGroup("tp0"))
+        self.assertEqual(eng.group_name_calls, ["tp0"])
+
+    def test_inlined_non_md_engine_is_skipped(self) -> None:
+        """An inlined engine with is_md=False is not touched."""
+        eng = _FakeEngine(is_md=False)
+        self._call(self._inlined_module(eng), _FakeGroup("tp0"))
+        self.assertEqual(eng.group_name_calls, [])
+
+    def test_no_active_group_is_noop(self) -> None:
+        """When the group has no group_name, set_group_name is never called."""
+        if dist.is_initialized():
+            self.skipTest("dist already initialized in this process")
+        eng = _FakeEngine(is_md=True)
+        # Plain object has no group_name attribute → get_active_group_name returns ""
+        self._call(self._inlined_module(eng), object())
+        self.assertEqual(eng.group_name_calls, [])
+
+    def test_multiple_engines_all_stamped(self) -> None:
+        """Every distinct md engine in the module receives the group name."""
+        eng_a = _FakeEngine(is_md=True)
+        eng_b = _FakeEngine(is_md=True)
+        self._call(self._inlined_module(eng_a, eng_b), _FakeGroup("tp0"))
+        self.assertEqual(eng_a.group_name_calls, ["tp0"])
+        self.assertEqual(eng_b.group_name_calls, ["tp0"])
+
+    def test_mixed_md_and_non_md_engines(self) -> None:
+        """md engines are stamped; non-md engines are left alone."""
+        md_eng = _FakeEngine(is_md=True)
+        non_md_eng = _FakeEngine(is_md=False)
+        self._call(self._inlined_module(md_eng, non_md_eng), _FakeGroup("tp0"))
+        self.assertEqual(md_eng.group_name_calls, ["tp0"])
+        self.assertEqual(non_md_eng.group_name_calls, [])
+
+    def test_same_engine_on_multiple_paths_stamped_once(self) -> None:
+        """An engine reachable via two module attributes is only stamped once."""
+        shared = _FakeEngine(is_md=True)
+
+        class Inner(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self._run_on_acc_0_engine = shared
+
+        class Outer(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.inner = Inner()
+                self._run_on_acc_0_engine = shared  # same object
+
+        self._call(Outer(), _FakeGroup("tp0"))
+        self.assertEqual(shared.group_name_calls, ["tp0"])  # exactly once
+
+    def test_nested_submodule_engines_stamped(self) -> None:
+        """Engines nested inside child modules are found recursively."""
+        eng_outer = _FakeEngine(is_md=True)
+        eng_inner = _FakeEngine(is_md=True)
+
+        class Inner(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self._run_on_acc_0_engine = eng_inner
+
+        class Outer(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.child = Inner()
+                self._run_on_acc_0_engine = eng_outer
+
+        self._call(Outer(), _FakeGroup("tp0"))
+        self.assertEqual(eng_outer.group_name_calls, ["tp0"])
+        self.assertEqual(eng_inner.group_name_calls, ["tp0"])
+
+    def test_state_is_restored_after_call(self) -> None:
+        """_state.pg is restored to its prior value after the call returns."""
+        from torch_tensorrt.distributed._distributed import _state
+
+        sentinel = object()
+        _state.pg = sentinel
+        self._call(self._inlined_module(), _FakeGroup("tp0"))
+        self.assertIs(_state.pg, sentinel)
+
+    # ---- TorchTensorRTModule (wrapper submodule) tests -------------------------
+
+    def test_trt_module_wrapper_md_engine_stamped(self) -> None:
+        """A TorchTensorRTModule submodule with is_md=True gets set_group_name."""
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        eng = _FakeEngine(is_md=True)
+
+        class FakeWrapper(TorchTensorRTModule):
+            def __init__(self) -> None:
+                nn.Module.__init__(self)  # bypass real TorchTensorRTModule.__init__
+                self.engine = eng
+
+        class M(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.trt_block = FakeWrapper()
+
+        self._call(M(), _FakeGroup("tp0"))
+        self.assertEqual(eng.group_name_calls, ["tp0"])
+
+    def test_trt_module_wrapper_non_md_engine_skipped(self) -> None:
+        """A TorchTensorRTModule submodule with is_md=False is not touched."""
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        eng = _FakeEngine(is_md=False)
+
+        class FakeWrapper(TorchTensorRTModule):
+            def __init__(self) -> None:
+                nn.Module.__init__(self)
+                self.engine = eng
+
+        class M(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.trt_block = FakeWrapper()
+
+        self._call(M(), _FakeGroup("tp0"))
+        self.assertEqual(eng.group_name_calls, [])
+
+    def test_wrapper_engine_not_double_stamped_via_attr_scan(self) -> None:
+        """The wrapper-path engine is not also stamped by the attr-scan path."""
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        eng = _FakeEngine(is_md=True)
+
+        class FakeWrapper(TorchTensorRTModule):
+            def __init__(self) -> None:
+                nn.Module.__init__(self)
+                self.engine = eng
+
+        self._call(FakeWrapper(), _FakeGroup("tp0"))
+        # called exactly once — not twice (once via isinstance, once via vars scan)
+        self.assertEqual(eng.group_name_calls, ["tp0"])
+
+
+# ============================================================================
+# Section 3 — NCCL library utilities (no GPU)   [was Section 2]
 # ============================================================================
 
 
@@ -268,7 +550,7 @@ class TestNcclUtils(unittest.TestCase):
 
     def test_get_nccl_library_path_returns_none_or_string(self) -> None:
         """get_nccl_library_path returns either None or an existing directory."""
-        from torch_tensorrt.dynamo.runtime._nccl_utils import get_nccl_library_path
+        from torch_tensorrt.distributed._nccl_utils import get_nccl_library_path
 
         result = get_nccl_library_path()
         if result is not None:
@@ -280,7 +562,7 @@ class TestNcclUtils(unittest.TestCase):
 
     def test_check_nccl_library_path_system_nccl(self) -> None:
         """check_nccl_library_path returns True when nvidia.nccl not installed."""
-        from torch_tensorrt.dynamo.runtime._nccl_utils import (
+        from torch_tensorrt.distributed._nccl_utils import (
             check_nccl_library_path,
             get_nccl_library_path,
         )
@@ -296,19 +578,19 @@ class TestNcclUtils(unittest.TestCase):
 
     def test_setup_nccl_for_torch_tensorrt_idempotent(self) -> None:
         """Calling setup_nccl_for_torch_tensorrt() multiple times is safe."""
-        from torch_tensorrt.dynamo.runtime import _nccl_utils
+        from torch_tensorrt.distributed import _nccl_utils
 
         # Reset the guard so we can test the first real call
         _nccl_utils._nccl_setup_checked = False
 
-        from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+        from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
         setup_nccl_for_torch_tensorrt()
         setup_nccl_for_torch_tensorrt()  # second call — must not raise
 
     def test_ensure_nccl_symlink_nonexistent_dir(self) -> None:
         """ensure_nccl_symlink handles a nonexistent directory gracefully."""
-        from torch_tensorrt.dynamo.runtime._nccl_utils import ensure_nccl_symlink
+        from torch_tensorrt.distributed._nccl_utils import ensure_nccl_symlink
 
         result = ensure_nccl_symlink("/nonexistent/path/to/nccl/lib")
         # libnccl.so.2 doesn't exist there → returns False
@@ -316,13 +598,13 @@ class TestNcclUtils(unittest.TestCase):
 
     def test_check_nccl_library_path_detects_missing_ld_path(self) -> None:
         """check_nccl_library_path returns False when LD_LIBRARY_PATH is absent."""
-        from torch_tensorrt.dynamo.runtime._nccl_utils import get_nccl_library_path
+        from torch_tensorrt.distributed._nccl_utils import get_nccl_library_path
 
         nccl_lib_dir = get_nccl_library_path()
         if nccl_lib_dir is None:
             self.skipTest("nvidia.nccl not installed; system NCCL path is always OK")
 
-        from torch_tensorrt.dynamo.runtime._nccl_utils import check_nccl_library_path
+        from torch_tensorrt.distributed._nccl_utils import check_nccl_library_path
 
         original = os.environ.get("LD_LIBRARY_PATH", "")
         # Remove nccl_lib_dir from LD_LIBRARY_PATH
@@ -336,7 +618,7 @@ class TestNcclUtils(unittest.TestCase):
 
 
 # ============================================================================
-# Section 3 — fuse_distributed_ops graph pass (no GPU, no dist)
+# Section 4 — fuse_distributed_ops graph pass (no GPU, no dist)   [was Section 3]
 # ============================================================================
 
 
@@ -598,7 +880,7 @@ class TestFuseDistributedOps(unittest.TestCase):
 
 
 # ============================================================================
-# Section 4 — Single-rank NCCL op compilation via pytest
+# Section 5 — Single-rank NCCL op compilation via pytest   [was Section 4]
 # ============================================================================
 
 
@@ -727,7 +1009,7 @@ class TestNcclOpsSingleRank(unittest.TestCase):
     def test_distributed_group_with_single_rank_subgroup(self) -> None:
         """distributed_group() selects the subgroup as NCCL communicator source."""
         import torch_tensorrt
-        from torch_tensorrt.dynamo.runtime._distributed import (
+        from torch_tensorrt.distributed._distributed import (
             distributed_group,
             get_active_group_name,
         )
@@ -746,7 +1028,7 @@ class TestNcclOpsSingleRank(unittest.TestCase):
 
     def test_get_active_group_falls_back_to_world_when_no_context(self) -> None:
         """When dist is initialized and no context is set, world group is returned."""
-        from torch_tensorrt.dynamo.runtime._distributed import (
+        from torch_tensorrt.distributed._distributed import (
             _state,
             get_active_group,
         )
@@ -759,7 +1041,7 @@ class TestNcclOpsSingleRank(unittest.TestCase):
 
     def test_group_name_survives_context_exit(self) -> None:
         """After distributed_group() exits, get_active_group_name reverts to world."""
-        from torch_tensorrt.dynamo.runtime._distributed import (
+        from torch_tensorrt.distributed._distributed import (
             distributed_group,
             get_active_group_name,
         )
@@ -774,7 +1056,7 @@ class TestNcclOpsSingleRank(unittest.TestCase):
 
 
 # ============================================================================
-# Section 5 — Python runtime pickle / unpickle of _nccl_comm
+# Section 6 — Python runtime pickle / unpickle of _nccl_comm   [was Section 5]
 # ============================================================================
 
 
@@ -897,7 +1179,7 @@ class TestPythonRuntimePickle(unittest.TestCase):
 
 
 # ============================================================================
-# Section 6 — Multi-rank tests (torchrun / mpirun, requires --multirank flag)
+# Section 7 — Multi-rank tests (torchrun / mpirun, requires --multirank flag)   [was Section 6]
 # ============================================================================
 
 # These tests are only executed when the script is run directly with
@@ -930,7 +1212,7 @@ def _multirank_all_reduce_correctness(
     rank: int, world_size: int, device: torch.device
 ) -> None:
     """all_reduce sum across all ranks produces world_size * value."""
-    from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
 
@@ -1027,8 +1309,8 @@ def _multirank_distributed_group_tp_model(
         RowwiseParallel,
         parallelize_module,
     )
-    from torch_tensorrt.dynamo.runtime._distributed import distributed_group
-    from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+    from torch_tensorrt.distributed._distributed import distributed_group
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
 
@@ -1086,12 +1368,15 @@ def _multirank_distributed_group_subgroup(
     We create a subgroup containing all ranks (same topology as world, but a
     distinct process group object). The all_reduce result must still be correct.
     """
+    if world_size < 2:
+        print(f"[SKIP] _multirank_distributed_group_subgroup requires world_size >= 2")
+        return
     import torch_tensorrt
-    from torch_tensorrt.dynamo.runtime._distributed import (
+    from torch_tensorrt.distributed._distributed import (
         distributed_group,
         get_active_group_name,
     )
-    from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
 
@@ -1136,8 +1421,11 @@ def _multirank_cpp_runtime_bind_nccl(
     rank: int, world_size: int, device: torch.device
 ) -> None:
     """C++ runtime TRTEngine.bind_nccl_comm() is called exactly once and produces correct results."""
+    if world_size < 2:
+        print(f"[SKIP] _multirank_cpp_runtime_bind_nccl requires world_size >= 2")
+        return
     import torch_tensorrt
-    from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
 
@@ -1180,8 +1468,8 @@ def _multirank_distributed_group_context_switch(
 ) -> None:
     """Switching distributed_group context between two subgroups routes to the correct communicator."""
     import torch_tensorrt
-    from torch_tensorrt.dynamo.runtime._distributed import distributed_group
-    from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+    from torch_tensorrt.distributed._distributed import distributed_group
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
 
@@ -1273,8 +1561,8 @@ def run_multirank_tests() -> None:
 # ============================================================================
 
 if __name__ == "__main__":
-    if "--multirank" in sys.argv:
-        sys.argv.remove("--multirank")
+    if "--multirank" in sys.argv or "--multinode" in sys.argv:
+        sys.argv = [a for a in sys.argv if a not in ("--multirank", "--multinode")]
         run_multirank_tests()
     else:
         run_tests()

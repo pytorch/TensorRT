@@ -526,7 +526,12 @@ jobs:
         pushd .
         cd tests/py
         cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml distributed/test_nccl_ops.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml \
+          distributed/test_nccl_ops.py \
+          distributed/test_native_nccl.py \
+          distributed/test_export_save_load.py
+        torchrun --nproc_per_node=2 distributed/test_native_nccl.py --multirank
+        torchrun --nproc_per_node=2 distributed/test_export_save_load.py --multirank
         popd
 
 concurrency:

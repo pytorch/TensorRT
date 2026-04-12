@@ -126,6 +126,26 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             })
         .def("bind_nccl_comm", [](c10::intrusive_ptr<TRTEngine> self) { self->bind_nccl_comm(); })
         .def_readonly("nccl_initialized", &TRTEngine::nccl_initialized)
+#else
+        .def(
+            "set_group_name",
+            [](c10::intrusive_ptr<TRTEngine> self, std::string group_name) {
+              LOG_ERROR(
+                  "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); set_group_name is a no-op");
+            })
+        .def(
+            "bind_nccl_comm",
+            [](c10::intrusive_ptr<TRTEngine> self) {
+              LOG_ERROR(
+                  "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); bind_nccl_comm is a no-op");
+            })
+        .def_property_readonly(
+            "nccl_initialized",
+            [](c10::intrusive_ptr<TRTEngine> self) -> bool {
+              LOG_ERROR(
+                  "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); nccl_initialized always returns false");
+              return false;
+            })
 #endif
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },

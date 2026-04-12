@@ -10,7 +10,7 @@ TRT's dlopen("libnccl.so") reads LD_LIBRARY_PATH at process start, so the
 NCCL directory must be in LD_LIBRARY_PATH before the process launches.
 Use setup_nccl_for_torch_tensorrt() to locate the path, then pass it at launch time.
 
-  NCCL_LIB=$(python -c "from torch_tensorrt.dynamo.runtime._nccl_utils import get_nccl_library_path; print(get_nccl_library_path())")
+  NCCL_LIB=$(python -c "from torch_tensorrt.distributed._nccl_utils import get_nccl_library_path; print(get_nccl_library_path())")
 
 # Rank 0:
   LD_LIBRARY_PATH="$NCCL_LIB:$LD_LIBRARY_PATH" \\
@@ -38,7 +38,7 @@ from torch.distributed.tensor.parallel import (
     RowwiseParallel,
     parallelize_module,
 )
-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
 
 torch.utils._pytree.register_constant(
     torch.distributed.tensor._dtensor_spec.DTensorSpec

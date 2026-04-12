@@ -1,9 +1,10 @@
 """
 Test torch.compile(backend="tensorrt") with Llama 3.2 1B using dynamic shapes.
 """
+
+import logging
 import os
 import sys
-import logging
 
 import torch
 import torch_tensorrt
@@ -11,13 +12,13 @@ import torch_tensorrt
 # Register SDPA converter and lowering pass
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from torchtrt_ext.register_sdpa import enable_sdpa_converter
-
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
+
 
 print(f"Loading model: {MODEL_NAME}")
 model = (
@@ -46,7 +47,9 @@ with torch.inference_mode():
     pyt_out = model(input_ids=input_ids)
 pyt_logits = pyt_out.logits
 pyt_next_token = pyt_logits[0, -1].argmax().item()
-print(f"PyTorch next token: {pyt_next_token!r} => {tokenizer.decode([pyt_next_token])!r}")
+print(
+    f"PyTorch next token: {pyt_next_token!r} => {tokenizer.decode([pyt_next_token])!r}"
+)
 
 # Compile with torch.compile(backend="tensorrt")
 print("\nCompiling with torch.compile(backend='tensorrt', dynamic=True)...")
@@ -69,11 +72,14 @@ with torch.inference_mode():
         trt_out = compiled_model(input_ids=input_ids)
         trt_logits = trt_out.logits
         trt_next_token = trt_logits[0, -1].argmax().item()
-        print(f"TRT next token:     {trt_next_token!r} => {tokenizer.decode([trt_next_token])!r}")
+        print(
+            f"TRT next token:     {trt_next_token!r} => {tokenizer.decode([trt_next_token])!r}"
+        )
         token_match = pyt_next_token == trt_next_token
         print(f"Token match: {token_match}")
 
         import torch.nn.functional as F
+
         cos_sim = F.cosine_similarity(
             pyt_logits[0, -1].unsqueeze(0), trt_logits[0, -1].unsqueeze(0)
         ).item()
@@ -83,6 +89,7 @@ with torch.inference_mode():
     except Exception as e:
         print(f"ERROR during TRT compilation/execution: {e}")
         import traceback
+
         traceback.print_exc()
 
 # Test with a different sequence length (dynamic shape test)
@@ -105,4 +112,5 @@ with torch.inference_mode():
     except Exception as e:
         print(f"ERROR during dynamic shape test: {e}")
         import traceback
+
         traceback.print_exc()

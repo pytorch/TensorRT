@@ -27,9 +27,7 @@ def _remove_identity_ops(gm: torch.fx.GraphModule) -> bool:
     for node in list(gm.graph.nodes):
         is_identity = (
             node.op == "call_method" and node.target in _IDENTITY_METHODS
-        ) or (
-            node.op == "call_function" and node.target in _IDENTITY_FUNCTIONS
-        )
+        ) or (node.op == "call_function" and node.target in _IDENTITY_FUNCTIONS)
         if not is_identity:
             continue
         if len(node.args) < 1 or not isinstance(node.args[0], torch.fx.Node):
@@ -44,7 +42,7 @@ def _get_actual_tensor(
     origin: torch.fx.Node,
     gm: torch.fx.GraphModule,
     sample_inputs: Optional[Sequence[Any]],
-    placeholder_index: dict,
+    placeholder_index: dict[int, int],
 ) -> Optional[torch.Tensor]:
     """Return the actual (non-fake) tensor for a placeholder or get_attr node."""
     from torch._subclasses.fake_tensor import FakeTensor
@@ -109,7 +107,7 @@ def fold_get_attr_item_calls(
     _remove_identity_ops(gm)
 
     # Build placeholder → positional index map (for sample_inputs fallback).
-    placeholder_index: dict = {}
+    placeholder_index: dict[int, int] = {}
     ph_idx = 0
     for node in gm.graph.nodes:
         if node.op == "placeholder":
@@ -138,7 +136,9 @@ def fold_get_attr_item_calls(
 
         for user in list(node.users):
             user.args = _replace_in_args(user.args, node, scalar)
-            user.kwargs = {k: scalar if v is node else v for k, v in user.kwargs.items()}
+            user.kwargs = {
+                k: scalar if v is node else v for k, v in user.kwargs.items()
+            }
 
         gm.graph.erase_node(node)
         modified = True
@@ -150,7 +150,7 @@ def fold_get_attr_item_calls(
     return gm
 
 
-def _replace_in_args(args, target_node, replacement):
+def _replace_in_args(args: Any, target_node: Any, replacement: Any) -> Any:
     """Recursively replace *target_node* with *replacement* inside args."""
     if isinstance(args, tuple):
         return tuple(_replace_in_args(a, target_node, replacement) for a in args)

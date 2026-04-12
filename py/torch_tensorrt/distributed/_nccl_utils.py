@@ -33,6 +33,8 @@ import logging
 import os
 from typing import Optional
 
+import torch.distributed as dist
+
 logger = logging.getLogger(__name__)
 
 _nccl_setup_checked = False
@@ -130,8 +132,7 @@ def setup_nccl_for_torch_tensorrt() -> None:
     process launch time, not when updated via os.environ. For the C++ TRT
     runtime path, LD_LIBRARY_PATH must be set before the process starts:
 
-        NCCL_LIB=$(python -c "from torch_tensorrt.dynamo.runtime._nccl_utils \\
-            import get_nccl_library_path; print(get_nccl_library_path())")
+        NCCL_LIB=$(python -c "from torch_tensorrt.distributed._nccl_utils import get_nccl_library_path; print(get_nccl_library_path())")
         LD_LIBRARY_PATH="$NCCL_LIB:$LD_LIBRARY_PATH" python script.py
 
     For NGC containers (system NCCL), this is a no-op.
@@ -182,3 +183,105 @@ def setup_nccl_for_torch_tensorrt() -> None:
             logger.warning(f"Failed to pre-load NCCL library {nccl_so}: {e}")
 
         logger.debug("NCCL library setup complete")
+
+
+def initialize_nccl_comm(device: Optional[int] = None) -> None:
+    """Eagerly initialize PyTorch's NCCL communicator for a device.
+
+    TRT's C++ runtime binds the NCCL communicator from PyTorch's
+    ProcessGroupNCCL via ``bind_nccl_comm()``.  However, PyTorch creates
+    this communicator lazily — only after the first NCCL collective.
+    If a TRT engine with NCCL ops (``is_md=True``) is loaded and executed
+    before any collective has run, ``bind_nccl_comm()`` finds a null
+    communicator and the engine's all-reduce produces incorrect results.
+
+    Call this function after ``dist.init_process_group(backend='nccl')``
+    and before loading/running a distributed TRT engine to ensure the
+    communicator is ready.
+
+    Args:
+        device: CUDA device ordinal.  Defaults to ``torch.cuda.current_device()``.
+
+    Example::
+
+        import torch.distributed as dist
+        from torch_tensorrt.distributed._nccl_utils import (
+            setup_nccl_for_torch_tensorrt,
+            initialize_nccl_comm,
+        )
+
+        dist.init_process_group(backend="nccl")
+        setup_nccl_for_torch_tensorrt()
+        initialize_nccl_comm()          # NCCL comm now ready for TRT
+
+        loaded = torch_tensorrt.load("engine_rank0.ep")
+        output = loaded.module()(input_ids)
+    """
+    import torch
+    import torch.distributed as dist
+
+    if not dist.is_initialized():
+        raise RuntimeError(
+            "torch.distributed is not initialized. "
+            "Call dist.init_process_group(backend='nccl') first."
+        )
+
+    if device is None:
+        device = torch.cuda.current_device()
+
+    pg = dist.distributed_c10d._get_default_group()
+    try:
+        nccl_backend = pg._get_backend(torch.device(f"cuda:{device}"))
+    except RuntimeError as e:
+        raise RuntimeError(
+            f"Could not get NCCL backend for cuda:{device}. "
+            "Ensure dist.init_process_group was called with backend='nccl'. "
+            f"Original error: {e}"
+        ) from e
+
+    if not hasattr(nccl_backend, "eager_connect_single_device"):
+        raise RuntimeError(
+            "ProcessGroupNCCL.eager_connect_single_device is not available. "
+            "This requires PyTorch 2.4+. As a workaround, run a dummy "
+            "collective before loading the TRT engine:\n"
+            "    _dummy = torch.zeros(1, device='cuda')\n"
+            "    dist.all_reduce(_dummy)"
+        )
+
+    nccl_backend.eager_connect_single_device(torch.device(f"cuda:{device}"))
+    logger.debug(f"NCCL communicator eagerly initialized for cuda:{device}")
+
+
+def check_nccl_engine_requirements() -> None:
+    """Warn if an is_md TRT engine's NCCL prerequisites are not satisfied.
+
+    Checks two conditions and logs a warning for each:
+    1. LD_LIBRARY_PATH does not include PyTorch's NCCL lib dir (too late to fix,
+       must be set before process launch — use torchtrtrun).
+    2. torch.distributed is not initialized or world_size == 1.
+
+    Call this from both TorchTensorRTModule and PythonTorchTensorRTModule after
+    confirming the engine has NCCL collective ops.
+    """
+    if get_nccl_library_path() is not None and not check_nccl_library_path():
+        logger.warning(
+            "This TRT engine contains NCCL collective ops but "
+            "LD_LIBRARY_PATH does not include PyTorch's NCCL library directory. "
+            "TRT may load a different NCCL instance than PyTorch, causing "
+            "communicator sharing to fail. Use torchtrtrun to launch distributed "
+            "scripts, or set LD_PRELOAD and LD_LIBRARY_PATH before process start:\n"
+            "  NCCL_LIB=$(python -c 'from torch_tensorrt.distributed._nccl_utils "
+            "import get_nccl_library_path; print(get_nccl_library_path())')\n"
+            "  LD_PRELOAD=$NCCL_LIB/libnccl.so.2 "
+            "LD_LIBRARY_PATH=$NCCL_LIB:$LD_LIBRARY_PATH python ..."
+        )
+
+    if not (
+        dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1
+    ):
+        logger.warning(
+            "This TRT engine contains NCCL collective ops but torch.distributed "
+            "is not initialized (or world_size=1). Call "
+            "dist.init_process_group(backend='nccl') before running this engine, "
+            "otherwise results will be incorrect."
+        )

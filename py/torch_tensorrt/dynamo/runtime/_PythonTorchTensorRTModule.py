@@ -231,6 +231,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.setup_engine()
 
         self._nccl_comm: Optional[Any] = None
+        self._has_nccl_ops: bool = False
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         """
@@ -298,7 +299,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         active, otherwise falls back to the default world group.
         Called lazily on first forward pass for distributed engines.
         """
-        from torch_tensorrt.dynamo.runtime._distributed import get_active_group
+        from torch_tensorrt.distributed._distributed import get_active_group
 
         if not self.is_distributed:
             return
@@ -344,16 +345,24 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.target_platform == Platform.current_platform()
         ), f"TensorRT engine was not built to target current platform (target: {self.target_platform}, current: {Platform.current_platform()})"
 
-        from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
-
-        setup_nccl_for_torch_tensorrt()
-
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
         if self.settings.enable_weight_streaming:
             self.set_default_device_memory_budget()
         self.context = self.engine.create_execution_context()
+
+        # Detect NCCL collective layers via engine inspector
+        inspector = self.engine.create_engine_inspector()
+        engine_json = inspector.get_engine_information(trt.LayerInformationFormat.JSON)
+        self._has_nccl_ops = "NCCL" in engine_json or "AllReduce" in engine_json
+
+        if self._has_nccl_ops:
+            from torch_tensorrt.distributed._nccl_utils import (
+                check_nccl_engine_requirements,
+            )
+
+            check_nccl_engine_requirements()
         assert self.context is not None, "Failed to create execution context"
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)
@@ -766,7 +775,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         ):
             self._check_initialized()
 
-            if self.is_distributed and self._nccl_comm is None:
+            if self._has_nccl_ops and self._nccl_comm is None:
                 nccl_type = (
                     "native TRT collectives"
                     if ENABLED_FEATURES.native_trt_collectives

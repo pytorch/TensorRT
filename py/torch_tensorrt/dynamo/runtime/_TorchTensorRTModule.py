@@ -157,6 +157,21 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         ):
             self.setup_engine()
 
+    def __deepcopy__(self, memo: dict[int, Any]) -> "TorchTensorRTModule":
+        # The C++ TRTEngine is not safely deep-copyable for distributed (NCCL)
+        # engines — creating a new execution context during copy can crash at
+        # destruction time.  Since the exporter only reads the engine (never
+        # executes it), sharing the same C++ object is safe.
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k == "engine":
+                object.__setattr__(result, k, v)  # shallow: reuse the same C++ Engine
+            else:
+                object.__setattr__(result, k, copy.deepcopy(v, memo))
+        return result
+
     def _pack_engine_info(self) -> List[str | bytes]:
         target_device = (
             self.settings.device
@@ -256,18 +271,24 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """
         if self.engine is not None:
             return
-        from torch_tensorrt.dynamo.runtime._distributed import get_active_group_name
-        from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
-
-        setup_nccl_for_torch_tensorrt()
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+
+        # is_md is set by the C++ constructor from the serialized IS_MD_ENGINE_IDX field.
+        if self.engine.is_md:
+            from torch_tensorrt.distributed._nccl_utils import (
+                check_nccl_engine_requirements,
+            )
+
+            check_nccl_engine_requirements()
 
         # Store the active process group name on the C++ engine so that the
         # lazy NCCL setup in execute_engine() can find the right communicator
         # without needing any further Python involvement.
-        if ENABLED_FEATURES.torch_tensorrt_runtime:
+        if ENABLED_FEATURES.torch_tensorrt_runtime and self.engine.is_md:
+            from torch_tensorrt.distributed._distributed import get_active_group_name
+
             group_name = get_active_group_name()
-            if group_name and hasattr(self.engine, "set_group_name"):
+            if group_name:
                 self.engine.set_group_name(group_name)
 
     def encode_metadata(self, metadata: Any) -> str:

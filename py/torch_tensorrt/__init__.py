@@ -99,9 +99,12 @@ if ENABLED_FEATURES.dynamo_frontend:
     from torch_tensorrt.dynamo import backend  # noqa: F401
     from torch_tensorrt import dynamo  # noqa: F401
 
-from torch_tensorrt._compile import *  # noqa: F403
-from torch_tensorrt.dynamo.runtime._distributed import distributed_group  # noqa: F401
 from torch_tensorrt import distributed  # noqa: F401
+from torch_tensorrt._compile import *  # noqa: F403
+from torch_tensorrt.distributed._distributed import (  # noqa: F401
+    distributed_group,
+    set_distributed_group,
+)
 from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import (
     MutableTorchTensorRTModule,
 )

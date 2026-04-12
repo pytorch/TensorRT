@@ -48,14 +48,12 @@ DEVICE = torch.device(f"cuda:{local_rank}")
 
 # Use a 2-hour timeout so TRT engine building (which can take many minutes
 # for complex dynamic-shape models) does not trigger the NCCL watchdog.
-dist.init_process_group(
-    backend="nccl", timeout=datetime.timedelta(hours=2)
-)
+dist.init_process_group(backend="nccl", timeout=datetime.timedelta(hours=2))
 rank = dist.get_rank()
 world_size = dist.get_world_size()
 
 import torch_tensorrt
-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
 
 setup_nccl_for_torch_tensorrt()
 

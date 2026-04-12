@@ -58,7 +58,7 @@ device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "tensor_parallel_simple_example"
 )
 import torch_tensorrt
-from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_for_torch_tensorrt
+from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
 
 setup_nccl_for_torch_tensorrt()
 from torch.distributed._tensor import Shard
