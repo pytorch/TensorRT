@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
     DRYRUN,
+    DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY,
     DYNAMICALLY_ALLOCATE_RESOURCES,
     ENABLE_AUTOCAST,
     ENABLE_CROSS_COMPILE_FOR_WINDOWS,
@@ -100,6 +101,7 @@ class CompilationSettings:
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
         runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. The cache is loaded on engine setup and saved on module cleanup. Uses file locking for concurrent access safety. Not used for standard TensorRT.
+        dynamic_shapes_kernel_specialization_strategy (str): Strategy for compiling shape-specialized kernels at runtime for dynamic shapes (TensorRT-RTX only). Options: "lazy" (compile in background, use fallback until ready), "eager" (compile immediately, blocking), "none" (always use fallback kernels). Default: "lazy".
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
@@ -154,6 +156,9 @@ class CompilationSettings:
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
     runtime_cache_path: str = RUNTIME_CACHE_PATH
+    dynamic_shapes_kernel_specialization_strategy: str = (
+        DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY
+    )
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES

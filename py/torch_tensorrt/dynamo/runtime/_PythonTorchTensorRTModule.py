@@ -27,6 +27,15 @@ from torch_tensorrt.runtime._utils import (
 logger = logging.getLogger(__name__)
 
 
+def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
+    """Map strategy string to TRT enum. Only called on RTX builds."""
+    return {
+        "lazy": trt.DynamicShapesKernelSpecializationStrategy.LAZY,
+        "eager": trt.DynamicShapesKernelSpecializationStrategy.EAGER,
+        "none": trt.DynamicShapesKernelSpecializationStrategy.NONE,
+    }.get(strategy_str, trt.DynamicShapesKernelSpecializationStrategy.LAZY)
+
+
 class DynamicOutputAllocator(trt.IOutputAllocator):  # type: ignore[misc]
     def __init__(self, output_dtypes: Dict[str, torch.dtype]) -> None:
         trt.IOutputAllocator.__init__(self)
@@ -344,6 +353,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.runtime_config = self.engine.create_runtime_config()
         self.runtime_config.set_execution_context_allocation_strategy(
             trt.ExecutionContextAllocationStrategy.STATIC
+        )
+        self.runtime_config.dynamic_shapes_kernel_specialization_strategy = (
+            _get_dynamic_shapes_kernel_strategy(
+                self.settings.dynamic_shapes_kernel_specialization_strategy
+            )
+        )
+        logger.info(
+            f"Dynamic shapes kernel specialization strategy: {self.settings.dynamic_shapes_kernel_specialization_strategy}"
         )
         self.runtime_cache = self.runtime_config.create_runtime_cache()
         self._load_runtime_cache()
