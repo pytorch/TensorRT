@@ -13,9 +13,16 @@ class SimpleModel(torch.nn.Module):
 
 
 def _compile_simple(**extra_kwargs):
-    """Helper: compile SimpleModel with Python runtime, return (compiled_module, inputs)."""
+    """Helper: compile SimpleModel with dynamic shapes and Python runtime."""
     model = SimpleModel().eval().cuda()
-    inputs = [torch.randn(2, 3).cuda()]
+    inputs = [
+        torchtrt.Input(
+            min_shape=(1, 3),
+            opt_shape=(2, 3),
+            max_shape=(4, 3),
+            dtype=torch.float32,
+        )
+    ]
     kwargs = {
         "ir": "dynamo",
         "inputs": inputs,
@@ -26,7 +33,7 @@ def _compile_simple(**extra_kwargs):
     kwargs.update(extra_kwargs)
     compiled = torchtrt.compile(model, **kwargs)
     torch._dynamo.reset()
-    return compiled, inputs
+    return compiled
 
 
 def _find_python_trt_module(compiled):
@@ -51,7 +58,7 @@ class TestDynamicShapesKernelStrategySetup(TestCase):
     def test_default_strategy_is_lazy(self):
         import tensorrt as trt
 
-        compiled, _ = _compile_simple()
+        compiled = _compile_simple()
         mod = _find_python_trt_module(compiled)
         self.assertIsNotNone(mod, "No PythonTorchTensorRTModule found")
         self.assertIsNotNone(mod.runtime_config, "runtime_config should be set for RTX")
@@ -63,7 +70,7 @@ class TestDynamicShapesKernelStrategySetup(TestCase):
     def test_eager_strategy(self):
         import tensorrt as trt
 
-        compiled, _ = _compile_simple(
+        compiled = _compile_simple(
             dynamic_shapes_kernel_specialization_strategy="eager"
         )
         mod = _find_python_trt_module(compiled)
@@ -76,9 +83,7 @@ class TestDynamicShapesKernelStrategySetup(TestCase):
     def test_none_strategy(self):
         import tensorrt as trt
 
-        compiled, _ = _compile_simple(
-            dynamic_shapes_kernel_specialization_strategy="none"
-        )
+        compiled = _compile_simple(dynamic_shapes_kernel_specialization_strategy="none")
         mod = _find_python_trt_module(compiled)
         self.assertIsNotNone(mod)
         self.assertEqual(
@@ -89,15 +94,17 @@ class TestDynamicShapesKernelStrategySetup(TestCase):
     def test_context_created_with_each_strategy(self):
         for strategy in ("lazy", "eager", "none"):
             with self.subTest(strategy=strategy):
-                compiled, inputs = _compile_simple(
+                compiled = _compile_simple(
                     dynamic_shapes_kernel_specialization_strategy=strategy
                 )
                 mod = _find_python_trt_module(compiled)
                 self.assertIsNotNone(
                     mod.context, f"Execution context should be created for {strategy}"
                 )
-                output = compiled(*[inp.clone() for inp in inputs])
-                self.assertEqual(output.shape, inputs[0].shape)
+                # Test inference with multiple dynamic batch sizes
+                for bs in (1, 2, 4):
+                    output = compiled(torch.randn(bs, 3).cuda())
+                    self.assertEqual(output.shape, (bs, 3))
 
     def test_setting_in_compilation_settings(self):
         for strategy in ("lazy", "eager", "none"):
@@ -121,7 +128,7 @@ class TestDynamicShapesKernelStrategyNonRTX(TestCase):
     """Tests that the setting is ignored on non-RTX builds."""
 
     def test_setting_ignored_on_non_rtx(self):
-        compiled, inputs = _compile_simple(
+        compiled = _compile_simple(
             dynamic_shapes_kernel_specialization_strategy="eager"
         )
         mod = _find_python_trt_module(compiled)
@@ -131,8 +138,8 @@ class TestDynamicShapesKernelStrategyNonRTX(TestCase):
                 "runtime_config should be None for standard TRT",
             )
         # Inference should still work
-        output = compiled(*[inp.clone() for inp in inputs])
-        self.assertEqual(output.shape, inputs[0].shape)
+        output = compiled(torch.randn(2, 3).cuda())
+        self.assertEqual(output.shape, (2, 3))
 
 
 if __name__ == "__main__":

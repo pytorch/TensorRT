@@ -22,11 +22,19 @@ class TestDynamicShapesKernelStrategyModels(TestCase):
     def tearDown(self):
         torch._dynamo.reset()
 
-    def _compile_and_verify(self, model, input_tensor, strategy):
+    def _compile_and_verify(self, model, strategy):
+        input_tensor = torch.randn(4, 3, 224, 224).cuda()
         compiled = torchtrt.compile(
             model,
             ir="dynamo",
-            inputs=[torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
+            inputs=[
+                torchtrt.Input(
+                    min_shape=(1, 3, 224, 224),
+                    opt_shape=(4, 3, 224, 224),
+                    max_shape=(8, 3, 224, 224),
+                    dtype=torch.float32,
+                )
+            ],
             enabled_precisions={torch.float32},
             use_python_runtime=True,
             min_block_size=1,
@@ -45,22 +53,19 @@ class TestDynamicShapesKernelStrategyModels(TestCase):
         import torchvision.models as models
 
         model = models.resnet18(pretrained=True).eval().cuda()
-        input_tensor = torch.randn(1, 3, 224, 224).cuda()
-        self._compile_and_verify(model, input_tensor, "lazy")
+        self._compile_and_verify(model, "lazy")
 
     def test_resnet18_eager_strategy(self):
         import torchvision.models as models
 
         model = models.resnet18(pretrained=True).eval().cuda()
-        input_tensor = torch.randn(1, 3, 224, 224).cuda()
-        self._compile_and_verify(model, input_tensor, "eager")
+        self._compile_and_verify(model, "eager")
 
     def test_resnet18_none_strategy(self):
         import torchvision.models as models
 
         model = models.resnet18(pretrained=True).eval().cuda()
-        input_tensor = torch.randn(1, 3, 224, 224).cuda()
-        self._compile_and_verify(model, input_tensor, "none")
+        self._compile_and_verify(model, "none")
 
 
 @unittest.skipIf(
