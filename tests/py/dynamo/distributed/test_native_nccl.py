@@ -1193,7 +1193,8 @@ def _multirank_setup() -> tuple:
     dist.init_process_group(backend="nccl")
     rank = dist.get_rank()
     world_size = dist.get_world_size()
-    local_rank = int(os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count()))
+    n_gpus = torch.cuda.device_count()
+    local_rank = int(os.environ.get("LOCAL_RANK", rank % n_gpus)) % n_gpus
     torch.cuda.set_device(local_rank)
     device = torch.device(f"cuda:{local_rank}")
     return rank, world_size, device

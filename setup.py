@@ -472,6 +472,8 @@ fx_packages = [
 
 dynamo_packages = [
     "torch_tensorrt",
+    "torch_tensorrt.distributed",
+    "torch_tensorrt.distributed.run",
     "torch_tensorrt.dynamo",
     "torch_tensorrt.dynamo.backend",
     "torch_tensorrt.dynamo.conversion",
@@ -506,6 +508,8 @@ fx_package_dir = {
 
 dynamo_package_dir = {
     "torch_tensorrt": "py/torch_tensorrt",
+    "torch_tensorrt.distributed": "py/torch_tensorrt/distributed",
+    "torch_tensorrt.distributed.run": "py/torch_tensorrt/distributed/run",
     "torch_tensorrt.dynamo": "py/torch_tensorrt/dynamo",
     "torch_tensorrt.dynamo.backend": "py/torch_tensorrt/dynamo/backend",
     "torch_tensorrt.dynamo.conversion": "py/torch_tensorrt/dynamo/conversion",
