@@ -245,12 +245,9 @@ def fake_tensorrt_execute_engine(
     Uses symbolic shape expressions captured at compile time to correctly infer
     output shapes while preserving symbolic SymInt relationships.
     """
-
     shape_info = _shape_info_from_trt_engine(fake_trt_engine)
 
     if shape_info:
-        # Apply the symbolic shape expressions to create output fake tensors
-        # shape_info now contains both 'inputs' and 'outputs' keys
         return _apply_symbolic_shape_expressions(inputs, shape_info)
     else:
         raise RuntimeError(

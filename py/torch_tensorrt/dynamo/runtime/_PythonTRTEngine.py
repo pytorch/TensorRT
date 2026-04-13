@@ -21,6 +21,7 @@ import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch._library.opaque_object import register_opaque_type
+from torch._opaque_base import OpaqueBase
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -128,11 +129,37 @@ class TorchTRTRuntimeStates:
 
 
 # ---------------------------------------------------------------------------
+# Pickle reconstruction — returns the right engine type for the current runtime
+# ---------------------------------------------------------------------------
+
+
+def _reconstruct_trt_engine(serialized_info: List[Any]) -> Any:
+    """Reconstruct a TRT engine from its serialized info list.
+
+    Called by pickle when deserializing a ``TRTEngine``.  Checks which runtime
+    is available and returns either a C++ ``torch.classes.tensorrt.Engine`` or
+    a Python ``TRTEngine``, so a single ``.pt2`` artifact is portable across
+    runtimes.
+    """
+    serialized_info = list(serialized_info)
+    engine_field = serialized_info[ENGINE_IDX]
+    if isinstance(engine_field, str):
+        serialized_info[ENGINE_IDX] = base64.b64decode(engine_field.encode("utf-8"))
+    elif isinstance(engine_field, bytes) and not engine_field.startswith(b"ftrt"):
+        serialized_info[ENGINE_IDX] = base64.b64decode(engine_field)
+
+    if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+        return torch.classes.tensorrt.Engine(tuple(serialized_info))
+
+    return TRTEngine(serialized_info)
+
+
+# ---------------------------------------------------------------------------
 # TRTEngine (Python implementation)
 # ---------------------------------------------------------------------------
 
 
-class TRTEngine:
+class TRTEngine(OpaqueBase):  # type: ignore[misc]
     """TensorRT engine + execution context, driven from Python TRT APIs.
 
     Exposes the same surface as the C++ ``torch.classes.tensorrt.Engine`` TorchBind
@@ -192,14 +219,16 @@ class TRTEngine:
     def __repr__(self) -> str:
         return self.__str__()
 
-    def __getstate__(self) -> List[Any]:
-        """Return serialized engine info list for ``torch.save`` / pickling."""
-        return list(self.serialized_info)
+    def __reduce__(self) -> Tuple[Any, Tuple[List[Any]]]:
+        """Pickle protocol: delegates to :func:`_reconstruct_trt_engine`.
 
-    def __setstate__(self, serialized_info: List[Any]) -> None:
-        """Restore engine from serialized info list (``torch.load`` / unpickling)."""
-        self._load_serialized_info(serialized_info)
-        self._setup_engine()
+        The reconstruction function checks which runtime is available at
+        load time and returns either a C++ ``torch.classes.tensorrt.Engine``
+        or a Python ``TRTEngine``, so a single saved artifact works on both.
+        """
+        state = list(self.serialized_info)
+        state[ENGINE_IDX] = base64.b64encode(state[ENGINE_IDX]).decode("utf-8")
+        return (_reconstruct_trt_engine, (state,))
 
     def tracing_mode(self) -> str:
         """Return ``"real"`` so FakeTensor/export pass the real engine into meta kernels.
@@ -696,8 +725,9 @@ class TRTEngine:
         return self._execute_standard(contiguous_inputs)
 
 
+register_opaque_type(TRTEngine, typ="reference")
+
 if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
-    register_opaque_type(TRTEngine, typ="reference")
 
     @torch.library.custom_op(  # type: ignore[misc]
         "tensorrt::execute_engine", mutates_args=()
@@ -707,6 +737,33 @@ if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
     ) -> List[torch.Tensor]:
         outputs = engine.execute(input_tensors)
         return [outputs] if isinstance(outputs, torch.Tensor) else list(outputs)
+
+    @execute_engine.register_fake  # type: ignore[misc]
+    def execute_engine_fake(
+        input_tensors: List[torch.Tensor], engine: TRTEngine
+    ) -> List[torch.Tensor]:
+        """Abstract/fake kernel for ``tensorrt::execute_engine``.
+
+        Called by FakeTensor propagation and ``torch.export`` to infer output
+        shapes and dtypes without executing the real TRT engine.  Output shapes
+        are obtained by asking the engine's execution context to propagate the
+        concrete input shapes symbolically; dtypes come from the engine's
+        pre-parsed output dtype list.
+        """
+        input_shapes = [list(t.shape) for t in input_tensors]
+        try:
+            output_shapes = engine.infer_outputs(input_shapes)
+        except Exception:
+            # Fall back to the statically-stored shapes when shape inference is
+            # unavailable (e.g. engine context not yet initialised in meta mode).
+            output_shapes = [list(s) for s in engine.output_shapes]
+
+        return [
+            torch.empty(
+                shape, dtype=engine.output_dtypes[i], device=input_tensors[0].device
+            )
+            for i, shape in enumerate(output_shapes)
+        ]
 
     @torch.library.custom_op(  # type: ignore[misc]
         "tensorrt::no_op_placeholder_for_execute_engine", mutates_args=()

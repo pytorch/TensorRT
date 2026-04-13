@@ -484,18 +484,28 @@ def inline_trt_modules(
                 f"trt_module_node: {trt_module_node.name} does not have the metadata which should be set during dynamo compile_module step."
             )
         num_outputs = len(trt_module_node.meta["val"])
+        # Insert a call_function node to perform inference on TRT engine
         with gm.graph.inserting_before(trt_module_node):
-            # Always embed engine data as primitive string args via no_op_placeholder
-            # so torch.export does not pickle torch.classes.tensorrt.Engine (which
-            # requires the C++ TorchBind class at load time).
-            # torch_tensorrt.load() lowers placeholders → execute_engine.
-            engine_info = trt_module._pack_engine_info()
-            engine_bytes = engine_info[ENGINE_IDX]
-            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
-            trt_node = gm.graph.call_function(
-                torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
-                (trt_module_node.args, *engine_info),
-            )
+            if cross_compile_module:
+                engine_info = trt_module._pack_engine_info()
+                engine_bytes = engine_info[ENGINE_IDX]
+                engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+                trt_node = gm.graph.call_function(
+                    torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
+                    (trt_module_node.args, *engine_info),
+                )
+            else:
+                engine_name = f"{name}_engine"
+                setattr(gm, engine_name, trt_module.engine)
+                engine_node = gm.graph.get_attr(engine_name)
+
+                trt_node = gm.graph.call_function(
+                    torch.ops.tensorrt.execute_engine.default,
+                    (trt_module_node.args, engine_node),
+                )
+                engine_node.meta["val"] = CustomObjArgument(
+                    name=engine_node.name, class_fqn=""
+                )
             assert num_outputs > 0
             trt_node.meta["val"] = trt_module_node.meta["val"]
 

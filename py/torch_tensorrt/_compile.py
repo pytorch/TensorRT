@@ -594,7 +594,10 @@ def load(
     Raises:
         ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file
     """
-    from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
+    # Ensure Python TRT engine ops are registered so torch.export.load can
+    # resolve tensorrt::execute_engine when the C++ runtime is absent.
+    if not ENABLED_FEATURES.torch_tensorrt_runtime:
+        import torch_tensorrt.dynamo.runtime._PythonTRTEngine  # noqa: F401
 
     try:
         logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
@@ -604,11 +607,17 @@ def load(
             extra_files=extra_files,
             **kwargs,
         )
+        # Handle legacy cross-compiled archives that use no_op_placeholder nodes
         gm = exp_program.graph_module
         if any(
             "no_op_placeholder_for_execute_engine" in n.name for n in gm.graph.nodes
         ):
+            from torch_tensorrt.dynamo._exporter import (
+                replace_execute_engine_no_op_node,
+            )
+
             return replace_execute_engine_no_op_node(exp_program)
+
         return exp_program
     except Exception:
         import traceback
@@ -895,6 +904,7 @@ def save(
                 logger.warning(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
+            _normalize_engine_constants_to_python(module)
             if output_format == "exported_program":
                 function_overload_with_kwargs(
                     torch.export.save,
@@ -952,6 +962,7 @@ def save(
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
                 )
+                _normalize_engine_constants_to_python(exp_program)
                 if output_format == "exported_program":
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1031,6 +1042,7 @@ def save(
                         strict=False,
                     )
 
+                _normalize_engine_constants_to_python(exp_program)
                 if output_format == "exported_program":
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1054,6 +1066,27 @@ def save(
                     raise RuntimeError(
                         "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
                     )
+
+
+def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:
+    """Convert C++ ``torch.classes.tensorrt.Engine`` constants to Python ``TRTEngine``.
+
+    The C++ runtime stores engine constants as ``torch._C.ScriptObject``
+    (``torch.classes.tensorrt.Engine``).  Python ``TRTEngine`` is registered as
+    an opaque type so ``torch.export`` can serialise it with ``pickle``.  By
+    converting before save the artifact is portable across both runtimes.
+    """
+    import base64
+
+    from torch_tensorrt.dynamo.runtime._PythonTRTEngine import TRTEngine
+    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
+
+    for fqn, constant in list(exp_program.constants.items()):
+        if isinstance(constant, torch._C.ScriptObject):
+            state = constant.__getstate__()
+            serialized_info = list(state[0])
+            serialized_info[ENGINE_IDX] = base64.b64decode(serialized_info[ENGINE_IDX])
+            exp_program.constants[fqn] = TRTEngine(serialized_info)
 
 
 def function_overload_with_kwargs(
