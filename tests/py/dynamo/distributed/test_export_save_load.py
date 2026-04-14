@@ -11,7 +11,11 @@ Run single-rank pytest tests (no multi-GPU needed):
     cd tests/py/dynamo
     pytest distributed/test_export_save_load.py -v
 
-Run multi-rank tests (single-node, 2 GPUs via torchrun):
+Run multi-rank pytest tests (requires 2 GPUs, spawned automatically):
+    cd tests/py/dynamo
+    pytest distributed/test_export_save_load.py::TestMultirankExportSaveLoad -v
+
+Run multi-rank tests via torchrun (legacy):
     torchrun --nproc_per_node=2 distributed/test_export_save_load.py --multirank
 
 Run multi-rank tests (multinode, 1 GPU per node — run on each node):
@@ -35,6 +39,11 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.utils._pytree
+from torch.testing._internal.common_distributed import (
+    MultiProcessTestCase,
+    requires_nccl,
+    skip_if_lt_x_gpu,
+)
 from torch.testing._internal.common_utils import run_tests
 
 # ---------------------------------------------------------------------------
@@ -166,8 +175,7 @@ def _multirank_setup() -> tuple:
     dist.init_process_group(backend="nccl")
     rank = dist.get_rank()
     world_size = dist.get_world_size()
-    n_gpus = torch.cuda.device_count()
-    local_rank = int(os.environ.get("LOCAL_RANK", rank % n_gpus)) % n_gpus
+    local_rank = int(os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count()))
     torch.cuda.set_device(local_rank)
     device = torch.device(f"cuda:{local_rank}")
     return rank, world_size, device
@@ -287,6 +295,62 @@ def _multirank_loaded_matches_compiled(
     diff = float((compiled_output - loaded_output).abs().max())
     assert diff < 1e-3, f"Compiled vs loaded mismatch: max_diff={diff}"
     print(f"[Rank {rank}] Compiled==loaded OK (max_diff={diff:.6f})", flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Multi-rank pytest tests (MultiProcessTestCase, requires 2 GPUs)
+# ---------------------------------------------------------------------------
+
+
+class TestMultirankExportSaveLoad(MultiProcessTestCase):
+    """Export → save → load → inference round-trip as a pytest-compatible test.
+
+    Spawns 2 worker processes automatically.  Requires 2 CUDA GPUs.  Run with:
+
+        pytest distributed/test_export_save_load.py::TestMultirankExportSaveLoad -v
+    """
+
+    world_size = 2
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._spawn_processes()
+
+    def _init_dist(self) -> torch.device:
+        """Init NCCL process group via FileStore (no env-var dependency)."""
+        store = dist.FileStore(self.file_name, self.world_size)
+        dist.init_process_group(
+            backend="nccl",
+            store=store,
+            rank=self.rank,
+            world_size=self.world_size,
+        )
+        local = self.rank % torch.cuda.device_count()
+        torch.cuda.set_device(local)
+        return torch.device(f"cuda:{local}")
+
+    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_export_save_load_round_trip(self) -> None:
+        """Full round-trip: export → AOT compile → save → load → verify output."""
+        device = self._init_dist()
+        save_dir = tempfile.mkdtemp(prefix="trt_export_pytest_")
+
+        compiled_model, inp = _multirank_export_compile_save(
+            self.rank, self.world_size, device, save_dir
+        )
+        dist.barrier()
+        _multirank_load_and_infer(self.rank, self.world_size, device, save_dir, inp)
+        dist.barrier()
+        _multirank_loaded_matches_compiled(
+            self.rank, self.world_size, device, save_dir, compiled_model, inp
+        )
+
+
+# ---------------------------------------------------------------------------
+# torchrun / mpirun entry point (legacy)
+# ---------------------------------------------------------------------------
 
 
 def run_multirank_tests() -> None:

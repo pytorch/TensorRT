@@ -290,15 +290,6 @@ TRTEngine::TRTEngine(
 TRTEngine::~TRTEngine() {
   torch::cuda::synchronize(device_info.id);
   trt_engine_profiler.reset();
-#ifdef ENABLE_TRT_NCCL_COLLECTIVES
-  // Null out the NCCL communicator before destroying the execution context.
-  // dist.destroy_process_group() may have already freed the ncclComm_t; if we
-  // let IExecutionContext::~IExecutionContext() run with a dangling pointer it
-  // will segfault.
-  if (nccl_initialized && exec_ctx) {
-    exec_ctx->setCommunicator(nullptr);
-  }
-#endif
   exec_ctx.reset();
   cuda_engine.reset();
   if (empty_tensor_placeholder) {

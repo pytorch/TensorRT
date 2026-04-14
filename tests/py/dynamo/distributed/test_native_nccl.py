@@ -13,14 +13,20 @@ Covers
 7.  C++ runtime NCCL bind (bind_nccl_comm)
 8.  Python runtime NCCL comm (setup_nccl_comm + pickle / unpickle)
 9.  distributed_group with a non-default TP subgroup
+10. Multi-rank pytest tests via MultiProcessTestCase (2 GPUs, plain pytest)
 
 Run single-rank pytest tests
 -----------------------------
     cd tests/py/dynamo
     pytest distributed/test_native_nccl.py -v
 
-Run multi-rank tests (single-node, 2 GPUs via torchrun)
----------------------------------------------------------
+Run multi-rank pytest tests (requires 2 GPUs, spawned automatically)
+----------------------------------------------------------------------
+    cd tests/py/dynamo
+    pytest distributed/test_native_nccl.py::TestMultirankNccl -v
+
+Run multi-rank tests via torchrun (legacy)
+------------------------------------------
     torchrun --nproc_per_node=2 distributed/test_native_nccl.py --multirank
 
 Run multi-rank tests (multinode, 1 GPU per node — run on each node)
@@ -47,6 +53,11 @@ import torch
 import torch.distributed as dist
 import torch.fx
 import torch.nn as nn
+from torch.testing._internal.common_distributed import (
+    MultiProcessTestCase,
+    requires_nccl,
+    skip_if_lt_x_gpu,
+)
 from torch.testing._internal.common_utils import run_tests
 
 # ---------------------------------------------------------------------------
@@ -1179,13 +1190,11 @@ class TestPythonRuntimePickle(unittest.TestCase):
 
 
 # ============================================================================
-# Section 7 — Multi-rank tests (torchrun / mpirun, requires --multirank flag)   [was Section 6]
+# Section 7 — Multi-rank helper functions (torchrun / mpirun)
 # ============================================================================
-
-# These tests are only executed when the script is run directly with
-# --multirank.  They are intentionally structured as plain functions rather
-# than unittest.TestCase so they can be driven by torchrun without a test
-# runner.
+# These functions are shared by both:
+#   * TestMultirankNccl (Section 8) — run via plain pytest with MultiProcessTestCase
+#   * run_multirank_tests() (Section 9) — legacy torchrun/mpirun entry point
 
 
 def _multirank_setup() -> tuple:
@@ -1193,8 +1202,7 @@ def _multirank_setup() -> tuple:
     dist.init_process_group(backend="nccl")
     rank = dist.get_rank()
     world_size = dist.get_world_size()
-    n_gpus = torch.cuda.device_count()
-    local_rank = int(os.environ.get("LOCAL_RANK", rank % n_gpus)) % n_gpus
+    local_rank = int(os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count()))
     torch.cuda.set_device(local_rank)
     device = torch.device(f"cuda:{local_rank}")
     return rank, world_size, device
@@ -1519,6 +1527,201 @@ def _multirank_distributed_group_context_switch(
         _check_close(out, expected, f"context_switch sg{i+1} rank={rank}")
 
 
+def _multirank_pg_migration(
+    rank: int, world_size: int, device: torch.device
+) -> None:
+    """Compile with the default world group, run inference, then migrate to a new
+    subgroup via distributed_group(new_group, model) and verify that inference
+    still produces correct results — i.e. the NCCL communicator is re-bound.
+
+    Tests both the C++ runtime (set_group_name resets nccl_initialized) and the
+    Python runtime (setup_nccl_comm re-runs on next forward after _nccl_comm reset).
+
+    Covers the API contract: a compiled/loaded TRT model can be migrated from one
+    process group to another without recompilation.
+    """
+    if world_size < 2:
+        print(f"[SKIP] _multirank_pg_migration requires world_size >= 2")
+        return
+
+    import torch_tensorrt
+    from torch_tensorrt.distributed._distributed import distributed_group
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+
+    world_group = dist.group.WORLD
+    world_name = world_group.group_name
+
+    # A new subgroup with identical membership (same all-reduce semantics,
+    # different ProcessGroup object and communicator).
+    subgroup = dist.new_group(ranks=list(range(world_size)))
+    sub_name = subgroup.group_name
+
+    class AllReduceModel(nn.Module):
+        def __init__(self, pg_name: str) -> None:
+            super().__init__()
+            self.pg_name = pg_name
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            out = torch.ops._c10d_functional.all_reduce.default(
+                x, "sum", self.pg_name
+            )
+            return torch.ops._c10d_functional.wait_tensor.default(out)
+
+    inp = torch.full((1, 4), float(rank + 1), device=device)
+    expected_sum = world_size * (world_size + 1) // 2
+    expected = torch.full((1, 4), float(expected_sum), device=device)
+
+    for label, use_python_runtime in [("cpp", False), ("python", True)]:
+        # ---- Step 1: compile + run with default world group ----
+        model = AllReduceModel(world_name).to(device).eval()
+
+        with distributed_group(world_group):
+            trt_model = torch.compile(
+                model,
+                backend="torch_tensorrt",
+                dynamic=False,
+                options={
+                    "enabled_precisions": {torch.float32},
+                    "use_python_runtime": use_python_runtime,
+                    "min_block_size": 1,
+                    "use_distributed_mode_trace": True,
+                },
+            )
+            with torch.no_grad():
+                out_world = trt_model(inp)
+
+        _check_close(out_world, expected, f"[{label}] world group rank={rank}")
+
+        # ---- Step 2: migrate to subgroup via distributed_group(subgroup, model) ----
+        # This calls set_distributed_group() which resets nccl_initialized on the
+        # C++ engine, and keeps _state.pg = subgroup active for the Python runtime's
+        # lazy setup_nccl_comm() call.
+        with distributed_group(subgroup, trt_model) as migrated_model:
+            with torch.no_grad():
+                out_sub = migrated_model(inp)
+
+        _check_close(
+            out_sub, expected, f"[{label}] migrated to subgroup rank={rank}"
+        )
+
+        # ---- Step 3: set_distributed_group (persistent, outside context) ----
+        subgroup2 = dist.new_group(ranks=list(range(world_size)))
+        torch_tensorrt.distributed.set_distributed_group(trt_model, subgroup2)
+        # _state.pg is NOT set here — Python runtime falls back to world group
+        # for lazy setup_nccl_comm; C++ runtime uses the pinned group name.
+        # For C++ runtime only (Python runtime needs _state.pg active):
+        if not use_python_runtime:
+            with torch.no_grad():
+                out_pin = trt_model(inp)
+            _check_close(
+                out_pin, expected, f"[{label}] set_distributed_group rank={rank}"
+            )
+
+        print(f"[Rank {rank}] PASS _multirank_pg_migration [{label}]", flush=True)
+
+
+# ============================================================================
+# Section 8 — Multi-rank pytest tests (MultiProcessTestCase, requires 2 GPUs)
+# ============================================================================
+
+
+class TestMultirankNccl(MultiProcessTestCase):
+    """Multi-rank NCCL tests as pytest-compatible MultiProcessTestCase.
+
+    Each test spawns 2 worker processes via torch.multiprocessing.  Requires
+    exactly 2 CUDA GPUs.  Run with:
+
+        pytest distributed/test_native_nccl.py::TestMultirankNccl -v
+    """
+
+    world_size = 2
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._spawn_processes()
+
+    def _init_dist(self) -> torch.device:
+        """Init NCCL process group via FileStore (no env-var dependency)."""
+        store = dist.FileStore(self.file_name, self.world_size)
+        dist.init_process_group(
+            backend="nccl",
+            store=store,
+            rank=self.rank,
+            world_size=self.world_size,
+        )
+        local = self.rank % torch.cuda.device_count()
+        torch.cuda.set_device(local)
+        return torch.device(f"cuda:{local}")
+
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_all_reduce_correctness(self) -> None:
+        """all_reduce sum across 2 ranks produces world_size * value."""
+        device = self._init_dist()
+        _multirank_all_reduce_correctness(self.rank, self.world_size, device)
+
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_all_gather_correctness(self) -> None:
+        """all_gather concatenates tensors from all ranks in correct order."""
+        device = self._init_dist()
+        _multirank_all_gather_correctness(self.rank, self.world_size, device)
+
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_reduce_scatter_correctness(self) -> None:
+        """reduce_scatter sum then scatters: rank r gets sum of row r."""
+        device = self._init_dist()
+        _multirank_reduce_scatter_correctness(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_distributed_group_tp_model(self) -> None:
+        """Tensor-parallel MLP with distributed_group() produces correct output."""
+        device = self._init_dist()
+        _multirank_distributed_group_tp_model(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_distributed_group_subgroup(self) -> None:
+        """distributed_group() with a non-default TP subgroup routes NCCL correctly."""
+        device = self._init_dist()
+        _multirank_distributed_group_subgroup(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_cpp_runtime_bind_nccl(self) -> None:
+        """C++ runtime TRTEngine.bind_nccl_comm() is called exactly once."""
+        device = self._init_dist()
+        _multirank_cpp_runtime_bind_nccl(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_distributed_group_context_switch(self) -> None:
+        """Switching distributed_group between two subgroups routes to correct communicator."""
+        device = self._init_dist()
+        _multirank_distributed_group_context_switch(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_pg_migration(self) -> None:
+        """Compile with world group, migrate to subgroup via distributed_group API."""
+        device = self._init_dist()
+        _multirank_pg_migration(self.rank, self.world_size, device)
+
+
+# ============================================================================
+# Section 9 — torchrun / mpirun entry point (legacy multi-rank runner)
+# ============================================================================
+
+
 def run_multirank_tests() -> None:
     """Entry point for --multirank mode (called by torchrun / mpirun workers)."""
     rank, world_size, device = _multirank_setup()
@@ -1532,6 +1735,7 @@ def run_multirank_tests() -> None:
         _multirank_distributed_group_subgroup,
         _multirank_cpp_runtime_bind_nccl,
         _multirank_distributed_group_context_switch,
+        _multirank_pg_migration,
     ]
 
     failed = []
