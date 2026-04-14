@@ -808,13 +808,13 @@ def register_custom_plugin(
             return
 
         from torch_tensorrt.dynamo.conversion.plugins._generate_plugin import (
-            register_plugin_with_aot,
+            register_plugin,
         )
 
         tactic_table = build_tactic_table(descriptor.specs)
 
         # Build the three QDP callbacks, then delegate the raw trtp calls to
-        # register_plugin_with_aot so that all plugin registration (JIT and AOT)
+        # register_plugin so that all plugin registration (JIT and AOT)
         # converges on the same path in the existing plugin system.
         desc_fn = _build_desc_fn(descriptor, num_inputs, num_outputs)
         autotune_fn = _build_autotune_fn(descriptor, num_inputs, num_outputs, tactic_table)
@@ -824,7 +824,7 @@ def register_custom_plugin(
         # op (from a prior call in this process), catch "already has a definition"
         # and mark it registered without re-registering.
         try:
-            register_plugin_with_aot(op_name, desc_fn, autotune_fn, aot_fn)
+            register_plugin(op_name, desc_fn, autotune_fn, aot_fn)
         except Exception as exc:  # noqa: BLE001
             if "already" in str(exc).lower():
                 logger.debug(

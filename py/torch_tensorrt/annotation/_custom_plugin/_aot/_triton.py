@@ -61,24 +61,44 @@ from .._qdp_utils import (
 from ..._recorders import TritonLaunchRecorder
 from ..._specs import TritonSpec
 from .._symbolic import SymbolicTensor, TensorRole
+from torch_tensorrt._enums import dtype as _dtype  # torch_tensorrt's shared cross-framework dtype enum
+
+# Triton's ASTSource signature dict requires string element-type tokens for
+# pointer arguments (e.g. "*fp16").  These tokens are Triton-ABI-specific and
+# have no counterpart in tensorrt or numpy, so they cannot be expressed as
+# torch_tensorrt.dtype values directly.  We map through torch_tensorrt.dtype
+# (the shared cross-framework enum) to stay consistent with the rest of the
+# library's dtype handling, and express the Triton-specific token as a final
+# per-backend step.
+_DTYPE_TO_TRITON_PTR: Dict[_dtype, str] = {
+    _dtype.f16: "fp16",
+    _dtype.bf16: "bf16",
+    _dtype.f32: "fp32",
+    _dtype.i32: "i32",
+}
 
 
 def _trt_dtype_to_triton_ptr(trt_dtype: Any, qdp_symbol: str) -> str:
-    """Map a TensorRT DataType to a Triton pointer element-type string."""
-    if trt_dtype == trt.float16:
-        return "fp16"
-    if trt_dtype == trt.bfloat16:
-        return "bf16"
-    if trt_dtype == trt.float32:
-        return "fp32"
-    if trt_dtype == trt.int32:
-        return "i32"
-    raise TTAPluginError(
-        op=qdp_symbol,
-        stage="aot_impl",
-        backend="triton",
-        msg=f"unsupported tensor dtype {trt_dtype} for Triton kernel signature",
-    )
+    """Map a TensorRT DataType to a Triton pointer element-type string.
+
+    Converts via ``torch_tensorrt.dtype`` (the shared cross-framework enum)
+    so the mapping stays consistent with the rest of the library's dtype
+    handling.  The final Triton ABI string is Triton-specific and lives only
+    in ``_DTYPE_TO_TRITON_PTR``.
+    """
+    try:
+        tta_dtype = _dtype._from(trt_dtype)
+    except TypeError:
+        tta_dtype = None
+    ptr_type = _DTYPE_TO_TRITON_PTR.get(tta_dtype) if tta_dtype is not None else None
+    if ptr_type is None:
+        raise TTAPluginError(
+            op=qdp_symbol,
+            stage="aot_impl",
+            backend="triton",
+            msg=f"unsupported tensor dtype {trt_dtype} for Triton kernel signature",
+        )
+    return ptr_type
 
 
 # LIMITATION (fragile PTX rewrite): the three _ptx_* helpers below rewrite .param

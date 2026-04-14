@@ -36,6 +36,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import tempfile
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -484,14 +485,22 @@ def aot_impl_cutile(
             msg=f"failed to import cuTILE internals (compile_tile/CompilerOptions) for op '{qdp_symbol}': {exc}",
         ) from exc
 
-    # Ensure tileiras is findable: add the Python-packaged nvidia/cu13/bin if needed.
+    # Verify that tileiras is on PATH — it ships with the cuda-tile package.
+    # Users must ensure their PATH includes the cuda-tile bin directory
+    # (e.g. add <site-packages>/nvidia/cu13/bin to PATH).
     import shutil as _shutil
-    import sysconfig as _sysconfig
     if not _shutil.which("tileiras"):
-        _site = _sysconfig.get_path("platlib")
-        _cu13_bin = os.path.join(_site, "nvidia", "cu13", "bin")
-        if os.path.isdir(_cu13_bin) and _cu13_bin not in os.environ.get("PATH", ""):
-            os.environ["PATH"] = _cu13_bin + os.pathsep + os.environ.get("PATH", "")
+        raise TTAPluginError(
+            op=qdp_symbol,
+            stage="aot_impl",
+            backend=backend,
+            msg=(
+                "tileiras compiler not found on PATH.  "
+                "Install cuda-tile (`pip install cuda-tile`) and ensure that "
+                "the package's bin directory (e.g. <site-packages>/nvidia/cu13/bin) "
+                "is on your PATH before importing torch_tensorrt.annotation."
+            ),
+        )
 
     all_descs = list(inp_descs) + list(out_descs)
     num_inputs = len(inp_descs)
@@ -588,9 +597,10 @@ def aot_impl_cutile(
         )
         # Dump diagnostic PTX for rank>1 kernels and log the path.
         diag_filename = f"cutile_rank_gt1_{kernel_name_str}_nparam_{num_ptx_params}_expected_{expected_n}.ptx"
-        dump_code_artifact("CUTILE_DUMP_DIR", diag_filename, ptx_raw, default_dir="/tmp/cutile_dump")
+        _default_dump_dir = os.path.join(tempfile.gettempdir(), "torch_tensorrt_cutile_dump")
+        dump_code_artifact("CUTILE_DUMP_DIR", diag_filename, ptx_raw, default_dir=_default_dump_dir)
         ptx_path = os.path.join(
-            os.environ.get("CUTILE_DUMP_DIR") or "/tmp/cutile_dump", diag_filename
+            os.environ.get("CUTILE_DUMP_DIR") or _default_dump_dir, diag_filename
         )
         logger.info(
             "cutile rank>1: kernel=%s num_ptx_params=%d expected_n=%d effective_rank=%d (num_inputs=%d num_outputs=%d num_scalars=%d) ptx_dumped=%s",

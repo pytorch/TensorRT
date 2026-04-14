@@ -481,7 +481,7 @@ def generate_plugin(plugin_name: str) -> None:
     _generate_plugin(plugin_name)
 
 
-def register_plugin_with_aot(
+def register_plugin(
     plugin_name: str,
     desc_fn: Any,
     autotune_fn: Optional[Any] = None,

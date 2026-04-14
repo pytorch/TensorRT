@@ -1,6 +1,13 @@
 """
 Torch-TensorRT Annotation Layer (TTA) — custom_plugin API.
 
+.. warning::
+    **Experimental.** The AOT compilation backends (Triton, CuTile, CuTeDSL)
+    rely on PTX-level workarounds to accommodate current TensorRT and driver
+    limitations (e.g. PTX version caps, parameter-order conventions).  These
+    workarounds will be removed as TRT and the underlying toolchains evolve.
+    APIs may change without notice.
+
 Provides descriptor types and factory functions for defining custom TensorRT
 AOT QDP plugins backed by Triton, CuTile, or CuTeDSL kernels.
 
