@@ -17,7 +17,6 @@ from typing import (
 )
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -57,6 +56,8 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
+
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
@@ -74,6 +75,7 @@ class TRTInterpreterResult(NamedTuple):
     output_names: Sequence[str]
     weight_name_map: Optional[dict[Any, Any]]
     requires_output_allocator: bool
+    requires_multidevice: bool
 
 
 @cls_supports_debugger
@@ -459,7 +461,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             except Exception:
                 return torch.all(sd_weight == network_weight)
 
-    @needs_refit
+    @needs_refit  # type: ignore
     def _save_weight_mapping(self) -> None:
         """
         Construct the weight name mapping from engine weight name to state_dict weight name.
@@ -670,6 +672,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self._output_names,
             self.weight_name_map,
             self.ctx.requires_output_allocator,
+            self.ctx.requires_multidevice,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -784,6 +787,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if converter_info.get("requires_output_allocator", False):
             self.ctx.requires_output_allocator = True
             _LOGGER.debug(f"{target} requires output allocator")
+
+        if converter_info.get("requires_multidevice", False):
+            self.ctx.requires_multidevice = True
+            _LOGGER.debug(f"{target} requires native multi-device support")
 
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)

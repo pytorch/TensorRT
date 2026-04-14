@@ -165,7 +165,11 @@ def generate(
             # bounds, dynamo traces symbolically and TRT infers the profile
             # from the first concrete shape it sees.
             torch._dynamo.mark_dynamic(input_seq, 1)
-        position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
+        position_ids = torch.arange(
+            input_seq.shape[1], device=input_seq.device
+        ).unsqueeze(0)
+        if dynamic_seqlen_range is not None:
+            torch._dynamo.mark_dynamic(position_ids, 1)
         outputs = model(input_seq, position_ids=position_ids)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]

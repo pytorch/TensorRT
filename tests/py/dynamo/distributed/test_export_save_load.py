@@ -317,7 +317,11 @@ class TestMultirankExportSaveLoad(MultiProcessTestCase):
         self._spawn_processes()
 
     def _init_dist(self) -> torch.device:
-        """Init NCCL process group via FileStore (no env-var dependency)."""
+        """Init NCCL process group via FileStore (no env-var dependency).
+
+        The dist.barrier() seeds the NCCL communicator so bind_nccl_comm()
+        sees a non-null getCommPtr() on the first TRT forward pass.
+        """
         store = dist.FileStore(self.file_name, self.world_size)
         dist.init_process_group(
             backend="nccl",
@@ -327,6 +331,7 @@ class TestMultirankExportSaveLoad(MultiProcessTestCase):
         )
         local = self.rank % torch.cuda.device_count()
         torch.cuda.set_device(local)
+        dist.barrier()  # seeds ncclComm_t before any TRT bind_nccl_comm() call
         return torch.device(f"cuda:{local}")
 
     @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")

@@ -28,6 +28,7 @@ Optional args:
 
 import argparse
 import datetime
+import gc
 import logging
 import os
 import sys
@@ -163,6 +164,9 @@ def compile_torchtrt(model, args):
 
 
 if __name__ == "__main__":
+    trt_model = None  # ensure names exist for the finally block
+    model = None
+
     parser = argparse.ArgumentParser(
         description="Two-node Llama TP inference with Torch-TensorRT (C++ runtime)"
     )
@@ -184,54 +188,75 @@ if __name__ == "__main__":
 
     device_mesh = init_device_mesh("cuda", (world_size,))
 
-    with torch.inference_mode():
-        model = get_model(args, device_mesh)
+    try:
+        with torch.inference_mode():
+            model = get_model(args, device_mesh)
 
-        tokenizer = AutoTokenizer.from_pretrained(args.model)
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
+            tokenizer = AutoTokenizer.from_pretrained(args.model)
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
 
-        input_ids = tokenizer(args.prompt, return_tensors="pt")["input_ids"].to(DEVICE)
-        max_len = input_ids.shape[1] + args.num_tokens
+            input_ids = tokenizer(args.prompt, return_tensors="pt")["input_ids"].to(
+                DEVICE
+            )
+            max_len = input_ids.shape[1] + args.num_tokens
 
-        logger.info("Running uncompiled PyTorch baseline ...")
-        torch_tokens = generate(
-            model, input_ids.clone(), max_len, tokenizer.eos_token_id
-        )
-        if rank == 0:
-            print("\n===== PyTorch-TP (uncompiled) =====")
-            print(tokenizer.decode(torch_tokens[0], skip_special_tokens=True))
-            sys.stdout.flush()
+            logger.info("Running uncompiled PyTorch baseline ...")
+            torch_tokens = generate(
+                model, input_ids.clone(), max_len, tokenizer.eos_token_id
+            )
+            if rank == 0:
+                print("\n===== PyTorch-TP (uncompiled) =====")
+                print(tokenizer.decode(torch_tokens[0], skip_special_tokens=True))
+                sys.stdout.flush()
 
-        logger.info("Compiling with Torch-TensorRT (C++ runtime)...")
-        trt_model = compile_torchtrt(model, args)
+            logger.info("Compiling with Torch-TensorRT (C++ runtime)...")
+            trt_model = compile_torchtrt(model, args)
 
-        # Trigger TRT engine build explicitly and barrier so all ranks finish
-        # compilation before the generation loop starts.  Without this, a slow
-        # build on one rank causes the other to timeout at the next NCCL collective.
-        # Warmup: mark seq-len dim dynamic to match the generate() loop so the
-        # compilation artifacts (TRT engine) are reused there without a recompile.
-        logger.info("Warming up TRT model (triggering engine build)...")
-        _warmup_ids = input_ids.clone()
-        torch._dynamo.mark_dynamic(_warmup_ids, 1)
-        _position_ids = torch.arange(_warmup_ids.shape[1]).unsqueeze(0).to(DEVICE)
-        torch._dynamo.mark_dynamic(_position_ids, 1)
-        _ = trt_model(_warmup_ids, position_ids=_position_ids)
-        dist.barrier()
-        logger.info("All ranks compiled. Starting TRT inference...")
+            # Trigger TRT engine build explicitly and barrier so all ranks finish
+            # compilation before the generation loop starts.  Without this, a slow
+            # build on one rank causes the other to timeout at the next NCCL collective.
+            # Warmup: mark seq-len dim dynamic to match the generate() loop so the
+            # compilation artifacts (TRT engine) are reused there without a recompile.
+            logger.info("Warming up TRT model (triggering engine build)...")
+            _warmup_ids = input_ids.clone()
+            torch._dynamo.mark_dynamic(_warmup_ids, 1)
+            _position_ids = torch.arange(_warmup_ids.shape[1]).unsqueeze(0).to(DEVICE)
+            torch._dynamo.mark_dynamic(_position_ids, 1)
+            _ = trt_model(_warmup_ids, position_ids=_position_ids)
+            dist.barrier()
+            logger.info("All ranks compiled. Starting TRT inference...")
 
-        logger.info("Running TRT-compiled model ...")
-        trt_tokens = generate(
-            trt_model,
-            input_ids.clone(),
-            max_len,
-            tokenizer.eos_token_id,
-            dynamic_seqlen_range=(1, max_len),
-        )
-        if rank == 0:
-            print("\n===== TensorRT-TP (C++ runtime) =====")
-            print(tokenizer.decode(trt_tokens[0], skip_special_tokens=True))
-            sys.stdout.flush()
+            logger.info("Running TRT-compiled model ...")
+            trt_tokens = generate(
+                trt_model,
+                input_ids.clone(),
+                max_len,
+                tokenizer.eos_token_id,
+                dynamic_seqlen_range=(1, max_len),
+            )
+            if rank == 0:
+                print("\n===== TensorRT-TP (C++ runtime) =====")
+                print(tokenizer.decode(trt_tokens[0], skip_special_tokens=True))
+                sys.stdout.flush()
 
-    dist.destroy_process_group()
-    logger.info("Done.")
+    finally:
+        # Destroy TRT engines BEFORE tearing down the NCCL process group.
+        # TRT's exec_ctx holds a raw pointer to the ncclComm obtained via
+        # setCommunicator().  If dist.destroy_process_group() runs first,
+        # exec_ctx.reset() in ~TRTEngine() accesses freed memory → segfault.
+        #
+        # torch._dynamo.reset() clears the compiled-graph cache, dropping its
+        # reference to the TRTEngine.  gc.collect() then breaks any remaining
+        # reference cycles so CPython's refcount drops to zero and ~TRTEngine()
+        # fires before we touch the NCCL state.
+        torch._dynamo.reset()
+        torch.compiler.reset()
+        trt_model = None
+        model = None
+        gc.collect()
+        torch.cuda.synchronize()
+        if dist.is_initialized():
+            dist.destroy_process_group()
+        torch.cuda.empty_cache()
+        logger.info("Done.")

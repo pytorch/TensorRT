@@ -268,6 +268,16 @@ def export_and_save(input_ids, args):
             assume_dynamic_shape_support=True,
         )
 
+    # Eagerly initialize the NCCL communicator so TRT's bind_nccl_comm()
+    # finds a non-null ncclComm_t when the first execute_engine() call runs.
+    # _c10d_functional.all_reduce (used by the ref model below) does not
+    # trigger eager_connect_single_device, so getCommPtr() would still return
+    # 0 without this call, causing TRT's getCommunicator() to assert.
+    from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
+
+    initialize_nccl_comm()
+    logger.info("NCCL communicator eagerly initialized for export verification")
+
     # Verify
     logger.info("Verifying compiled model ...")
     with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16):

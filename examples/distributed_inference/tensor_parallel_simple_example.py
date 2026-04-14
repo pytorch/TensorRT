@@ -121,6 +121,7 @@ if args.mode == "load":
     logger.info(f"Loading from {args.save_path}")
     loaded_program = torch_tensorrt.load(args.save_path)
     output = loaded_program.module()(inp)
+    dist.barrier()
     assert (python_result - output).std() < 0.01, "Result mismatch"
     logger.info("Load successful!")
 
@@ -137,6 +138,8 @@ elif args.mode == "jit_python":
         },
     )
     output = trt_model(inp)
+    dist.barrier()
+
     assert (python_result - output).std() < 0.01, "Result mismatch"
     logger.info("JIT compile successful!")
 
@@ -153,6 +156,7 @@ elif args.mode == "jit_cpp":
         },
     )
     output = trt_model(inp)
+    dist.barrier()
     assert (python_result - output).std() < 0.01, "Result mismatch"
     logger.info("JIT compile successful!")
 
@@ -169,6 +173,7 @@ elif args.mode == "export":
         use_distributed_mode_trace=True,
     )
     output = trt_model(inp)
+    dist.barrier()
     assert (python_result - output).std() < 0.01, "Result mismatch"
 
     # Save per-rank: /tmp/tp_model.ep -> /tmp/tp_model_rank0_of_2.ep

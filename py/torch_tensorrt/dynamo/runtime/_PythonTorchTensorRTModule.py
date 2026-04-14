@@ -134,6 +134,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
+        requires_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         _debugger_config: Optional[DebuggerConfig] = None,
     ):
@@ -150,6 +151,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+            requires_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             symbolic_shape_expressions (List[str]): List of symbolic shape expressions for each output binding
         Example:
 
@@ -227,11 +229,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # If the output tensor is not owned by the engine (output_tensors_are_unowned=True), we need to create a new output tensor in each forward pass
         self.output_tensors_are_unowned = False
         self.symbolic_shape_expressions = symbolic_shape_expressions
+        self._nccl_comm: Optional[Any] = None
+        self._has_nccl_ops: bool = requires_multidevice
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
-
-        self._nccl_comm: Optional[Any] = None
-        self._has_nccl_ops: bool = False
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         """
@@ -334,7 +335,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ctypes.c_void_p,
             ]
             comm_capsule = ctypes.pythonapi.PyCapsule_New(comm_ptr, None, None)
-            self.context.set_communicator(comm_capsule)
+            ok = self.context.set_communicator(comm_capsule)
+            if not ok:
+                raise RuntimeError(
+                    f"TRT context.set_communicator() returned False for rank={dist.get_rank()}. "
+                    f"comm_ptr={comm_ptr:#x}. Failed to bind NCCL communicator to TRT execution context."
+                )
 
         logger.info(
             f"NCCL comm set up (rank={dist.get_rank()}, world_size={dist.get_world_size()})"
@@ -352,17 +358,28 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.set_default_device_memory_budget()
         self.context = self.engine.create_execution_context()
 
-        # Detect NCCL collective layers via engine inspector
-        inspector = self.engine.create_engine_inspector()
-        engine_json = inspector.get_engine_information(trt.LayerInformationFormat.JSON)
-        self._has_nccl_ops = "NCCL" in engine_json or "AllReduce" in engine_json
-
         if self._has_nccl_ops:
             from torch_tensorrt.distributed._nccl_utils import (
                 check_nccl_engine_requirements,
             )
 
             check_nccl_engine_requirements()
+
+            # For engines with native NCCL collective layers, all ranks must
+            # have a live IExecutionContext before any rank executes a
+            # collective. Barrier here so a fast-compiling rank does not race
+            # ahead and issue an NCCL op while another rank is still inside
+            # deserialize_cuda_engine / create_execution_context.
+            if (
+                dist.is_available()
+                and dist.is_initialized()
+                and dist.get_world_size() > 1
+            ):
+                logger.debug(
+                    "Barrier after execution context creation (distributed NCCL engine)"
+                )
+                dist.barrier()
+
         assert self.context is not None, "Failed to create execution context"
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)

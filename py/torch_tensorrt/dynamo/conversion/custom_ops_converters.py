@@ -3,7 +3,6 @@
 import logging
 from typing import Dict, Sequence, Tuple, Union
 
-import tensorrt as trt
 from torch.fx.node import Argument, Target
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -18,13 +17,17 @@ from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_reduce_scatter_op,
 )
 
+import tensorrt as trt
+
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 if ENABLED_FEATURES.native_trt_collectives:
     # Use native TensorRT DistCollective API (no TensorRT-LLM dependency)
     _LOGGER.info("Using native TensorRT DistCollective API for distributed operations")
 
-    @dynamo_tensorrt_converter(tensorrt_fused_nccl_all_gather_op)
+    @dynamo_tensorrt_converter(
+        tensorrt_fused_nccl_all_gather_op, requires_multidevice=True
+    )
     def fused_nccl_gather(
         ctx: ConversionContext,
         target: Target,
@@ -41,7 +44,9 @@ if ENABLED_FEATURES.native_trt_collectives:
             [args[0]],
         )
 
-    @dynamo_tensorrt_converter(tensorrt_fused_nccl_reduce_scatter_op)
+    @dynamo_tensorrt_converter(
+        tensorrt_fused_nccl_reduce_scatter_op, requires_multidevice=True
+    )
     def fused_nccl_reduce_scatter(
         ctx: ConversionContext,
         target: Target,
@@ -58,7 +63,9 @@ if ENABLED_FEATURES.native_trt_collectives:
             [args[0]],
         )
 
-    @dynamo_tensorrt_converter(tensorrt_fused_nccl_all_reduce_op)
+    @dynamo_tensorrt_converter(
+        tensorrt_fused_nccl_all_reduce_op, requires_multidevice=True
+    )
     def fused_nccl_all_reduce(
         ctx: ConversionContext,
         target: Target,

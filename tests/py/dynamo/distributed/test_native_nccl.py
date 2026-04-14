@@ -1527,9 +1527,7 @@ def _multirank_distributed_group_context_switch(
         _check_close(out, expected, f"context_switch sg{i+1} rank={rank}")
 
 
-def _multirank_pg_migration(
-    rank: int, world_size: int, device: torch.device
-) -> None:
+def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) -> None:
     """Compile with the default world group, run inference, then migrate to a new
     subgroup via distributed_group(new_group, model) and verify that inference
     still produces correct results — i.e. the NCCL communicator is re-bound.
@@ -1564,9 +1562,7 @@ def _multirank_pg_migration(
             self.pg_name = pg_name
 
         def forward(self, x: torch.Tensor) -> torch.Tensor:
-            out = torch.ops._c10d_functional.all_reduce.default(
-                x, "sum", self.pg_name
-            )
+            out = torch.ops._c10d_functional.all_reduce.default(x, "sum", self.pg_name)
             return torch.ops._c10d_functional.wait_tensor.default(out)
 
     inp = torch.full((1, 4), float(rank + 1), device=device)
@@ -1602,9 +1598,7 @@ def _multirank_pg_migration(
             with torch.no_grad():
                 out_sub = migrated_model(inp)
 
-        _check_close(
-            out_sub, expected, f"[{label}] migrated to subgroup rank={rank}"
-        )
+        _check_close(out_sub, expected, f"[{label}] migrated to subgroup rank={rank}")
 
         # ---- Step 3: set_distributed_group (persistent, outside context) ----
         subgroup2 = dist.new_group(ranks=list(range(world_size)))
@@ -1643,7 +1637,13 @@ class TestMultirankNccl(MultiProcessTestCase):
         self._spawn_processes()
 
     def _init_dist(self) -> torch.device:
-        """Init NCCL process group via FileStore (no env-var dependency)."""
+        """Init NCCL process group via FileStore (no env-var dependency).
+
+        The dist.barrier() call seeds the NCCL communicator so that
+        bind_nccl_comm() in the C++ TRTEngine sees a non-null getCommPtr()
+        on the first TRT forward pass.  Without it the JIT path segfaults
+        because no collective has fired yet and the ncclComm_t is uninitialized.
+        """
         store = dist.FileStore(self.file_name, self.world_size)
         dist.init_process_group(
             backend="nccl",
@@ -1653,6 +1653,7 @@ class TestMultirankNccl(MultiProcessTestCase):
         )
         local = self.rank % torch.cuda.device_count()
         torch.cuda.set_device(local)
+        dist.barrier()  # seeds ncclComm_t before any TRT bind_nccl_comm() call
         return torch.device(f"cuda:{local}")
 
     @requires_nccl()
