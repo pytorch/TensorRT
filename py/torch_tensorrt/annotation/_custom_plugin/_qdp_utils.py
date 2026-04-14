@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import inspect
+import tempfile
 import types
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -709,7 +710,7 @@ def dump_code_artifact(
     env_key: str,
     filename: str,
     content: Union[str, bytes],
-    default_dir: str = "/tmp/tta_dump",
+    default_dir: str = "",
 ) -> None:
     """Write content to $env_key/<filename>, silently ignoring all errors.
 
