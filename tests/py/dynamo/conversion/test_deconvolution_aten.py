@@ -227,9 +227,6 @@ class TestDeconvolutionConverter(DispatchTestCase):
             ),
         ]
     )
-    @unittest.skipIf(
-        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on deconv3d"
-    )
     def test_deconv3d(
         self,
         _,
@@ -241,6 +238,9 @@ class TestDeconvolutionConverter(DispatchTestCase):
         bias=True,
         output_padding=0,
     ):
+        if groups > 1 and torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+            self.skipTest("Grouped 3D deconvolutions fall back to PyTorch on TRT-RTX")
+
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()

@@ -609,3 +609,54 @@ def test_bf16_fallback_model(ir):
 
     # Clean up model env
     torch._dynamo.reset()
+
+
+@pytest.mark.unit
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    "Grouped 3D deconv fallback WAR is TensorRT-RTX specific",
+)
+def test_grouped_deconv3d_fallback(ir):
+    """Grouped 3D deconvolutions fall back to PyTorch on TRT-RTX.
+
+    The convolution_capability_validator rejects grouped ConvTranspose3d ops
+    so that the partitioner keeps them in PyTorch while other ops run on TRT.
+    """
+
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv3d(3, 16, 3, padding=1)
+            self.relu = torch.nn.ReLU()
+            self.deconv = torch.nn.ConvTranspose3d(16, 16, 3, padding=1, groups=16)
+
+        def forward(self, x):
+            out = self.conv(x)
+            out = self.relu(out)
+            out = self.deconv(out)
+            return out
+
+    model = MyModule().eval().cuda()
+    input = torch.randn((1, 3, 16, 16, 16), device="cuda")
+
+    compile_spec = {
+        "inputs": [torchtrt.Input(input.shape, dtype=torch.float32)],
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float32},
+        "ir": ir,
+        "pass_through_build_failures": True,
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+    }
+
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
+
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"Grouped 3D deconv fallback model TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    # Clean up model env
+    torch._dynamo.reset()
