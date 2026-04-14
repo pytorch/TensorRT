@@ -38,6 +38,14 @@ def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
     }.get(strategy_str, trt.DynamicShapesKernelSpecializationStrategy.LAZY)
 
 
+def _get_cuda_graph_strategy(strategy_str: str) -> Any:
+    """Map strategy string to TRT CudaGraphStrategy enum. Only called on RTX builds."""
+    return {
+        "disabled": trt.CudaGraphStrategy.DISABLED,
+        "whole_graph_capture": trt.CudaGraphStrategy.WHOLE_GRAPH_CAPTURE,
+    }.get(strategy_str, trt.CudaGraphStrategy.DISABLED)
+
+
 class DynamicOutputAllocator(trt.IOutputAllocator):  # type: ignore[misc]
     def __init__(self, output_dtypes: Dict[str, torch.dtype]) -> None:
         trt.IOutputAllocator.__init__(self)
@@ -246,6 +254,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.runtime_config: Any = None
         self.runtime_cache: Any = None
         self.runtime_cache_path = settings.runtime_cache_path
+        self._rtx_native_cudagraphs = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -400,6 +409,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         if ENABLED_FEATURES.tensorrt_rtx:
             self._setup_runtime_config()
+            self._rtx_native_cudagraphs = (
+                ENABLED_FEATURES.tensorrt_rtx
+                and self.settings.cuda_graph_strategy != "disabled"
+            )
 
         self.context = self._create_context()
         assert self.context is not None, "Failed to create execution context"
@@ -427,7 +440,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.requires_output_allocator:
             self.create_output_allocator()
 
-        if torch_tensorrt.runtime.get_cudagraphs_mode():
+        if (
+            torch_tensorrt.runtime.get_cudagraphs_mode()
+            and not self._rtx_native_cudagraphs
+        ):
             self.cudagraph = torch.cuda.CUDAGraph()
 
         self.is_shape_inference_io = {
@@ -453,6 +469,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         logger.info(
             f"Dynamic shapes kernel specialization strategy: {self.settings.dynamic_shapes_kernel_specialization_strategy}"
         )
+        self.runtime_config.cuda_graph_strategy = _get_cuda_graph_strategy(
+            self.settings.cuda_graph_strategy
+        )
+        logger.info(f"CUDA graph strategy: {self.settings.cuda_graph_strategy}")
         self.runtime_cache = self.runtime_config.create_runtime_cache()
         self._load_runtime_cache()
         self.runtime_config.set_runtime_cache(self.runtime_cache)
@@ -561,6 +581,32 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.cudagraph.reset()
             self.cudagraph = None
 
+    def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
+        """Check if manual torch.cuda.CUDAGraph capture is safe for this engine.
+
+        Returns False on RTX if the engine has conditions that prevent
+        manual stream capture (runtime allocation, DDS, lazy kernels).
+        """
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            return True  # non-RTX: assume capturable (existing behavior)
+        # Check 1: TRT-RTX stream capturability (runtime allocation, DDS, etc.)
+        if not self.context.is_stream_capturable(stream.cuda_stream):
+            return False
+        # Check 2: Lazy kernel specialization would invalidate captured graph
+        if self.settings.dynamic_shapes_kernel_specialization_strategy == "lazy":
+            return False
+        return True
+
+    def _enable_rtx_native_cudagraphs(self) -> None:
+        """Switch to RTX-native CUDA graphs by recreating the execution context."""
+        if self.runtime_config is not None:
+            self.runtime_config.cuda_graph_strategy = _get_cuda_graph_strategy(
+                "whole_graph_capture"
+            )
+            self.context = self._create_context()
+            self._rtx_native_cudagraphs = True
+            logger.info("Switched to TRT-RTX native CUDA graphs")
+
     def __del__(self) -> None:
         self._save_runtime_cache()
         self._reset_captured_graph()
@@ -654,13 +700,32 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         def run_standard_execution() -> torch.Tensor | Tuple[torch.Tensor, ...]:
+            # On RTX + SUBGRAPH cudagraphs: always use RTX-native CUDA graphs.
+            # Manual torch.cuda.CUDAGraph capture is not safe on TRT-RTX because
+            # lazy kernel specialization can invalidate captured graphs and
+            # runtime allocation can prevent stream capture.
+            if ENABLED_FEATURES.tensorrt_rtx and self.cudagraphs_enabled:
+                if not self._rtx_native_cudagraphs:
+                    logger.warning(
+                        "Manual CUDA graph capture is not guaranteed to work "
+                        "on TRT-RTX (lazy kernel specialization or "
+                        "non-capturable stream). Switching to TRT-RTX native "
+                        "CUDA graphs. Set cuda_graph_strategy="
+                        '"whole_graph_capture" at compile time to avoid '
+                        "this warning."
+                    )
+                    self._enable_rtx_native_cudagraphs()
+
+            effective_cudagraphs = (
+                self.cudagraphs_enabled and not self._rtx_native_cudagraphs
+            )
             shape_changed = self.validate_input_shapes(contiguous_inputs)
             (
                 need_cudagraphs_record,
                 can_use_pre_allocated_outputs,
                 need_cudagraphs_reset,
             ) = self.runtime_states.set_runtime_states(
-                self.cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
+                effective_cudagraphs, self.use_pre_allocated_outputs, shape_changed
             )
 
             if need_cudagraphs_reset:
@@ -682,7 +747,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
 
                 self.setup_input_tensors(
-                    contiguous_inputs, self.cudagraphs_enabled, need_cudagraphs_record
+                    contiguous_inputs, effective_cudagraphs, need_cudagraphs_record
                 )
 
                 if shape_changed:
@@ -718,7 +783,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     if need_cudagraphs_record:
                         self._output_buffers[o] = outputs[o].clone()
 
-                    if self.cudagraphs_enabled:
+                    if effective_cudagraphs:
                         self.context.set_tensor_address(
                             output_name, self._output_buffers[o].data_ptr()
                         )
@@ -744,7 +809,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
-                    if self.cudagraphs_enabled:
+                    if effective_cudagraphs:
                         if need_cudagraphs_record:
                             self.cudagraph = torch.cuda.CUDAGraph()
 
@@ -778,7 +843,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             ):
                 self.pre_allocated_outputs = self.create_output_tensors()
 
-            if self.cudagraphs_enabled:
+            if effective_cudagraphs:
                 for idx, o in enumerate(outputs):
                     o.copy_(self._output_buffers[idx])
 
@@ -952,7 +1017,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     return run_output_allocator()
                 else:
                     logger.debug(
-                        f"Using the standard execution runtime mode with cudagraphs={self.cudagraphs_enabled}."
+                        f"Using the standard execution runtime mode with cudagraphs={self.cudagraphs_enabled}"
+                        + (" (RTX native)" if self._rtx_native_cudagraphs else "")
                     )
                     return run_standard_execution()
 
