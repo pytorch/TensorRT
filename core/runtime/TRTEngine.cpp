@@ -288,10 +288,10 @@ TRTEngine::TRTEngine(
     num_io = std::make_pair(inputs_size, outputs);
   }
 
-#ifndef NDEBUG
-  this->enable_profiling();
-#endif
-  LOG_DEBUG(*this);
+// #ifndef NDEBUG
+//   this->enable_profiling();
+// #endif
+//   LOG_DEBUG(*this);
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
   // Attempt to bind the NCCL communicator immediately after exec_ctx is ready.

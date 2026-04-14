@@ -320,6 +320,7 @@ if __name__ == "__main__":
                 MAX_OUTPUT_SEQ_LENGTH,
                 tokenizer.eos_token_id,
                 iterations=args.iterations,
+                dynamic_seqlen_range=(1, MAX_OUTPUT_SEQ_LENGTH),
             )
 
         if rank == 0:

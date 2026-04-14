@@ -31,6 +31,7 @@ import datetime
 import logging
 import os
 import sys
+import timeit
 from pathlib import Path
 
 import torch
@@ -99,6 +100,33 @@ def generate_greedy(model, input_ids, max_len, eos_token_id):
         if (next_token == eos_token_id).all():
             break
     return seq
+
+
+def time_generate(model, input_ids, max_len, eos_token_id, iterations=5):
+    """Measure end-to-end generation latency over multiple iterations."""
+    timings = []
+    for _ in range(iterations):
+        start = timeit.default_timer()
+        generate_greedy(model, input_ids.clone(), max_len, eos_token_id)
+        torch.cuda.synchronize()
+        timings.append(timeit.default_timer() - start)
+    return timings
+
+
+def record_stats(backend, timings, precision, batch_size=1):
+    import numpy as np
+    times = np.array(timings)
+    speeds = batch_size / times
+    return {
+        "Backend": backend,
+        "Model Precision": precision,
+        "Batch size": batch_size,
+        "Median(FPS)": float(np.median(speeds)),
+        "Mean(FPS)": float(np.mean(speeds)),
+        "Median-Latency(ms)": float(np.median(times)) * 1000,
+        "Mean-Latency(ms)": float(np.mean(times)) * 1000,
+        "Latency-StdDev(ms)": float(np.std(times)) * 1000,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -351,8 +379,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--model", default="meta-llama/Llama-3.2-1B-Instruct")
     parser.add_argument("--prompt", default="What is tensor parallelism?")
-    parser.add_argument("--num_tokens", type=int, default=64)
-    parser.add_argument("--max_seq_len", type=int, default=128)
+    parser.add_argument("--num_tokens", type=int, default=128)
     parser.add_argument(
         "--mode",
         required=True,
@@ -361,14 +388,22 @@ if __name__ == "__main__":
     )
     parser.add_argument("--save_dir", default="/tmp/llama_tp_engines")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--benchmark", action="store_true", help="Measure generation latency")
+    parser.add_argument("--iterations", type=int, default=5, help="Benchmark iterations")
+    parser.add_argument("--batch_size", type=int, default=1, help="Batch size for benchmarking")
+    parser.add_argument("--isl", type=int, default=2048, help="Input sequence length for benchmarking")
     args = parser.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    input_ids = tokenizer(args.prompt, return_tensors="pt")["input_ids"].to(DEVICE)
+    if args.benchmark:
+        input_ids = torch.randint(1, 10000, (args.batch_size, args.isl), dtype=torch.int64).to(DEVICE)
+    else:
+        input_ids = tokenizer(args.prompt, return_tensors="pt")["input_ids"].to(DEVICE)
     max_len = input_ids.shape[1] + args.num_tokens
+    args.max_seq_len = max_len
 
     trt_model = None
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
@@ -382,13 +417,43 @@ if __name__ == "__main__":
                 max_len,
                 tokenizer.eos_token_id,
             )
-            if rank == 0:
-                print("\n===== TensorRT-TP (freshly compiled) =====")
-                print(tokenizer.decode(trt_tokens[0], skip_special_tokens=True))
-                sys.stdout.flush()
+            if not args.benchmark:
+                if rank == 0:
+                    print("\n===== TensorRT-TP (freshly compiled) =====")
+                    print(tokenizer.decode(trt_tokens[0], skip_special_tokens=True))
+                    sys.stdout.flush()
+            else:
+                # All ranks must participate in the benchmark loop.
+                trt_timings = time_generate(
+                    trt_model, input_ids.clone(), max_len,
+                    tokenizer.eos_token_id, iterations=args.iterations,
+                )
+                if rank == 0:
+                    stats = record_stats(
+                        "TensorRT-TP (export)", trt_timings,
+                        "FP16", batch_size=args.batch_size,
+                    )
+                    print("\n=========TensorRT-TP (export) PERFORMANCE============")
+                    print(stats)
+                    sys.stdout.flush()
 
         elif args.mode == "load":
             trt_model, _ = load_and_run(input_ids, tokenizer, args)
+            if args.benchmark:
+                # All ranks must participate — generate_greedy contains NCCL
+                # all-reduce ops that require every rank to call in lockstep.
+                trt_timings = time_generate(
+                    trt_model, input_ids.clone(), max_len,
+                    tokenizer.eos_token_id, iterations=args.iterations,
+                )
+                if rank == 0:
+                    stats = record_stats(
+                        "TensorRT-TP (load)", trt_timings,
+                        "FP16", batch_size=args.batch_size,
+                    )
+                    print("\n=========TensorRT-TP (load) PERFORMANCE============")
+                    print(stats)
+                    sys.stdout.flush()
 
     # Delete the TRT engine before destroying the process group — the engine
     # holds a reference to the NCCL communicator and will segfault if NCCL is

@@ -266,15 +266,20 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
 
       setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record);
-      // Check if input shapes can be inferred.
-      int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
-      std::vector<char const*> names(io_size);
-      int32_t const nbNames = compiled_engine->exec_ctx->inferShapes(names.size(), names.data());
-      TORCHTRT_CHECK(
-          nbNames == 0,
-          "The shapes of the inputs: "
-              << names
-              << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
+      // Only infer shapes when input shapes have changed, matching the Python runtime behavior.
+      // inferShapes() propagates shape info through the entire TRT network and is expensive
+      // for models with many layers (e.g., LLMs). Skipping it when shapes are unchanged
+      // significantly reduces per-iteration latency.
+      if (shape_changed) {
+        int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
+        std::vector<char const*> names(io_size);
+        int32_t const nbNames = compiled_engine->exec_ctx->inferShapes(names.size(), names.data());
+        TORCHTRT_CHECK(
+            nbNames == 0,
+            "The shapes of the inputs: "
+                << names
+                << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
+      }
     }
 
     { // Output Setup

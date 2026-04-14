@@ -246,7 +246,8 @@ def generate_with_dynamic_cache(model, input_seq, max_output_seq_length, eos_tok
 
 
 def time_generate(
-    generate_fn, model, inputs, output_seq_length, eos_token_id, iterations=10
+    generate_fn, model, inputs, output_seq_length, eos_token_id, iterations=10,
+    dynamic_seqlen_range=None,
 ):
     """
     Measure the time for generating a sentence over certain number of iterations
@@ -254,7 +255,8 @@ def time_generate(
     timings = []
     for _ in range(iterations):
         start_time = timeit.default_timer()
-        _ = generate_fn(model, inputs, output_seq_length, eos_token_id)
+        _ = generate_fn(model, inputs, output_seq_length, eos_token_id,
+                        dynamic_seqlen_range=dynamic_seqlen_range)
         torch.cuda.synchronize()
         end_time = timeit.default_timer()
         timings.append(end_time - start_time)

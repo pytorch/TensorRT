@@ -67,7 +67,7 @@ def get_model(args):
             .cuda()
         )
         # register SDPA variant for the model
-        register_sdpa.enable_sdpa_converter(args.model, model.config)
+        # register_sdpa.enable_sdpa_converter(args.model, model.config)
 
     hf_quant_config = load_quantization_config(args.model)
     if hf_quant_config:
@@ -130,7 +130,7 @@ def compile_torchtrt(model, input_ids, args):
             use_fp32_acc=use_fp32_acc,
             device=DEVICE,
             disable_tf32=True,
-            use_python_runtime=True,
+            use_python_runtime=False,
             debug=args.debug,
             offload_module_to_cpu=True,
             min_block_size=args.min_block_size,
@@ -350,6 +350,7 @@ if __name__ == "__main__":
                 input_ids.clone(),
                 MAX_OUTPUT_SEQ_LENGTH,
                 tokenizer.eos_token_id,
+                dynamic_seqlen_range=(1, MAX_OUTPUT_SEQ_LENGTH)
             )
             if args.benchmark:
                 trt_timings = time_generate(
@@ -359,6 +360,7 @@ if __name__ == "__main__":
                     MAX_OUTPUT_SEQ_LENGTH,
                     tokenizer.eos_token_id,
                     iterations=args.iterations,
+                    dynamic_seqlen_range=(1, MAX_OUTPUT_SEQ_LENGTH)
                 )
 
         if args.benchmark:

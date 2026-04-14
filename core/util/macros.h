@@ -9,11 +9,13 @@
 #define DLA_LOCAL_DRAM_SIZE 1073741824
 #define DLA_GLOBAL_DRAM_SIZE 536870912
 
-#define TORCHTRT_LOG(l, sev, msg) \
-  do {                            \
-    std::stringstream ss{};       \
-    ss << msg;                    \
-    l.log(sev, ss.str());         \
+#define TORCHTRT_LOG(l, sev, msg)                  \
+  do {                                             \
+    if (sev <= l.get_reportable_log_level()) {     \
+      std::stringstream ss{};                      \
+      ss << msg;                                   \
+      l.log(sev, ss.str());                        \
+    }                                              \
   } while (0)
 
 #define LOG_GRAPH_GLOBAL(s) \

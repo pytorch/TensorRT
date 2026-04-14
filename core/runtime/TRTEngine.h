@@ -255,11 +255,10 @@ struct TRTEngine : torch::CustomClassHolder {
 
   void set_profiling_paths();
   void reset_captured_graph();
-#ifndef NDEBUG
-  bool profile_execution = true;
-#else
+  // Profiling is disabled by default in all builds for production-level
+  // performance. Use enable_profiling()/disable_profiling() to toggle at
+  // runtime when detailed per-layer timing or trace output is needed.
   bool profile_execution = false;
-#endif
   std::string device_profile_path;
   std::string input_profile_path;
   std::string output_profile_path;

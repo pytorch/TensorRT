@@ -12,7 +12,7 @@ Usage
 .. code-block:: bash
 
    # Single-node, 2 GPUs
-   torchrun --nproc_per_node=2 tensor_parallel_simple_example_torchrun.py
+   torchrun --nproc_per_node=2 tensor_parallel_simple_example_md.py
 
    # Two nodes, 1 GPU each — run on BOTH nodes simultaneously:
    #   Node 0 (spirit):

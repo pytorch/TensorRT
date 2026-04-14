@@ -16,15 +16,15 @@ Usage
 -----
 .. code-block:: bash
 
-   # JIT mode python runtime
-   mpirun -n 2 python tensor_parallel_simple_example.py --mode jit_cpp
-
    # JIT mode cpp runtime
-   mpirun -n 2 python tensor_parallel_simple_example.py --mode jit_python
+   mpirun -n 2 --allow-run-as-root python3 tensor_parallel_simple_example.py --mode jit_cpp
+
+   # JIT mode python runtime
+   mpirun -n 2 --allow-run-as-root python3 tensor_parallel_simple_example.py --mode jit_python
 
    WIP: Export and load mode
-    mpirun -n 2 python tensor_parallel_simple_example.py --mode export --save-path /tmp/tp_model.ep
-    mpirun -n 2 python tensor_parallel_simple_example.py --mode load --save-path /tmp/tp_model.ep
+    mpirun -n 2 --allow-run-as-root python3 tensor_parallel_simple_example.py --mode export --save-path /tmp/tp_model.ep
+    mpirun -n 2 --allow-run-as-root python3 tensor_parallel_simple_example.py --mode load --save-path /tmp/tp_model.ep
 
 """
 
