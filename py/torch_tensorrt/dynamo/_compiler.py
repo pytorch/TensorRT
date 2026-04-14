@@ -94,6 +94,7 @@ def cross_compile_for_windows(
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     dynamic_shapes_kernel_specialization_strategy: str = _defaults.DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY,
+    cuda_graph_strategy: str = _defaults.CUDA_GRAPH_STRATEGY,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -176,6 +177,7 @@ def cross_compile_for_windows(
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
         runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: "lazy", "eager", "none". Default: "lazy".
+        cuda_graph_strategy (str): Strategy for CUDA graph capture/replay (TensorRT-RTX only). Options: "disabled" (manual capture), "whole_graph_capture" (TRT-RTX handles internally). Default: "disabled".
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -342,6 +344,7 @@ def cross_compile_for_windows(
         "timing_cache_path": timing_cache_path,
         "runtime_cache_path": runtime_cache_path,
         "dynamic_shapes_kernel_specialization_strategy": dynamic_shapes_kernel_specialization_strategy,
+        "cuda_graph_strategy": cuda_graph_strategy,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
@@ -455,6 +458,7 @@ def compile(
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     dynamic_shapes_kernel_specialization_strategy: str = _defaults.DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY,
+    cuda_graph_strategy: str = _defaults.CUDA_GRAPH_STRATEGY,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -552,6 +556,7 @@ def compile(
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
         runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: "lazy", "eager", "none". Default: "lazy".
+        cuda_graph_strategy (str): Strategy for CUDA graph capture/replay (TensorRT-RTX only). Options: "disabled" (manual capture), "whole_graph_capture" (TRT-RTX handles internally). Default: "disabled".
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -761,6 +766,7 @@ def compile(
         "timing_cache_path": timing_cache_path,
         "runtime_cache_path": runtime_cache_path,
         "dynamic_shapes_kernel_specialization_strategy": dynamic_shapes_kernel_specialization_strategy,
+        "cuda_graph_strategy": cuda_graph_strategy,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
@@ -1176,6 +1182,7 @@ def convert_exported_program_to_serialized_trt_engine(
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     dynamic_shapes_kernel_specialization_strategy: str = _defaults.DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY,
+    cuda_graph_strategy: str = _defaults.CUDA_GRAPH_STRATEGY,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -1254,6 +1261,7 @@ def convert_exported_program_to_serialized_trt_engine(
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
         runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: "lazy", "eager", "none". Default: "lazy".
+        cuda_graph_strategy (str): Strategy for CUDA graph capture/replay (TensorRT-RTX only). Options: "disabled" (manual capture), "whole_graph_capture" (TRT-RTX handles internally). Default: "disabled".
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -1429,6 +1437,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "timing_cache_path": timing_cache_path,
         "runtime_cache_path": runtime_cache_path,
         "dynamic_shapes_kernel_specialization_strategy": dynamic_shapes_kernel_specialization_strategy,
+        "cuda_graph_strategy": cuda_graph_strategy,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
