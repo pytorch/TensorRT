@@ -154,6 +154,22 @@ def _reconstruct_trt_engine(serialized_info: List[Any]) -> Any:
     return TRTEngine(serialized_info)
 
 
+class EngineSerializer(OpaqueBase):  # type: ignore[misc]
+    def __init__(self, serialized_info: SerializedTensorRTEngineFmt) -> None:
+        self.serialized_info = serialized_info
+
+    def __reduce__(self) -> Tuple[Any, Tuple[List[Any]]]:
+        """Pickle protocol: delegates to :func:`_reconstruct_trt_engine`.
+
+        The reconstruction function checks which runtime is available at
+        load time and returns either a C++ ``torch.classes.tensorrt.Engine``
+        or a Python ``TRTEngine``, so a single saved artifact works on both.
+        """
+        state = list(self.serialized_info)
+        state[ENGINE_IDX] = base64.b64encode(state[ENGINE_IDX]).decode("utf-8")
+        return (_reconstruct_trt_engine, (state,))
+
+
 # ---------------------------------------------------------------------------
 # TRTEngine (Python implementation)
 # ---------------------------------------------------------------------------
@@ -219,16 +235,49 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def __repr__(self) -> str:
         return self.__str__()
 
-    def __reduce__(self) -> Tuple[Any, Tuple[List[Any]]]:
-        """Pickle protocol: delegates to :func:`_reconstruct_trt_engine`.
+    def __getstate__(self) -> Tuple[List[Any], str]:
+        """Return pickle state in the same shape as C++ ``ScriptObject.__getstate__``.
 
-        The reconstruction function checks which runtime is available at
-        load time and returns either a C++ ``torch.classes.tensorrt.Engine``
-        or a Python ``TRTEngine``, so a single saved artifact works on both.
+        Outer tuple with a single element: the ``serialize()``-style list of string
+        slots, with ``ENGINE_IDX`` base64-encoded (matches ``def_pickle`` getter).
         """
-        state = list(self.serialized_info)
-        state[ENGINE_IDX] = base64.b64encode(state[ENGINE_IDX]).decode("utf-8")
-        return (_reconstruct_trt_engine, (state,))
+        serialized_info = list(self.serialized_info)
+        serialized_info[ENGINE_IDX] = base64.b64encode(
+            serialized_info[ENGINE_IDX]
+        ).decode("utf-8")
+        return (serialized_info, "TRTEngine")
+
+    def __setstate__(self, state: Any) -> None:
+        """Restore from C++-matching pickle state ``(serialized_info,)``."""
+        self._profile_execution = False
+        self.profile_path_prefix = tempfile.gettempdir()
+        self.use_pre_allocated_outputs = False
+        self.use_output_allocator_outputs = False
+        self.output_tensors_are_unowned = False
+        self.output_allocator = None
+        self.pre_allocated_outputs = []
+        self._input_buffers = []
+        self._output_buffers = []
+        self._caller_stream = None
+        self._engine_stream = None
+        self.cudagraph = None
+        self.shape_key = None
+        self._empty_tensor_placeholder = None
+        self._dynamic_workspace = None
+        self.runtime_states = TorchTRTRuntimeStates(
+            torch_tensorrt.runtime.get_cudagraphs_mode()
+        )
+        self.resource_allocation_strategy = 0
+        self._runtime_config = None
+
+        serialized_info = list(state[0])
+        engine_field = serialized_info[ENGINE_IDX]
+        if isinstance(engine_field, str):
+            serialized_info[ENGINE_IDX] = base64.b64decode(engine_field.encode("utf-8"))
+        elif isinstance(engine_field, bytes) and not engine_field.startswith(b"ftrt"):
+            serialized_info[ENGINE_IDX] = base64.b64decode(engine_field)
+        self._load_serialized_info(serialized_info)
+        self._setup_engine()
 
     def tracing_mode(self) -> str:
         """Return ``"real"`` so FakeTensor/export pass the real engine into meta kernels.
@@ -725,9 +774,11 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self._execute_standard(contiguous_inputs)
 
 
-register_opaque_type(TRTEngine, typ="reference")
+register_opaque_type(EngineSerializer, typ="reference")
 
 if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+
+    register_opaque_type(TRTEngine, typ="reference")
 
     @torch.library.custom_op(  # type: ignore[misc]
         "tensorrt::execute_engine", mutates_args=()

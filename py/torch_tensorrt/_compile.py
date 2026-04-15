@@ -1078,17 +1078,28 @@ def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> Non
     """
     import base64
 
-    from torch_tensorrt.dynamo.runtime._PythonTRTEngine import TRTEngine
+    from torch_tensorrt.dynamo.runtime._PythonTRTEngine import (
+        EngineSerializer,
+        TRTEngine,
+    )
     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
 
     for fqn, constant in list(exp_program.constants.items()):
-        if isinstance(constant, torch._C.ScriptObject):
+        if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):
+
             state = constant.__getstate__()
-            serialized_info = list(state[0])
-            serialized_info[ENGINE_IDX] = base64.b64decode(serialized_info[ENGINE_IDX])
-            exp_program.constants[fqn] = TRTEngine(serialized_info)
+            if len(state) == 2 and (
+                state[1] == "TRTEngine"
+                or state[1] == "__torch__.torch.classes.tensorrt.Engine"
+            ):
+                serialized_info = list(state[0])
+                serialized_info[ENGINE_IDX] = base64.b64decode(
+                    serialized_info[ENGINE_IDX]
+                )
+                exp_program.constants[fqn] = EngineSerializer(serialized_info)
 
 
+#
 def function_overload_with_kwargs(
     fn: Callable[..., Any], *args: Any, **kwargs: Any
 ) -> Any:
