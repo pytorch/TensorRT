@@ -369,6 +369,12 @@ def cross_compile_for_windows(
                 f"arg: {key} is not supported for cross compilation for windows feature, hence it is disabled."
             )
 
+    if "runtime_cache_path" in compilation_options:
+        compilation_options.pop("runtime_cache_path")
+        logger.warning(
+            "runtime_cache_path is a JIT-time API and is not applicable to cross compilation for windows. Ignoring."
+        )
+
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
@@ -1422,6 +1428,11 @@ def convert_exported_program_to_serialized_trt_engine(
         "use_distributed_mode_trace": use_distributed_mode_trace,
         "decompose_attention": decompose_attention,
     }
+    if "runtime_cache_path" in compilation_options:
+        compilation_options.pop("runtime_cache_path")
+        logger.warning(
+            "runtime_cache_path is a JIT-time API and is not applicable to serialized engine export. Ignoring."
+        )
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
