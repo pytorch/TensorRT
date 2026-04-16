@@ -178,6 +178,82 @@ def _strip_trt_sdpa_kwargs(gm: torch.fx.GraphModule) -> None:
         gm.recompile()
 
 
+def _sdpa_attn_mask_has_bool_ancestry(
+    node: torch.fx.Node, max_depth: int = 30, visited: Any = None
+) -> bool:
+    """Return True if the node's computation chain uses boolean-valued operations.
+
+    Used to distinguish a bool gate mask (built with and_ / new_ones(dtype=bool)
+    / ge / etc.) from a float additive logit-bias mask.  We only inject a
+    .to(dtype=bool) cast when the mask is clearly boolean-valued, so that float
+    additive masks used by causal models (Llama, GPT-2, …) are left untouched.
+    """
+    import operator
+
+    if visited is None:
+        visited = set()
+    if id(node) in visited or max_depth <= 0:
+        return False
+    visited.add(id(node))
+
+    if node.op == "call_function" and node.target in (
+        operator.and_,
+        operator.or_,
+        operator.xor,
+    ):
+        return True
+
+    if node.op == "call_method" and node.target == "new_ones":
+        if node.kwargs.get("dtype") == torch.bool:
+            return True
+
+    for inp in node.all_input_nodes:
+        if _sdpa_attn_mask_has_bool_ancestry(inp, max_depth - 1, visited):
+            return True
+
+    return False
+
+
+def _cast_bool_sdpa_attn_masks(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """Insert .to(dtype=torch.bool) before SDPA attn_mask when mask is boolean-valued.
+
+    FakeTensor mode inside aot_export_joint_simple occasionally loses dtype
+    tracking through Python-level boolean ops (operator.and_, new_ones, etc.),
+    causing SDPA to receive an int-dtype mask and raise:
+        RuntimeError: Expected attn_mask dtype to be bool or float …
+
+    Inserting an explicit cast in the pre-AOT dynamo graph forces correct dtype
+    through FakeTensor dispatch without affecting float additive masks used by
+    other models.
+    """
+    modified = False
+    for node in list(gm.graph.nodes):
+        if (
+            node.op == "call_function"
+            and node.target is torch.nn.functional.scaled_dot_product_attention
+            and "attn_mask" in node.kwargs
+        ):
+            mask_node = node.kwargs["attn_mask"]
+            if isinstance(
+                mask_node, torch.fx.Node
+            ) and _sdpa_attn_mask_has_bool_ancestry(mask_node):
+                with gm.graph.inserting_before(node):
+                    cast_node = gm.graph.call_method(
+                        "to", args=(mask_node,), kwargs={"dtype": torch.bool}
+                    )
+                node.kwargs = {**node.kwargs, "attn_mask": cast_node}
+                modified = True
+                logger.debug(
+                    "Inserted bool cast on SDPA attn_mask for node %s", node.name
+                )
+
+    if modified:
+        gm.graph.lint()
+        gm.recompile()
+
+    return gm
+
+
 def _graph_has_higher_order_ops(gm: torch.fx.GraphModule) -> bool:
     """Return True if the graph contains vmap or other higher-order ops."""
     for node in gm.graph.nodes:
@@ -237,6 +313,13 @@ def _pretraced_backend(
 
             # Remove detach nodes
             remove_detach(gm, settings)
+
+            # Ensure SDPA attn_mask tensors computed via boolean ops are
+            # explicitly cast to bool before AOT tracing.  FakeTensor mode
+            # inside aot_export_joint_simple can lose dtype tracking through
+            # Python-level boolean ops (and_, new_ones, ge), causing SDPA to
+            # receive an int-typed mask and fail at dispatch time.
+            _cast_bool_sdpa_attn_masks(gm)
 
             # Invoke AOTAutograd to translate operators to aten.
             # SymInt placeholders are kept so that aot_export_joint_simple
