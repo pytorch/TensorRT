@@ -209,30 +209,33 @@ if __name__ == "__main__":
         logger.info("Compiling with Torch-TensorRT ...")
         trt_model = compile_torchtrt(model, args)
 
-        # Trigger TRT engine building explicitly and wait for all ranks to
-        # finish before starting the generation loop.  Without this barrier,
-        # a slow TRT build on one rank causes the other rank to timeout at
-        # the next NCCL collective (NCCL default watchdog = 10 min).
-        logger.info("Warming up TRT model (triggering engine build)...")
-        _position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
-        _ = trt_model(input_ids.clone(), position_ids=_position_ids)
-        dist.barrier()
-        logger.info("All ranks finished TRT compilation, starting inference...")
+        # Use distributed_context to manage the NCCL lifecycle.  On __exit__
+        # it calls release_nccl_comm() on all tracked MD engines, making
+        # dist.destroy_process_group() safe without manual cleanup ordering.
+        with torch_tensorrt.distributed.distributed_context(dist.group.WORLD, trt_model) as trt_model:
+            # Trigger TRT engine building explicitly and wait for all ranks to
+            # finish before starting the generation loop.  Without this barrier,
+            # a slow TRT build on one rank causes the other rank to timeout at
+            # the next NCCL collective (NCCL default watchdog = 10 min).
+            logger.info("Warming up TRT model (triggering engine build)...")
+            _position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
+            _ = trt_model(input_ids.clone(), position_ids=_position_ids)
+            dist.barrier()
+            logger.info("All ranks finished TRT compilation, starting inference...")
 
-        logger.info("Running TRT-compiled model ...")
-        # dynamic_seqlen_range=(1, max_len) tells dynamo the full range of
-        # sequence lengths upfront so TRT builds one engine covering all steps
-        # instead of recompiling for every new length during generation.
-        trt_tokens = generate(
-            trt_model,
-            input_ids.clone(),
-            max_len,
-            tokenizer.eos_token_id,
-            dynamic_seqlen_range=(1, max_len),
-        )
-        if rank == 0:
-            print("\n===== TensorRT-TP =====")
-            print(tokenizer.decode(trt_tokens[0], skip_special_tokens=True))
+            logger.info("Running TRT-compiled model ...")
+            # dynamic_seqlen_range=(1, max_len) tells dynamo the full range of
+            # sequence lengths upfront so TRT builds one engine covering all steps
+            # instead of recompiling for every new length during generation.
+            trt_tokens = generate(
+                trt_model,
+                input_ids.clone(),
+                max_len,
+                tokenizer.eos_token_id,
+                dynamic_seqlen_range=(1, max_len),
+            )
+            if rank == 0:
+                print("\n===== TensorRT-TP =====")
+                print(tokenizer.decode(trt_tokens[0], skip_special_tokens=True))
 
-    dist.destroy_process_group()
     logger.info("Done.")

@@ -103,7 +103,6 @@ for runtime, use_python in [("cpp", False), ("python", True)]:
                 "enabled_precisions": {torch.float32},
                 "use_python_runtime": use_python,
                 "min_block_size": 1,
-                "use_distributed_mode_trace": True,
             },
         )
         output = trt_model(inp)

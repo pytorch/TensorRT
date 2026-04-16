@@ -134,7 +134,6 @@ elif args.mode == "jit_python":
             "enabled_precisions": {torch.float32, torch.float16},
             "use_python_runtime": True,
             "min_block_size": 1,
-            "use_distributed_mode_trace": True,
         },
     )
     output = trt_model(inp)
@@ -152,7 +151,6 @@ elif args.mode == "jit_cpp":
             "enabled_precisions": {torch.float32, torch.float16},
             "use_python_runtime": False,
             "min_block_size": 1,
-            "use_distributed_mode_trace": True,
         },
     )
     output = trt_model(inp)

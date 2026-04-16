@@ -115,16 +115,18 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def(
             "set_group_name",
             [](c10::intrusive_ptr<TRTEngine> self, std::string group_name) {
-              self->group_name = group_name;
-              // Reset nccl_initialized so execute_engine() re-binds with the
-              // correct communicator.  This matters when distributed_group() is
-              // used to select a TP subgroup: the constructor may have already
-              // bound to the default world group before set_group_name() was
-              // called.  Clearing the flag causes a re-bind on the first forward.
-              self->nccl_initialized = false;
-              LOG_DEBUG("TRTEngine group_name set to '" << group_name << "'");
+              // Only reset nccl_initialized when the group actually changes.
+              // Re-pinning the same group should be a no-op — calling
+              // setCommunicator() on an exec_ctx that already has one causes
+              // a TRT API error ("existing communicator must be null").
+              if (self->group_name != group_name) {
+                self->group_name = group_name;
+                self->nccl_initialized = false;
+                LOG_DEBUG("TRTEngine group_name changed to '" << group_name << "'");
+              }
             })
         .def("bind_nccl_comm", [](c10::intrusive_ptr<TRTEngine> self) { self->bind_nccl_comm(); })
+        .def("release_nccl_comm", [](c10::intrusive_ptr<TRTEngine> self) { self->release_nccl_comm(); })
         .def_readonly("nccl_initialized", &TRTEngine::nccl_initialized)
 #else
         .def(
@@ -138,6 +140,12 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             [](c10::intrusive_ptr<TRTEngine> self) {
               LOG_ERROR(
                   "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); bind_nccl_comm is a no-op");
+            })
+        .def(
+            "release_nccl_comm",
+            [](c10::intrusive_ptr<TRTEngine> self) {
+              LOG_ERROR(
+                  "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); release_nccl_comm is a no-op");
             })
         .def_property_readonly(
             "nccl_initialized",

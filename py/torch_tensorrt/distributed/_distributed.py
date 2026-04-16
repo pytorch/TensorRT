@@ -7,13 +7,13 @@ up automatically after dist.init_process_group().
 
 For advanced parallelism strategies (e.g. TP inside a DP job) where TRT engines
 should use a subgroup communicator, wrap compilation and execution with the
-distributed_group() context manager, or call set_distributed_group() to pin
+distributed_context() context manager, or call set_distributed_mode() to pin
 the group on all engines in a loaded module before the first forward pass.
 """
 
 import threading
 from contextlib import contextmanager
-from typing import Any, Generator, Optional, TypeVar
+from typing import Any, Generator, List, Optional, Sequence, TypeVar, Union
 
 import torch.distributed as dist
 import torch.nn as nn
@@ -22,11 +22,25 @@ M = TypeVar("M", bound=nn.Module)
 
 _state = threading.local()
 
+def register_md_engine(engine: object) -> None:
+    """Register a C++ TRTEngine with is_md=True for teardown tracking.
+
+    Engines are stored on the thread-local ``_state`` so they are scoped
+    to the active ``distributed_context`` context.  If called before any
+    context is entered, the engine is stored in a pending list that the
+    next ``distributed_context.__enter__`` will adopt.
+    """
+    engines = getattr(_state, "md_engines", None)
+    if engines is None:
+        _state.md_engines = [engine]
+    else:
+        engines.append(engine)
+
 
 def get_active_group() -> Optional[Any]:
     """Return the active ProcessGroup for TRT NCCL engines.
 
-    Respects the distributed_group() context manager; falls back to the
+    Respects the distributed_context() context manager; falls back to the
     default world group when no context is active.
     """
     group = getattr(_state, "pg", None)
@@ -50,9 +64,10 @@ def get_active_group_name() -> str:
 
 
 @contextmanager
-def distributed_group(
-    group: Any, module: Optional[M] = None
-) -> Generator[Optional[M], None, None]:
+def distributed_context(
+    group: Any,
+    module: Union[M, Sequence[M], None] = None,
+) -> Generator[Union[M, List[M], None], None, None]:
     """Context manager: run TRT engines using *group* for NCCL.
 
     Sets the active process group for the duration of the ``with`` block.
@@ -61,64 +76,94 @@ def distributed_group(
     For the default world group, no context manager is required.
 
     When *module* is supplied the group is also pre-pinned on all TRT engines
-    in the module via :func:`set_distributed_group`, and the configured module
-    is yielded so it can be used directly::
+    in the module via :func:`set_distributed_mode`, and the configured module
+    is yielded so it can be used directly.  A list of modules may be passed to
+    pre-pin and yield multiple programs at once.
+
+    **Teardown:** when *module* is supplied, ``__exit__`` calls
+    ``release_nccl_comm()`` on all tracked multi-device engines, detaching the
+    NCCL communicator from the TRT execution context.  This makes
+    ``dist.destroy_process_group()`` safe to call after the block without
+    requiring manual ``del trt_model`` / ``gc.collect()`` ordering.
+
+    .. note::
+
+       ``os._exit(0)`` is still recommended after ``destroy_process_group()``
+       to avoid segfaults from TRT/CUDA destructors during Python interpreter
+       shutdown (GC runs destructors in unpredictable order).
+
+    Example::
 
         tp_group = dist.new_group(ranks=[0, 1])
 
-        # Without module — use for compile-time wrapping:
-        with torch_tensorrt.distributed_group(tp_group):
-            trt_model = torch.compile(model, backend="torch_tensorrt", ...)
-            output = trt_model(inp)
+        # Single module:
+        with torch_tensorrt.distributed.distributed_context(tp_group, model_a) as m:
+            output = m(inp)
 
-        # With module — pre-pin on a loaded model and get it back as the handle:
-        model = torch_tensorrt.load("tp_model.ep")
-        with torch_tensorrt.distributed_group(tp_group, model) as trt_model:
+        # Multiple modules — yields a list in the same order:
+        with torch_tensorrt.distributed.distributed_context(tp_group, [encoder, decoder]) as (enc, dec):
+            output = dec(enc(inp))
+
+        # Without module — use for compile-time wrapping:
+        with torch_tensorrt.distributed.distributed_context(tp_group):
+            trt_model = torch.compile(model, backend="torch_tensorrt", ...)
             output = trt_model(inp)
 
     Args:
         group:  The ``ProcessGroup`` to use for all TRT NCCL collectives.
-        module: Optional compiled/loaded module.  When provided,
-                :func:`set_distributed_group` is called on it and the module
-                is yielded as the context value.
+        module: Optional compiled/loaded module or list of modules.  When
+                provided, :func:`set_distributed_mode` is called on each and
+                the module(s) are yielded as the context value.  On exit,
+                NCCL communicators are released from all tracked engines.
 
     Yields:
-        *module* (with the group pre-pinned) when supplied, otherwise ``None``.
+        *module* when a single module is supplied, a list when multiple modules
+        are supplied, or ``None`` when no module is given.
     """
     old = getattr(_state, "pg", None)
     _state.pg = group
+
+    # Normalise to a list internally; track whether caller passed a single module
+    # so we can yield the right type.
+    if module is None:
+        modules: List[nn.Module] = []
+        single = False
+    elif isinstance(module, nn.Module):
+        modules = [module]
+        single = True
+    else:
+        modules = list(module)
+        single = False
+
     try:
-        if module is not None:
-            set_distributed_group(module, group)
-            yield module
+        for mod in modules:
+            set_distributed_mode(mod, group)
+        if single:
+            yield modules[0]  # type: ignore[misc]
+        elif modules:
+            yield modules  # type: ignore[misc]
         else:
             yield None
     finally:
         _state.pg = old
+        # Release NCCL communicators from all md engines registered on
+        # this thread so dist.destroy_process_group() is safe after exit.
+        if modules:
+            engines = getattr(_state, "md_engines", None) or []
+            for engine in engines:
+                if getattr(engine, "nccl_initialized", False):
+                    engine.release_nccl_comm()
+            _state.md_engines = []
 
 
-def set_distributed_group(module: nn.Module, group: Any) -> None:
+def set_distributed_mode(module: nn.Module, group: Any) -> None:
     """Pin *group* as the NCCL process group on every TRT engine in *module*.
 
     Walks *module* recursively and calls ``set_group_name`` on every
-    multi-device TRT engine found, covering both cases:
-
-    * **Submodule engines** — ``TorchTensorRTModule`` children produced by
-      ``torch.compile(..., backend="torch_tensorrt")`` or
-      ``torch_tensorrt.compile()``.
-    * **Inlined engines** — ``torch.classes.tensorrt.Engine`` objects stored
-      as plain attributes on an ``fx.GraphModule`` after
-      ``torch_tensorrt.save()`` / ``torch_tensorrt.load()``.
-
-    Prefer the ``distributed_group(group, module)`` context manager over
-    calling this directly — it combines group activation and engine pinning
-    in one step.  Call this directly only when you need the pinning to persist
-    outside any ``with`` block::
-
-        model = torch_tensorrt.load("tp_model.ep")
-        tp_group = dist.new_group(ranks=[0, 1])
-        torch_tensorrt.distributed.set_distributed_group(model, tp_group)
-        output = model(inp)  # group already pinned, no context needed
+    multi-device TRT engine found.  Also covers engines registered in the
+    global ``_md_modules`` registry (populated at engine creation time),
+    which handles the ``torch.compile`` case where engines live in dynamo's
+    code cache rather than the module tree.
 
     Args:
         module: Compiled or loaded module whose TRT engines should use *group*.
@@ -126,8 +171,6 @@ def set_distributed_group(module: nn.Module, group: Any) -> None:
     """
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-    # Resolve the group name directly from the supplied group object so this
-    # function is safe to call whether or not _state.pg is already set.
     group_name = str(group.group_name) if hasattr(group, "group_name") else ""
 
     if not group_name:
@@ -135,21 +178,16 @@ def set_distributed_group(module: nn.Module, group: Any) -> None:
 
     seen: set[int] = set()
 
+    # Walk the module tree for direct submodules and inlined engines.
     for submod in module.modules():
-        # --- Case 1: TorchTensorRTModule wrapper ---
         if isinstance(submod, TorchTensorRTModule):
             engine = getattr(submod, "engine", None)
             if engine is not None and id(engine) not in seen:
                 seen.add(id(engine))
                 if engine.is_md:
                     engine.set_group_name(group_name)
-            # Don't fall through to the attribute scan for this submodule.
             continue
 
-        # --- Case 2: Inlined engines on fx.GraphModule (or any module) ---
-        # After inline_trt_modules(), engines are stored as plain attributes
-        # (e.g. "_run_on_acc_0_engine") rather than as TorchTensorRTModule
-        # submodules.  Duck-type check for torch.classes.tensorrt.Engine.
         for attr_val in vars(submod).values():
             if (
                 id(attr_val) not in seen
@@ -159,3 +197,10 @@ def set_distributed_group(module: nn.Module, group: Any) -> None:
             ):
                 seen.add(id(attr_val))
                 attr_val.set_group_name(group_name)
+
+    # Also pin on any engines in the thread-local registry (handles torch.compile).
+    for engine in getattr(_state, "md_engines", None) or []:
+        if id(engine) not in seen:
+            seen.add(id(engine))
+            if getattr(engine, "is_md", False):
+                engine.set_group_name(group_name)

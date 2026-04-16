@@ -173,7 +173,7 @@ def compile_torchtrt(model, input_ids, args):
 
     # torch.export does not support DTensor-parallelized models (sharding propagation
     # fails during run_decompositions). Use torch.compile with dynamic=True so that
-    # torch._dynamo traces via aot_autograd (use_distributed_mode_trace=True path)
+    # torch._dynamo traces via aot_autograd (distributed mode is auto-detected)
     # and builds a single TRT engine with dynamic sequence-length profiles.
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_model = torch.compile(
@@ -186,7 +186,6 @@ def compile_torchtrt(model, input_ids, args):
                 "device": DEVICE,
                 "disable_tf32": True,
                 "use_python_runtime": False,
-                "use_distributed_mode_trace": True,
                 "debug": args.debug,
                 "min_block_size": 1,
                 "assume_dynamic_shape_support": True,

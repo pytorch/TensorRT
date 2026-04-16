@@ -72,10 +72,12 @@ Workflow 1: torch.compile (JIT)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The simplest path for tensor-parallel inference. Shard the model with
-``parallelize_module`` (DTensor), then compile with ``torch.compile``:
+``parallelize_module`` (DTensor), compile with ``torch.compile``, and wrap
+inference in ``distributed_context`` for safe NCCL lifecycle management:
 
 .. code-block:: python
 
+    import os
     import torch
     import torch.distributed as dist
     from torch.distributed.tensor.parallel import (
@@ -113,16 +115,32 @@ The simplest path for tensor-parallel inference. Shard the model with
         },
     )
 
-    output = trt_model(input_ids, position_ids=position_ids)
+    # Warmup — triggers engine build
+    _ = trt_model(input_ids, position_ids=position_ids)
+    dist.barrier()
+
+    # Use distributed_context to manage the NCCL lifecycle.
+    # On __exit__ it releases NCCL communicators from TRT engines,
+    # making dist.destroy_process_group() safe to call afterward.
+    with torch_tensorrt.distributed.distributed_context(dist.group.WORLD, trt_model) as model:
+        output = model(input_ids, position_ids=position_ids)
+
+    dist.destroy_process_group()
+    os._exit(0)  # bypass Python GC destructor races
 
 **Key points:**
 
+* **Use** ``distributed_context`` **for safe teardown** — TRT engines hold a raw
+  pointer to the NCCL communicator.  ``distributed_context(group, module)`` tracks
+  all multi-device engines and calls ``release_nccl_comm()`` on ``__exit__``,
+  detaching the communicator so ``dist.destroy_process_group()`` doesn't cause a
+  use-after-free.  Always follow the block with ``dist.destroy_process_group()``
+  and ``os._exit(0)``.
 * **Automatic distributed tracing** — when ``dist.init_process_group()`` has been
   called and ``world_size > 1``, Torch-TensorRT detects the active distributed context
   and automatically switches the ``torch.compile`` backend tracer from the default
   ``torch._dynamo`` path to ``aot_autograd``. You do not need to set
-  ``use_distributed_mode_trace=True`` explicitly; it is enabled for you. This mirrors
-  how ``DistributedDataParallel`` works under the hood.
+  ``use_distributed_mode_trace=True`` explicitly.
 * ``dynamic=True`` enables dynamic sequence lengths — TRT builds a single engine that
   handles varying input shapes without recompiling.
 * NCCL all-reduce ops from ``RowwiseParallel`` are fused and converted to native TRT
@@ -130,15 +148,14 @@ The simplest path for tensor-parallel inference. Shard the model with
 * The warmup forward pass should use ``torch._dynamo.mark_dynamic()`` to match the
   generate loop and avoid a recompile.
 * **Non-default TP subgroup** — if the TRT engine should use a subgroup communicator
-  (e.g. tensor-parallel inside a data-parallel job), wrap compilation and inference in
-  ``distributed_group(tp_group)``:
+  (e.g. tensor-parallel inside a data-parallel job), pass the subgroup instead of
+  ``dist.group.WORLD``:
 
   .. code-block:: python
 
       tp_group = dist.new_group(ranks=[0, 1])
-      with torch_tensorrt.distributed_group(tp_group):
-          trt_model = torch.compile(model, backend="torch_tensorrt", ...)
-          output = trt_model(inp)
+      with torch_tensorrt.distributed.distributed_context(tp_group, trt_model) as model:
+          output = model(inp)
 
 For a complete LLM example, see
 `tensor_parallel_llama_llm.py <https://github.com/pytorch/TensorRT/blob/main/tools/llm/tensor_parallel_llama_llm.py>`_
@@ -210,6 +227,7 @@ Step 2: Load and Run
 
 .. code-block:: python
 
+    import os
     import torch
     import torch.distributed as dist
     import torch_tensorrt
@@ -225,15 +243,20 @@ Step 2: Load and Run
     loaded = torch_tensorrt.load(f"/engines/model_rank{rank}.ep")
     trt_model = loaded.module()
 
-    output = trt_model(input_ids)
+    with torch_tensorrt.distributed.distributed_context(dist.group.WORLD, trt_model) as model:
+        output = model(input_ids)
+
+    dist.destroy_process_group()
+    os._exit(0)
 
 **Non-default TP subgroup** (e.g. tensor-parallel inside a data-parallel job):
 
-Use ``distributed_group(group, module)`` to pin the group on all TRT engines
+Use ``distributed_context(group, module)`` to pin the group on all TRT engines
 in the loaded module and get the configured model back as the context value:
 
 .. code-block:: python
 
+    import os
     import torch
     import torch.distributed as dist
     import torch_tensorrt
@@ -250,8 +273,11 @@ in the loaded module and get the configured model back as the context value:
     loaded = torch_tensorrt.load(f"/engines/model_rank{rank}.ep")
     raw_model = loaded.module()
 
-    with torch_tensorrt.distributed_group(tp_group, raw_model) as trt_model:
+    with torch_tensorrt.distributed.distributed_context(tp_group, raw_model) as trt_model:
         output = trt_model(input_ids)
+
+    dist.destroy_process_group()
+    os._exit(0)
 
 **What happens under the hood:**
 
@@ -473,38 +499,71 @@ Confirming the active backend
 
 ----
 
-Process Group Management
---------------------------
+Process Group Management and Teardown
+---------------------------------------
 
-Two APIs control which NCCL process group a TRT engine uses at runtime.
+``torch_tensorrt.distributed.distributed_context(group, module=None)``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``torch_tensorrt.distributed_group(group, module=None)``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The **recommended** way to manage the NCCL lifecycle for distributed TRT
+engines.  This context manager:
 
-A context manager that sets the active process group for the duration of its
-block.  When *module* is supplied it also pre-pins the group on every TRT
-engine in the module (both submodule and inlined engines) and yields the
-configured module as the context value.
+1. **On enter** — sets the active process group and pins it on all TRT engines
+   in *module* (both submodule and inlined engine storage patterns).
+2. **During the block** — inference uses the specified NCCL communicator.
+3. **On exit** — calls ``release_nccl_comm()`` on every tracked multi-device
+   engine, detaching the NCCL communicator from TRT's execution context.  This
+   makes ``dist.destroy_process_group()`` safe to call afterward.
+
+*module* may be a single compiled module, a list of modules, or omitted:
+
+**Single module** — yields the module as the context value:
+
+.. code-block:: python
+
+    trt_model = torch.compile(model, backend="torch_tensorrt", ...)
+    _ = trt_model(inp)  # warmup — triggers engine build
+    dist.barrier()
+
+    with torch_tensorrt.distributed.distributed_context(dist.group.WORLD, trt_model) as model:
+        output = model(inp)
+
+    dist.destroy_process_group()
+    os._exit(0)
+
+**Multiple modules** — pass a list; yields a list in the same order.  Useful
+when you have separately compiled programs (e.g. an encoder and a decoder)
+that both need NCCL teardown:
+
+.. code-block:: python
+
+    with torch_tensorrt.distributed.distributed_context(
+        tp_group, [encoder_trt, decoder_trt]
+    ) as (enc, dec):
+        output = dec(enc(inp))
+
+    dist.destroy_process_group()
+    os._exit(0)
+
+**Non-default TP subgroup** (e.g. tensor-parallel inside a data-parallel job):
 
 .. code-block:: python
 
     tp_group = dist.new_group(ranks=[0, 1])
+    with torch_tensorrt.distributed.distributed_context(tp_group, trt_model) as model:
+        output = model(inp)
 
-    # Without module — use at compile time or when the model is created inside
-    # the block (torch.compile path):
-    with torch_tensorrt.distributed_group(tp_group):
+**Without module** — use at compile time when the model is created inside the
+block:
+
+.. code-block:: python
+
+    with torch_tensorrt.distributed.distributed_context(tp_group):
         trt_model = torch.compile(model, backend="torch_tensorrt", ...)
         output = trt_model(inp)
 
-    # With module — pre-pin on a loaded model; use the yielded handle directly:
-    with torch_tensorrt.distributed_group(tp_group, loaded_model) as trt_model:
-        output = trt_model(inp)
-
-The default world group requires no context manager — engines pick it up
-automatically after ``dist.init_process_group()``.
-
-``torch_tensorrt.distributed.set_distributed_group(module, group)``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``torch_tensorrt.distributed.set_distributed_mode(module, group)``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Permanently pins *group* on all TRT engines in *module* without entering a
 context manager.  Use this when the group should remain set across multiple
@@ -512,22 +571,48 @@ calls outside any ``with`` block:
 
 .. code-block:: python
 
-    torch_tensorrt.distributed.set_distributed_group(model, tp_group)
-    output1 = model(inp1)  # no context manager needed
+    torch_tensorrt.distributed.set_distributed_mode(model, tp_group)
+    output1 = model(inp1)  # group already pinned
     output2 = model(inp2)
 
-Both APIs handle two engine storage patterns automatically:
+.. note::
+
+   ``set_distributed_mode`` pins the group but does **not** handle teardown.
+   Prefer ``distributed_context(group, module)`` when you need safe cleanup.
+
+Both APIs handle three engine storage patterns:
 
 * **Submodule engines** — ``TorchTensorRTModule`` children produced by
   ``torch.compile`` or ``torch_tensorrt.compile()``.
 * **Inlined engines** — ``torch.classes.tensorrt.Engine`` objects stored as
   plain attributes on an ``fx.GraphModule`` after
   ``torch_tensorrt.save()`` / ``torch_tensorrt.load()``.
+* **torch.compile engines** — engines inside dynamo's code cache, tracked via
+  a thread-local registry populated at engine creation time.
 
 For ``PythonTorchTensorRTModule`` (``use_python_runtime=True``), the group is
 read lazily from the active context on the first forward call, so
-``distributed_group`` (without the *module* argument) is sufficient — keep the
+``distributed_context`` (without the *module* argument) is sufficient — keep the
 context manager active for the duration of inference.
+
+.. note::
+
+   **Always end distributed scripts with** ``os._exit(0)`` **after**
+   ``dist.destroy_process_group()``.
+
+   TRT engines and CUDA contexts register C++ destructors that can race with
+   Python's garbage collector during normal interpreter shutdown, causing
+   segfaults or hangs.  ``os._exit(0)`` bypasses the GC and exits immediately
+   with a clean exit code, avoiding this entirely.
+
+   .. code-block:: python
+
+       dist.destroy_process_group()
+       os._exit(0)  # bypass Python GC — TRT/CUDA destructors race during shutdown
+
+   This applies to all distributed workflows: ``torch.compile``, export/load,
+   and multinode.  It is safe because all meaningful work has completed before
+   this point.
 
 ----
 

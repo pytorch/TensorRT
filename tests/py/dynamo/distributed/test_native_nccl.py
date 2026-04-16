@@ -3,16 +3,16 @@ Comprehensive tests for the native NCCL system in Torch-TensorRT.
 
 Covers
 ------
-1.  distributed_group() context manager — thread-local state, nesting, exception safety
+1.  distributed_context() context manager — thread-local state, nesting, exception safety
 2.  get_active_group / get_active_group_name — group resolution
 3.  NCCL library utilities — path detection, symlink, LD_LIBRARY_PATH check
 4.  fuse_distributed_ops graph pass — all_gather, reduce_scatter, all_reduce,
     no-fuse when wait_tensor has multiple users
 5.  Single-rank NCCL op compilation (pytest, WORLD_SIZE=1)
-6.  Multi-rank inference with distributed_group (torchrun / mpirun, 2 ranks)
+6.  Multi-rank inference with distributed_context (torchrun / mpirun, 2 ranks)
 7.  C++ runtime NCCL bind (bind_nccl_comm)
 8.  Python runtime NCCL comm (setup_nccl_comm + pickle / unpickle)
-9.  distributed_group with a non-default TP subgroup
+9.  distributed_context with a non-default TP subgroup
 10. Multi-rank pytest tests via MultiProcessTestCase (2 GPUs, plain pytest)
 
 Run single-rank pytest tests
@@ -90,7 +90,7 @@ class _FakeEngine:
     """Minimal duck-type for torch.classes.tensorrt.Engine in unit tests.
 
     Has ``is_md`` and ``set_group_name`` so it passes the duck-type check
-    inside set_distributed_group() without needing a real TRT build.
+    inside set_distributed_mode() without needing a real TRT build.
     """
 
     def __init__(self, is_md: bool = True) -> None:
@@ -109,12 +109,12 @@ class _FakeGroup:
 
 
 # ============================================================================
-# Section 1 — distributed_group() context manager (no GPU / no dist init)
+# Section 1 — distributed_context() context manager (no GPU / no dist init)
 # ============================================================================
 
 
 class TestDistributedGroupContextManager(unittest.TestCase):
-    """Pure unit tests for the distributed_group() thread-local context manager.
+    """Pure unit tests for the distributed_context() thread-local context manager.
 
     These tests deliberately avoid dist.init_process_group so they run in any
     environment, including CI without GPUs.
@@ -123,9 +123,9 @@ class TestDistributedGroupContextManager(unittest.TestCase):
     def setUp(self) -> None:
         from torch_tensorrt.distributed._distributed import (
             _state,
-            distributed_group,
             get_active_group,
             get_active_group_name,
+            distributed_context,
         )
 
         # Reset thread-local state so each test starts clean.
@@ -135,7 +135,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         self._state = _state
         self.get_active_group = get_active_group
         self.get_active_group_name = get_active_group_name
-        self.distributed_group = distributed_group
+        self.distributed_context = distributed_context
 
     # -- default / no-dist cases --------------------------------------------
 
@@ -154,18 +154,18 @@ class TestDistributedGroupContextManager(unittest.TestCase):
     # -- basic set / restore ------------------------------------------------
 
     def test_context_manager_sets_active_group(self) -> None:
-        """distributed_group() makes the group visible via get_active_group()."""
+        """distributed_context() makes the group visible via get_active_group()."""
         fake = MagicMock()
         fake.group_name = "tp_group"
         self.assertIsNone(getattr(self._state, "pg", None))
-        with self.distributed_group(fake):
+        with self.distributed_context(fake):
             self.assertIs(self.get_active_group(), fake)
 
     def test_context_manager_restores_none_on_exit(self) -> None:
         """Thread-local is restored to None after context exits."""
         fake = MagicMock()
         fake.group_name = "tp_group"
-        with self.distributed_group(fake):
+        with self.distributed_context(fake):
             pass
         self.assertIsNone(getattr(self._state, "pg", None))
 
@@ -176,8 +176,8 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         inner = MagicMock()
         inner.group_name = "inner"
 
-        with self.distributed_group(outer):
-            with self.distributed_group(inner):
+        with self.distributed_context(outer):
+            with self.distributed_context(inner):
                 self.assertIs(self.get_active_group(), inner)
             # inner exited → back to outer
             self.assertIs(self.get_active_group(), outer)
@@ -190,7 +190,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         fake = MagicMock()
         fake.group_name = "tp_group"
         try:
-            with self.distributed_group(fake):
+            with self.distributed_context(fake):
                 raise RuntimeError("body error")
         except RuntimeError:
             pass
@@ -202,20 +202,20 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         """get_active_group_name() returns group.group_name string."""
         fake = MagicMock()
         fake.group_name = "my_tp_group"
-        with self.distributed_group(fake):
+        with self.distributed_context(fake):
             self.assertEqual(self.get_active_group_name(), "my_tp_group")
 
     def test_get_active_group_name_group_without_group_name_attr(self) -> None:
         """get_active_group_name() returns '' when the group has no group_name."""
         fake = MagicMock(spec=[])  # empty spec → no attributes
-        with self.distributed_group(fake):
+        with self.distributed_context(fake):
             self.assertEqual(self.get_active_group_name(), "")
 
     def test_get_active_group_name_non_string_group_name(self) -> None:
         """group_name is coerced to str even if the mock returns an int."""
         fake = MagicMock()
         fake.group_name = 42
-        with self.distributed_group(fake):
+        with self.distributed_context(fake):
             name = self.get_active_group_name()
         self.assertEqual(name, "42")
 
@@ -230,7 +230,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         def worker() -> None:
             other_saw.append(getattr(self._state, "pg", None))
 
-        with self.distributed_group(fake):
+        with self.distributed_context(fake):
             t = threading.Thread(target=worker)
             t.start()
             t.join()
@@ -248,10 +248,10 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         thread_saw: list[Any] = []
 
         def worker() -> None:
-            with self.distributed_group(fake_thread):
+            with self.distributed_context(fake_thread):
                 thread_saw.append(self.get_active_group())
 
-        with self.distributed_group(fake_main):
+        with self.distributed_context(fake_main):
             t = threading.Thread(target=worker)
             t.start()
             t.join()
@@ -271,7 +271,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         def enter(depth: int) -> None:
             if depth == len(groups):
                 return
-            with self.distributed_group(groups[depth]):
+            with self.distributed_context(groups[depth]):
                 self.assertIs(self.get_active_group(), groups[depth])
                 enter(depth + 1)
                 # after inner exits, we're back to current level
@@ -285,17 +285,17 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         for i in range(3):
             g = MagicMock()
             g.group_name = f"group_{i}"
-            with self.distributed_group(g):
+            with self.distributed_context(g):
                 self.assertIs(self.get_active_group(), g)
             self.assertIsNone(getattr(self._state, "pg", None))
 
     def test_none_group_is_valid(self) -> None:
-        """distributed_group(None) is legal and makes get_active_group return None."""
+        """distributed_context(None) is legal and makes get_active_group return None."""
         fake = MagicMock()
         fake.group_name = "outer"
-        with self.distributed_group(fake):
+        with self.distributed_context(fake):
             # Override with None
-            with self.distributed_group(None):
+            with self.distributed_context(None):
                 # None stored → get_active_group falls through to dist fallback
                 active = getattr(self._state, "pg", "SENTINEL")
                 self.assertIsNone(active)
@@ -305,22 +305,22 @@ class TestDistributedGroupContextManager(unittest.TestCase):
     # -- module argument --------------------------------------------------------
 
     def test_with_module_yields_module(self) -> None:
-        """distributed_group(group, module) yields the module as the context value."""
+        """distributed_context(group, module) yields the module as the context value."""
         group = MagicMock()
         group.group_name = "tp0"
         module = nn.Linear(4, 4)
-        with self.distributed_group(group, module) as handle:
+        with self.distributed_context(group, module) as handle:
             self.assertIs(handle, module)
 
     def test_without_module_yields_none(self) -> None:
-        """distributed_group(group) without module yields None."""
+        """distributed_context(group) without module yields None."""
         group = MagicMock()
         group.group_name = "tp0"
-        with self.distributed_group(group) as handle:
+        with self.distributed_context(group) as handle:
             self.assertIsNone(handle)
 
     def test_with_module_pre_pins_engines(self) -> None:
-        """distributed_group(group, module) calls set_group_name on md engines."""
+        """distributed_context(group, module) calls set_group_name on md engines."""
         eng = _FakeEngine(is_md=True)
 
         class M(nn.Module):
@@ -330,7 +330,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
 
         group = _FakeGroup("tp0")
         module = M()
-        with self.distributed_group(group, module):
+        with self.distributed_context(group, module):
             pass
         self.assertEqual(eng.group_name_calls, ["tp0"])
 
@@ -342,7 +342,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
             pass
 
         captured = []
-        with self.distributed_group(group, M()):
+        with self.distributed_context(group, M()):
             captured.append(getattr(self._state, "pg", None))
         self.assertIs(captured[0], group)
 
@@ -353,7 +353,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         class M(nn.Module):
             pass
 
-        with self.distributed_group(group, M()):
+        with self.distributed_context(group, M()):
             pass
         self.assertIsNone(getattr(self._state, "pg", None))
 
@@ -365,18 +365,123 @@ class TestDistributedGroupContextManager(unittest.TestCase):
             pass
 
         with self.assertRaises(ValueError):
-            with self.distributed_group(group, M()):
+            with self.distributed_context(group, M()):
                 raise ValueError("boom")
         self.assertIsNone(getattr(self._state, "pg", None))
 
+    # -- multi-module argument --------------------------------------------------
+
+    def test_list_of_modules_yields_list(self) -> None:
+        """distributed_context(group, [a, b]) yields a list, not a single module."""
+        group = _FakeGroup("tp0")
+        mod_a = nn.Linear(4, 4)
+        mod_b = nn.Linear(4, 4)
+        with self.distributed_context(group, [mod_a, mod_b]) as handle:
+            self.assertIsInstance(handle, list)
+            self.assertEqual(len(handle), 2)
+            self.assertIs(handle[0], mod_a)
+            self.assertIs(handle[1], mod_b)
+
+    def test_list_of_modules_pins_engines_on_all(self) -> None:
+        """distributed_context(group, [a, b]) calls set_group_name on engines in both modules."""
+        eng_a = _FakeEngine(is_md=True)
+        eng_b = _FakeEngine(is_md=True)
+
+        class M(nn.Module):
+            def __init__(self, eng) -> None:
+                super().__init__()
+                self._run_on_acc_0_engine = eng
+
+        group = _FakeGroup("tp0")
+        with self.distributed_context(group, [M(eng_a), M(eng_b)]):
+            pass
+
+        self.assertEqual(eng_a.group_name_calls, ["tp0"])
+        self.assertEqual(eng_b.group_name_calls, ["tp0"])
+
+    def test_single_item_list_yields_list(self) -> None:
+        """distributed_context(group, [mod]) yields a list, not the bare module."""
+        group = _FakeGroup("tp0")
+        mod = nn.Linear(4, 4)
+        with self.distributed_context(group, [mod]) as handle:
+            self.assertIsInstance(handle, list)
+            self.assertIs(handle[0], mod)
+
+    def test_empty_list_yields_none(self) -> None:
+        """distributed_context(group, []) yields None (no modules to pre-pin)."""
+        group = _FakeGroup("tp0")
+        with self.distributed_context(group, []) as handle:
+            self.assertIsNone(handle)
+
+    def test_list_state_active_inside_block(self) -> None:
+        """_state.pg is set during a multi-module block."""
+        group = _FakeGroup("tp0")
+        captured = []
+        with self.distributed_context(group, [nn.Linear(2, 2), nn.Linear(2, 2)]):
+            captured.append(getattr(self._state, "pg", None))
+        self.assertIs(captured[0], group)
+
+    def test_list_state_restored_after_block(self) -> None:
+        """_state.pg is restored after a multi-module block exits."""
+        group = _FakeGroup("tp0")
+        with self.distributed_context(group, [nn.Linear(2, 2)]):
+            pass
+        self.assertIsNone(getattr(self._state, "pg", None))
+
+    def test_list_state_restored_on_exception(self) -> None:
+        """_state.pg is restored even when the multi-module body raises."""
+        group = _FakeGroup("tp0")
+        with self.assertRaises(RuntimeError):
+            with self.distributed_context(group, [nn.Linear(2, 2)]):
+                raise RuntimeError("boom")
+        self.assertIsNone(getattr(self._state, "pg", None))
+
+    def test_list_teardown_releases_registered_engines(self) -> None:
+        """On __exit__ with a module list, release_nccl_comm() is called on tracked engines."""
+        from torch_tensorrt.distributed._distributed import register_md_engine
+
+        released = []
+
+        class _FakeEngineWithRelease(_FakeEngine):
+            def __init__(self) -> None:
+                super().__init__(is_md=True)
+                self.nccl_initialized = True
+
+            def release_nccl_comm(self) -> None:
+                released.append(self)
+
+        eng_a = _FakeEngineWithRelease()
+        eng_b = _FakeEngineWithRelease()
+
+        # Simulate engines registered during compilation
+        register_md_engine(eng_a)
+        register_md_engine(eng_b)
+
+        group = _FakeGroup("tp0")
+        with self.distributed_context(group, [nn.Linear(2, 2)]):
+            pass
+
+        self.assertIn(eng_a, released)
+        self.assertIn(eng_b, released)
+        # Registry cleared after exit
+        self.assertEqual(getattr(self._state, "md_engines", []), [])
+
+    def test_single_module_still_yields_module_not_list(self) -> None:
+        """Passing a bare nn.Module (not a list) still yields the module directly."""
+        group = _FakeGroup("tp0")
+        mod = nn.Linear(4, 4)
+        with self.distributed_context(group, mod) as handle:
+            self.assertIs(handle, mod)
+            self.assertNotIsInstance(handle, list)
+
 
 # ============================================================================
-# Section 2 — set_distributed_group() (no GPU / no dist init)
+# Section 2 — set_distributed_mode() (no GPU / no dist init)
 # ============================================================================
 
 
 class TestSetDistributedGroup(unittest.TestCase):
-    """Unit tests for set_distributed_group().
+    """Unit tests for set_distributed_mode().
 
     All tests avoid dist.init_process_group so they run in any environment,
     including CI without GPUs.  The ``_FakeEngine`` and ``_FakeGroup`` helpers
@@ -392,9 +497,9 @@ class TestSetDistributedGroup(unittest.TestCase):
         self._state = _state
 
     def _call(self, module: nn.Module, group: Any) -> None:
-        from torch_tensorrt.distributed import set_distributed_group
+        from torch_tensorrt.distributed import set_distributed_mode
 
-        set_distributed_group(module, group)
+        set_distributed_mode(module, group)
 
     # ---- helpers ----------------------------------------------------------------
 
@@ -1017,18 +1122,18 @@ class TestNcclOpsSingleRank(unittest.TestCase):
             [torch.randn(1, dim)],
         )
 
-    def test_distributed_group_with_single_rank_subgroup(self) -> None:
-        """distributed_group() selects the subgroup as NCCL communicator source."""
+    def test_distributed_mode_with_single_rank_subgroup(self) -> None:
+        """distributed_context() selects the subgroup as NCCL communicator source."""
         import torch_tensorrt
         from torch_tensorrt.distributed._distributed import (
-            distributed_group,
             get_active_group_name,
+            distributed_context,
         )
 
         dim = 8
         subgroup = dist.new_group(ranks=[0])
 
-        with distributed_group(subgroup):
+        with distributed_context(subgroup):
             # Inside the context, active group name must reflect subgroup
             self.assertEqual(get_active_group_name(), subgroup.group_name)
 
@@ -1051,14 +1156,14 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         self.assertIsNotNone(active)
 
     def test_group_name_survives_context_exit(self) -> None:
-        """After distributed_group() exits, get_active_group_name reverts to world."""
+        """After distributed_context() exits, get_active_group_name reverts to world."""
         from torch_tensorrt.distributed._distributed import (
-            distributed_group,
             get_active_group_name,
+            distributed_context,
         )
 
         subgroup = dist.new_group(ranks=[0])
-        with distributed_group(subgroup):
+        with distributed_context(subgroup):
             inner_name = get_active_group_name()
         outer_name = get_active_group_name()
         self.assertEqual(inner_name, subgroup.group_name)
@@ -1301,14 +1406,14 @@ def _multirank_reduce_scatter_correctness(
     _check_close(out, expected, f"reduce_scatter rank={rank}")
 
 
-def _multirank_distributed_group_tp_model(
+def _multirank_distributed_mode_tp_model(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """Tensor-parallel MLP with distributed_group() context manager produces correct output.
+    """Tensor-parallel MLP with distributed_context() context manager produces correct output.
 
-    This is the core test for the distributed_group() API at runtime.
+    This is the core test for the distributed_context() API at runtime.
     It verifies that:
-      1. The subgroup can be passed to TRT engines via distributed_group()
+      1. The subgroup can be passed to TRT engines via distributed_context()
       2. TRT TP compilation produces the same result as PyTorch TP
     """
     import torch_tensorrt
@@ -1318,7 +1423,7 @@ def _multirank_distributed_group_tp_model(
         RowwiseParallel,
         parallelize_module,
     )
-    from torch_tensorrt.distributed._distributed import distributed_group
+    from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
@@ -1349,9 +1454,9 @@ def _multirank_distributed_group_tp_model(
     with torch.no_grad():
         pt_out = model(inp)
 
-    # Compile inside distributed_group context so TRT engines pick up the right PG
+    # Compile inside distributed_context context so TRT engines pick up the right PG
     pg = dist.group.WORLD
-    with distributed_group(pg):
+    with distributed_context(pg):
         trt_model = torch.compile(
             model,
             backend="torch_tensorrt",
@@ -1366,24 +1471,24 @@ def _multirank_distributed_group_tp_model(
         with torch.no_grad():
             trt_out = trt_model(inp)
 
-    _check_close(pt_out, trt_out, f"TP MLP distributed_group rank={rank}")
+    _check_close(pt_out, trt_out, f"TP MLP distributed_context rank={rank}")
 
 
-def _multirank_distributed_group_subgroup(
+def _multirank_distributed_mode_subgroup(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """distributed_group() with a TP subgroup (not the world group) routes NCCL correctly.
+    """distributed_context() with a TP subgroup (not the world group) routes NCCL correctly.
 
     We create a subgroup containing all ranks (same topology as world, but a
     distinct process group object). The all_reduce result must still be correct.
     """
     if world_size < 2:
-        print(f"[SKIP] _multirank_distributed_group_subgroup requires world_size >= 2")
+        print(f"[SKIP] _multirank_distributed_mode_subgroup requires world_size >= 2")
         return
     import torch_tensorrt
     from torch_tensorrt.distributed._distributed import (
-        distributed_group,
         get_active_group_name,
+        distributed_context,
     )
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
@@ -1402,7 +1507,7 @@ def _multirank_distributed_group_subgroup(
     inp = torch.full((1, 8), float(rank + 1), device=device)
     expected_sum = sum(r + 1 for r in range(world_size))
 
-    with distributed_group(subgroup):
+    with distributed_context(subgroup):
         # Verify get_active_group_name returns the subgroup name inside context
         assert get_active_group_name() == sg_name, (
             f"Expected group name {sg_name!r}, " f"got {get_active_group_name()!r}"
@@ -1423,7 +1528,7 @@ def _multirank_distributed_group_subgroup(
             out = trt_model(inp)
 
     expected = torch.full((1, 8), float(expected_sum), device=device)
-    _check_close(out, expected, f"distributed_group subgroup all_reduce rank={rank}")
+    _check_close(out, expected, f"distributed_context subgroup all_reduce rank={rank}")
 
 
 def _multirank_cpp_runtime_bind_nccl(
@@ -1472,19 +1577,19 @@ def _multirank_cpp_runtime_bind_nccl(
     _check_close(out2, expected, f"C++ runtime all_reduce second call rank={rank}")
 
 
-def _multirank_distributed_group_context_switch(
+def _multirank_distributed_mode_context_switch(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """Switching distributed_group context between two subgroups routes to the correct communicator."""
+    """Switching distributed_context context between two subgroups routes to the correct communicator."""
     import torch_tensorrt
-    from torch_tensorrt.distributed._distributed import distributed_group
+    from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
 
     if world_size < 2:
         print(
-            f"[SKIP] test_multirank_distributed_group_context_switch requires world_size >= 2"
+            f"[SKIP] test_multirank_distributed_mode_context_switch requires world_size >= 2"
         )
         return
 
@@ -1508,7 +1613,7 @@ def _multirank_distributed_group_context_switch(
 
     for i, (sg, sg_name) in enumerate([(sg1, sg1_name), (sg2, sg2_name)]):
         model = AllReduceModel(sg_name).to(device).eval()
-        with distributed_group(sg):
+        with distributed_context(sg):
             trt_model = torch.compile(
                 model,
                 backend="torch_tensorrt",
@@ -1529,7 +1634,7 @@ def _multirank_distributed_group_context_switch(
 
 def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) -> None:
     """Compile with the default world group, run inference, then migrate to a new
-    subgroup via distributed_group(new_group, model) and verify that inference
+    subgroup via distributed_context(new_group, model) and verify that inference
     still produces correct results — i.e. the NCCL communicator is re-bound.
 
     Tests both the C++ runtime (set_group_name resets nccl_initialized) and the
@@ -1543,7 +1648,7 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
         return
 
     import torch_tensorrt
-    from torch_tensorrt.distributed._distributed import distributed_group
+    from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
@@ -1573,7 +1678,7 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
         # ---- Step 1: compile + run with default world group ----
         model = AllReduceModel(world_name).to(device).eval()
 
-        with distributed_group(world_group):
+        with distributed_context(world_group):
             trt_model = torch.compile(
                 model,
                 backend="torch_tensorrt",
@@ -1590,19 +1695,19 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
 
         _check_close(out_world, expected, f"[{label}] world group rank={rank}")
 
-        # ---- Step 2: migrate to subgroup via distributed_group(subgroup, model) ----
-        # This calls set_distributed_group() which resets nccl_initialized on the
+        # ---- Step 2: migrate to subgroup via distributed_context(subgroup, model) ----
+        # This calls set_distributed_mode() which resets nccl_initialized on the
         # C++ engine, and keeps _state.pg = subgroup active for the Python runtime's
         # lazy setup_nccl_comm() call.
-        with distributed_group(subgroup, trt_model) as migrated_model:
+        with distributed_context(subgroup, trt_model) as migrated_model:
             with torch.no_grad():
                 out_sub = migrated_model(inp)
 
         _check_close(out_sub, expected, f"[{label}] migrated to subgroup rank={rank}")
 
-        # ---- Step 3: set_distributed_group (persistent, outside context) ----
+        # ---- Step 3: set_distributed_mode (persistent, outside context) ----
         subgroup2 = dist.new_group(ranks=list(range(world_size)))
-        torch_tensorrt.distributed.set_distributed_group(trt_model, subgroup2)
+        torch_tensorrt.distributed.set_distributed_mode(trt_model, subgroup2)
         # _state.pg is NOT set here — Python runtime falls back to world group
         # for lazy setup_nccl_comm; C++ runtime uses the pinned group name.
         # For C++ runtime only (Python runtime needs _state.pg active):
@@ -1610,7 +1715,7 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
             with torch.no_grad():
                 out_pin = trt_model(inp)
             _check_close(
-                out_pin, expected, f"[{label}] set_distributed_group rank={rank}"
+                out_pin, expected, f"[{label}] set_distributed_mode rank={rank}"
             )
 
         print(f"[Rank {rank}] PASS _multirank_pg_migration [{label}]", flush=True)
@@ -1680,18 +1785,18 @@ class TestMultirankNccl(MultiProcessTestCase):
     @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
-    def test_distributed_group_tp_model(self) -> None:
-        """Tensor-parallel MLP with distributed_group() produces correct output."""
+    def test_distributed_mode_tp_model(self) -> None:
+        """Tensor-parallel MLP with distributed_context() produces correct output."""
         device = self._init_dist()
-        _multirank_distributed_group_tp_model(self.rank, self.world_size, device)
+        _multirank_distributed_mode_tp_model(self.rank, self.world_size, device)
 
     @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
-    def test_distributed_group_subgroup(self) -> None:
-        """distributed_group() with a non-default TP subgroup routes NCCL correctly."""
+    def test_distributed_mode_subgroup(self) -> None:
+        """distributed_context() with a non-default TP subgroup routes NCCL correctly."""
         device = self._init_dist()
-        _multirank_distributed_group_subgroup(self.rank, self.world_size, device)
+        _multirank_distributed_mode_subgroup(self.rank, self.world_size, device)
 
     @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
     @requires_nccl()
@@ -1704,16 +1809,16 @@ class TestMultirankNccl(MultiProcessTestCase):
     @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
-    def test_distributed_group_context_switch(self) -> None:
-        """Switching distributed_group between two subgroups routes to correct communicator."""
+    def test_distributed_mode_context_switch(self) -> None:
+        """Switching distributed_context between two subgroups routes to correct communicator."""
         device = self._init_dist()
-        _multirank_distributed_group_context_switch(self.rank, self.world_size, device)
+        _multirank_distributed_mode_context_switch(self.rank, self.world_size, device)
 
     @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_pg_migration(self) -> None:
-        """Compile with world group, migrate to subgroup via distributed_group API."""
+        """Compile with world group, migrate to subgroup via distributed_context API."""
         device = self._init_dist()
         _multirank_pg_migration(self.rank, self.world_size, device)
 
@@ -1732,10 +1837,10 @@ def run_multirank_tests() -> None:
         _multirank_all_reduce_correctness,
         _multirank_all_gather_correctness,
         _multirank_reduce_scatter_correctness,
-        _multirank_distributed_group_tp_model,
-        _multirank_distributed_group_subgroup,
+        _multirank_distributed_mode_tp_model,
+        _multirank_distributed_mode_subgroup,
         _multirank_cpp_runtime_bind_nccl,
-        _multirank_distributed_group_context_switch,
+        _multirank_distributed_mode_context_switch,
         _multirank_pg_migration,
     ]
 

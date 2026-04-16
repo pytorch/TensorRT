@@ -117,6 +117,8 @@ def get_model(device_mesh):
 
 
 def compile_torchtrt(model, args):
+    model.eval()
+
     use_fp32_acc = False
     use_explicit_typing = False
     if args.precision == "FP16":
@@ -146,7 +148,6 @@ def compile_torchtrt(model, args):
                 "use_python_runtime": use_python_runtime,
                 "debug": args.debug,
                 "min_block_size": 1,
-                "use_distributed_mode_trace": True,
             },
         )
     return trt_model
@@ -197,12 +198,15 @@ if __name__ == "__main__":
             dist.barrier()
             logger.info("All ranks compiled. Running inference...")
 
-            output = trt_model(inp)
+            with torch_tensorrt.distributed.distributed_context(dist.group.WORLD, trt_model) as dist_model:
+                output = dist_model(inp)
+
             assert (python_result - output).std() < 0.01, "Result mismatch"
             logger.info("JIT compile successful!")
 
         elif args.mode == "export":
-            exported_program = torch.export.export(model, (inp,), strict=False)
+            with torch.inference_mode():
+                exported_program = torch.export.export(model, (inp,), strict=False)
             trt_model = torch_tensorrt.dynamo.compile(
                 exported_program,
                 inputs=[inp],
@@ -215,7 +219,8 @@ if __name__ == "__main__":
                 use_distributed_mode_trace=True,
                 assume_dynamic_shape_support=True,
             )
-            output = trt_model(inp)
+            with torch.inference_mode():
+                output = trt_model(inp)
             assert (python_result - output).std() < 0.01, "Result mismatch"
             save_path = torch_tensorrt.save(trt_model, args.save_path, inputs=[inp])
             logger.info(f"Saved to {save_path}")
@@ -223,3 +228,6 @@ if __name__ == "__main__":
 
     dist.destroy_process_group()
     logger.info("Done!")
+    # Bypass Python GC — TRT/CUDA destructors can segfault during
+    # interpreter shutdown due to unpredictable destruction order.
+    os._exit(0)

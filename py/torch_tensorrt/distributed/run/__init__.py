@@ -4,37 +4,23 @@ import os
 import signal
 import subprocess
 import sys
-from typing import Optional
+
+from torch_tensorrt.distributed._nccl_utils import (
+    ensure_nccl_symlink,
+    get_nccl_library_path,
+)
 
 logger = logging.getLogger("torchtrtrun")
 
 
-def _get_nccl_lib_dir() -> Optional[str]:
-    try:
-        import nvidia.nccl
-
-        d = os.path.join(list(nvidia.nccl.__path__)[0], "lib")
-        return d if os.path.isdir(d) else None
-    except ImportError:
-        return None
-
-
 def _setup_nccl_env(env: dict[str, str]) -> dict[str, str]:
     """Return a copy of env with LD_LIBRARY_PATH and LD_PRELOAD wired for NCCL."""
-    lib_dir = _get_nccl_lib_dir()
+    lib_dir = get_nccl_library_path()
     if lib_dir is None:
         logger.info("System NCCL detected — no setup needed.")
         return env
 
-    # Ensure libnccl.so symlink exists (TRT dlopen looks for this name)
-    nccl_so2 = os.path.join(lib_dir, "libnccl.so.2")
-    nccl_so = os.path.join(lib_dir, "libnccl.so")
-    if not os.path.lexists(nccl_so):
-        try:
-            os.symlink(nccl_so2, nccl_so)
-            logger.info(f"Created symlink: {nccl_so} -> {nccl_so2}")
-        except OSError as e:
-            logger.warning(f"Could not create symlink: {e}")
+    ensure_nccl_symlink(lib_dir)
 
     env = dict(env)
 
@@ -45,6 +31,7 @@ def _setup_nccl_env(env: dict[str, str]) -> dict[str, str]:
 
     # LD_PRELOAD — forces libnccl.so.2 into the process before TRT's loader
     # runs, so any subsequent dlopen("libnccl.so") finds it already resident.
+    nccl_so2 = os.path.join(lib_dir, "libnccl.so.2")
     if os.path.exists(nccl_so2):
         ld_pre = env.get("LD_PRELOAD", "")
         if nccl_so2 not in ld_pre:

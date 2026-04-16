@@ -286,11 +286,20 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # lazy NCCL setup in execute_engine() can find the right communicator
         # without needing any further Python involvement.
         if ENABLED_FEATURES.torch_tensorrt_runtime and self.engine.is_md:
-            from torch_tensorrt.distributed._distributed import get_active_group_name
+            from torch_tensorrt.distributed._distributed import (
+                get_active_group_name,
+                register_md_engine,
+            )
 
             group_name = get_active_group_name()
             if group_name:
                 self.engine.set_group_name(group_name)
+
+            # Register the C++ engine for teardown tracking so
+            # distributed_context().__exit__ can release the NCCL comm even
+            # for torch.compile models where the engine lives in dynamo's
+            # code cache and isn't reachable via module tree walking.
+            register_md_engine(self.engine)
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)

@@ -296,7 +296,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def setup_nccl_comm(self) -> None:
         """Set up NCCL communicator from the active ProcessGroup.
 
-        Uses the process group set by torch_tensorrt.distributed_group() if
+        Uses the process group set by torch_tensorrt.distributed.distributed_context() if
         active, otherwise falls back to the default world group.
         Called lazily on first forward pass for distributed engines.
         """
@@ -309,7 +309,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if pg is None or dist.get_backend(pg) != "nccl":
             raise RuntimeError(
                 "Active ProcessGroup must use NCCL backend. "
-                "Use torch_tensorrt.distributed_group(group) to select a non-default group."
+                "Use torch_tensorrt.distributed.distributed_context(group) to select a non-default group."
             )
 
         backend = pg._get_backend(torch.device("cuda"))

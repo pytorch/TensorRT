@@ -392,8 +392,8 @@ if __name__ == "__main__":
     # Delete the TRT engine before destroying the process group — the engine
     # holds a reference to the NCCL communicator and will segfault if NCCL is
     # torn down first.
-    del trt_model
-    torch.cuda.empty_cache()
+    #del trt_model
+    #torch.cuda.empty_cache()
     dist.destroy_process_group()
     logger.info("Done.")
     # Bypass Python GC — TRT/CUDA destructors can segfault during interpreter shutdown.

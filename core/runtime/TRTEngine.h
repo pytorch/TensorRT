@@ -223,6 +223,13 @@ struct TRTEngine : torch::CustomClassHolder {
   // throwing) when the process group or NCCL communicator is not yet available
   // so callers can retry later.  Throws on hard misconfiguration (wrong backend).
   bool bind_nccl_comm();
+
+  // Detach the NCCL communicator from the execution context by recreating it.
+  // After this call the process group can be safely destroyed without causing a
+  // use-after-free in the TRT engine destructor.  If the engine is used again
+  // later (with a new PG), execute_engine() will see nccl_initialized=false
+  // and re-bind automatically.
+  void release_nccl_comm();
 #endif
 
   // TODO: Implement a call method
