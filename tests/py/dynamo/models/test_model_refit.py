@@ -1,5 +1,6 @@
 import importlib
 import os
+import sys
 import unittest
 
 import pytest
@@ -408,6 +409,10 @@ def test_refit_one_engine_no_map_with_weightmap():
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
+)
+@unittest.skipIf(
+    torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+    "Refit with wrong weightmap is not supported on TensorRT-RTX",
 )
 @pytest.mark.unit
 def test_refit_one_engine_with_wrong_weightmap():
@@ -1077,6 +1082,10 @@ def test_refit_multiple_engine_without_weightmap():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    torch_trt.ENABLED_FEATURES.tensorrt_rtx and sys.platform == "win32",
+    "cumsum refit errors out on TensorRT-RTX on Windows",
 )
 @pytest.mark.unit
 def test_refit_cumsum():
