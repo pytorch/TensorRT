@@ -5,6 +5,8 @@ Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)
 Same model as tensor_parallel_simple_example.py but launched with
 torchrun / ``python -m torch_tensorrt.distributed.run`` instead of mpirun.
 
+
+
 Usage
 -----
 .. code-block:: bash
@@ -198,7 +200,9 @@ if __name__ == "__main__":
             dist.barrier()
             logger.info("All ranks compiled. Running inference...")
 
-            with torch_tensorrt.distributed.distributed_context(dist.group.WORLD, trt_model) as dist_model:
+            with torch_tensorrt.distributed.distributed_context(
+                dist.group.WORLD, trt_model
+            ) as dist_model:
                 output = dist_model(inp)
 
             assert (python_result - output).std() < 0.01, "Result mismatch"

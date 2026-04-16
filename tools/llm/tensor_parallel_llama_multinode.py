@@ -194,9 +194,7 @@ if __name__ == "__main__":
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
-        input_ids = tokenizer(args.prompt, return_tensors="pt")["input_ids"].to(
-            DEVICE
-        )
+        input_ids = tokenizer(args.prompt, return_tensors="pt")["input_ids"].to(DEVICE)
         max_len = input_ids.shape[1] + args.num_tokens
 
         logger.info("Running uncompiled PyTorch baseline ...")
@@ -214,7 +212,9 @@ if __name__ == "__main__":
         # Use distributed_context to manage the NCCL lifecycle.  On __exit__
         # it calls release_nccl_comm() on all engines in the module, making
         # dist.destroy_process_group() safe without manual cleanup ordering.
-        with torch_tensorrt.distributed.distributed_context(dist.group.WORLD, trt_model) as trt_model:
+        with torch_tensorrt.distributed.distributed_context(
+            dist.group.WORLD, trt_model
+        ) as trt_model:
             # Trigger TRT engine build explicitly and barrier so all ranks
             # finish compilation before the generation loop starts.
             logger.info("Warming up TRT model (triggering engine build)...")

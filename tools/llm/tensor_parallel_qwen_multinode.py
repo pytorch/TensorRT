@@ -212,7 +212,9 @@ if __name__ == "__main__":
         # Use distributed_context to manage the NCCL lifecycle.  On __exit__
         # it calls release_nccl_comm() on all tracked MD engines, making
         # dist.destroy_process_group() safe without manual cleanup ordering.
-        with torch_tensorrt.distributed.distributed_context(dist.group.WORLD, trt_model) as trt_model:
+        with torch_tensorrt.distributed.distributed_context(
+            dist.group.WORLD, trt_model
+        ) as trt_model:
             # Trigger TRT engine building explicitly and wait for all ranks to
             # finish before starting the generation loop.  Without this barrier,
             # a slow TRT build on one rank causes the other rank to timeout at

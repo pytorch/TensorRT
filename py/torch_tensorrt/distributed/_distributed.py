@@ -22,6 +22,7 @@ M = TypeVar("M", bound=nn.Module)
 
 _state = threading.local()
 
+
 def register_md_engine(engine: object) -> None:
     """Register a C++ TRTEngine with is_md=True for teardown tracking.
 
@@ -139,9 +140,9 @@ def distributed_context(
         for mod in modules:
             set_distributed_mode(mod, group)
         if single:
-            yield modules[0]  # type: ignore[misc]
+            yield modules[0]
         elif modules:
-            yield modules  # type: ignore[misc]
+            yield modules
         else:
             yield None
     finally:
