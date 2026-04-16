@@ -4,7 +4,6 @@ import pickle
 import shutil
 import unittest
 
-import tensorrt as trt
 import torch
 import torch_tensorrt as torch_trt
 from torch.testing._internal.common_utils import TestCase
@@ -12,6 +11,8 @@ from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_eng
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+import tensorrt as trt  # isort: skip  # must import after torch_tensorrt to resolve tensorrt_rtx alias
 
 assertions = unittest.TestCase()
 
@@ -266,11 +267,6 @@ class TestWeightStrippedEngine(TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"),
         "torchvision is not installed",
-    )
-    @unittest.skipIf(
-        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
-        "There is bug in refit, so we skip the test for now",
     )
     def test_dynamo_compile_with_refittable_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
