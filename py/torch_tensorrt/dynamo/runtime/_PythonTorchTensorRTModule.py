@@ -315,8 +315,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         backend = pg._get_backend(torch.device("cuda"))
 
         # Force NCCL communicator initialization with a dummy collective
+        # Must use group=pg so the correct group's comm is initialized
+        # dist.all_reduce without group= only initializes the default world group.
         dummy = torch.zeros(1, device="cuda")
-        dist.all_reduce(dummy)
+        dist.all_reduce(dummy, group=pg)
 
         comm_ptr = backend._comm_ptr()
         if comm_ptr is None or comm_ptr == 0:
