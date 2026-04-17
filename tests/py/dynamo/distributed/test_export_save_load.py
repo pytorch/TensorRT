@@ -67,6 +67,18 @@ def is_trtllm_for_nccl() -> bool:
         return False
 
 
+def has_nccl_collectives() -> bool:
+    """Check if any NCCL collective backend is available (native TRT or TRT-LLM)."""
+    try:
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(ENABLED_FEATURES.native_trt_collectives) or bool(
+            ENABLED_FEATURES.trtllm_for_nccl
+        )
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Model (small dims for fast TRT compilation in CI)
 # ---------------------------------------------------------------------------
@@ -334,7 +346,7 @@ class TestMultirankExportSaveLoad(MultiProcessTestCase):
         dist.barrier()  # seeds ncclComm_t before any TRT bind_nccl_comm() call
         return torch.device(f"cuda:{local}")
 
-    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_export_save_load_round_trip(self) -> None:

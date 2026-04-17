@@ -81,6 +81,18 @@ def is_trtllm_for_nccl() -> bool:
         return False
 
 
+def has_nccl_collectives() -> bool:
+    """Check if any NCCL collective backend is available (native TRT or TRT-LLM)."""
+    try:
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(ENABLED_FEATURES.native_trt_collectives) or bool(
+            ENABLED_FEATURES.trtllm_for_nccl
+        )
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Shared test fakes
 # ---------------------------------------------------------------------------
@@ -123,9 +135,9 @@ class TestDistributedGroupContextManager(unittest.TestCase):
     def setUp(self) -> None:
         from torch_tensorrt.distributed._distributed import (
             _state,
+            distributed_context,
             get_active_group,
             get_active_group_name,
-            distributed_context,
         )
 
         # Reset thread-local state so each test starts clean.
@@ -474,6 +486,27 @@ class TestDistributedGroupContextManager(unittest.TestCase):
             self.assertIs(handle, mod)
             self.assertNotIsInstance(handle, list)
 
+    def test_distributed_context_with_trt_module_wrapper(self) -> None:
+        """distributed_context(group, module) stamps TorchTensorRTModule engines (Case 1)."""
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        eng = _FakeEngine(is_md=True)
+
+        class FakeWrapper(TorchTensorRTModule):
+            def __init__(self) -> None:
+                nn.Module.__init__(self)
+                self.engine = eng
+
+        class M(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.trt_block = FakeWrapper()
+
+        group = _FakeGroup("tp0")
+        with self.distributed_context(group, M()):
+            pass
+        self.assertEqual(eng.group_name_calls, ["tp0"])
+
 
 # ============================================================================
 # Section 2 — set_distributed_mode() (no GPU / no dist init)
@@ -674,6 +707,10 @@ class TestNcclUtils(unittest.TestCase):
             self.assertTrue(
                 os.path.isdir(result),
                 f"get_nccl_library_path returned non-existent dir: {result}",
+            )
+            self.assertTrue(
+                os.path.exists(os.path.join(result, "libnccl.so.2")),
+                f"libnccl.so.2 not found in {result}",
             )
 
     def test_check_nccl_library_path_system_nccl(self) -> None:
@@ -1047,8 +1084,8 @@ class _ReduceScatterModel(nn.Module):
     "Skipped: NCCL backend not available.",
 )
 @unittest.skipIf(
-    not is_trtllm_for_nccl(),
-    "Skipped: TensorRT-LLM plugin for NCCL not available.",
+    not has_nccl_collectives(),
+    "Skipped: No NCCL collective support (neither native TRT collectives nor TRT-LLM).",
 )
 class TestNcclOpsSingleRank(unittest.TestCase):
     """Single-rank compilation tests for all three NCCL collective ops.
@@ -1126,8 +1163,8 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         """distributed_context() selects the subgroup as NCCL communicator source."""
         import torch_tensorrt
         from torch_tensorrt.distributed._distributed import (
-            get_active_group_name,
             distributed_context,
+            get_active_group_name,
         )
 
         dim = 8
@@ -1158,8 +1195,8 @@ class TestNcclOpsSingleRank(unittest.TestCase):
     def test_group_name_survives_context_exit(self) -> None:
         """After distributed_context() exits, get_active_group_name reverts to world."""
         from torch_tensorrt.distributed._distributed import (
-            get_active_group_name,
             distributed_context,
+            get_active_group_name,
         )
 
         subgroup = dist.new_group(ranks=[0])
@@ -1181,8 +1218,8 @@ class TestNcclOpsSingleRank(unittest.TestCase):
     "Skipped: NCCL backend not available.",
 )
 @unittest.skipIf(
-    not is_trtllm_for_nccl(),
-    "Skipped: TensorRT-LLM plugin for NCCL not available.",
+    not has_nccl_collectives(),
+    "Skipped: No NCCL collective support (neither native TRT collectives nor TRT-LLM).",
 )
 class TestPythonRuntimePickle(unittest.TestCase):
     """Verifies that _nccl_comm is stripped on pickle and reset on unpickle.
@@ -1487,8 +1524,8 @@ def _multirank_distributed_mode_subgroup(
         return
     import torch_tensorrt
     from torch_tensorrt.distributed._distributed import (
-        get_active_group_name,
         distributed_context,
+        get_active_group_name,
     )
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
@@ -1567,10 +1604,13 @@ def _multirank_cpp_runtime_bind_nccl(
         },
     )
 
-    with torch.no_grad():
-        out = trt_model(inp)
-        # Second call — nccl_initialized must be True now, bind_nccl_comm not called again
-        out2 = trt_model(inp)
+    from torch_tensorrt.distributed._distributed import distributed_context
+
+    with distributed_context(group, trt_model) as m:
+        with torch.no_grad():
+            out = m(inp)
+            # Second call — nccl_initialized must be True now, bind_nccl_comm not called again
+            out2 = m(inp)
 
     expected = torch.full((1, 4), float(expected_sum), device=device)
     _check_close(out, expected, f"C++ runtime all_reduce first call rank={rank}")
@@ -1782,7 +1822,7 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_reduce_scatter_correctness(self.rank, self.world_size, device)
 
-    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_distributed_mode_tp_model(self) -> None:
@@ -1790,7 +1830,7 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_distributed_mode_tp_model(self.rank, self.world_size, device)
 
-    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_distributed_mode_subgroup(self) -> None:
@@ -1798,7 +1838,7 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_distributed_mode_subgroup(self.rank, self.world_size, device)
 
-    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_cpp_runtime_bind_nccl(self) -> None:
@@ -1806,7 +1846,7 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_cpp_runtime_bind_nccl(self.rank, self.world_size, device)
 
-    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_distributed_mode_context_switch(self) -> None:
@@ -1814,7 +1854,7 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_distributed_mode_context_switch(self.rank, self.world_size, device)
 
-    @unittest.skipIf(not is_trtllm_for_nccl(), "TRT-LLM NCCL plugin not available")
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_pg_migration(self) -> None:

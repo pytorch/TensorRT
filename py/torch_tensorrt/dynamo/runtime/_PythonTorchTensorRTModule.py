@@ -4,6 +4,7 @@ import logging
 from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 import torch.distributed as dist
 import torch_tensorrt
@@ -22,8 +23,6 @@ from torch_tensorrt.runtime._utils import (
     _select_rt_device,
     multi_gpu_device_check,
 )
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
