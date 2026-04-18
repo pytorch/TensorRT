@@ -3,13 +3,12 @@ from typing import Any, Dict, Iterable, Sequence
 import torch
 import torch.fx.passes.operator_support as ops
 import torch.fx.passes.splitter_base as splitter_base
-from torch.fx.passes.tools_common import get_acc_ops_name, Tensors
+from torch.fx.passes.tools_common import Tensors, get_acc_ops_name
 
 from .. import (
     CONVERTERS,
-    InputTensorSpec,
-    NO_EXPLICIT_BATCH_DIM_SUPPORT,
     NO_IMPLICIT_BATCH_DIM_SUPPORT,
+    InputTensorSpec,
     TRTInterpreter,
     TRTModule,
 )
@@ -28,7 +27,7 @@ def create_trt_operator_support(
         if use_implicit_batch_dim:
             if k not in NO_IMPLICIT_BATCH_DIM_SUPPORT.keys():
                 support_dict[get_acc_ops_name(k)] = None
-        elif k not in NO_EXPLICIT_BATCH_DIM_SUPPORT.keys():
+        else:
             support_dict[get_acc_ops_name(k)] = None
     supported_if_converter_registered = ops.OperatorSupport(support_dict=support_dict)
 

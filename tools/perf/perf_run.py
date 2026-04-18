@@ -15,6 +15,7 @@ import pandas as pd
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_engine
 from utils import (
     BENCHMARK_MODELS,
@@ -24,7 +25,6 @@ from utils import (
     parse_precisions,
     precision_to_dtype,
     time_generate,
-    torch_device_from_trt,
     torch_dtype_from_trt,
 )
 
@@ -488,9 +488,13 @@ def run_onnx_trt(
             )
         start_compile = timeit.default_timer()
         builder = trt.Builder(logger)
-        network = builder.create_network(
-            1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        )
+        flag = 0
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            STRONGLY_TYPED = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+            )
+            flag |= STRONGLY_TYPED
+        network = builder.create_network(flag)
         parser = trt.OnnxParser(network, logger)
         success = parser.parse_from_file(onnx_path)
         if not success:
