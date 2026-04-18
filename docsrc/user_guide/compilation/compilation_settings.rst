@@ -123,6 +123,11 @@ Optimization Tuning
      - Disable TensorFloat-32 (TF32) accumulation. TF32 is enabled by default on
        Ampere and newer GPUs and provides FP32-range with FP16-speed for matmul/conv.
        Disable only when you need strict IEEE FP32 semantics.
+   * - ``attn_bias_is_causal``
+     - ``True``
+     - Whether the attn_bias in efficient SDPA is causal. Default is True. This can 
+       accelerate models from HF because attn_bias is always a causal mask in HF. 
+       If you want to use non-causal attn_bias, you can set this to False.
 
 ----
 
@@ -350,6 +355,10 @@ Graph Partitioning
      - ``False``
      - Use ``aot_autograd`` for tracing instead of the default path. Required when the
        model contains ``DTensor`` or other distributed tensors.
+   * - ``decompose_attention``
+     - ``False``
+     - Decompose attention layers into smaller ops. We have converters for handling attention ops,
+       but if you want to decompose them into smaller ops, you can set this to True.
 
 ----
 
@@ -372,7 +381,7 @@ Compilation Workflow
      - ``False``
      - Defer TRT engine deserialization until all engines have been built.
        Works around resource contraints and builder overhad but engines
-       may be less well tuned to their deployment resource availablity
+       may be less well tuned to their deployment resource availability
    * - ``debug``
      - ``False``
      - Enable verbose TRT builder logs at ``DEBUG`` level.
@@ -402,7 +411,13 @@ Engine Caching
      - ``/tmp/torch_tensorrt_engine_cache/timing_cache.bin``
      - Path for TRT's timing cache file. The timing cache records kernel timing data
        across sessions, speeding up subsequent engine builds for similar subgraphs even
-       when the engine cache itself is cold.
+       when the engine cache itself is cold. Not used for TensorRT-RTX (no autotuning).
+   * - ``runtime_cache_path``
+     - ``/tmp/torch_tensorrt_engine_cache/runtime_cache.bin``
+     - Path for the TensorRT-RTX runtime cache file. The runtime cache stores JIT
+       compilation results at inference time, preventing repeated compilation of
+       kernels and graphs across sessions. Uses file locking for concurrent access
+       safety. Only used with TensorRT-RTX; ignored for standard TensorRT.
 
 ----
 
@@ -444,7 +459,7 @@ rebuilt from scratch:
 ``l2_limit_for_tiling``, ``enable_autocast``, ``autocast_low_precision_type``,
 ``autocast_excluded_nodes``, ``autocast_excluded_ops``,
 ``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``,
-``autocast_calibration_dataloader``.
+``autocast_calibration_dataloader``, ``decompose_attention``, ``attn_bias_is_causal``.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
 can be changed without invalidating the cache.

@@ -204,8 +204,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     def validate_compile_settings(self) -> None:
         if ENABLED_FEATURES.tensorrt_rtx:
-            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
-                raise RuntimeError("TensorRT-RTX does not support bfloat16!")
+            # NOTE: bfloat16 check disabled — depthwise conv BF16 limitation
+            # is now handled per-layer via capability_validator
             return
 
         if (
@@ -387,7 +387,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         """
         Create a timing cache to enable faster build time for TRT engines.
         By default the timing_cache_path="/tmp/timing_cache.bin"
+        Skipped for TensorRT-RTX since it does not use autotuning.
         """
+        if ENABLED_FEATURES.tensorrt_rtx:
+            _LOGGER.info(
+                "Skipping timing cache creation for TensorRT-RTX (no autotuning)"
+            )
+            return
+
         buffer = b""
         if os.path.isfile(timing_cache_path):
             # Load from existing cache
@@ -402,8 +409,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         timing_cache_path: str,
     ) -> None:
         """
-        This is called after a TensorRT engine is built. Save the timing cache
+        This is called after a TensorRT engine is built. Save the timing cache.
+        Skipped for TensorRT-RTX since it does not use autotuning.
         """
+        if ENABLED_FEATURES.tensorrt_rtx:
+            return
+
         timing_cache = builder_config.get_timing_cache()
         os.makedirs(os.path.dirname(timing_cache_path), exist_ok=True)
         with open(timing_cache_path, "wb") as timing_cache_file:

@@ -827,6 +827,7 @@ def get_requirements():
     base_requirements = [
         "packaging>=23",
         "typing-extensions>=4.7.0",
+        "filelock",
         "dllist",
         "psutil",
     ]

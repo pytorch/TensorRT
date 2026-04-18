@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -230,6 +231,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.symbolic_shape_expressions = symbolic_shape_expressions
         self._nccl_comm: Optional[Any] = None
         self._has_nccl_ops: bool = requires_multidevice
+
+        # Runtime cache state (TensorRT-RTX only)
+        self.runtime_config: Any = None
+        self.runtime_cache: Any = None
+        self.runtime_cache_path = settings.runtime_cache_path
+
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
@@ -261,7 +268,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.context is not None:
             del self.context
         budget_bytes = self._set_device_memory_budget(budget_bytes)
-        self.context = self.engine.create_execution_context()
+        self.context = self._create_context()
         self.runtime_states.context_changed = True
         return budget_bytes
 
@@ -381,6 +388,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 )
                 dist.barrier()
 
+
+        if ENABLED_FEATURES.tensorrt_rtx:
+            self._setup_runtime_config()
+
+        self.context = self._create_context()
         assert self.context is not None, "Failed to create execution context"
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)
@@ -413,6 +425,67 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             input_name: self.engine.is_shape_inference_io(input_name)
             for input_name in self.input_names
         }
+
+    def _setup_runtime_config(self) -> None:
+        """Create a RuntimeConfig with runtime cache for TensorRT-RTX.
+
+        The runtime cache stores JIT compilation results to avoid repeated
+        compilation of kernels/graphs across inference runs.
+        """
+        self.runtime_config = self.engine.create_runtime_config()
+        self.runtime_config.set_execution_context_allocation_strategy(
+            trt.ExecutionContextAllocationStrategy.STATIC
+        )
+        self.runtime_cache = self.runtime_config.create_runtime_cache()
+        self._load_runtime_cache()
+        self.runtime_config.set_runtime_cache(self.runtime_cache)
+        logger.info("TensorRT-RTX runtime cache configured")
+
+    def _create_context(self) -> trt.IExecutionContext:
+        """Create an execution context, using RuntimeConfig for RTX."""
+        if ENABLED_FEATURES.tensorrt_rtx and self.runtime_config is not None:
+            return self.engine.create_execution_context(self.runtime_config)
+        return self.engine.create_execution_context()
+
+    def _load_runtime_cache(self) -> None:
+        """Load runtime cache from disk if it exists (with shared file lock)."""
+        if self.runtime_cache is None:
+            return
+        if not os.path.isfile(self.runtime_cache_path):
+            logger.debug(f"No existing runtime cache at {self.runtime_cache_path}")
+            return
+        try:
+            from filelock import FileLock
+
+            lock = FileLock(self.runtime_cache_path + ".lock")
+            with lock.acquire(timeout=10):
+                with open(self.runtime_cache_path, "rb") as f:
+                    data = f.read()
+            if data:
+                self.runtime_cache.deserialize(data)
+                logger.info(f"Loaded runtime cache from {self.runtime_cache_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load runtime cache: {e}")
+
+    def _save_runtime_cache(self) -> None:
+        """Save runtime cache to disk (with exclusive file lock)."""
+        if self.runtime_cache is None:
+            return
+        try:
+            host_mem = self.runtime_cache.serialize()
+            if host_mem is None:
+                return
+            os.makedirs(os.path.dirname(self.runtime_cache_path), exist_ok=True)
+
+            from filelock import FileLock
+
+            lock = FileLock(self.runtime_cache_path + ".lock")
+            with lock.acquire(timeout=10):
+                with open(self.runtime_cache_path, "wb") as f:
+                    f.write(memoryview(host_mem))
+            logger.info(f"Saved runtime cache to {self.runtime_cache_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save runtime cache: {e}")
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -449,6 +522,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         state.pop("context", None)
         # NCCLcomm cannot be pickled
         state.pop("_nccl_comm", None)
+        state.pop("runtime_config", None)
+        state.pop("runtime_cache", None)
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
@@ -470,6 +545,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.cudagraph = None
 
     def __del__(self) -> None:
+        self._save_runtime_cache()
         self._reset_captured_graph()
 
     def setup_input_tensors(
@@ -882,7 +958,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self._check_initialized()
         torch.cuda.synchronize()
         del self.context
-        self.context = self.engine.create_execution_context()
+        self.context = self._create_context()
         self.profiling_enabled = False
 
     def get_layer_info(self) -> str:

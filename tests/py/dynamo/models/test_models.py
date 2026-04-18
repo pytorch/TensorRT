@@ -197,9 +197,6 @@ def test_resnet18_torch_exec_ops(ir):
     "torchvision is not installed",
 )
 def test_mobilenet_v2(ir, dtype):
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
-        pytest.skip("TensorRT-RTX does not support bfloat16")
-
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda").to(dtype)
     input = torch.randn((1, 3, 224, 224)).to("cuda").to(dtype)
 
@@ -239,9 +236,6 @@ def test_mobilenet_v2(ir, dtype):
     "timm or torchvision not installed",
 )
 def test_efficientnet_b0(ir, dtype):
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
-        pytest.skip("TensorRT-RTX does not support bfloat16")
-
     model = (
         timm.create_model("efficientnet_b0", pretrained=True)
         .eval()
@@ -286,9 +280,6 @@ def test_efficientnet_b0(ir, dtype):
     "transformers is required to run this test",
 )
 def test_bert_base_uncased(ir, dtype):
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
-        pytest.skip("TensorRT-RTX does not support bfloat16")
-
     from transformers import BertModel
 
     model = BertModel.from_pretrained("bert-base-uncased").cuda().eval().to(dtype)
@@ -317,6 +308,7 @@ def test_bert_base_uncased(ir, dtype):
         "cache_built_engines": False,
         "reuse_cached_engines": False,
         "use_explicit_typing": True,
+        "attn_bias_is_causal": False,  # BERT uses bidirectional self-attention instead of causal
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
 
@@ -370,6 +362,7 @@ def test_bert_base_uncased_cpu_offload(ir):
         "cache_built_engines": False,
         "reuse_cached_engines": False,
         "offload_module_to_cpu": True,
+        "attn_bias_is_causal": False,  # BERT uses bidirectional self-attention instead of causal
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
     if ir == "dynamo":
@@ -430,10 +423,6 @@ def test_resnet18_half(ir):
 
 
 @pytest.mark.unit
-@unittest.skipIf(
-    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
-    "tensorrt_rtx does not support bfloat16",
-)
 def test_cosmos_true_div(ir):
     class CosmosLearnablePositionalEmbed(torch.nn.Module):
         def __init__(
@@ -532,10 +521,6 @@ def test_cosmos_true_div(ir):
 
 
 @pytest.mark.unit
-@unittest.skipIf(
-    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
-    "bf16 is not supported for tensorrt_rtx",
-)
 @pytest.mark.critical
 def test_bf16_model(ir):
     class MyModule(torch.nn.Module):
@@ -581,10 +566,6 @@ def test_bf16_model(ir):
 
 
 @pytest.mark.unit
-@unittest.skipIf(
-    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
-    "bf16 is not supported for tensorrt_rtx",
-)
 @pytest.mark.critical
 def test_bf16_fallback_model(ir):
     class MyModule(torch.nn.Module):
@@ -626,6 +607,57 @@ def test_bf16_fallback_model(ir):
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"BF16 fallback model TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    "Grouped 3D deconv fallback WAR is TensorRT-RTX specific",
+)
+def test_grouped_deconv3d_fallback(ir):
+    """Grouped 3D deconvolutions fall back to PyTorch on TRT-RTX.
+
+    The convolution_capability_validator rejects grouped ConvTranspose3d ops
+    so that the partitioner keeps them in PyTorch while other ops run on TRT.
+    """
+
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv3d(3, 16, 3, padding=1)
+            self.relu = torch.nn.ReLU()
+            self.deconv = torch.nn.ConvTranspose3d(16, 16, 3, padding=1, groups=16)
+
+        def forward(self, x):
+            out = self.conv(x)
+            out = self.relu(out)
+            out = self.deconv(out)
+            return out
+
+    model = MyModule().eval().cuda()
+    input = torch.randn((1, 3, 16, 16, 16), device="cuda")
+
+    compile_spec = {
+        "inputs": [torchtrt.Input(input.shape, dtype=torch.float32)],
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float32},
+        "ir": ir,
+        "pass_through_build_failures": True,
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+    }
+
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
+
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"Grouped 3D deconv fallback model TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env

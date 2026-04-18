@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=55bd4f66"></script>
+    <script src="../../_static/documentation_options.js?v=3eb18c47"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -668,6 +668,12 @@ improvements on Ampere+ GPUs with sparse weights.</p></td>
 Ampere and newer GPUs and provides FP32-range with FP16-speed for matmul/conv.
 Disable only when you need strict IEEE FP32 semantics.</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>Whether the attn_bias in efficient SDPA is causal. Default is True. This can
+accelerate models from HF because attn_bias is always a causal mask in HF.
+If you want to use non-causal attn_bias, you can set this to False.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -960,6 +966,11 @@ differences.</p></td>
 <td><p>Use <code class="docutils literal notranslate"><span class="pre">aot_autograd</span></code> for tracing instead of the default path. Required when the
 model contains <code class="docutils literal notranslate"><span class="pre">DTensor</span></code> or other distributed tensors.</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Decompose attention layers into smaller ops. We have converters for handling attention ops,
+but if you want to decompose them into smaller ops, you can set this to True.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -990,7 +1001,7 @@ model contains <code class="docutils literal notranslate"><span class="pre">DTen
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
 <td><p>Defer TRT engine deserialization until all engines have been built.
 Works around resource contraints and builder overhad but engines
-may be less well tuned to their deployment resource availablity</p></td>
+may be less well tuned to their deployment resource availability</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">debug</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
@@ -1083,7 +1094,7 @@ rebuilt from scratch:</p>
 <code class="docutils literal notranslate"><span class="pre">l2_limit_for_tiling</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_autocast</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>,
-<code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>, <code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>.</p>
 <p>Settings not in this list (e.g., <code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>, <code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code>)
 can be changed without invalidating the cache.</p>
 </section>

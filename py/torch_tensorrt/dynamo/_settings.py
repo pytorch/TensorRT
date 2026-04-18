@@ -8,6 +8,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    ATTN_BIAS_IS_CAUSAL,
     AUTOCAST_CALIBRATION_DATALOADER,
     AUTOCAST_EXCLUDED_NODES,
     AUTOCAST_EXCLUDED_OPS,
@@ -43,6 +44,7 @@ from torch_tensorrt.dynamo._defaults import (
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
+    RUNTIME_CACHE_PATH,
     SPARSE_WEIGHTS,
     STRIP_ENGINE_WEIGHTS,
     TILING_OPTIMIZATION_LEVEL,
@@ -96,7 +98,8 @@ class CompilationSettings:
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. The cache is loaded on engine setup and saved on module cleanup. Uses file locking for concurrent access safety. Not used for standard TensorRT.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
@@ -120,6 +123,7 @@ class CompilationSettings:
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -149,6 +153,7 @@ class CompilationSettings:
     dryrun: Union[bool, str] = DRYRUN
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
+    runtime_cache_path: str = RUNTIME_CACHE_PATH
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
@@ -180,6 +185,7 @@ class CompilationSettings:
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
     decompose_attention: bool = DECOMPOSE_ATTENTION
+    attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -220,6 +226,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "autocast_max_depth_of_reduction",
     "autocast_calibration_dataloader",
     "decompose_attention",
+    "attn_bias_is_causal",
 }
 
 

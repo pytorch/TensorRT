@@ -6,7 +6,6 @@ import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch.fx.node import Target
-from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -53,9 +52,7 @@ def batch_norm(
     # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
     # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
     # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
-    # TODO: lanl: to remove this once we have solved the batchnorm constant folding issue in RTX
-    # https://github.com/pytorch/TensorRT/issues/3699
-    if ENABLED_FEATURES.tensorrt_rtx or any(
+    if any(
         [
             isinstance(weight, trt.ITensor),
             isinstance(bias, trt.ITensor),
@@ -175,8 +172,6 @@ def batch_norm(
             if running_var is None:
                 running_var = torch.ones((feature_num,))
 
-            power = torch.ones_like(weight)
-
             adjusted_scale, adjusted_bias = batch_norm_constant_folding(
                 weight, bias, running_mean, running_var, eps
             )
@@ -200,16 +195,6 @@ def batch_norm(
             source_ir=source_ir,
         )
 
-        power = to_trt_weights(
-            ctx,
-            power,
-            name,
-            layer_type_name="SCALE",
-            weight_type_name="POWER",
-            target=target,
-            source_ir=source_ir,
-        )
-
         if len(input.shape) < 4:
             new_shape = (
                 (input.shape[0], input.shape[1], 1, 1)
@@ -221,7 +206,7 @@ def batch_norm(
             )
 
         layer = ctx.net.add_scale_nd(
-            input, trt.ScaleMode.CHANNEL, adjusted_bias, adjusted_scale, power, 1
+            input, trt.ScaleMode.CHANNEL, adjusted_bias, adjusted_scale, None, 1
         )
         set_layer_name(layer, target, name, source_ir)
         output = layer.get_output(0)

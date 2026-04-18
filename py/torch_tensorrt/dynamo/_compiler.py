@@ -92,6 +92,7 @@ def cross_compile_for_windows(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -112,6 +113,7 @@ def cross_compile_for_windows(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -170,7 +172,8 @@ def cross_compile_for_windows(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -190,6 +193,7 @@ def cross_compile_for_windows(
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -334,6 +338,7 @@ def cross_compile_for_windows(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
+        "runtime_cache_path": runtime_cache_path,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
@@ -349,6 +354,7 @@ def cross_compile_for_windows(
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
+        "attn_bias_is_causal": attn_bias_is_causal,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -365,6 +371,12 @@ def cross_compile_for_windows(
             logger.warning(
                 f"arg: {key} is not supported for cross compilation for windows feature, hence it is disabled."
             )
+
+    if "runtime_cache_path" in compilation_options:
+        compilation_options.pop("runtime_cache_path")
+        logger.warning(
+            "runtime_cache_path is a JIT-time API and is not applicable to cross compilation for windows. Ignoring."
+        )
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
@@ -442,6 +454,7 @@ def compile(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -475,6 +488,7 @@ def compile(
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -535,7 +549,8 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -563,6 +578,7 @@ def compile(
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -742,6 +758,7 @@ def compile(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
+        "runtime_cache_path": runtime_cache_path,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
@@ -767,6 +784,7 @@ def compile(
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
+        "attn_bias_is_causal": attn_bias_is_causal,
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
@@ -1158,6 +1176,7 @@ def convert_exported_program_to_serialized_trt_engine(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -1175,6 +1194,7 @@ def convert_exported_program_to_serialized_trt_engine(
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -1232,7 +1252,8 @@ def convert_exported_program_to_serialized_trt_engine(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -1250,6 +1271,7 @@ def convert_exported_program_to_serialized_trt_engine(
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model.
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -1405,6 +1427,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
+        "runtime_cache_path": runtime_cache_path,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
@@ -1420,7 +1443,13 @@ def convert_exported_program_to_serialized_trt_engine(
         "offload_module_to_cpu": offload_module_to_cpu,
         "use_distributed_mode_trace": use_distributed_mode_trace,
         "decompose_attention": decompose_attention,
+        "attn_bias_is_causal": attn_bias_is_causal,
     }
+    if "runtime_cache_path" in compilation_options:
+        compilation_options.pop("runtime_cache_path")
+        logger.warning(
+            "runtime_cache_path is a JIT-time API and is not applicable to serialized engine export. Ignoring."
+        )
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)

@@ -274,5 +274,53 @@ class TestNativeBatchNormConverter(DispatchTestCase):
         )
 
 
+class TestBatchNormConvFusion(DispatchTestCase):
+    """Regression test for https://github.com/pytorch/TensorRT/issues/3699.
+
+    When Conv output is negative and feeds into BatchNorm, the fused
+    Conv+Scale kernel must not produce NaN. This test uses the full
+    torch_tensorrt.dynamo.compile() pipeline to exercise the TRT optimizer's
+    layer fusion.
+    """
+
+    def test_conv_batchnorm_conv_no_nan(self):
+        import torch_tensorrt
+
+        class ConvBNConv(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv1 = torch.nn.Conv2d(1, 1, 3, 1, 1, bias=False)
+                self.bn1 = torch.nn.BatchNorm2d(1)
+                self.conv2 = torch.nn.Conv2d(1, 1, 3, 1, 1, bias=False)
+
+            def forward(self, x):
+                return self.conv2(self.bn1(self.conv1(x)))
+
+        model = ConvBNConv().eval().to("cuda")
+        with torch.no_grad():
+            model.conv1.weight.fill_(1.0)
+            model.conv2.weight.fill_(1.0)
+
+        inp = torch.full((1, 1, 1, 1), -1.0, device="cuda")
+        exp_program = torch.export.export(model, (inp,), strict=False)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            exp_program,
+            inputs=[torch_tensorrt.Input(shape=(1, 1, 1, 1), dtype=torch.float32)],
+            device=torch_tensorrt.Device("cuda:0"),
+            enabled_precisions={torch.float32},
+            min_block_size=1,
+            pass_through_build_failures=True,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+
+        pyt_out = model(inp)
+        trt_out = trt_mod(inp)
+
+        nan_count = torch.isnan(trt_out).sum().item()
+        self.assertEqual(nan_count, 0, "TRT output contains NaN")
+        torch.testing.assert_close(trt_out, pyt_out, atol=1e-3, rtol=1e-3)
+
+
 if __name__ == "__main__":
     run_tests()
