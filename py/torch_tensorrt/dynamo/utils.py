@@ -312,7 +312,17 @@ def prepare_inputs(
         elif isinstance(inputs, Input):
             return inputs
 
-        elif isinstance(inputs, (torch.Tensor, int, float, bool)):
+        elif isinstance(inputs, torch.Tensor):
+            # Pass the tensor directly — torch.tensor() would create a full
+            # data copy, which wastes GPU memory when torch.compile lifts
+            # model parameters as graph inputs.
+            # Input.from_tensor only reads shape/dtype/format metadata.
+            return Input.from_tensor(
+                inputs,
+                disable_memory_format_check=disable_memory_format_check,
+            )
+
+        elif isinstance(inputs, (int, float, bool)):
             return Input.from_tensor(
                 torch.tensor(inputs),
                 disable_memory_format_check=disable_memory_format_check,

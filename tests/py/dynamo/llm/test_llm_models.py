@@ -28,8 +28,6 @@ def test_llm_decoder_layer(precision):
     from run_llm import compile_torchtrt
     from torchtrt_ext import register_sdpa
 
-    if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx and precision == "BF16":
-        pytest.skip("TensorRT-RTX does not support bfloat16, skipping test")
     with torch.inference_mode():
         args = argparse.Namespace()
         args.debug = False
