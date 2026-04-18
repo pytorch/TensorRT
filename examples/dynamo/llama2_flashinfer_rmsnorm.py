@@ -243,7 +243,6 @@ with torch_tensorrt.logging.errors():
     trt_model = torch_tensorrt.dynamo.compile(
         exported,
         inputs=[input_ids],
-        enabled_precisions={torch.float32, torch.float16},
         truncate_double=True,
         device=DEVICE,
         disable_tf32=True,

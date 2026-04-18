@@ -109,7 +109,6 @@ ep = _export(
 trt_gm = torch_tensorrt.dynamo.compile(
     ep,
     inputs=dummy_inputs,
-    enabled_precisions={torch.float32},
     truncate_double=True,
     min_block_size=1,
     use_fp32_acc=True,

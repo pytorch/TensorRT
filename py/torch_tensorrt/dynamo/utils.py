@@ -625,13 +625,6 @@ def parse_dynamo_kwargs(
         valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
         settings = replace(settings, **valid_kwargs)
 
-    if "enabled_precisions" in kwargs:
-        warnings.warn(
-            "`enabled_precisions` is deprecated for the Dynamo path. Strong typing is always enabled; precision is controlled by the model's graph dtypes.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
     # Parse input runtime specification
     settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
 

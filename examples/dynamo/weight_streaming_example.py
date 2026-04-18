@@ -123,14 +123,12 @@ llama2_ep = export_llm(model, input_tensors[0], max_seq_len=osl)
 # ----------------------------------
 #
 # enable_weight_streaming=True option is required to build the engine with weight streaming feature.
-# Only float32 precision is allowed in enabled_precisions option.
 #
 
 # Create a TensorRT-compiled model
 trt_model = torch_tensorrt.dynamo.compile(
     llama2_ep,
     inputs=input_tensors,
-    enabled_precisions={torch.float32},
     truncate_double=True,
     device=DEVICE,
     enable_weight_streaming=True,

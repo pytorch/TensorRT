@@ -255,10 +255,7 @@ def _compile_lm(
 
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    else:  # FP32
-        enabled_precisions = {torch.float32}
 
     exported_program = export_llm(
         lm_wrap, input_embeds, min_seq_len=1, max_seq_len=2560
@@ -268,7 +265,6 @@ def _compile_lm(
         trt_mod = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs=[input_embeds, position_ids],
-            enabled_precisions=enabled_precisions,
             use_fp32_acc=use_fp32_acc,
             device=device,
             disable_tf32=args.disable_tf32,
@@ -329,12 +325,7 @@ def _compile_eagle2_vision(
     # Set precision-specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-    else:  # FP32
-        enabled_precisions = {torch.float32}
 
     with torch.inference_mode():
         exported_program = torch.export.export(
@@ -347,7 +338,6 @@ def _compile_eagle2_vision(
         trt_mod = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs=[example_pixel_values],
-            enabled_precisions=enabled_precisions,
             use_fp32_acc=use_fp32_acc,
             device=device,
             disable_tf32=args.disable_tf32,

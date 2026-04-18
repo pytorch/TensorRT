@@ -34,13 +34,6 @@ Core Parameters
    * - Parameter
      - Default
      - Description
-   * - ``enabled_precisions`` (**DEPRECATED**)
-     - ``{dtype.f32}``
-     - Set of precisions the TensorRT builder may use. Any combination of
-       ``torch.float32``, ``torch.float16``, ``torch.bfloat16``, ``torch.int8``,
-       ``torch.float8_e4m3fn``. Adding a lower precision does not force its use — TRT
-       selects the best kernel per layer. For INT8 calibration or FP8, use ModelOpt
-       quantization first.
    * - ``min_block_size``
      - ``5``
      - Minimum number of consecutive TRT-capable operators required to form a TRT
@@ -438,7 +431,7 @@ Engine-Invariant Settings
 Changing any of the following settings invalidates cached engines — the engine must be
 rebuilt from scratch:
 
-``enabled_precisions``, ``max_aux_streams``, ``version_compatible``,
+``max_aux_streams``, ``version_compatible``,
 ``optimization_level``, ``disable_tf32``, ``sparse_weights``,
 ``engine_capability``, ``hardware_compatible``, ``refit_identical_engine_weights``,
 ``immutable_weights``, ``enable_weight_streaming``, ``tiling_optimization_level``,

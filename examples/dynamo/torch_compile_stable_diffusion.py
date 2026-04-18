@@ -38,7 +38,6 @@ pipe.unet = torch.compile(
     backend=backend,
     options={
         "truncate_long_and_double": True,
-        "enabled_precisions": {torch.float32, torch.float16},
     },
     dynamic=False,
 )

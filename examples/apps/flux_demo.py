@@ -29,7 +29,6 @@ def compile_model(
         import register_sdpa
 
     if args.dtype == "fp4":
-        enabled_precisions = {torch.float4_e2m1fn_x2}
         ptq_config = mtq.NVFP4_DEFAULT_CFG
         if args.fp4_mha:
             from modelopt.torch.quantization.config import NVFP4_FP8_MHA_CONFIG
@@ -37,16 +36,14 @@ def compile_model(
             ptq_config = NVFP4_FP8_MHA_CONFIG
 
     elif args.dtype == "fp8":
-        enabled_precisions = {torch.float8_e4m3fn, torch.float16}
         ptq_config = mtq.FP8_DEFAULT_CFG
 
     elif args.dtype == "int8":
-        enabled_precisions = {torch.int8, torch.float16}
         ptq_config = mtq.INT8_DEFAULT_CFG
         ptq_config["quant_cfg"]["*weight_quantizer"]["axis"] = None
 
     elif args.dtype == "fp16":
-        enabled_precisions = {torch.float16}
+        pass
 
     print(f"\nUsing {args.dtype}")
 
@@ -120,7 +117,6 @@ def compile_model(
     settings = {
         "strict": False,
         "prefer_deferred_runtime_asserts_over_guards": True,
-        "enabled_precisions": enabled_precisions,
         "truncate_double": True,
         "min_block_size": 1,
         "use_python_runtime": True,

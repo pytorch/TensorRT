@@ -84,7 +84,6 @@ Cache Invalidation
 The cache is **automatically invalidated** when any engine-invariant setting changes.
 The following changes always require a cache miss (engine rebuild):
 
-* ``enabled_precisions``
 * ``max_aux_streams``
 * ``version_compatible`` / ``hardware_compatible``
 * ``optimization_level``

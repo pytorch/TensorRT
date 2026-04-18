@@ -186,22 +186,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         return repr(tuple(str_args))
 
     def validate_compile_settings(self) -> None:
-        if ENABLED_FEATURES.tensorrt_rtx:
-            # NOTE: bfloat16 check disabled — depthwise conv BF16 limitation
-            # is now handled per-layer via capability_validator
-            return
-
-        if (
-            dtype.i8 in self.compilation_settings.enabled_precisions
-            and not self.builder.platform_has_fast_int8
-        ):
-            raise RuntimeError("Current platform doesn't support fast native int8!")
-
-        if (
-            dtype.f16 in self.compilation_settings.enabled_precisions
-            and not self.builder.platform_has_fast_fp16
-        ):
-            warnings.warn("Current platform doesn't support fast native fp16!")
+        pass
 
     def _populate_trt_builder_config(
         self,

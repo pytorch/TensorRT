@@ -1,4 +1,5 @@
 import os
+
 import torch
 import torch_tensorrt
 
@@ -41,7 +42,6 @@ with torch.no_grad():
                 dtype=torch.float32,
             )
         ],
-        "enabled_precisions": {torch.float32},
         "min_block_size": 1,
     }
     cg_trt_module = torch_tensorrt.dynamo.compile(exported, **compile_settings)

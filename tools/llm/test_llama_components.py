@@ -49,13 +49,7 @@ def test_llama_attention(args):
     # Set precision specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
 
     # model = LlamaAttentionBlock().eval().cuda().to(DTYPE)
     model = llama_model.model.layers[0].self_attn.to(DTYPE)
@@ -84,7 +78,6 @@ def test_llama_attention(args):
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[hidden_states, position_embeddings, None],
-            enabled_precisions=enabled_precisions,
             disable_tf32=True,
             use_fp32_acc=use_fp32_acc,
             debug=args.debug,
@@ -131,13 +124,7 @@ def test_llama_attention_with_static_cache(args):
     # Set precision specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
     model = llama_model.model.layers[0].self_attn.to(DTYPE)
 
     # Inputs
@@ -176,7 +163,6 @@ def test_llama_attention_with_static_cache(args):
                 end_idx,
                 is_causal,
             ],
-            enabled_precisions=enabled_precisions,
             disable_tf32=True,
             debug=args.debug,
             # offload_module_to_cpu=True,
@@ -252,13 +238,7 @@ def test_llama_decoder(args):
     # Set precision specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
 
     model = LlamaDecoderLayerBlock(llama_model.model.layers[0].to(DTYPE))
     # llama3
@@ -279,7 +259,6 @@ def test_llama_decoder(args):
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[hidden_states, position_embeddings],
-            enabled_precisions=enabled_precisions,
             debug=args.debug,
             use_fp32_acc=use_fp32_acc,
         )
@@ -312,13 +291,7 @@ def test_llama_decoder_with_static_cache(args):
     # Set precision specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
     model = LlamaDecoderLayerBlock(llama_model.model.layers[0].to(DTYPE))
 
     # Inputs
@@ -356,7 +329,6 @@ def test_llama_decoder_with_static_cache(args):
                 end_idx,
                 is_causal,
             ],
-            enabled_precisions=enabled_precisions,
             disable_tf32=True,
             debug=args.debug,
             # offload_module_to_cpu=True,
@@ -420,13 +392,7 @@ def test_llama_model(args):
     # Set precision specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
 
     model = llama_model.model.to(DTYPE)
 
@@ -457,7 +423,6 @@ def test_llama_model(args):
             ep,
             arg_inputs=[],
             kwarg_inputs=kwarg_inputs,
-            enabled_precisions=enabled_precisions,
             disable_tf32=True,
             debug=args.debug,
             offload_module_to_cpu=True,
@@ -486,13 +451,7 @@ def test_llama_model_with_static_cache(args):
     # Set precision specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
     model = llama_model.model.to(DTYPE)
 
     # Inputs
@@ -522,7 +481,6 @@ def test_llama_model_with_static_cache(args):
             ep,
             arg_inputs=[],
             kwarg_inputs=kwarg_inputs,
-            enabled_precisions=enabled_precisions,
             disable_tf32=True,
             debug=args.debug,
             # offload_module_to_cpu=True,

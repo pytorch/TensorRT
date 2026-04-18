@@ -74,13 +74,7 @@ def test_qwen_apply_rotary_pos_emb(args):
     # Set precision specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
 
     model = QwenApplyRotaryPosEmb().eval().cuda().to(DTYPE)
     # Shapes for Qwen 2.5
@@ -98,7 +92,6 @@ def test_qwen_apply_rotary_pos_emb(args):
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[q, k, cos, sin],
-            enabled_precisions=enabled_precisions,
             disable_tf32=True,
             use_fp32_acc=use_fp32_acc,
             debug=args.debug,
@@ -125,13 +118,7 @@ def test_qwen_attention(args):
     # Set precision specific flags
     use_fp32_acc = False
     if args.precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
 
     model = qwen2_5_model.model.layers[0].self_attn.to(DTYPE)
     # qwen2.5
@@ -153,7 +140,6 @@ def test_qwen_attention(args):
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[hidden_states, position_embeddings, None],
-            enabled_precisions=enabled_precisions,
             disable_tf32=True,
             use_fp32_acc=use_fp32_acc,
             debug=args.debug,

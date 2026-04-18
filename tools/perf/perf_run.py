@@ -220,7 +220,6 @@ def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
     iters = params.get("iterations", 20)
 
     compilation_options = {
-        "enabled_precisions": {precision_to_dtype(precision)},
         "min_block_size": params.get("min_block_size", 1),
         "truncate_double": params.get("truncate", False),
         "immutable_weights": params.get("immutable_weights", True),
@@ -290,7 +289,6 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         return run_hf_dynamo(model, input_tensors, params, precision, batch_size)
 
     compilation_options = {
-        "enabled_precisions": {precision_to_dtype(precision)},
         "min_block_size": params.get("min_block_size", 1),
         "truncate_double": params.get("truncate", False),
         "immutable_weights": params.get("immutable_weights", True),
@@ -353,7 +351,6 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
     )
     compile_spec = {
         "inputs": input_tensors,
-        "enabled_precisions": {precision_to_dtype(precision)},
         "truncate": params.get("truncate", False),
         "min_block_size": params.get("min_block_size", 1),
         "use_python_runtime": params.get("use_python_runtime", False),
