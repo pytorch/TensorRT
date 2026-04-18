@@ -8,6 +8,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    ATTN_BIAS_IS_CAUSAL,
     AUTOCAST_CALIBRATION_DATALOADER,
     AUTOCAST_EXCLUDED_NODES,
     AUTOCAST_EXCLUDED_OPS,
@@ -120,6 +121,7 @@ class CompilationSettings:
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -180,6 +182,7 @@ class CompilationSettings:
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
     decompose_attention: bool = DECOMPOSE_ATTENTION
+    attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -220,6 +223,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "autocast_max_depth_of_reduction",
     "autocast_calibration_dataloader",
     "decompose_attention",
+    "attn_bias_is_causal",
 }
 
 
