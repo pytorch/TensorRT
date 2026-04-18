@@ -247,7 +247,6 @@ with torch_tensorrt.logging.errors():
         truncate_double=True,
         device=DEVICE,
         disable_tf32=True,
-        use_explicit_typing=False,
         use_fp32_acc=True,
     )
 

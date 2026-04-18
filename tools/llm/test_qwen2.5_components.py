@@ -73,11 +73,9 @@ def test_qwen_apply_rotary_pos_emb(args):
 
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
@@ -103,7 +101,6 @@ def test_qwen_apply_rotary_pos_emb(args):
             enabled_precisions=enabled_precisions,
             disable_tf32=True,
             use_fp32_acc=use_fp32_acc,
-            use_explicit_typing=use_explicit_typing,
             debug=args.debug,
         )
     trt_output = trt_model(q, k, cos, sin)
@@ -127,11 +124,9 @@ def test_qwen_attention(args):
 
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
@@ -161,7 +156,6 @@ def test_qwen_attention(args):
             enabled_precisions=enabled_precisions,
             disable_tf32=True,
             use_fp32_acc=use_fp32_acc,
-            use_explicit_typing=use_explicit_typing,
             debug=args.debug,
         )
     trt_output = trt_model(hidden_states, position_embeddings, None)

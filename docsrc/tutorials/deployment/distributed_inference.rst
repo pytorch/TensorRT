@@ -41,7 +41,6 @@ compiles its own TRT engine independently.
             model,
             ir="dynamo",
             arg_inputs=local_inputs,
-            use_explicit_typing=True,  # enabled_precisions deprecated; cast model/inputs to target dtype
             min_block_size=1,
         )
         output = trt_model(*local_inputs)
@@ -98,7 +97,6 @@ handles DTensor inputs correctly:
         backend="torch_tensorrt",
         options={
             "use_distributed_mode_trace": True,
-            "use_explicit_typing": True,  # enabled_precisions deprecated
             "use_python_runtime": True,
             "min_block_size": 1,
         },
@@ -156,10 +154,6 @@ Compilation Settings for Distributed Workloads
      - ``None`` (auto)
      - Use the Python runtime. Often set to ``True`` for tensor-parallel models that run
        inside an existing distributed process group.
-   * - ``use_explicit_typing``
-     - ``True``
-     - Respect dtypes set in model/inputs (recommended). Use ``model.half()`` or
-       ``enable_autocast=True`` for lower-precision workloads. ``enabled_precisions`` is **deprecated**.
 
 ----
 

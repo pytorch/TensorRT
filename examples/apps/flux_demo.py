@@ -20,7 +20,6 @@ def compile_model(
 ) -> tuple[
     FluxPipeline, FluxTransformer2DModel, torch_tensorrt.MutableTorchTensorRTModule
 ]:
-    use_explicit_typing = False
     if args.use_sdpa:
         # currently use sdpa is not working correctly with flux model, so we don't use it
         # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
@@ -30,7 +29,6 @@ def compile_model(
         import register_sdpa
 
     if args.dtype == "fp4":
-        use_explicit_typing = True
         enabled_precisions = {torch.float4_e2m1fn_x2}
         ptq_config = mtq.NVFP4_DEFAULT_CFG
         if args.fp4_mha:
@@ -128,7 +126,6 @@ def compile_model(
         "use_python_runtime": True,
         "immutable_weights": False,
         "offload_module_to_cpu": args.low_vram_mode,
-        "use_explicit_typing": use_explicit_typing,
     }
     if args.low_vram_mode:
         pipe.remove_all_hooks()

@@ -48,11 +48,9 @@ def test_llama_attention(args):
 
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
@@ -89,7 +87,6 @@ def test_llama_attention(args):
             enabled_precisions=enabled_precisions,
             disable_tf32=True,
             use_fp32_acc=use_fp32_acc,
-            use_explicit_typing=use_explicit_typing,
             debug=args.debug,
         )
     trt_output = trt_model(hidden_states, position_embeddings, None)
@@ -133,11 +130,9 @@ def test_llama_attention_with_static_cache(args):
 
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
@@ -186,7 +181,6 @@ def test_llama_attention_with_static_cache(args):
             debug=args.debug,
             # offload_module_to_cpu=True,
             use_fp32_acc=use_fp32_acc,
-            use_explicit_typing=use_explicit_typing,
             use_python_runtime=True,
         )
 
@@ -257,11 +251,9 @@ def test_llama_decoder(args):
 
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
@@ -290,7 +282,6 @@ def test_llama_decoder(args):
             enabled_precisions=enabled_precisions,
             debug=args.debug,
             use_fp32_acc=use_fp32_acc,
-            use_explicit_typing=use_explicit_typing,
         )
     trt_output = trt_model(hidden_states, position_embeddings)
 
@@ -320,11 +311,9 @@ def test_llama_decoder_with_static_cache(args):
 
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
@@ -372,7 +361,6 @@ def test_llama_decoder_with_static_cache(args):
             debug=args.debug,
             # offload_module_to_cpu=True,
             use_fp32_acc=use_fp32_acc,
-            use_explicit_typing=use_explicit_typing,
             use_python_runtime=True,
         )
 
@@ -431,11 +419,9 @@ def test_llama_model(args):
 
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
@@ -476,7 +462,6 @@ def test_llama_model(args):
             debug=args.debug,
             offload_module_to_cpu=True,
             use_fp32_acc=use_fp32_acc,
-            use_explicit_typing=use_explicit_typing,
             use_python_runtime=True,
         )
 
@@ -500,11 +485,9 @@ def test_llama_model_with_static_cache(args):
 
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
     elif args.precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
@@ -544,7 +527,6 @@ def test_llama_model_with_static_cache(args):
             debug=args.debug,
             # offload_module_to_cpu=True,
             use_fp32_acc=use_fp32_acc,
-            use_explicit_typing=use_explicit_typing,
             use_python_runtime=True,
         )
 

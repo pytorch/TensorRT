@@ -16,7 +16,6 @@ Dynamo compilation. It is passed (directly or via keyword arguments) to
     trt_gm = torch_tensorrt.dynamo.compile(
         exported_program,
         arg_inputs=inputs,
-        use_explicit_typing=True,  # respects dtypes set in model/inputs
         min_block_size=3,
         optimization_level=4,
     )
@@ -150,13 +149,7 @@ Precision and Typing
      - ``False``
      - Insert FP32 cast nodes around matmul layers so that accumulation happens in
        FP32 even when the network runs in FP16. Improves numerical accuracy for
-       transformer models at a small throughput cost. Requires ``use_explicit_typing=True``.
-   * - ``use_explicit_typing``
-     - ``True``
-     - Respect the dtypes set in the PyTorch model (strong typing). When ``True``,
-       TRT will not silently up/downcast layers. This is the recommended approach for
-       controlling precision — set dtypes in your model/inputs directly. Required by
-       autocast and ``use_fp32_acc``.
+       transformer models at a small throughput cost.
 
 ----
 
@@ -169,8 +162,7 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
 
 .. note::
 
-   When ``enable_autocast=True``, ``use_explicit_typing`` is automatically set to
-   ``True`` as well.
+   Strong typing (explicit typing) is always enabled in the Dynamo path.
 
 .. code-block:: python
 
