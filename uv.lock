@@ -4014,6 +4014,7 @@ name = "torch-tensorrt"
 source = { editable = "." }
 dependencies = [
     { name = "dllist", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "filelock", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version < '3.11' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform == 'win32')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version >= '3.11' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform == 'win32')" },
     { name = "packaging", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
@@ -4077,6 +4078,7 @@ test-ext = [
 [package.metadata]
 requires-dist = [
     { name = "dllist" },
+    { name = "filelock" },
     { name = "numpy" },
     { name = "packaging", specifier = ">=23" },
     { name = "psutil" },

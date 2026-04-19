@@ -92,6 +92,7 @@ def cross_compile_for_windows(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -171,7 +172,8 @@ def cross_compile_for_windows(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -336,6 +338,7 @@ def cross_compile_for_windows(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
+        "runtime_cache_path": runtime_cache_path,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
@@ -368,6 +371,12 @@ def cross_compile_for_windows(
             logger.warning(
                 f"arg: {key} is not supported for cross compilation for windows feature, hence it is disabled."
             )
+
+    if "runtime_cache_path" in compilation_options:
+        compilation_options.pop("runtime_cache_path")
+        logger.warning(
+            "runtime_cache_path is a JIT-time API and is not applicable to cross compilation for windows. Ignoring."
+        )
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
@@ -441,6 +450,7 @@ def compile(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -535,7 +545,8 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -743,6 +754,7 @@ def compile(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
+        "runtime_cache_path": runtime_cache_path,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
@@ -1156,6 +1168,7 @@ def convert_exported_program_to_serialized_trt_engine(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    runtime_cache_path: str = _defaults.RUNTIME_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
@@ -1231,7 +1244,8 @@ def convert_exported_program_to_serialized_trt_engine(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -1405,6 +1419,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
+        "runtime_cache_path": runtime_cache_path,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
@@ -1422,6 +1437,11 @@ def convert_exported_program_to_serialized_trt_engine(
         "decompose_attention": decompose_attention,
         "attn_bias_is_causal": attn_bias_is_causal,
     }
+    if "runtime_cache_path" in compilation_options:
+        compilation_options.pop("runtime_cache_path")
+        logger.warning(
+            "runtime_cache_path is a JIT-time API and is not applicable to serialized engine export. Ignoring."
+        )
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)

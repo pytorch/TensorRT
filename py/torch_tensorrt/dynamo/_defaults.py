@@ -40,6 +40,9 @@ SUPPORTED_KERNEL_PRECISIONS = {
 TIMING_CACHE_PATH = os.path.join(
     tempfile.gettempdir(), "torch_tensorrt_engine_cache", "timing_cache.bin"
 )
+RUNTIME_CACHE_PATH = os.path.join(
+    tempfile.gettempdir(), "torch_tensorrt_engine_cache", "runtime_cache.bin"
+)
 LAZY_ENGINE_INIT = False
 CACHE_BUILT_ENGINES = False
 REUSE_CACHED_ENGINES = False

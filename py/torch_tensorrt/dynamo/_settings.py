@@ -44,6 +44,7 @@ from torch_tensorrt.dynamo._defaults import (
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
+    RUNTIME_CACHE_PATH,
     SPARSE_WEIGHTS,
     STRIP_ENGINE_WEIGHTS,
     TILING_OPTIMIZATION_LEVEL,
@@ -97,7 +98,8 @@ class CompilationSettings:
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. The cache is loaded on engine setup and saved on module cleanup. Uses file locking for concurrent access safety. Not used for standard TensorRT.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
@@ -151,6 +153,7 @@ class CompilationSettings:
     dryrun: Union[bool, str] = DRYRUN
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
+    runtime_cache_path: str = RUNTIME_CACHE_PATH
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
