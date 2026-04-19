@@ -2,7 +2,6 @@ import logging
 
 from .converter_registry import (  # noqa
     CONVERTERS,
-    NO_IMPLICIT_BATCH_DIM_SUPPORT,
     tensorrt_converter,
 )
 from .converters import *  # noqa: F403 F401
