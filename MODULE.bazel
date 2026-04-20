@@ -8,6 +8,7 @@ bazel_dep(name = "googletest", version = "1.16.0")
 bazel_dep(name = "platforms", version = "0.0.11")
 bazel_dep(name = "rules_cc", version = "0.1.1")
 bazel_dep(name = "rules_python", version = "1.3.0")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
@@ -25,6 +26,10 @@ git_override(
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 
 local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
+
+torch_nccl_detect = use_repo_rule("//toolchains/torch_nccl:defs.bzl", "torch_nccl_detect")
+
+torch_nccl_detect(name = "torch_nccl")
 
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 new_local_repository(
@@ -131,9 +136,9 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.16.0.72",
+    strip_prefix = "TensorRT-10.16.1.11",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.0/tars/TensorRT-10.16.0.72.Linux.x86_64-gnu.cuda-13.2.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-13.2.tar.gz",
     ],
 )
 
@@ -149,9 +154,9 @@ http_archive(
 http_archive(
     name = "tensorrt_sbsa",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.16.0.72",
+    strip_prefix = "TensorRT-10.16.1.11",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.0/tars/TensorRT-10.16.0.72.Linux.aarch64-gnu.cuda-13.2.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.aarch64-gnu.cuda-13.2.tar.gz",
     ],
 )
 
@@ -167,9 +172,9 @@ http_archive(
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.16.0.72",
+    strip_prefix = "TensorRT-10.16.1.11",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.0/zip/TensorRT-10.16.0.72.Windows.amd64.cuda-13.2.zip",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-13.2.zip",
     ],
 )
 

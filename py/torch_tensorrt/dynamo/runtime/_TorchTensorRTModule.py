@@ -36,6 +36,7 @@ SERIALIZED_METADATA_IDX = -1  # Not implemented
 TARGET_PLATFORM_IDX = -1  # Not implemented
 REQUIRES_OUTPUT_ALLOCATOR_IDX = -1  # Not implemented
 SERIALIZATION_LEN = -1  # Not implemented
+IS_MD_ENGINE_IDX = -1  # Not implemented
 
 if ENABLED_FEATURES.torch_tensorrt_runtime:
     ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()  # 0
@@ -53,7 +54,8 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
     RESOURCE_ALLOCATION_STRATEGY_IDX = (
         torch.ops.tensorrt.RESOURCE_ALLOCATION_STRATEGY_IDX()
     )  # 10
-    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 11
+    IS_MD_ENGINE_IDX = torch.ops.tensorrt.IS_MD_ENGINE_IDX()  # 11
+    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 12
 
 
 @for_all_methods(needs_torch_tensorrt_runtime)
@@ -87,6 +89,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),  # Assumes engine was built with default compilation settings if object not passed
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
+        requires_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
@@ -107,6 +110,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+            requires_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding
 
         Example:
@@ -146,6 +150,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
         self.symbolic_shape_expressions = symbolic_shape_expressions
+        self.requires_multidevice = requires_multidevice
 
         if (
             serialized_engine
@@ -153,6 +158,21 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             and not self.settings.enable_cross_compile_for_windows
         ):
             self.setup_engine()
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> "TorchTensorRTModule":
+        # The C++ TRTEngine is not safely deep-copyable for distributed (NCCL)
+        # engines — creating a new execution context during copy can crash at
+        # destruction time.  Since the exporter only reads the engine (never
+        # executes it), sharing the same C++ object is safe.
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k == "engine":
+                object.__setattr__(result, k, v)  # shallow: reuse the same C++ Engine
+            else:
+                object.__setattr__(result, k, copy.deepcopy(v, memo))
+        return result
 
     def _pack_engine_info(self) -> List[str | bytes]:
         target_device = (
@@ -203,6 +223,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[RESOURCE_ALLOCATION_STRATEGY_IDX] = str(
             int(self.dynamically_allocate_resources)
         )
+        engine_info[IS_MD_ENGINE_IDX] = str(int(self.requires_multidevice))
+        # rank/world_size are runtime facts; queried from ProcessGroup at execution time
 
         return engine_info
 
@@ -251,6 +273,33 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is not None:
             return
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+
+        # requires_multidevice is set by the C++ constructor from the serialized IS_MD_ENGINE_IDX field.
+        if self.engine.requires_multidevice:
+            from torch_tensorrt.distributed._nccl_utils import (
+                check_nccl_engine_requirements,
+            )
+
+            check_nccl_engine_requirements()
+
+        # Store the active process group name on the C++ engine so that the
+        # lazy NCCL setup in execute_engine() can find the right communicator
+        # without needing any further Python involvement.
+        if ENABLED_FEATURES.torch_tensorrt_runtime and self.engine.requires_multidevice:
+            from torch_tensorrt.distributed._distributed import (
+                get_active_group_name,
+                register_md_engine,
+            )
+
+            group_name = get_active_group_name()
+            if group_name:
+                self.engine.set_group_name(group_name)
+
+            # Register the C++ engine for teardown tracking so
+            # distributed_context().__exit__ can release the NCCL comm even
+            # for torch.compile models where the engine lives in dynamo's
+            # code cache and isn't reachable via module tree walking.
+            register_md_engine(self.engine)
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
@@ -350,10 +399,19 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # directly cast the input to a Torch Tensor.
         #
         # This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors
-        input_tensors: List[torch.Tensor] = [
-            (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
-            for i in inputs
-        ]
+        input_tensors: List[torch.Tensor] = []
+        for i in inputs:
+            if isinstance(i, torch.Tensor):
+                if not i.is_cuda:
+                    logger.warning(
+                        "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
+                        "For best performance, ensure all inputs are on the correct CUDA device "
+                        "before calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device))."
+                    )
+                    i = i.cuda()
+                input_tensors.append(i)
+            else:
+                input_tensors.append(torch.tensor(i).cuda())
 
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine

@@ -9,6 +9,7 @@ import tensorrt
 from packaging import version
 from torch_tensorrt._utils import (
     check_cross_compile_trt_win_lib,
+    check_native_trt_collectives,
     load_tensorrt_llm_for_nccl,
     sanitized_torch_version,
 )
@@ -25,6 +26,7 @@ FeatureSet = namedtuple(
         "windows_cross_compile",
         "tensorrt_rtx",
         "trtllm_for_nccl",
+        "native_trt_collectives",
     ],
 )
 
@@ -50,7 +52,16 @@ _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.
 _FX_FE_AVAIL = False if _TENSORRT_RTX else True
 _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
-_TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
+
+# Check if native TRT collectives are available (TRT 10.16+ with NCCL)
+_NATIVE_TRT_COLLECTIVES_AVAIL = check_native_trt_collectives(
+    linked_file_full_path, linked_file_runtime_full_path
+)
+
+# Only load TRT-LLM for NCCL if native TRT collectives are not available
+_TRTLLM_AVAIL = False
+if not _NATIVE_TRT_COLLECTIVES_AVAIL:
+    _TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
 
 if _TENSORRT_RTX:
     _QDP_PLUGIN_AVAIL = False
@@ -77,6 +88,7 @@ ENABLED_FEATURES = FeatureSet(
     _WINDOWS_CROSS_COMPILE,
     _TENSORRT_RTX,
     _TRTLLM_AVAIL,
+    _NATIVE_TRT_COLLECTIVES_AVAIL,
 )
 
 T = TypeVar("T")
@@ -84,7 +96,7 @@ T = TypeVar("T")
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
-    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n"  # type: ignore[no-untyped-call]
+    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n - Native TRT Collectives: {enabled(_NATIVE_TRT_COLLECTIVES_AVAIL)}\n"  # type: ignore[no-untyped-call]
     return out_str
 
 

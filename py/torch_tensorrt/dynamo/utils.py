@@ -25,6 +25,7 @@ import sympy
 import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
+from torch._subclasses.fake_tensor import FakeScriptObject
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._sympy.numbers import int_oo
 from torch_tensorrt._Device import Device
@@ -501,7 +502,8 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
         return torch.int64
     elif isinstance(tensor, torch.SymFloat):
         return torch.float32
-    elif tensor is None:
+    elif isinstance(tensor, FakeScriptObject) or tensor is None:
+        # In torch.compile distributed cases, the DeviceMesh for each tensor is passed as an argument to the graph as a FakeScriptObject
         # Case where we explicitly pass one of the inputs to be None (eg: FLUX.1-dev)
         return None
     else:

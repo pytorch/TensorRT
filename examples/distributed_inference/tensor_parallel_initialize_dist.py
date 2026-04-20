@@ -77,15 +77,24 @@ def initialize_distributed_env(
         console_level: Console handler level - "debug", "info", "warning" (default: "info")
     """
     local_rank = int(
-        os.environ.get("OMPI_COMM_WORLD_LOCAL_RANK", rank % torch.cuda.device_count())
+        os.environ.get(
+            "OMPI_COMM_WORLD_LOCAL_RANK",
+            os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count()),
+        )
     )
-    world_size = int(os.environ.get("OMPI_COMM_WORLD_SIZE", world_size))
+    world_size = int(
+        os.environ.get("OMPI_COMM_WORLD_SIZE", os.environ.get("WORLD_SIZE", world_size))
+    )
 
-    # Set up environment variable to run with mpirun
-    os.environ["RANK"] = str(local_rank)
-    os.environ["WORLD_SIZE"] = str(world_size)
-    os.environ["MASTER_ADDR"] = "127.0.0.1"
-    os.environ["MASTER_PORT"] = str(port)
+    # Set env vars only if not already set by launcher (torchtrtrun/torchrun)
+    if "RANK" not in os.environ:
+        os.environ["RANK"] = str(local_rank)
+    if "WORLD_SIZE" not in os.environ:
+        os.environ["WORLD_SIZE"] = str(world_size)
+    if "MASTER_ADDR" not in os.environ:
+        os.environ["MASTER_ADDR"] = "127.0.0.1"
+    if "MASTER_PORT" not in os.environ:
+        os.environ["MASTER_PORT"] = str(port)
 
     # Necessary to assign a device to each rank.
     torch.cuda.set_device(local_rank)
