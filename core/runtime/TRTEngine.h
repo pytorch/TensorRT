@@ -29,21 +29,22 @@
 #endif
 
 namespace torch_tensorrt {
+
 namespace core {
 namespace runtime {
 
 using FlattenedState = std::tuple<
-    std::tuple<std::string, std::string>,  // ABI_VERSION
-    std::tuple<std::string, std::string>,  // name
-    std::tuple<std::string, std::string>,  // device
-    std::tuple<std::string, std::string>,  // engine
-    std::tuple<std::string, std::string>,  // input binding names
-    std::tuple<std::string, std::string>,  // output binding names
-    std::tuple<std::string, std::string>,  // HW compatibility
-    std::tuple<std::string, std::string>,  // requires_output_allocator
-    std::tuple<std::string, std::string>,  // serialized metadata
-    std::tuple<std::string, std::string>,  // Platform
-    std::tuple<std::string, std::string>,  // Resource Allocation Strategy
+    std::tuple<std::string, std::string>, // ABI_VERSION
+    std::tuple<std::string, std::string>, // name
+    std::tuple<std::string, std::string>, // device
+    std::tuple<std::string, std::string>, // engine
+    std::tuple<std::string, std::string>, // input binding names
+    std::tuple<std::string, std::string>, // output binding names
+    std::tuple<std::string, std::string>, // HW compatibility
+    std::tuple<std::string, std::string>, // requires_output_allocator
+    std::tuple<std::string, std::string>, // serialized metadata
+    std::tuple<std::string, std::string>, // Platform
+    std::tuple<std::string, std::string>, // Resource Allocation Strategy
     std::tuple<std::string, std::string>>; // requires_multidevice
 
 struct TorchTRTRuntimeStates {
