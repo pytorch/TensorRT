@@ -93,6 +93,20 @@ def _local_executorch_impl(ctx):
         if child.exists:
             ctx.symlink(child, sub)
 
+    # Expose libqnn_executorch_backend.so as a cc_import target so that
+    # libtrt_executorch_backend.so can resolve 6 ExecuTorch backend-registry
+    # symbols at dlopen() time (register_backend, find_backend, vlogf, …).
+    qnn_so = et_dir.get_child("backends/qualcomm/libqnn_executorch_backend.so")
+    if qnn_so.exists:
+        ctx.symlink(qnn_so, "libqnn_executorch_backend.so")
+
+    # Expose libexecutorch_core.a so that C++ binaries (e.g. trt_executor_runner)
+    # can link the full ExecuTorch runtime (Program::load, Method::execute,
+    # runtime_init, MethodMeta, …) statically.
+    core_a = et_dir.get_child("cmake-out/libexecutorch_core.a")
+    if core_a.exists:
+        ctx.symlink(core_a, "libexecutorch_core.a")
+
     ctx.file("BUILD", ctx.read(Label("@//third_party/executorch:BUILD")))
 
 local_executorch = repository_rule(
