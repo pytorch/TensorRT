@@ -71,11 +71,14 @@ def nccl_gather(
     name: str,
     plug_inputs: Tuple[Argument, ...],
 ) -> trt.ITensor:
+    rank, world_size = _get_distributed_rank_and_world_size()
+    if world_size == 1:
+        return plug_inputs[0]
+
     allgather_plg_creator = trt.get_plugin_registry().get_plugin_creator(
         "AllGather", "1", "tensorrt_llm"
     )
     assert allgather_plg_creator is not None
-    rank, world_size = _get_distributed_rank_and_world_size()
     logger.debug(
         f"Adding TRT-LLM NCCL gather: name={name}, rank={rank}, world_size={world_size}"
     )
@@ -102,6 +105,10 @@ def nccl_all_reduce(
     name: str,
     plug_inputs: Tuple[Argument, ...],
 ) -> trt.ITensor:
+    rank, world_size = _get_distributed_rank_and_world_size()
+    if world_size == 1:
+        return plug_inputs[0]
+
     allreduce_plg_creator = trt.get_plugin_registry().get_plugin_creator(
         "AllReduce", "1", "tensorrt_llm"
     )
@@ -110,7 +117,6 @@ def nccl_all_reduce(
     counter = 0
     strategy = AllReduceStrategy.NCCL
     config = AllReduceConfig(0)
-    rank, world_size = _get_distributed_rank_and_world_size()
     logger.debug(
         f"Adding TRT-LLM NCCL all reduce: name={name}, rank={rank}, world_size={world_size}"
     )
@@ -152,6 +158,10 @@ def nccl_reduce_scatter(
     name: str,
     plug_inputs: Tuple[Argument, ...],
 ) -> trt.ITensor:
+    rank, world_size = _get_distributed_rank_and_world_size()
+    if world_size == 1:
+        return plug_inputs[0]
+
     allreduce_plg_creator = trt.get_plugin_registry().get_plugin_creator(
         "ReduceScatter", "1", "tensorrt_llm"
     )
@@ -161,7 +171,6 @@ def nccl_reduce_scatter(
     counter = 0
     strategy = AllReduceStrategy.NCCL
     config = AllReduceConfig(0)
-    rank, world_size = _get_distributed_rank_and_world_size()
     logger.debug(
         f"Adding TRT-LLM NCCL reduce scatter: name={name}, rank={rank}, world_size={world_size}"
     )
@@ -218,6 +227,11 @@ def nccl_gather_native(
         Output on all ranks: [1, 2, 3, 4]  shape=(4,)
     """
     rank, world_size = _get_distributed_rank_and_world_size()
+
+    # TRT add_dist_collective crashes with world_size=1; all_gather of a single rank
+    # is an identity op.
+    if world_size == 1:
+        return plug_inputs[0]
     logger.debug(
         f"Adding native all_gather: name={name}, rank={rank}, world_size={world_size}"
     )
@@ -304,6 +318,11 @@ def nccl_reduce_scatter_native(
         f"Adding native reduce_scatter: name={name}, rank={rank}, world_size={world_size}, reduce_op={reduce_op}"
     )
 
+    # TRT add_dist_collective crashes with world_size=1; reduce_scatter of a single rank
+    # is an identity op.
+    if world_size == 1:
+        return plug_inputs[0]
+
     # Get the input tensor
     input_tensor = plug_inputs[0]
 
@@ -389,6 +408,12 @@ def nccl_all_reduce_native(
         Output on rank 1: [6, 8, 10, 12]  shape=(4,)
     """
     rank, world_size = _get_distributed_rank_and_world_size()
+
+    # TRT add_dist_collective crashes with world_size=1; all_reduce of a single rank
+    # is an identity op.
+    if world_size == 1:
+        return plug_inputs[0]
+
     logger.debug(
         f"Adding native all_reduce: name={name}, rank={rank}, world_size={world_size}, reduce_op={reduce_op}"
     )
