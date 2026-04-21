@@ -284,7 +284,7 @@ def test_bert_base_uncased(ir, dtype):
 
     model = (
         BertModel.from_pretrained(
-            "bert-base-uncased", dtype=dtype, attn_implementation="sdpa"
+            "bert-base-uncased", torch_dtype=dtype, attn_implementation="sdpa"
         )
         .cuda()
         .eval()
