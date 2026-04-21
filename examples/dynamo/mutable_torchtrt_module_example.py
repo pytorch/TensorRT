@@ -37,8 +37,7 @@ settings = {
 }
 
 model = models.resnet18(pretrained=True).to("cuda").eval()
-with torch_trt.runtime.set_runtime_backend("cpp"):
-    mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
+mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
 # You can use the mutable module just like the original pytorch module. The compilation happens while you first call the mutable module.
 with torch.no_grad():
     mutable_module(*inputs)
@@ -92,8 +91,7 @@ with torch.no_grad():
     pipe.to(device)
 
     # The only extra line you need
-    with torch_trt.runtime.set_runtime_backend("python"):
-        pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **settings)
+    pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **settings)
     BATCH = torch.export.Dim("BATCH", min=2, max=24)
     _HEIGHT = torch.export.Dim("_HEIGHT", min=16, max=32)
     _WIDTH = torch.export.Dim("_WIDTH", min=16, max=32)
@@ -209,16 +207,15 @@ start = torch.cuda.Event(enable_timing=True)
 end = torch.cuda.Event(enable_timing=True)
 
 example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
-with torch_trt.runtime.set_runtime_backend("python"):
-    model = torch_trt.MutableTorchTensorRTModule(
-        model,
-        enabled_precisions={torch.float},
-        min_block_size=1,
-        immutable_weights=False,
-        cache_built_engines=True,
-        reuse_cached_engines=True,
-        engine_cache_size=1 << 30,  # 1GB
-    )
+model = torch_trt.MutableTorchTensorRTModule(
+    model,
+    enabled_precisions={torch.float},
+    min_block_size=1,
+    immutable_weights=False,
+    cache_built_engines=True,
+    reuse_cached_engines=True,
+    engine_cache_size=1 << 30,  # 1GB
+)
 
 
 def remove_timing_cache(path=TIMING_CACHE_PATH):

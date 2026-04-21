@@ -53,14 +53,13 @@ def test_mapping():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
     settings = trt_gm._run_on_acc_0.settings
     runtime = trt.Runtime(TRT_LOGGER)
 
@@ -117,14 +116,13 @@ def test_conv_refit_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("python"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -180,14 +178,13 @@ def test_batch_norm_refit_one_engine_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("python"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -243,14 +240,13 @@ def test_batch_norm_refit_one_engine_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("python"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -297,14 +293,13 @@ def test_refit_one_engine_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("python"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -351,14 +346,13 @@ def test_refit_one_engine_no_map_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     trt_gm._run_on_acc_0.weight_name_map = None
 
@@ -406,14 +400,13 @@ def test_refit_one_engine_with_wrong_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("python"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
     # Manually Deleted all batch norm layer. This suppose to fail the fast refit
     trt_gm._run_on_acc_0.weight_name_map = {
         k: v
@@ -470,14 +463,13 @@ def test_refit_one_engine_bert_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("python"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -529,14 +521,13 @@ def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
     exp_program = torch.export.export(model, tuple(inputs), strict=False)
     exp_program2 = torch.export.export(model2, tuple(inputs), strict=False)
 
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
     torchtrt.save(trt_gm, trt_ep_path, arg_inputs=inputs, retrace=True)
     trt_gm = torch.export.load(trt_ep_path)
 
@@ -581,14 +572,13 @@ def test_refit_one_engine_python_runtime_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("python"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -651,16 +641,15 @@ def test_refit_multiple_engine_with_weightmap():
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
     torch_executed_ops = {"torch.ops.aten.convolution.default"}
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-            torch_executed_ops=torch_executed_ops,
-            reuse_cached_engines=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+        torch_executed_ops=torch_executed_ops,
+        reuse_cached_engines=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -715,17 +704,16 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
     torch_executed_ops = {"torch.ops.aten.convolution.default"}
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-            torch_executed_ops=torch_executed_ops,
-            reuse_cached_engines=False,
-            offload_module_to_cpu=True,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+        torch_executed_ops=torch_executed_ops,
+        reuse_cached_engines=False,
+        offload_module_to_cpu=True,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -770,14 +758,13 @@ def test_refit_one_engine_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -828,14 +815,13 @@ def test_refit_one_engine_bert_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -886,14 +872,13 @@ def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
     torchtrt.save(trt_gm, trt_ep_path, arg_inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
@@ -936,14 +921,13 @@ def test_refit_one_engine_python_runtime_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    with torchtrt.runtime.set_runtime_backend("python"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -1006,16 +990,15 @@ def test_refit_multiple_engine_without_weightmap():
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
     torch_executed_ops = {"torch.ops.aten.convolution.default"}
-    with torchtrt.runtime.set_runtime_backend("cpp"):
-        trt_gm = torchtrt.dynamo.compile(
-            exp_program,
-            tuple(inputs),
-            enabled_precisions=enabled_precisions,
-            min_block_size=min_block_size,
-            immutable_weights=False,
-            torch_executed_ops=torch_executed_ops,
-            reuse_cached_engines=False,
-        )
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+        torch_executed_ops=torch_executed_ops,
+        reuse_cached_engines=False,
+    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,

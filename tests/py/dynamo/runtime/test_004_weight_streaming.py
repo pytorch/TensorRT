@@ -43,17 +43,15 @@ class TestWeightStreamingPython(TestCase):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.dynamo.compile(
-                exp_program,
-                inputs=input,
-                min_block_size=1,
-                cache_built_engines=False,
-                reuse_cached_engines=False,
-                use_explicit_typing=True,
-                enable_weight_streaming=True,
-            )
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
+            inputs=input,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            use_explicit_typing=True,
+            enable_weight_streaming=True,
+        )
         # Checking if default weight streaming budget(automatic) is applied when compiler option was provided
         weight_streaming_ctx = torchtrt.runtime.weight_streaming(optimized_model)
         assert weight_streaming_ctx.device_budget > 0
@@ -95,17 +93,15 @@ class TestWeightStreamingPython(TestCase):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.dynamo.compile(
-                exp_program,
-                inputs=input,
-                min_block_size=1,
-                cache_built_engines=False,
-                reuse_cached_engines=False,
-                use_explicit_typing=True,
-                enable_weight_streaming=True,
-            )
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
+            inputs=input,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            use_explicit_typing=True,
+            enable_weight_streaming=True,
+        )
         # Weight streaming budget is applied manually.
         with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
             streamable_budget = weight_streaming_ctx.total_device_budget
@@ -156,20 +152,18 @@ class TestWeightStreamingPython(TestCase):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.dynamo.compile(
-                exp_program,
-                inputs=input,
-                min_block_size=1,
-                cache_built_engines=False,
-                reuse_cached_engines=False,
-                torch_executed_ops=(
-                    {"torch.ops.aten.convolution.default"} if multi_rt else {}
-                ),
-                use_explicit_typing=True,
-                enable_weight_streaming=True,
-            )
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
+            inputs=input,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            torch_executed_ops=(
+                {"torch.ops.aten.convolution.default"} if multi_rt else {}
+            ),
+            use_explicit_typing=True,
+            enable_weight_streaming=True,
+        )
 
         # Setting weight streaming context to unsupported module
         with torchtrt.runtime.weight_streaming(model) as weight_streaming_ctx:
@@ -205,18 +199,16 @@ class TestWeightStreamingPython(TestCase):
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
 
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.dynamo.compile(
-                exp_program,
-                inputs=input,
-                min_block_size=1,
-                cache_built_engines=False,
-                reuse_cached_engines=False,
-                torch_executed_ops={"torch.ops.aten.convolution.default"},
-                use_explicit_typing=True,
-                enable_weight_streaming=True,
-            )
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
+            inputs=input,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            torch_executed_ops={"torch.ops.aten.convolution.default"},
+            use_explicit_typing=True,
+            enable_weight_streaming=True,
+        )
 
         with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
             streamable_budget = weight_streaming_ctx.total_device_budget
@@ -251,18 +243,16 @@ class TestWeightStreamingPython(TestCase):
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
 
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.dynamo.compile(
-                exp_program,
-                inputs=input,
-                min_block_size=1,
-                cache_built_engines=False,
-                reuse_cached_engines=False,
-                torch_executed_ops={"torch.ops.aten.convolution.default"},
-                use_explicit_typing=True,
-                enable_weight_streaming=True,
-            )
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
+            inputs=input,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            torch_executed_ops={"torch.ops.aten.convolution.default"},
+            use_explicit_typing=True,
+            enable_weight_streaming=True,
+        )
 
         with torchtrt.runtime.enable_cudagraphs(optimized_model) as cudagraphs_module:
             with torchtrt.runtime.weight_streaming(
@@ -362,13 +352,11 @@ class TestWeightStreamingPython(TestCase):
             "enable_weight_streaming": True,
             "torch_executed_ops": {"torch.ops.aten.mul.Tensor"},
         }
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            exp_program = torchtrt.dynamo.trace(model, **compile_spec)
-            optimized_model = torchtrt.dynamo.compile(
-                exp_program,
-                **compile_spec,
-            )
+        exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
+            **compile_spec,
+        )
 
         # List of tuples representing different configurations for three features:
         # Cuda graphs, pre-allocated output buffer, weight streaming change

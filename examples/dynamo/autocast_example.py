@@ -69,20 +69,19 @@ pytorch_outs = model(*inputs)
 # ``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``, and ``autocast_calibration_dataloader``. Please refer to
 # the documentation for more details.
 
-with torch_tensorrt.runtime.set_runtime_backend("python"):
-    trt_autocast_mod = torch_tensorrt.compile(
-        ep.module(),
-        arg_inputs=inputs,
-        min_block_size=1,
-        use_explicit_typing=True,
-        enable_autocast=True,
-        autocast_low_precision_type=torch.bfloat16,
-        autocast_excluded_nodes={"^conv1$", "relu"},
-        autocast_excluded_ops={"torch.ops.aten.flatten.using_ints"},
-        autocast_max_output_threshold=512,
-        autocast_max_depth_of_reduction=None,
-        autocast_calibration_dataloader=calibration_dataloader,
-    )
+trt_autocast_mod = torch_tensorrt.compile(
+    ep.module(),
+    arg_inputs=inputs,
+    min_block_size=1,
+    use_explicit_typing=True,
+    enable_autocast=True,
+    autocast_low_precision_type=torch.bfloat16,
+    autocast_excluded_nodes={"^conv1$", "relu"},
+    autocast_excluded_ops={"torch.ops.aten.flatten.using_ints"},
+    autocast_max_output_threshold=512,
+    autocast_max_depth_of_reduction=None,
+    autocast_calibration_dataloader=calibration_dataloader,
+)
 
 autocast_outs = trt_autocast_mod(*inputs)
 

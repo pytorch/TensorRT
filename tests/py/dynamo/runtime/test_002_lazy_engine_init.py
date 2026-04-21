@@ -14,7 +14,7 @@ from torch_tensorrt.dynamo.utils import (
     cosine_similarity,
     get_model_device,
 )
-from torch_tensorrt.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.runtime import TorchTensorRTModule
 
 assertions = unittest.TestCase()
 
@@ -72,7 +72,7 @@ class TestLazyEngineInit(TestCase):
         )
 
         # Inference on TRT Engine
-        trt_module = PythonTorchTensorRTModule(
+        trt_module = TorchTensorRTModule(
             trt_engine_str,
             ["a", "b"],
             ["output0"],
@@ -128,7 +128,7 @@ class TestLazyEngineInit(TestCase):
         assert get_model_device(model).type == "cpu"
         model.cuda()
         # Inference on TRT Engine
-        trt_module = PythonTorchTensorRTModule(
+        trt_module = TorchTensorRTModule(
             trt_engine_str,
             ["x"],
             ["output0"],

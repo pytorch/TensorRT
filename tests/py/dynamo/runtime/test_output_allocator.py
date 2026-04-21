@@ -57,14 +57,12 @@ class TestOutputAllocatorStaticModel(TestCase):
     def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = StaticModel().eval().cuda()
         inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         ref_out = model(*inputs)
 
@@ -102,14 +100,12 @@ class TestOutputAllocatorStaticModel(TestCase):
         """
         model = StaticModel().eval().cuda()
         inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
         standard_out = compiled_model(*inputs)
         ref_out = model(*inputs)
 
@@ -129,14 +125,12 @@ class TestOutputAllocatorStaticModel(TestCase):
     def test_combination_of_cg_and_oa(self, _, use_python_runtime):
         model = StaticModel().eval().cuda()
         inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         with pytest.raises(
             RuntimeError,
@@ -173,14 +167,12 @@ class TestOutputAllocatorDDSModel(TestCase):
     def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = DDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         with pytest.raises(
             RuntimeError,
@@ -215,14 +207,12 @@ class TestOutputAllocatorDDSModel(TestCase):
         """
         model = DDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
         oa_out = compiled_model(*inputs)
         ref_out = model(*inputs)
 
@@ -242,14 +232,12 @@ class TestOutputAllocatorDDSModel(TestCase):
     def test_combination_of_cg_and_oa(self, _, use_python_runtime):
         model = DDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         with pytest.raises(
             RuntimeError,
@@ -290,14 +278,12 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
     def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = DDSOpWithReductionOpModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         with pytest.raises(
             RuntimeError,
@@ -332,14 +318,12 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
         """
         model = DDSOpWithReductionOpModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
         oa_out = compiled_model(*inputs)
         ref_out = model(*inputs)
 
@@ -359,14 +343,12 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
     def test_combination_of_cg_and_oa(self, _, use_python_runtime):
         model = DDSOpWithReductionOpModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         with pytest.raises(
             RuntimeError,
@@ -403,15 +385,13 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
     def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = DDSModel2().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-                torch_executed_ops={"torch.ops.aten.abs.default"},
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.abs.default"},
+        )
 
         with pytest.raises(
             RuntimeError,
@@ -446,15 +426,13 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
         """
         model = DDSModel2().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-                torch_executed_ops={"torch.ops.aten.abs.default"},
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.abs.default"},
+        )
         oa_out = compiled_model(*inputs)
         ref_out = model(*inputs)
 
@@ -474,15 +452,13 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
     def test_combination_of_cg_and_oa(self, _, use_python_runtime):
         model = DDSModel2().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        backend = "python" if use_python_runtime else "cpp"
-        with torch_tensorrt.runtime.set_runtime_backend(backend):
-            compiled_model = torch_tensorrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-                torch_executed_ops={"torch.ops.aten.abs.default"},
-            )
+        compiled_model = torch_tensorrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.abs.default"},
+        )
 
         with pytest.raises(
             RuntimeError,

@@ -122,14 +122,12 @@ class TestConcatEmptyTensor(TestCase):
             inputs = [non_empty_input]
 
         # Compile with Torch-TensorRT
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            compiled_model = torchtrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torchtrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         # Run reference model
         ref_out = model(*inputs)
@@ -163,14 +161,12 @@ class TestConcatEmptyTensor(TestCase):
         empty_input = torch.empty(empty_shape, dtype=torch.float).cuda()
         inputs = [non_empty_input, empty_input]
 
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            compiled_model = torchtrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torchtrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         ref_out = model(*inputs)
         trt_out = compiled_model(*inputs)
@@ -208,14 +204,12 @@ class TestEmptyTensorMemoryLeak(TestCase):
         non_empty_input = torch.randn((3, 4), dtype=torch.float).cuda()
         inputs = [empty_input, non_empty_input]
 
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            compiled_model = torchtrt.compile(
-                model,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-            )
+        compiled_model = torchtrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+        )
 
         # Record initial GPU memory
         torch.cuda.synchronize()

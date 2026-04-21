@@ -155,9 +155,9 @@ Runtime Errors
     The model contains data-dependent-shape ops (``nonzero``, ``unique``,
     ``masked_select``, etc.) which require TRT's output allocator.
 
-    * Use :func:`~torch_tensorrt.runtime.set_runtime_backend` with ``"python"`` or use a module with
-      ``requires_output_allocator=True`` so the runtime can use TRT's output allocator
-      on the Python execution path when needed.
+    * Use :class:`~torch_tensorrt.runtime.TorchTensorRTModule` (or a compiled graph that wraps it)
+      with ``requires_output_allocator=True`` so the runtime can use TRT's output allocator
+      when the engine needs dynamic output allocation.
     * See :ref:`cuda_graphs` for ``DynamicOutputAllocator`` details.
 
 ----

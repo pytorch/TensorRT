@@ -24,15 +24,13 @@ class TestPreAllocatedOutputs(TestCase):
         fx_graph = torch.fx.symbolic_trace(model)
 
         # Validate that the results between Torch and Torch-TRT are similar
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.compile(
-                fx_graph,
-                "torch_compile",
-                inputs[0],
-                min_block_size=1,
-                pass_through_build_failures=True,
-            )
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
 
         ref_out_list = []
         trt_out_list = []
@@ -75,16 +73,14 @@ class TestPreAllocatedOutputs(TestCase):
         )
         fx_graph = torch.fx.symbolic_trace(SampleModel())
 
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.compile(
-                fx_graph,
-                "dynamo",
-                inputs,
-                min_block_size=1,
-                pass_through_build_failures=True,
-                torch_executed_ops={"torch.ops.aten.mul.Tensor"},
-            )
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        )
 
         input_list = []
         ref_out_list = []
@@ -137,15 +133,14 @@ class TestPreAllocatedOutputs(TestCase):
         fx_graph = torch.fx.symbolic_trace(model)
 
         # Validate that the results between Torch and Torch-TRT are similar
-        with torchtrt.runtime.set_runtime_backend("python"):
-            optimized_model = torchtrt.compile(
-                fx_graph,
-                "dynamo",
-                inputs[0],
-                min_block_size=1,
-                pass_through_build_failures=True,
-                torch_executed_ops={torch.ops.aten.add.Tensor},
-            )
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={torch.ops.aten.add.Tensor},
+        )
 
         with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
             _ = optimized_model(inputs[0])
@@ -184,16 +179,14 @@ class TestPreAllocatedOutputs(TestCase):
         fx_graph = torch.fx.symbolic_trace(model)
 
         # Validate that the results between Torch and Torch-TRT are similar
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.compile(
-                fx_graph,
-                "dynamo",
-                inputs[0],
-                min_block_size=1,
-                pass_through_build_failures=True,
-                torch_executed_ops={torch.ops.aten.add.Tensor},
-            )
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={torch.ops.aten.add.Tensor},
+        )
 
         with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
             _ = optimized_model(inputs[0])
@@ -226,16 +219,14 @@ class TestPreAllocatedOutputs(TestCase):
         fx_graph = torch.fx.symbolic_trace(model)
 
         # Validate that the results between Torch and Torch-TRT are similar
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.compile(
-                fx_graph,
-                "dynamo",
-                inputs[0],
-                min_block_size=1,
-                pass_through_build_failures=True,
-                torch_executed_ops={torch.ops.aten.add.Tensor},
-            )
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={torch.ops.aten.add.Tensor},
+        )
 
         torch_res = model(inputs[0])
 
@@ -280,15 +271,14 @@ class TestPreAllocatedOutputs(TestCase):
         fx_graph = torch.fx.symbolic_trace(model)
 
         # Validate that the results between Torch and Torch-TRT are similar
-        with torchtrt.runtime.set_runtime_backend("python"):
-            optimized_model = torchtrt.compile(
-                fx_graph,
-                "dynamo",
-                inputs[0],
-                min_block_size=1,
-                pass_through_build_failures=True,
-                torch_executed_ops={torch.ops.aten.add.Tensor},
-            )
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={torch.ops.aten.add.Tensor},
+        )
 
         with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
             res1 = optimized_model(inputs[0])
@@ -331,16 +321,14 @@ class TestPreAllocatedOutputs(TestCase):
         fx_graph = torch.fx.symbolic_trace(model)
 
         # Validate that the results between Torch and Torch-TRT are similar
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.compile(
-                fx_graph,
-                "dynamo",
-                inputs[0],
-                min_block_size=1,
-                pass_through_build_failures=True,
-                torch_executed_ops={torch.ops.aten.add.Tensor},
-            )
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={torch.ops.aten.add.Tensor},
+        )
 
         with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
             _ = optimized_model(inputs[0])
@@ -378,16 +366,14 @@ class TestPreAllocatedOutputs(TestCase):
         fx_graph = torch.fx.symbolic_trace(model)
 
         # Validate that the results between Torch and Torch-TRT are similar
-        backend = "python" if use_python_runtime else "cpp"
-        with torchtrt.runtime.set_runtime_backend(backend):
-            optimized_model = torchtrt.compile(
-                fx_graph,
-                "dynamo",
-                inputs[0],
-                min_block_size=1,
-                pass_through_build_failures=True,
-                torch_executed_ops={torch.ops.aten.add.Tensor},
-            )
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={torch.ops.aten.add.Tensor},
+        )
 
         with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
             res_1 = optimized_model(inputs[0])

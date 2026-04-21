@@ -87,20 +87,19 @@ def torch_compile(iterations=3):
             reuse_cached_engines = True
 
         start.record()
-        with torch_trt.runtime.set_runtime_backend("python"):
-            compiled_model = torch.compile(
-                model,
-                backend="tensorrt",
-                options={
-                    "enabled_precisions": enabled_precisions,
-                    "min_block_size": min_block_size,
-                    "immutable_weights": False,
-                    "cache_built_engines": cache_built_engines,
-                    "reuse_cached_engines": reuse_cached_engines,
-                },
-            )
-            with torch.no_grad():
-                compiled_model(*inputs)  # trigger the compilation
+        compiled_model = torch.compile(
+            model,
+            backend="tensorrt",
+            options={
+                "enabled_precisions": enabled_precisions,
+                "min_block_size": min_block_size,
+                "immutable_weights": False,
+                "cache_built_engines": cache_built_engines,
+                "reuse_cached_engines": reuse_cached_engines,
+            },
+        )
+        with torch.no_grad():
+            compiled_model(*inputs)  # trigger the compilation
         end.record()
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
@@ -148,17 +147,16 @@ def dynamo_compile(iterations=3):
             reuse_cached_engines = True
 
         start.record()
-        with torch_trt.runtime.set_runtime_backend("cpp"):
-            trt_gm = torch_trt.dynamo.compile(
-                exp_program,
-                tuple(inputs),
-                enabled_precisions=enabled_precisions,
-                min_block_size=min_block_size,
-                immutable_weights=False,
-                cache_built_engines=cache_built_engines,
-                reuse_cached_engines=reuse_cached_engines,
-                engine_cache_size=1 << 30,  # 1GB
-            )
+        trt_gm = torch_trt.dynamo.compile(
+            exp_program,
+            tuple(inputs),
+            enabled_precisions=enabled_precisions,
+            min_block_size=min_block_size,
+            immutable_weights=False,
+            cache_built_engines=cache_built_engines,
+            reuse_cached_engines=reuse_cached_engines,
+            engine_cache_size=1 << 30,  # 1GB
+        )
         # output = trt_gm(*inputs)
         end.record()
         torch.cuda.synchronize()
@@ -257,21 +255,20 @@ def torch_compile_my_cache(iterations=3):
             reuse_cached_engines = True
 
         start.record()
-        with torch_trt.runtime.set_runtime_backend("python"):
-            compiled_model = torch.compile(
-                model,
-                backend="tensorrt",
-                options={
-                    "enabled_precisions": enabled_precisions,
-                    "min_block_size": min_block_size,
-                    "immutable_weights": False,
-                    "cache_built_engines": cache_built_engines,
-                    "reuse_cached_engines": reuse_cached_engines,
-                    "custom_engine_cache": engine_cache,
-                },
-            )
-            with torch.no_grad():
-                compiled_model(*inputs)  # trigger the compilation
+        compiled_model = torch.compile(
+            model,
+            backend="tensorrt",
+            options={
+                "enabled_precisions": enabled_precisions,
+                "min_block_size": min_block_size,
+                "immutable_weights": False,
+                "cache_built_engines": cache_built_engines,
+                "reuse_cached_engines": reuse_cached_engines,
+                "custom_engine_cache": engine_cache,
+            },
+        )
+        with torch.no_grad():
+            compiled_model(*inputs)  # trigger the compilation
         end.record()
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))

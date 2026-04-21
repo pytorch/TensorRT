@@ -27,12 +27,12 @@ Functions
 
 .. autofunction:: enable_output_allocator
 
-Runtime backend selection
--------------------------
+Runtime backend
+---------------
 
-.. autofunction:: torch_tensorrt.runtime.get_runtime_backend
-
-.. autofunction:: torch_tensorrt.runtime.set_runtime_backend
+Execution uses the C++ Torch-TensorRT extension when it is installed; otherwise the
+Python ``TRTEngine`` path is used. There is no separate process-wide backend switch
+in ``torch_tensorrt.runtime``.
 
 Classes
 ---------
@@ -43,13 +43,4 @@ Classes
    :show-inheritance:
 
    Single runtime module for TensorRT engines. Dispatches to the C++ or Python execution
-   implementation based on :func:`~torch_tensorrt.runtime.get_runtime_backend` /
-   :func:`~torch_tensorrt.runtime.set_runtime_backend`. See :ref:`python_runtime`.
-
-.. autoclass:: PythonTorchTensorRTModule
-   :members:
-   :special-members: __init__
-   :show-inheritance:
-
-   Subclass of ``TorchTensorRTModule`` that **pins** the Python engine path. Prefer
-   ``TorchTensorRTModule`` plus compile flags unless you need this guarantee. See :ref:`python_runtime`.
+   implementation depending on whether the C++ extension is available. See :ref:`python_runtime`.

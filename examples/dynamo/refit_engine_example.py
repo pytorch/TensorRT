@@ -59,16 +59,15 @@ enabled_precisions = {torch.float}
 workspace_size = 20 << 30
 min_block_size = 0
 torch_executed_ops = {}
-with torch_trt.runtime.set_runtime_backend("cpp"):
-    trt_gm = torch_trt.dynamo.compile(
-        exp_program,
-        tuple(inputs),
-        enabled_precisions=enabled_precisions,
-        min_block_size=min_block_size,
-        torch_executed_ops=torch_executed_ops,
-        immutable_weights=False,
-        reuse_cached_engines=False,
-    )  # Output is a torch.fx.GraphModule
+trt_gm = torch_trt.dynamo.compile(
+    exp_program,
+    tuple(inputs),
+    enabled_precisions=enabled_precisions,
+    min_block_size=min_block_size,
+    torch_executed_ops=torch_executed_ops,
+    immutable_weights=False,
+    reuse_cached_engines=False,
+)  # Output is a torch.fx.GraphModule
 
 # Save the graph module as an exported program
 torch_trt.save(trt_gm, "./compiled.ep", inputs=inputs)

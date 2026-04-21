@@ -93,18 +93,17 @@ inp = torch.rand(20, 10, device="cuda")
 python_result = tp_model(inp)
 
 backend = "torch_tensorrt"
-with torch_tensorrt.runtime.set_runtime_backend("python"):
-    tp_model = torch.compile(
-        tp_model,
-        backend=backend,
-        options={
-            "truncate_long_and_double": True,
-            "enabled_precisions": {torch.float32, torch.float16},
-            "min_block_size": 1,
-            "use_distributed_mode_trace": True,
-        },
-        dynamic=None,
-    )
+tp_model = torch.compile(
+    tp_model,
+    backend=backend,
+    options={
+        "truncate_long_and_double": True,
+        "enabled_precisions": {torch.float32, torch.float16},
+        "min_block_size": 1,
+        "use_distributed_mode_trace": True,
+    },
+    dynamic=None,
+)
 
 # For TP, input needs to be same across all TP ranks.
 # Setting the random seed is to mimic the behavior of dataloader.

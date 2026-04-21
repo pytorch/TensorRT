@@ -27,7 +27,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.lowering.passes import remove_num_users_is_0_nodes
-from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -197,7 +197,7 @@ class TRTTestCase(TestCase):
         atol=ATOL,
         check_dtype=True,
         pyt_inputs=None,
-        rt_cls=PythonTorchTensorRTModule,
+        rt_cls=TorchTensorRTModule,
     ):
         with torch.no_grad():
             cuda_inputs = []
@@ -269,7 +269,7 @@ class TRTTestCase(TestCase):
         interpreter,
         comparators: List[Tuple[Callable, List]],
         fp16_mode=False,
-        rt_cls=PythonTorchTensorRTModule,
+        rt_cls=TorchTensorRTModule,
     ):
         """
         Runs the test and compares the result using the provided comparators.

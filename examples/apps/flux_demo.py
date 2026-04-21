@@ -135,8 +135,7 @@ def compile_model(
         remove_hook_from_module(pipe.transformer, recurse=True)
         pipe.transformer.to(DEVICE)
 
-    with torch_tensorrt.runtime.set_runtime_backend("python"):
-        trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+    trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
     if dynamic_shapes:
         trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
     pipe.transformer = trt_gm

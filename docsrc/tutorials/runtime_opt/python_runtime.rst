@@ -5,30 +5,28 @@ Python vs C++ runtime
 
 Torch-TensorRT uses a single module type, :class:`~torch_tensorrt.runtime.TorchTensorRTModule`,
 to run TensorRT engines inside PyTorch. The **execution path** (which code actually drives
-``execute_async``) is selected at runtime:
+TensorRT execution) is selected automatically:
 
-* **C++ path (default)** — ``torch.classes.tensorrt.Engine`` and ``torch.ops.tensorrt.execute_engine``.
-  Preferred for production when the Torch-TensorRT C++ extension is available: TorchScript-friendly,
-  and integrates with the full C++ runtime stack.
-* **Python path** — When the C++ runtime is absent, use the internal ``TRTEngine`` plus
-  ``torch.ops.tensorrt.execute_engine`` (registered from Python when the C++ runtime is absent). Useful when the C++ extension is absent, or when
-  you want easier Python-level debugging and instrumentation.
+* **C++ path** — ``torch.classes.tensorrt.Engine`` and ``torch.ops.tensorrt.execute_engine``.
+  Used when the Torch-TensorRT C++ extension (``libtorchtrt`` / runtime ``.so``) is loaded:
+  TorchScript-friendly, and integrates with the full C++ runtime stack.
+* **Python path** — Internal ``TRTEngine`` (``torch_tensorrt.dynamo.runtime._PythonTRTEngine``)
+  plus ``tensorrt::execute_engine`` registered from Python when the C++ runtime is not
+  available. Useful for minimal installs and for Python-level debugging.
 
-:class:`~torch_tensorrt.runtime.PythonTorchTensorRTModule` is a **thin subclass** of
-``TorchTensorRTModule`` that **pins** the Python path (same constructor and behavior, but always
-resolves to the Python engine). Prefer ``TorchTensorRTModule`` plus the global backend APIs below
-when you do not need that pin.
+There is no separate subclass or API to **pin** only the Python path: the same
+``TorchTensorRTModule`` class is used in both cases.
 
 ----
 
-When to use the Python path
----------------------------
+When the Python path is used
+-----------------------------
 
-Use :func:`~torch_tensorrt.runtime.set_runtime_backend` (typically as a context manager) when:
+The Python engine implementation is chosen automatically when the C++ Torch-TensorRT library
+is not installed. You may still prefer that setup when:
 
-* The C++ Torch-TensorRT library is not installed (e.g. a minimal environment with only the Python pieces).
-* You want Python-level hooks (e.g. :ref:`observer`) without relying on the C++ extension.
-* You are debugging conversion or execution and want to break inside the Python TRT wrapper.
+* You deploy environments without the compiled Torch-TensorRT extension.
+* You want easier Python-level debugging and instrumentation around TRT execution.
 
 Prefer the C++ path when:
 
@@ -37,71 +35,53 @@ Prefer the C++ path when:
 
 ----
 
-Enabling the Python path
-------------------------
+Compile and run
+-----------------
 
-**Process-wide default (context manager)**
-
-.. code-block:: python
-
-    import torch_tensorrt as tt
-
-    with tt.runtime.set_runtime_backend("python"):
-        trt_gm = tt.dynamo.compile(exported_program, inputs)
-
-**``torch.compile``** (same context manager around compile / first run)
-
-.. code-block:: python
-
-    import torch_tensorrt as tt
-
-    with tt.runtime.set_runtime_backend("python"):
-        trt_model = torch.compile(model, backend="tensorrt", options={})
-
-The context manager does **not** replace :class:`~torch_tensorrt.runtime.PythonTorchTensorRTModule`,
-which always requests the Python path via a class-level pin.
+Use ``torch_tensorrt.dynamo.compile``, ``torch.compile(..., backend="tensorrt", ...)``, or
+construct :class:`~torch_tensorrt.runtime.TorchTensorRTModule` directly. The module picks C++
+vs Python execution based on extension availability.
 
 ----
 
 Serialization
 ---------------
 
-Module state records which backend was used (``runtime_backend`` in packed metadata). After load,
-``TorchTensorRTModule`` reconstructs either the C++ engine or the Python engine wrapper
-as appropriate. Some **export** workflows (e.g. certain ``ExportedProgram`` save paths) may still
-assume a C++-only graph; validate your deployment path if you mix Python execution with AOT export.
+``TorchTensorRTModule`` records serialized state compatible with ``torch.save`` /
+``get_extra_state`` / ``set_extra_state``. Some **export** workflows (e.g. certain
+``ExportedProgram`` save paths) may still assume a C++-only graph; validate your deployment path
+if you rely on portable artifacts.
 
 ----
 
 Limitations
 -----------
 
-* **C++ deployment**: A module that executed on the Python path still needs TensorRT and the
-  Torch-TensorRT Python pieces available in-process unless you recompile targeting the C++ path.
+* **C++ deployment**: Artifacts produced or run on the Python path still need TensorRT and the
+  Torch-TensorRT Python package in-process unless you recompile for the C++ path.
 * **CUDAGraphs**: Whole-graph CUDAGraph wrappers may assume the C++ runtime for some configurations;
   see :ref:`cuda_graphs`.
 * **Explicit allocator engines**: Engines with data-dependent outputs may set
-  ``requires_output_allocator=True``; the unified module supports the output-allocator execution
-  mode on the Python path. See :ref:`cuda_graphs` for interaction with CUDA graphs.
+  ``requires_output_allocator=True``; ``TorchTensorRTModule`` supports output-allocator execution
+  on the Python path. See :ref:`cuda_graphs` for interaction with CUDA graphs.
 
 ----
 
-``PythonTorchTensorRTModule`` direct instantiation
---------------------------------------------------
+``TorchTensorRTModule`` from raw engine bytes
+---------------------------------------------
 
-You can instantiate :class:`~torch_tensorrt.runtime.PythonTorchTensorRTModule` from raw engine bytes
-when you need a **guaranteed** Python execution path (e.g. integrating an engine built outside
-Torch-TensorRT):
+You can build a module directly from a serialized TensorRT engine (for example, an engine
+produced outside Torch-TensorRT):
 
 .. code-block:: python
 
-    from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
+    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
     from torch_tensorrt.dynamo._settings import CompilationSettings
 
     with open("model.engine", "rb") as f:
         engine_bytes = f.read()
 
-    module = PythonTorchTensorRTModule(
+    module = TorchTensorRTModule(
         serialized_engine=engine_bytes,
         input_binding_names=["x"],
         output_binding_names=["output"],
@@ -111,7 +91,7 @@ Torch-TensorRT):
 
     output = module(torch.randn(1, 3, 224, 224).cuda())
 
-**Constructor arguments** (same as ``TorchTensorRTModule``):
+**Constructor arguments** (see class docstring for full detail):
 
 ``serialized_engine`` (``bytes``)
     Raw serialized TRT engine.
@@ -136,7 +116,6 @@ Torch-TensorRT):
 Runtime selection summary
 -------------------------
 
-* :func:`~torch_tensorrt.runtime.get_runtime_backend` / :func:`~torch_tensorrt.runtime.set_runtime_backend`
-  — process default for newly created ``TorchTensorRTModule`` instances (unless a subclass pins a backend).
-  Use ``set_runtime_backend`` as a context manager to scope C++ vs Python for compile and forward.
+* ``TorchTensorRTModule`` uses the C++ engine path when the Torch-TensorRT extension is loaded;
+  otherwise it uses the Python ``TRTEngine`` path.
 * If the C++ extension is **not** built, only the Python path is available.
