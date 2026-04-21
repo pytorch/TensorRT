@@ -21,7 +21,8 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
+# must import after torch_tensorrt to resolve tensorrt_rtx alias
+import tensorrt as trt  # isort: skip
 
 assertions = unittest.TestCase()
 
@@ -409,10 +410,6 @@ def test_refit_one_engine_no_map_with_weightmap():
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
-)
-@unittest.skipIf(
-    torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-    "Refit with wrong weightmap is not supported on TensorRT-RTX",
 )
 @pytest.mark.unit
 def test_refit_one_engine_with_wrong_weightmap():
