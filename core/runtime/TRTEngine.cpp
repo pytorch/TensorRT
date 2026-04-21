@@ -573,14 +573,16 @@ bool TRTEngine::bind_nccl_comm() {
     } else if (nccl_groups.size() > 1) {
       std::string names;
       for (const auto& n : nccl_groups) {
-        if (!names.empty()) names += ", ";
+        if (!names.empty())
+          names += ", ";
         names += "'" + n + "'";
       }
       LOG_WARNING(
           "This TRT engine requires NCCL but multiple NCCL process groups are registered ("
-          << names << "). Cannot auto-select a group — NCCL bind deferred. "
-          "Use the recommended workflow: "
-          "with torch_tensorrt.distributed.distributed_context(group, model) as m: m(inp)");
+          << names
+          << "). Cannot auto-select a group — NCCL bind deferred. "
+             "Use the recommended workflow: "
+             "with torch_tensorrt.distributed.distributed_context(group, model) as m: m(inp)");
     } else {
       LOG_WARNING(
           "This TRT engine requires NCCL (requires_native_multidevice=true) but no NCCL process group "

@@ -1796,6 +1796,10 @@ class TestMultirankNccl(MultiProcessTestCase):
             rank=self.rank,
             world_size=self.world_size,
         )
+        # Overwrite any stale RANK/WORLD_SIZE left by single-rank test setup
+        # so TRT converter env-var reads agree with torch.distributed.
+        os.environ["RANK"] = str(self.rank)
+        os.environ["WORLD_SIZE"] = str(self.world_size)
         local = self.rank % torch.cuda.device_count()
         torch.cuda.set_device(local)
         dist.barrier()  # seeds ncclComm_t before any TRT bind_nccl_comm() call

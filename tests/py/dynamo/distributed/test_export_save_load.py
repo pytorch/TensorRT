@@ -255,22 +255,22 @@ def _multirank_load_and_infer(
 ) -> None:
     """Load per-rank engine and verify inference matches reference."""
     import torch_tensorrt
+    from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import (
         initialize_nccl_comm,
         setup_nccl_for_torch_tensorrt,
     )
 
     setup_nccl_for_torch_tensorrt()
-    # PyTorch creates the NCCL communicator lazily; bind_nccl_comm() in the
-    # C++ runtime needs it ready before the first inference on a loaded engine.
     initialize_nccl_comm()
 
     path = rank_path(save_dir, rank, world_size)
     loaded = torch_tensorrt.load(path)
     loaded_model = loaded.module()
 
-    with torch.no_grad():
-        loaded_output = loaded_model(inp)
+    with distributed_context(dist.group.WORLD, loaded_model) as m:
+        with torch.no_grad():
+            loaded_output = m(inp)
 
     torch.manual_seed(0)
     ref_model = build_exportable_model(rank, world_size)
@@ -292,6 +292,7 @@ def _multirank_loaded_matches_compiled(
 ) -> None:
     """Verify loaded engine output is numerically identical to compiled engine output."""
     import torch_tensorrt
+    from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
 
     initialize_nccl_comm()
@@ -300,9 +301,13 @@ def _multirank_loaded_matches_compiled(
     loaded = torch_tensorrt.load(path)
     loaded_model = loaded.module()
 
-    with torch.no_grad():
-        loaded_output = loaded_model(inp)
-        compiled_output = compiled_model(inp)
+    with distributed_context(dist.group.WORLD, [loaded_model, compiled_model]) as (
+        lm,
+        cm,
+    ):
+        with torch.no_grad():
+            loaded_output = lm(inp)
+            compiled_output = cm(inp)
 
     diff = float((compiled_output - loaded_output).abs().max())
     assert diff < 1e-3, f"Compiled vs loaded mismatch: max_diff={diff}"
@@ -341,6 +346,10 @@ class TestMultirankExportSaveLoad(MultiProcessTestCase):
             rank=self.rank,
             world_size=self.world_size,
         )
+        # Overwrite any stale RANK/WORLD_SIZE left by single-rank test setup
+        # so TRT converter env-var reads agree with torch.distributed.
+        os.environ["RANK"] = str(self.rank)
+        os.environ["WORLD_SIZE"] = str(self.world_size)
         local = self.rank % torch.cuda.device_count()
         torch.cuda.set_device(local)
         dist.barrier()  # seeds ncclComm_t before any TRT bind_nccl_comm() call

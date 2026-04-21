@@ -37,31 +37,46 @@ class AllReduceConfig(IntFlag):
 
 
 def _get_distributed_rank_and_world_size() -> Tuple[int, int]:
-    """Get rank and world_size from environment variables.
+    """Get rank and world_size for TRT collective layer construction.
+
+    Prefers torch.distributed when initialized (reliable, unaffected by env var
+    contamination from single-rank test setup).  Falls back to RANK/WORLD_SIZE
+    env vars when dist is not initialized (e.g. AOT-export without a live PG).
 
     Returns:
         (rank, world_size) tuple.
 
     Raises:
-        RuntimeError: If WORLD_SIZE is not set.
+        RuntimeError: If neither dist nor env vars provide world_size.
     """
-    _world_size = os.environ.get("WORLD_SIZE")
-    if _world_size is None:
-        raise RuntimeError(
-            "The WORLD_SIZE env variable is not set in distributed environment"
-        )
-    world_size = int(_world_size)
+    import torch.distributed as dist
 
-    # Get rank from environment
-    _rank = int(os.environ.get("RANK", 0))
-    if _rank is not None:
-        rank = int(_rank)
+    if dist.is_available() and dist.is_initialized():
+        dist_rank = dist.get_rank()
+        dist_world_size = dist.get_world_size()
+
+        env_world_size = os.environ.get("WORLD_SIZE")
+        env_rank = os.environ.get("RANK")
+        if env_world_size is not None and env_rank is not None:
+            env_world_size = int(env_world_size)
+            env_rank = int(env_rank)
+            if env_world_size != dist_world_size or env_rank != dist_rank:
+                raise RuntimeError(
+                    f"RANK/WORLD_SIZE env vars ({env_rank}/{env_world_size}) conflict with "
+                    f"torch.distributed ({dist_rank}/{dist_world_size}). "
+                    f"Unset RANK and WORLD_SIZE or ensure they match the active process group."
+                )
+
+        return dist_rank, dist_world_size
     else:
-        raise RuntimeError(
-            "The RANK env variable is not set in distributed environment"
-        )
-
-    return rank, world_size
+        _world_size = os.environ.get("WORLD_SIZE")
+        if _world_size is None:
+            raise RuntimeError(
+                "The WORLD_SIZE env variable is not set in distributed environment"
+            )
+        world_size = int(_world_size)
+        rank = int(os.environ.get("RANK", 0))
+        return rank, world_size
 
 
 def nccl_gather(
