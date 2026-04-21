@@ -562,7 +562,7 @@ block:
         trt_model = torch.compile(model, backend="torch_tensorrt", ...)
         output = trt_model(inp)
 
-``torch_tensorrt.distributed.set_distributed_mode(module, group)``
+``torch_tensorrt.distributed.set_distributed_mode(group, module)``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Permanently pins *group* on all TRT engines in *module* without entering a
@@ -571,7 +571,7 @@ calls outside any ``with`` block:
 
 .. code-block:: python
 
-    torch_tensorrt.distributed.set_distributed_mode(model, tp_group)
+    torch_tensorrt.distributed.set_distributed_mode(tp_group, model)
     output1 = model(inp1)  # group already pinned
     output2 = model(inp2)
 

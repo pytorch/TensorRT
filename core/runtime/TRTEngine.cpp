@@ -554,23 +554,39 @@ bool TRTEngine::bind_nccl_comm() {
   // find one with an NCCL backend.
   if (this->group_name.empty() && this->requires_native_multidevice) {
     // PyTorch assigns sequential numeric names ("0", "1", ...) to process
-    // groups.  In practice most jobs create fewer than 10 groups; we probe
-    // up to 20 to allow for destroyed-and-recreated groups.
+    // groups.  Collect every group that has an NCCL backend; we can only
+    // auto-resolve when there is exactly one — if there are several (TP+DP,
+    // Megatron 4-D parallelism, etc.) we cannot know which group this engine
+    // belongs to and the caller must pin it explicitly.
+    std::vector<std::string> nccl_groups;
     for (int i = 0; i < 20; ++i) {
       auto candidate = std::to_string(i);
       auto probe = c10d::resolve_process_group(candidate);
       if (probe != nullptr && probe->getBackendType() == c10d::ProcessGroup::BackendType::NCCL) {
-        this->group_name = candidate;
-        LOG_INFO("Auto-resolved distributed group name to '" << candidate << "'");
-        break;
+        nccl_groups.push_back(candidate);
       }
     }
-    if (this->group_name.empty()) {
+
+    if (nccl_groups.size() == 1) {
+      this->group_name = nccl_groups[0];
+      LOG_INFO("Auto-resolved distributed group name to '" << this->group_name << "'");
+    } else if (nccl_groups.size() > 1) {
+      std::string names;
+      for (const auto& n : nccl_groups) {
+        if (!names.empty()) names += ", ";
+        names += "'" + n + "'";
+      }
+      LOG_WARNING(
+          "This TRT engine requires NCCL but multiple NCCL process groups are registered ("
+          << names << "). Cannot auto-select a group — NCCL bind deferred. "
+          "Use the recommended workflow: "
+          "with torch_tensorrt.distributed.distributed_context(group, model) as m: m(inp)");
+    } else {
       LOG_WARNING(
           "This TRT engine requires NCCL (requires_native_multidevice=true) but no NCCL process group "
           "was found in the c10d registry. Ensure dist.init_process_group(backend='nccl') "
           "has been called before loading the engine. You can also set the group name "
-          "manually via: engine.set_group_name(NCCL_GROUP_NAME)");
+          "manually via: torch_tensorrt.distributed.distributed_context(group, model)");
     }
   }
 

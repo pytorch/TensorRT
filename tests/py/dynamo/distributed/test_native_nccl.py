@@ -532,7 +532,7 @@ class TestSetDistributedGroup(unittest.TestCase):
     def _call(self, module: nn.Module, group: Any) -> None:
         from torch_tensorrt.distributed import set_distributed_mode
 
-        set_distributed_mode(module, group)
+        set_distributed_mode(group, module)
 
     # ---- helpers ----------------------------------------------------------------
 
@@ -1747,7 +1747,7 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
 
         # ---- Step 3: set_distributed_mode (persistent, outside context) ----
         subgroup2 = dist.new_group(ranks=list(range(world_size)))
-        torch_tensorrt.distributed.set_distributed_mode(trt_model, subgroup2)
+        torch_tensorrt.distributed.set_distributed_mode(subgroup2, trt_model)
         # _state.pg is NOT set here — Python runtime falls back to world group
         # for lazy setup_nccl_comm; C++ runtime uses the pinned group name.
         # For C++ runtime only (Python runtime needs _state.pg active):

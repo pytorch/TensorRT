@@ -138,7 +138,7 @@ def distributed_context(
 
     try:
         for mod in modules:
-            set_distributed_mode(mod, group)
+            set_distributed_mode(group, mod)
         if single:
             yield modules[0]
         elif modules:
@@ -157,7 +157,7 @@ def distributed_context(
             _state.md_engines = []
 
 
-def set_distributed_mode(module: nn.Module, group: Any) -> None:
+def set_distributed_mode(group: Any, module: nn.Module) -> None:
     """Pin *group* as the NCCL process group on every TRT engine in *module*.
 
     Walks *module* recursively and calls ``set_group_name`` on every
@@ -167,8 +167,8 @@ def set_distributed_mode(module: nn.Module, group: Any) -> None:
     code cache rather than the module tree.
 
     Args:
-        module: Compiled or loaded module whose TRT engines should use *group*.
         group:  The ``ProcessGroup`` to bind for NCCL collectives.
+        module: Compiled or loaded module whose TRT engines should use *group*.
     """
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
