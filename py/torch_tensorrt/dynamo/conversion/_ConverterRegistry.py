@@ -89,7 +89,7 @@ class ConverterSupport:
     )
     supports_dynamic_shapes: bool = False
     requires_output_allocator: bool = False
-    requires_multidevice: bool = False
+    requires_native_multidevice: bool = False
 
 
 # Dictionary representing Dynamo aten-only converters
@@ -207,7 +207,7 @@ def dynamo_tensorrt_converter(
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
     requires_output_allocator: bool = False,
-    requires_multidevice: bool = False,
+    requires_native_multidevice: bool = False,
 ) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
@@ -225,7 +225,7 @@ def dynamo_tensorrt_converter(
             same target
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic shapes.
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
-        requires_multidevice: Boolean flag indicating if the converter creates operators which require native TensorRT multi device collectives.
+        requires_native_multidevice: Boolean flag indicating if the converter creates operators which require native TensorRT multi device collectives.
     Returns:
         The converter being decorated
     """
@@ -240,7 +240,7 @@ def dynamo_tensorrt_converter(
                 converter_implementation=converter,
                 supports_dynamic_shapes=supports_dynamic_shapes,
                 requires_output_allocator=requires_output_allocator,
-                requires_multidevice=requires_multidevice,
+                requires_native_multidevice=requires_native_multidevice,
             )
         else:
             assert callable(
@@ -251,7 +251,7 @@ def dynamo_tensorrt_converter(
                 capability_validator=capability_validator,
                 supports_dynamic_shapes=supports_dynamic_shapes,
                 requires_output_allocator=requires_output_allocator,
-                requires_multidevice=requires_multidevice,
+                requires_native_multidevice=requires_native_multidevice,
             )
 
         # OpOverloadPackets are only valid if they have a single overload, or
@@ -483,7 +483,7 @@ class ConverterRegistry:
                                 {
                                     "supports_dynamic_shapes": candidate.supports_dynamic_shapes,
                                     "requires_output_allocator": candidate.requires_output_allocator,
-                                    "requires_multidevice": candidate.requires_multidevice,
+                                    "requires_native_multidevice": candidate.requires_native_multidevice,
                                 },
                             )
                         else:
@@ -500,7 +500,7 @@ class ConverterRegistry:
                             {
                                 "supports_dynamic_shapes": False,
                                 "requires_output_allocator": False,
-                                "requires_multidevice": False,
+                                "requires_native_multidevice": False,
                             },
                         )
 

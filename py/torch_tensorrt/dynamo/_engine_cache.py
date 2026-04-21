@@ -110,7 +110,7 @@ class BaseEngineCache(ABC):
         compilation_settings: CompilationSettings,
         weight_name_map: Optional[Dict[Any, Any]],
         requires_output_allocator: bool,
-        requires_multidevice: bool,
+        requires_native_multidevice: bool,
     ) -> bytes:
         """Pack serialized engine, input names, output names, and weight map into a single blob
 
@@ -122,7 +122,7 @@ class BaseEngineCache(ABC):
             compilation_settings (CompilationSettings): compilation settings of TRT engine
             weight_name_map (Optional[Dict[Any, Any]]): weight name map for refitting
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
-            requires_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
+            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
         Returns:
             bytes: packed blob
         """
@@ -137,7 +137,7 @@ class BaseEngineCache(ABC):
                 "compilation_settings": settings,
                 "weight_name_map": weight_name_map,
                 "requires_output_allocator": requires_output_allocator,
-                "requires_multidevice": requires_multidevice,
+                "requires_native_multidevice": requires_native_multidevice,
             }
         )
 
@@ -160,7 +160,7 @@ class BaseEngineCache(ABC):
             unpacked["compilation_settings"],
             unpacked["weight_name_map"],
             unpacked["requires_output_allocator"],
-            unpacked["requires_multidevice"],
+            unpacked["requires_native_multidevice"],
         )
 
     def insert(

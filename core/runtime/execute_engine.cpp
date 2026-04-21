@@ -223,7 +223,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   // the constructor-time bind was deferred (e.g. no collective had been issued
   // at construction time, or for serialized programs loaded inline where there
   // is no Python _TorchTensorRTModule.forward wrapper).
-  if (compiled_engine->requires_multidevice && !compiled_engine->nccl_initialized) {
+  if (compiled_engine->requires_native_multidevice && !compiled_engine->nccl_initialized) {
     compiled_engine->bind_nccl_comm();
   }
 #endif

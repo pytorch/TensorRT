@@ -32,12 +32,12 @@ logger = logging.getLogger(__name__)
 
 class SerializedInterpreterResult(NamedTuple):
     serialized_engine: bytes
-    input_names: Sequence[str]
-    output_names: Sequence[str]
+    input_names: List[str]
+    output_names: List[str]
     weight_name_map: Optional[dict[Any, Any]]
     requires_output_allocator: bool
     symbolic_shape_expressions: Dict[str, List[Dict[str, Any]]]
-    requires_multidevice: bool
+    requires_native_multidevice: bool
 
 
 def infer_module_output_dtypes(
@@ -80,7 +80,7 @@ def insert_engine_to_cache(
     # for TensorRT >= 10.14, we save weight-stripped engine in cache
     if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
         serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-    serialized_engine_in_cache = interpreter_result.engine.serialize_with_config(
+    serialized_engine_in_cache: bytes = interpreter_result.engine.serialize_with_config(
         serialization_config
     )
 
@@ -95,7 +95,7 @@ def insert_engine_to_cache(
             settings,
             interpreter_result.weight_name_map,
             interpreter_result.requires_output_allocator,
-            interpreter_result.requires_multidevice,
+            interpreter_result.requires_native_multidevice,
         ),
     )
     logger.info(f"Engine with hash: {hash_val} was successfully inserted into cache")
@@ -133,7 +133,7 @@ def pull_cached_engine(
             cached_engine_compilation_settings,
             weight_name_map,
             requires_output_allocator,
-            requires_multidevice,
+            requires_native_multidevice,
         ) = cached_data
 
         setting_compatiblity, incompattible_settings = settings_are_compatible(
@@ -192,7 +192,7 @@ def pull_cached_engine(
             output_names=output_names,
             weight_name_map=weight_name_map,
             requires_output_allocator=requires_output_allocator,
-            requires_multidevice=requires_multidevice,
+            requires_native_multidevice=requires_native_multidevice,
             symbolic_shape_expressions=symbolic_shape_expressions,
         )
     return None
@@ -321,7 +321,7 @@ def interpret_module_to_result(
         output_names=interpreter_result.output_names,
         weight_name_map=interpreter_result.weight_name_map,
         requires_output_allocator=interpreter_result.requires_output_allocator,
-        requires_multidevice=interpreter_result.requires_multidevice,
+        requires_native_multidevice=interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=symbolic_shape_expressions,
     )
 
@@ -387,6 +387,6 @@ def convert_module(
         settings=settings,
         weight_name_map=serialized_interpreter_result.weight_name_map,
         requires_output_allocator=serialized_interpreter_result.requires_output_allocator,
-        requires_multidevice=serialized_interpreter_result.requires_multidevice,
+        requires_native_multidevice=serialized_interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
     )

@@ -26,7 +26,7 @@ if ENABLED_FEATURES.native_trt_collectives:
     _LOGGER.info("Using native TensorRT DistCollective API for distributed operations")
 
     @dynamo_tensorrt_converter(
-        tensorrt_fused_nccl_all_gather_op, requires_multidevice=True
+        tensorrt_fused_nccl_all_gather_op, requires_native_multidevice=True
     )
     def fused_nccl_gather(
         ctx: ConversionContext,
@@ -45,7 +45,7 @@ if ENABLED_FEATURES.native_trt_collectives:
         )
 
     @dynamo_tensorrt_converter(
-        tensorrt_fused_nccl_reduce_scatter_op, requires_multidevice=True
+        tensorrt_fused_nccl_reduce_scatter_op, requires_native_multidevice=True
     )
     def fused_nccl_reduce_scatter(
         ctx: ConversionContext,
@@ -64,7 +64,7 @@ if ENABLED_FEATURES.native_trt_collectives:
         )
 
     @dynamo_tensorrt_converter(
-        tensorrt_fused_nccl_all_reduce_op, requires_multidevice=True
+        tensorrt_fused_nccl_all_reduce_op, requires_native_multidevice=True
     )
     def fused_nccl_all_reduce(
         ctx: ConversionContext,

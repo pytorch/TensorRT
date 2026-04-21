@@ -191,7 +191,7 @@ def initialize_nccl_comm(device: Optional[int] = None) -> None:
     TRT's C++ runtime binds the NCCL communicator from PyTorch's
     ProcessGroupNCCL via ``bind_nccl_comm()``.  However, PyTorch creates
     this communicator lazily — only after the first NCCL collective.
-    If a TRT engine with NCCL ops (``requires_multidevice=True``) is loaded and executed
+    If a TRT engine with NCCL ops (``requires_native_multidevice=True``) is loaded and executed
     before any collective has run, ``bind_nccl_comm()`` finds a null
     communicator and the engine's all-reduce produces incorrect results.
 
@@ -253,7 +253,7 @@ def initialize_nccl_comm(device: Optional[int] = None) -> None:
 
 
 def check_nccl_engine_requirements() -> None:
-    """Warn if an requires_multidevice TRT engine's NCCL prerequisites are not satisfied.
+    """Warn if an requires_native_multidevice TRT engine's NCCL prerequisites are not satisfied.
 
     Checks two conditions and logs a warning for each:
     1. LD_LIBRARY_PATH does not include PyTorch's NCCL lib dir (too late to fix,

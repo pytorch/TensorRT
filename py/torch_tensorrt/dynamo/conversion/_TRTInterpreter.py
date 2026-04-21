@@ -71,11 +71,11 @@ class UnsupportedOperatorException(RuntimeError):
 
 class TRTInterpreterResult(NamedTuple):
     engine: trt.ICudaEngine
-    input_names: Sequence[str]
-    output_names: Sequence[str]
+    input_names: List[str]
+    output_names: List[str]
     weight_name_map: Optional[dict[Any, Any]]
     requires_output_allocator: bool
-    requires_multidevice: bool
+    requires_native_multidevice: bool
 
 
 @cls_supports_debugger
@@ -683,7 +683,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self._output_names,
             self.weight_name_map,
             self.ctx.requires_output_allocator,
-            self.ctx.requires_multidevice,
+            self.ctx.requires_native_multidevice,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -799,8 +799,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_output_allocator = True
             _LOGGER.debug(f"{target} requires output allocator")
 
-        if converter_info.get("requires_multidevice", False):
-            self.ctx.requires_multidevice = True
+        if converter_info.get("requires_native_multidevice", False):
+            self.ctx.requires_native_multidevice = True
             _LOGGER.debug(f"{target} requires native multi-device support")
 
         if calling_convention is CallingConvention.LEGACY:

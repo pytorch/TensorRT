@@ -101,12 +101,12 @@ def has_nccl_collectives() -> bool:
 class _FakeEngine:
     """Minimal duck-type for torch.classes.tensorrt.Engine in unit tests.
 
-    Has ``requires_multidevice`` and ``set_group_name`` so it passes the duck-type check
+    Has ``requires_native_multidevice`` and ``set_group_name`` so it passes the duck-type check
     inside set_distributed_mode() without needing a real TRT build.
     """
 
-    def __init__(self, requires_multidevice: bool = True) -> None:
-        self.requires_multidevice = requires_multidevice
+    def __init__(self, requires_native_multidevice: bool = True) -> None:
+        self.requires_native_multidevice = requires_native_multidevice
         self.group_name_calls: list = []
 
     def set_group_name(self, name: str) -> None:
@@ -333,7 +333,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
 
     def test_with_module_pre_pins_engines(self) -> None:
         """distributed_context(group, module) calls set_group_name on md engines."""
-        eng = _FakeEngine(requires_multidevice=True)
+        eng = _FakeEngine(requires_native_multidevice=True)
 
         class M(nn.Module):
             def __init__(self) -> None:
@@ -396,8 +396,8 @@ class TestDistributedGroupContextManager(unittest.TestCase):
 
     def test_list_of_modules_pins_engines_on_all(self) -> None:
         """distributed_context(group, [a, b]) calls set_group_name on engines in both modules."""
-        eng_a = _FakeEngine(requires_multidevice=True)
-        eng_b = _FakeEngine(requires_multidevice=True)
+        eng_a = _FakeEngine(requires_native_multidevice=True)
+        eng_b = _FakeEngine(requires_native_multidevice=True)
 
         class M(nn.Module):
             def __init__(self, eng) -> None:
@@ -456,7 +456,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
 
         class _FakeEngineWithRelease(_FakeEngine):
             def __init__(self) -> None:
-                super().__init__(requires_multidevice=True)
+                super().__init__(requires_native_multidevice=True)
                 self.nccl_initialized = True
 
             def release_nccl_comm(self) -> None:
@@ -490,7 +490,7 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         """distributed_context(group, module) stamps TorchTensorRTModule engines (Case 1)."""
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-        eng = _FakeEngine(requires_multidevice=True)
+        eng = _FakeEngine(requires_native_multidevice=True)
 
         class FakeWrapper(TorchTensorRTModule):
             def __init__(self) -> None:
@@ -550,14 +550,14 @@ class TestSetDistributedGroup(unittest.TestCase):
     # ---- inlined-engine tests ---------------------------------------------------
 
     def test_inlined_md_engine_receives_group_name(self) -> None:
-        """An inlined requires_multidevice engine gets set_group_name called with the group name."""
-        eng = _FakeEngine(requires_multidevice=True)
+        """An inlined requires_native_multidevice engine gets set_group_name called with the group name."""
+        eng = _FakeEngine(requires_native_multidevice=True)
         self._call(self._inlined_module(eng), _FakeGroup("tp0"))
         self.assertEqual(eng.group_name_calls, ["tp0"])
 
     def test_inlined_non_md_engine_is_skipped(self) -> None:
-        """An inlined engine with requires_multidevice=False is not touched."""
-        eng = _FakeEngine(requires_multidevice=False)
+        """An inlined engine with requires_native_multidevice=False is not touched."""
+        eng = _FakeEngine(requires_native_multidevice=False)
         self._call(self._inlined_module(eng), _FakeGroup("tp0"))
         self.assertEqual(eng.group_name_calls, [])
 
@@ -565,30 +565,30 @@ class TestSetDistributedGroup(unittest.TestCase):
         """When the group has no group_name, set_group_name is never called."""
         if dist.is_initialized():
             self.skipTest("dist already initialized in this process")
-        eng = _FakeEngine(requires_multidevice=True)
+        eng = _FakeEngine(requires_native_multidevice=True)
         # Plain object has no group_name attribute → get_active_group_name returns ""
         self._call(self._inlined_module(eng), object())
         self.assertEqual(eng.group_name_calls, [])
 
     def test_multiple_engines_all_stamped(self) -> None:
         """Every distinct md engine in the module receives the group name."""
-        eng_a = _FakeEngine(requires_multidevice=True)
-        eng_b = _FakeEngine(requires_multidevice=True)
+        eng_a = _FakeEngine(requires_native_multidevice=True)
+        eng_b = _FakeEngine(requires_native_multidevice=True)
         self._call(self._inlined_module(eng_a, eng_b), _FakeGroup("tp0"))
         self.assertEqual(eng_a.group_name_calls, ["tp0"])
         self.assertEqual(eng_b.group_name_calls, ["tp0"])
 
     def test_mixed_md_and_non_md_engines(self) -> None:
         """md engines are stamped; non-md engines are left alone."""
-        md_eng = _FakeEngine(requires_multidevice=True)
-        non_md_eng = _FakeEngine(requires_multidevice=False)
+        md_eng = _FakeEngine(requires_native_multidevice=True)
+        non_md_eng = _FakeEngine(requires_native_multidevice=False)
         self._call(self._inlined_module(md_eng, non_md_eng), _FakeGroup("tp0"))
         self.assertEqual(md_eng.group_name_calls, ["tp0"])
         self.assertEqual(non_md_eng.group_name_calls, [])
 
     def test_same_engine_on_multiple_paths_stamped_once(self) -> None:
         """An engine reachable via two module attributes is only stamped once."""
-        shared = _FakeEngine(requires_multidevice=True)
+        shared = _FakeEngine(requires_native_multidevice=True)
 
         class Inner(nn.Module):
             def __init__(self) -> None:
@@ -606,8 +606,8 @@ class TestSetDistributedGroup(unittest.TestCase):
 
     def test_nested_submodule_engines_stamped(self) -> None:
         """Engines nested inside child modules are found recursively."""
-        eng_outer = _FakeEngine(requires_multidevice=True)
-        eng_inner = _FakeEngine(requires_multidevice=True)
+        eng_outer = _FakeEngine(requires_native_multidevice=True)
+        eng_inner = _FakeEngine(requires_native_multidevice=True)
 
         class Inner(nn.Module):
             def __init__(self) -> None:
@@ -636,10 +636,10 @@ class TestSetDistributedGroup(unittest.TestCase):
     # ---- TorchTensorRTModule (wrapper submodule) tests -------------------------
 
     def test_trt_module_wrapper_md_engine_stamped(self) -> None:
-        """A TorchTensorRTModule submodule with requires_multidevice=True gets set_group_name."""
+        """A TorchTensorRTModule submodule with requires_native_multidevice=True gets set_group_name."""
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-        eng = _FakeEngine(requires_multidevice=True)
+        eng = _FakeEngine(requires_native_multidevice=True)
 
         class FakeWrapper(TorchTensorRTModule):
             def __init__(self) -> None:
@@ -655,10 +655,10 @@ class TestSetDistributedGroup(unittest.TestCase):
         self.assertEqual(eng.group_name_calls, ["tp0"])
 
     def test_trt_module_wrapper_non_md_engine_skipped(self) -> None:
-        """A TorchTensorRTModule submodule with requires_multidevice=False is not touched."""
+        """A TorchTensorRTModule submodule with requires_native_multidevice=False is not touched."""
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-        eng = _FakeEngine(requires_multidevice=False)
+        eng = _FakeEngine(requires_native_multidevice=False)
 
         class FakeWrapper(TorchTensorRTModule):
             def __init__(self) -> None:
@@ -677,7 +677,7 @@ class TestSetDistributedGroup(unittest.TestCase):
         """The wrapper-path engine is not also stamped by the attr-scan path."""
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-        eng = _FakeEngine(requires_multidevice=True)
+        eng = _FakeEngine(requires_native_multidevice=True)
 
         class FakeWrapper(TorchTensorRTModule):
             def __init__(self) -> None:

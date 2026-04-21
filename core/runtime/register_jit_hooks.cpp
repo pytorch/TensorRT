@@ -108,7 +108,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             &TRTEngine::set_device_memory_budget)
         .def_property("streamable_device_memory_budget", &TRTEngine::get_streamable_device_memory_budget)
         .def_property("automatic_device_memory_budget", &TRTEngine::get_automatic_device_memory_budget)
-        .def_readonly("requires_multidevice", &TRTEngine::requires_multidevice)
+        .def_readonly("requires_native_multidevice", &TRTEngine::requires_native_multidevice)
         .def_readonly("rank", &TRTEngine::rank)
         .def_readonly("world_size", &TRTEngine::world_size)
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
@@ -197,7 +197,7 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("REQUIRES_OUTPUT_ALLOCATOR_IDX", []() -> int64_t { return REQUIRES_OUTPUT_ALLOCATOR_IDX; });
   m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
   m.def("RESOURCE_ALLOCATION_STRATEGY_IDX", []() -> int64_t { return RESOURCE_ALLOCATION_STRATEGY_IDX; });
-  m.def("IS_MD_ENGINE_IDX", []() -> int64_t { return IS_MD_ENGINE_IDX; });
+  m.def("REQUIRES_NATIVE_MULTIDEVICE_IDX", []() -> int64_t { return REQUIRES_NATIVE_MULTIDEVICE_IDX; });
   m.def("NATIVE_TRT_COLLECTIVES_AVAIL", []() -> bool {
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
     return true;

@@ -45,7 +45,7 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>, // Platform
     std::tuple<std::string, std::string>, // Resource Allocation Strategy
-    std::tuple<std::string, std::string>>; // requires_multidevice
+    std::tuple<std::string, std::string>>; // requires_native_multidevice
 
 struct TorchTRTRuntimeStates {
   // Indicates whether CUDAGraphs were enabled in the previous execute_engine
@@ -211,7 +211,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::shared_ptr<DynamicOutputAllocator> output_allocator;
 
   // Member variables for distributed inference
-  bool requires_multidevice = false; // compile-time flag: engine contains NCCL collectives
+  bool requires_native_multidevice = false; // compile-time flag: engine contains NCCL collectives
   int64_t rank = -1; // populated at runtime by setup_nccl_comm()
   int64_t world_size = -1; // populated at runtime by setup_nccl_comm()
   std::string group_name = ""; // c10d registry name; "" = default world group

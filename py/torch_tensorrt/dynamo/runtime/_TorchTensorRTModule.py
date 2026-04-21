@@ -36,7 +36,7 @@ SERIALIZED_METADATA_IDX = -1  # Not implemented
 TARGET_PLATFORM_IDX = -1  # Not implemented
 REQUIRES_OUTPUT_ALLOCATOR_IDX = -1  # Not implemented
 SERIALIZATION_LEN = -1  # Not implemented
-IS_MD_ENGINE_IDX = -1  # Not implemented
+REQUIRES_NATIVE_MULTIDEVICE_IDX = -1  # Not implemented
 
 if ENABLED_FEATURES.torch_tensorrt_runtime:
     ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()  # 0
@@ -54,7 +54,9 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
     RESOURCE_ALLOCATION_STRATEGY_IDX = (
         torch.ops.tensorrt.RESOURCE_ALLOCATION_STRATEGY_IDX()
     )  # 10
-    IS_MD_ENGINE_IDX = torch.ops.tensorrt.IS_MD_ENGINE_IDX()  # 11
+    REQUIRES_NATIVE_MULTIDEVICE_IDX = (
+        torch.ops.tensorrt.REQUIRES_NATIVE_MULTIDEVICE_IDX()
+    )  # 11
     SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 12
 
 
@@ -89,7 +91,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),  # Assumes engine was built with default compilation settings if object not passed
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
-        requires_multidevice: bool = False,
+        requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
@@ -110,7 +112,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
-            requires_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
+            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding
 
         Example:
@@ -150,7 +152,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
         self.symbolic_shape_expressions = symbolic_shape_expressions
-        self.requires_multidevice = requires_multidevice
+        self.requires_native_multidevice = requires_native_multidevice
 
         if (
             serialized_engine
@@ -223,7 +225,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[RESOURCE_ALLOCATION_STRATEGY_IDX] = str(
             int(self.dynamically_allocate_resources)
         )
-        engine_info[IS_MD_ENGINE_IDX] = str(int(self.requires_multidevice))
+        engine_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = str(
+            int(self.requires_native_multidevice)
+        )
         # rank/world_size are runtime facts; queried from ProcessGroup at execution time
 
         return engine_info
@@ -274,8 +278,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             return
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
 
-        # requires_multidevice is set by the C++ constructor from the serialized IS_MD_ENGINE_IDX field.
-        if self.engine.requires_multidevice:
+        # requires_native_multidevice is set by the C++ constructor from the serialized REQUIRES_NATIVE_MULTIDEVICE_IDX field.
+        if self.engine.requires_native_multidevice:
             from torch_tensorrt.distributed._nccl_utils import (
                 check_nccl_engine_requirements,
             )
@@ -285,7 +289,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # Store the active process group name on the C++ engine so that the
         # lazy NCCL setup in execute_engine() can find the right communicator
         # without needing any further Python involvement.
-        if ENABLED_FEATURES.torch_tensorrt_runtime and self.engine.requires_multidevice:
+        if (
+            ENABLED_FEATURES.torch_tensorrt_runtime
+            and self.engine.requires_native_multidevice
+        ):
             from torch_tensorrt.distributed._distributed import (
                 get_active_group_name,
                 register_md_engine,

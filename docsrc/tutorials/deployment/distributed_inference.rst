@@ -287,7 +287,7 @@ in the loaded module and get the configured model back as the context value:
 * At load time, the C++ runtime auto-resolves the NCCL process group name from the
   c10d registry.  ``initialize_nccl_comm()`` eagerly creates PyTorch's lazy NCCL
   communicator is initialized before TRT tries to bind to it.
-* The engine is serialized with ``requires_multidevice=True``, which tells the C++ runtime to bind
+* The engine is serialized with ``requires_native_multidevice=True``, which tells the C++ runtime to bind
   the NCCL communicator on first execution.
 
 For a complete example, see
@@ -427,7 +427,7 @@ TRT layers compiled into the engine. Requires:
    insert a native ``DistCollective`` layer (``trt.CollectiveOperation.ALL_REDUCE``,
    ``ALL_GATHER``, or ``REDUCE_SCATTER``) into the TRT network.
 
-3. **Serialization** — the engine is serialized with the ``requires_multidevice=True`` flag in the
+3. **Serialization** — the engine is serialized with the ``requires_native_multidevice=True`` flag in the
    Torch-TRT metadata, signalling to the C++ runtime that NCCL communicator binding is
    required at load time.
 
@@ -464,7 +464,7 @@ Used automatically when native TRT collectives are not available. Requires:
 
 The same ``fuse_distributed_ops`` lowering pass runs, but the converter calls
 TRT-LLM's plugin API instead of ``add_dist_collective()``. The runtime behaviour and
-``requires_multidevice`` flag are identical.
+``requires_native_multidevice`` flag are identical.
 
 ----
 

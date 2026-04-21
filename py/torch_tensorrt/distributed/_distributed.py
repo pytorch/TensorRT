@@ -24,7 +24,7 @@ _state = threading.local()
 
 
 def register_md_engine(engine: object) -> None:
-    """Register a C++ TRTEngine with requires_multidevice=True for teardown tracking.
+    """Register a C++ TRTEngine with requires_native_multidevice=True for teardown tracking.
 
     Engines are stored on the thread-local ``_state`` so they are scoped
     to the active ``distributed_context`` context.  If called before any
@@ -185,16 +185,16 @@ def set_distributed_mode(module: nn.Module, group: Any) -> None:
             engine = getattr(submod, "engine", None)
             if engine is not None and id(engine) not in seen:
                 seen.add(id(engine))
-                if engine.requires_multidevice:
+                if engine.requires_native_multidevice:
                     engine.set_group_name(group_name)
             continue
 
         for attr_val in vars(submod).values():
             if (
                 id(attr_val) not in seen
-                and hasattr(attr_val, "requires_multidevice")
+                and hasattr(attr_val, "requires_native_multidevice")
                 and hasattr(attr_val, "set_group_name")
-                and attr_val.requires_multidevice
+                and attr_val.requires_native_multidevice
             ):
                 seen.add(id(attr_val))
                 attr_val.set_group_name(group_name)
@@ -203,5 +203,5 @@ def set_distributed_mode(module: nn.Module, group: Any) -> None:
     for engine in getattr(_state, "md_engines", None) or []:
         if id(engine) not in seen:
             seen.add(id(engine))
-            if getattr(engine, "requires_multidevice", False):
+            if getattr(engine, "requires_native_multidevice", False):
                 engine.set_group_name(group_name)

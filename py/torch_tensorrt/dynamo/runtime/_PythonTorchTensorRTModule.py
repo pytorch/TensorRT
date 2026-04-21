@@ -135,7 +135,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
-        requires_multidevice: bool = False,
+        requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         _debugger_config: Optional[DebuggerConfig] = None,
     ):
@@ -152,7 +152,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
-            requires_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
+            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             symbolic_shape_expressions (List[str]): List of symbolic shape expressions for each output binding
         Example:
 
@@ -231,7 +231,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_tensors_are_unowned = False
         self.symbolic_shape_expressions = symbolic_shape_expressions
         self._nccl_comm: Optional[Any] = None
-        self._has_nccl_ops: bool = requires_multidevice
+        self._has_nccl_ops: bool = requires_native_multidevice
 
         # Runtime cache state (TensorRT-RTX only)
         self.runtime_config: Any = None

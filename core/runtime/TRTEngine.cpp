@@ -96,8 +96,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]))
                ? ResourceAllocationStrategy::kDynamic
                : ResourceAllocationStrategy::kStatic)) {
-  this->requires_multidevice = std::stoi(serialized_info[IS_MD_ENGINE_IDX]);
-  if (this->requires_multidevice) {
+  this->requires_native_multidevice = std::stoi(serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]);
+  if (this->requires_native_multidevice) {
     LOG_INFO("Loaded distributed TRT engine (contains NCCL collectives); NCCL comm will be bound on first execution");
   }
 }
@@ -281,7 +281,7 @@ TRTEngine::TRTEngine(
   // If the communicator isn't available yet (e.g. engine constructed before the
   // first collective), bind_nccl_comm returns false and execute_engine() will
   // retry on its first invocation.
-  if (this->requires_multidevice) {
+  if (this->requires_native_multidevice) {
     bind_nccl_comm();
   }
 #endif
@@ -458,7 +458,7 @@ std::string TRTEngine::to_str() const {
   ss << "  Hardware Compatibility: " << (hardware_compatible ? "Enabled" : "Disabled") << std::endl;
   ss << "  Target Platform: " << target_platform << std::endl;
   ss << "  Resource Allocation Strategy: " << (resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "Dynamic" : "Static") << std::endl;
-  ss << "  Multi-Device Engine: " << (requires_multidevice) << std::endl;
+  ss << "  Multi-Device Engine: " << (requires_native_multidevice) << std::endl;
   // clang-format on
   return ss.str();
 }
@@ -495,7 +495,7 @@ FlattenedState TRTEngine::__obj_flatten__() {
       std::tuple("requires_output_allocator", serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]),
       std::tuple("target_platform", serialized_info[TARGET_PLATFORM_IDX]),
       std::tuple("resource_allocation_strategy", serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]),
-      std::tuple("requires_multidevice", serialized_info[IS_MD_ENGINE_IDX]));
+      std::tuple("requires_native_multidevice", serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]));
 }
 
 std::vector<std::string> TRTEngine::serialize() {
@@ -520,7 +520,7 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[TARGET_PLATFORM_IDX] = this->target_platform.serialize();
   serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
-  serialized_info[IS_MD_ENGINE_IDX] = this->requires_multidevice ? "1" : "0";
+  serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = this->requires_native_multidevice ? "1" : "0";
   // rank/world_size are runtime facts (may differ at load time); not serialized.
 
   return serialized_info;
@@ -552,7 +552,7 @@ bool TRTEngine::bind_nccl_comm() {
   // process group from the c10d registry.  PyTorch assigns sequential
   // numeric names ("0", "1", ...) to process groups; probe until we
   // find one with an NCCL backend.
-  if (this->group_name.empty() && this->requires_multidevice) {
+  if (this->group_name.empty() && this->requires_native_multidevice) {
     // PyTorch assigns sequential numeric names ("0", "1", ...) to process
     // groups.  In practice most jobs create fewer than 10 groups; we probe
     // up to 20 to allow for destroyed-and-recreated groups.
@@ -567,7 +567,7 @@ bool TRTEngine::bind_nccl_comm() {
     }
     if (this->group_name.empty()) {
       LOG_WARNING(
-          "This TRT engine requires NCCL (requires_multidevice=true) but no NCCL process group "
+          "This TRT engine requires NCCL (requires_native_multidevice=true) but no NCCL process group "
           "was found in the c10d registry. Ensure dist.init_process_group(backend='nccl') "
           "has been called before loading the engine. You can also set the group name "
           "manually via: engine.set_group_name(NCCL_GROUP_NAME)");
