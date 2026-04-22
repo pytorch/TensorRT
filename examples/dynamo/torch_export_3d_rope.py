@@ -333,7 +333,6 @@ def main():
     trt_model = torch_tensorrt.dynamo.compile(
         ep,
         inputs=trt_inputs,
-        enabled_precisions={torch.float32},
         min_block_size=1,
     )
 

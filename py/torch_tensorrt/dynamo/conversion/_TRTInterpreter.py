@@ -115,9 +115,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
 
         self.compilation_settings = compilation_settings
-        if not CONVERTERS.compilation_settings:
-            # Configure user compilation settings to converters.
-            CONVERTERS.set_compilation_settings(compilation_settings)
+        # Always update the global converter registry with the current compilation
+        # settings.  The registry is a process-global singleton; without an
+        # unconditional update, torch_executed_ops set by one compilation leak
+        # into subsequent compilations in the same process (e.g. across tests in
+        # an xdist worker), making those ops incorrectly appear as disallowed.
+        CONVERTERS.set_compilation_settings(compilation_settings)
         self.validate_compile_settings()
         assert TRTInterpreter._all_precisions_supported(
             compilation_settings.enabled_precisions

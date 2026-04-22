@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,7 @@ class ComplexOpDetector:
             if hasattr(val, "dtype"):
                 dtype = val.dtype
 
-        return dtype in {torch.complex64, torch.complex128}
+        return dtype in COMPLEX_DTYPES
 
     def has_complex_input(self, node: Node) -> bool:
         """Return True if any input to node has complex dtype."""
@@ -289,17 +290,18 @@ class ComplexGraphRewriter:
             # Set fake-tensor metadata on the new node so that _is_complex_layout_node
             # can identify it as a complex-layout [..., 2] tensor later when
             # processing ops that use this buffer.
-            if fake_mode is not None:
-                try:
-                    with unset_fake_temporarily():
-                        real_tensor = torch.empty(
-                            stacked_tensor.shape,
-                            dtype=stacked_tensor.dtype,
-                            device=stacked_tensor.device,
-                        )
-                    new_node.meta["val"] = fake_mode.from_tensor(real_tensor)
-                except Exception:
-                    pass  # best-effort
+            if fake_mode is None:
+                fake_mode = FakeTensorMode()
+            try:
+                with unset_fake_temporarily():
+                    real_tensor = torch.empty(
+                        stacked_tensor.shape,
+                        dtype=stacked_tensor.dtype,
+                        device=stacked_tensor.device,
+                    )
+                new_node.meta["val"] = fake_mode.from_tensor(real_tensor)
+            except Exception:
+                pass  # best-effort
             new_node.meta["is_complex_layout"] = True
             logger.debug(
                 "  unpack get_attr  %s%s  ->  %s%s",
@@ -309,7 +311,9 @@ class ComplexGraphRewriter:
                 tuple(stacked_tensor.shape),
             )
         else:
-            pass  # call_function inputs are rewritten in-place by the op handlers
+            # call_function inputs are rewritten in-place by the op handlers;
+            # nothing to replace or erase at the input boundary.
+            return
         input_node.replace_all_uses_with(new_node)
         self.gm.graph.erase_node(input_node)
         clean_up_graph_after_modifications(self.gm)
@@ -621,9 +625,14 @@ class ComplexGraphRewriter:
 
     @_complex_unpacker(torch.ops.aten.add.Tensor, torch.ops.aten.sub.Tensor)
     def _rewrite_add_sub_tensor_scalar(self, node: Node) -> bool:
-        # add.Tensor(z, scalar) / sub.Tensor(z, scalar): scalar applies to real part only.
+        # add.Tensor(z1, z2): tensor+tensor is componentwise on the [..., 2]
+        # real layout — real and imag parts are handled independently — so no
+        # rewrite is needed.  Return True (handled, no modification).
+        # add.Tensor(z, scalar): scalar applies to real part only, so we must
+        # explicitly rewrite.
+        # tensor+tensor: componentwise on [..., 2] layout — no rewrite needed
         if len(node.args) < 2 or isinstance(node.args[1], torch.fx.Node):
-            return False
+            return True
         inp, scalar = node.args[0], node.args[1]
         with SubgraphBuilder(self.gm.graph, node) as b:
             re = b(torch.ops.aten.select.int, inp, -1, 0)
@@ -1264,7 +1273,7 @@ class ComplexGraphRewriter:
     @_complex_unpacker(torch.ops.aten.scalar_tensor.default)
     def _rewrite_scalar_tensor(self, node: Node) -> bool:
         # scalar_tensor(val, dtype=complex64) → scalar_tensor(0.0, float32)
-        if dict(node.kwargs).get("dtype") not in (torch.complex64, torch.complex128):
+        if dict(node.kwargs).get("dtype") not in COMPLEX_DTYPES:
             return False
         with SubgraphBuilder(self.gm.graph, node) as b:
             out = b(torch.ops.aten.scalar_tensor.default, 0.0)
@@ -1612,7 +1621,7 @@ class ComplexGraphRewriter:
         node_val = node.meta.get("val", None)
         if node_val is None or not hasattr(node_val, "dtype"):
             return False
-        if node_val.dtype not in (torch.complex64, torch.complex128):
+        if node_val.dtype not in COMPLEX_DTYPES:
             return False
         mask_node, true_node, other_node = node.args
         target_shape = list(node_val.shape) + [2]
@@ -1687,7 +1696,7 @@ class ComplexGraphRewriter:
                 elif node.target in _ELEMENTWISE_SAFE:
                     logger.debug("  pass-through  %s  (elementwise-safe)", node.name)
                 else:
-                    logger.warning(
+                    logger.info(
                         "Complex op '%s' has no explicit rewrite rule. "
                         "Wrapping with view_as_complex/view_as_real so the op "
                         "receives genuine complex tensors and TRT graph-breaks "
@@ -1759,7 +1768,7 @@ class ComplexGraphRewriter:
                 is_real_input = (
                     inp_val is not None
                     and hasattr(inp_val, "dtype")
-                    and inp_val.dtype not in {torch.complex64, torch.complex128}
+                    and inp_val.dtype not in COMPLEX_DTYPES
                 )
                 # If meta not yet propagated, use the target as a heuristic:
                 # the real-arithmetic replacement ends with aten.cat.default
@@ -1945,7 +1954,6 @@ def complex_div_replacement(
 
 def _get_complex_output_indices(gm: GraphModule) -> List[int]:
     """Return indices of output nodes that have complex dtype, before rewriting."""
-    complex_dtypes = {torch.complex64, torch.complex128}
     output_node = next((n for n in reversed(gm.graph.nodes) if n.op == "output"), None)
     if output_node is None:
         return []
@@ -1957,7 +1965,7 @@ def _get_complex_output_indices(gm: GraphModule) -> List[int]:
     for i, out in enumerate(outputs):
         if isinstance(out, torch.fx.Node) and "val" in out.meta:
             val = out.meta["val"]
-            if hasattr(val, "dtype") and val.dtype in complex_dtypes:
+            if hasattr(val, "dtype") and val.dtype in COMPLEX_DTYPES:
                 indices.append(i)
     return indices
 
@@ -1969,13 +1977,12 @@ def _get_complex_input_names(gm: GraphModule) -> List[str]:
     and changes their dtype to float. This captures the original names so the post-partition
     pass can insert view_as_real at the graph input boundary.
     """
-    complex_dtypes = {torch.complex64, torch.complex128}
     names = []
     for node in gm.graph.nodes:
         if node.op != "placeholder":
             continue
         val = node.meta.get("val", None)
-        if val is not None and hasattr(val, "dtype") and val.dtype in complex_dtypes:
+        if val is not None and hasattr(val, "dtype") and val.dtype in COMPLEX_DTYPES:
             names.append(node.name)
     return names
 
@@ -1986,13 +1993,12 @@ def _get_complex_input_dtypes(gm: GraphModule) -> dict:
     Used by the post-partition boundary pass to know which inputs were complex128
     so it can insert float32 casts when truncate_double=True.
     """
-    complex_dtypes = {torch.complex64, torch.complex128}
     dtypes = {}
     for node in gm.graph.nodes:
         if node.op != "placeholder":
             continue
         val = node.meta.get("val", None)
-        if val is not None and hasattr(val, "dtype") and val.dtype in complex_dtypes:
+        if val is not None and hasattr(val, "dtype") and val.dtype in COMPLEX_DTYPES:
             dtypes[node.name] = val.dtype
     return dtypes
 

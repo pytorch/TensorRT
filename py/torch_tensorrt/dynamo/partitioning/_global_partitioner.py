@@ -1,5 +1,5 @@
 import logging
-from typing import Collection, Dict, List, Mapping, Optional, Sequence, Tuple, Set
+from typing import Collection, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import torch
 from torch.fx.graph_module import GraphModule
@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
 
 logger = logging.getLogger(__name__)
 
@@ -151,17 +152,17 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         TensorRT has no native complex-type support.  Any node that produces or
         consumes a complex tensor must run in the PyTorch fallback so the graph
         breaks naturally around it.
+
         """
-        _COMPLEX = {torch.complex64, torch.complex128}
 
         def _dtype(n: torch.fx.Node) -> Optional[torch.dtype]:
             val = n.meta.get("val")
             return getattr(val, "dtype", None) if val is not None else None
 
-        if _dtype(node) in _COMPLEX:
+        if _dtype(node) in COMPLEX_DTYPES:
             return True
         for arg in node.all_input_nodes:
-            if _dtype(arg) in _COMPLEX:
+            if _dtype(arg) in COMPLEX_DTYPES:
                 return True
         return False
 

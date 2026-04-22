@@ -600,7 +600,7 @@ def refit_module_weights(
         torch.cuda.empty_cache()
 
     if verify_output and arg_inputs is not None:
-        new_gm.to(to_torch_device(settings.device))
+        new_gm.to(to_torch_device(settings.device))  # move to device for inference
         # complex_graph_detection rewrites complex placeholders to real (view_as_real).
         # The compiled TRT module handles complex→real internally, but the lowered
         # PyTorch reference module (new_gm) expects real-unpacked inputs directly.

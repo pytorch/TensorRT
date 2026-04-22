@@ -1208,7 +1208,6 @@ def test_complex_buffer_refit():
         exp_program1,
         tuple(inputs),
         use_python_runtime=True,
-        enabled_precisions={torch.float},
         min_block_size=1,
         immutable_weights=False,
     )
@@ -1281,7 +1280,6 @@ def test_complex_buffer_with_real_param_refit():
         exp_program1,
         tuple(inputs),
         use_python_runtime=True,
-        enabled_precisions={torch.float},
         min_block_size=1,
         immutable_weights=False,
     )
@@ -1352,7 +1350,6 @@ def test_dual_complex_buffer_refit():
         exp_program1,
         tuple(inputs),
         use_python_runtime=True,
-        enabled_precisions={torch.float},
         min_block_size=1,
         immutable_weights=False,
     )

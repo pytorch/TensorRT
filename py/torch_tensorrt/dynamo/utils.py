@@ -105,6 +105,8 @@ COMPLEX_TO_REAL_DTYPE: Dict[torch.dtype, torch.dtype] = {
     torch.complex128: torch.float64,
 }
 
+COMPLEX_DTYPES: frozenset = frozenset(COMPLEX_TO_REAL_DTYPE)
+
 
 def unified_dtype_converter(
     dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks

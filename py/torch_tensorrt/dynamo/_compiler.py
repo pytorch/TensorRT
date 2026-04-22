@@ -44,7 +44,6 @@ from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
 from torch_tensorrt.dynamo.utils import (
-    COMPLEX_TO_REAL_DTYPE,
     deallocate_module,
     get_cpu_memory_usage,
     get_flat_args_with_check,
@@ -914,7 +913,9 @@ def _insert_complex_io_adapters(
             src = outputs[idx]
             if not isinstance(src, torch.fx.Node):
                 continue
-            if src.op == "call_module" and "_run_on_acc" in str(src.target):
+            if src.op == "call_module" and (
+                "_run_on_acc" in str(src.target) or "_run_on_gpu" in str(src.target)
+            ):
                 with partitioned_module.graph.inserting_before(output_node):
                     complex_node = partitioned_module.graph.call_function(
                         torch.ops.aten.view_as_complex.default, args=(src,)
