@@ -217,6 +217,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string group_name = ""; // c10d registry name; "" = default world group
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  const bool _native_nccl_support = true; // Support value that is mostly here to back the torchbind hooks
   bool nccl_initialized = false; // guards lazy one-shot NCCL setup in execute_engine
 
   // Resolve ProcessGroup via group_name, fetch the NCCL comm from PyTorch,
@@ -231,6 +232,8 @@ struct TRTEngine : torch::CustomClassHolder {
   // later (with a new PG), execute_engine() will see nccl_initialized=false
   // and re-bind automatically.
   void release_nccl_comm();
+#else
+  const bool _native_nccl_support = false;
 #endif
 
   // TODO: Implement a call method
