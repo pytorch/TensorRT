@@ -129,6 +129,38 @@ The timing cache is always active and persisted at ``timing_cache_path``:
 The default path is
 ``/tmp/torch_tensorrt_engine_cache/timing_cache.bin``.
 
+.. note::
+
+   The timing cache is **not used with TensorRT-RTX**, which does not perform
+   autotuning. For TensorRT-RTX, see the *Runtime Cache* section below.
+
+Runtime Cache (TensorRT-RTX)
+-----------------------------
+
+TensorRT-RTX uses JIT compilation at inference time. The **runtime cache** stores
+these compilation results so that kernels and execution graphs are not recompiled
+on subsequent runs. This is analogous to the timing cache but operates at inference
+time rather than build time.
+
+The runtime cache is automatically created when using TensorRT-RTX and can be
+persisted to disk via ``runtime_cache_path``:
+
+.. code-block:: python
+
+    trt_gm = torch_tensorrt.dynamo.compile(
+        exported_program,
+        arg_inputs=inputs,
+        runtime_cache_path="/data/trt_cache/runtime_cache.bin",
+        use_python_runtime=True,
+    )
+
+The default path is
+``/tmp/torch_tensorrt_engine_cache/runtime_cache.bin``.
+
+The cache is saved to disk when the module is destroyed (garbage collected) and
+loaded on subsequent compilations with the same path. File locking is used to
+prevent corruption when multiple processes share the same cache file.
+
 ----
 
 Custom Cache Backends

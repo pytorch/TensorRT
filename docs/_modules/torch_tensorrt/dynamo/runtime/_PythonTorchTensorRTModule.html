@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=3eb18c47"></script>
+    <script src="../../../../_static/documentation_options.js?v=8cb60082"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -477,14 +477,17 @@ document.write(`
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">nullcontext</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="kn">import</span> <span class="n">Module</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">Platform</span><span class="p">,</span> <span class="n">dtype</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEBUG_LOGGING_DIR</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompilationSettings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.debug._DebuggerConfig</span><span class="w"> </span><span class="kn">import</span> <span class="n">DebuggerConfig</span>
@@ -497,9 +500,16 @@ document.write(`
     <span class="n">multi_gpu_device_check</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
-
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_dynamic_shapes_kernel_strategy</span><span class="p">(</span><span class="n">strategy_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map strategy string to TRT enum. Only called on RTX builds.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;lazy&quot;</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">LAZY</span><span class="p">,</span>
+        <span class="s2">&quot;eager&quot;</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">EAGER</span><span class="p">,</span>
+        <span class="s2">&quot;none&quot;</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+    <span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">strategy_str</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">LAZY</span><span class="p">)</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">DynamicOutputAllocator</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">IOutputAllocator</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
@@ -706,6 +716,12 @@ document.write(`
         <span class="c1"># If the output tensor is not owned by the engine (output_tensors_are_unowned=True), we need to create a new output tensor in each forward pass</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">symbolic_shape_expressions</span>
+
+        <span class="c1"># Runtime cache state (TensorRT-RTX only)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">runtime_cache_path</span>
+
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span></div>
 
@@ -741,7 +757,7 @@ document.write(`
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span>
         <span class="n">budget_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_device_memory_budget</span><span class="p">(</span><span class="n">budget_bytes</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_context</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">runtime_states</span><span class="o">.</span><span class="n">context_changed</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">return</span> <span class="n">budget_bytes</span>
 
@@ -774,7 +790,11 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">runtime</span><span class="o">.</span><span class="n">deserialize_cuda_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_weight_streaming</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">set_default_device_memory_budget</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_setup_runtime_config</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_context</span><span class="p">()</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Failed to create execution context&quot;</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">num_io_tensors</span> <span class="o">==</span> <span class="p">(</span>
             <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">)</span>
@@ -807,6 +827,75 @@ document.write(`
             <span class="n">input_name</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">is_shape_inference_io</span><span class="p">(</span><span class="n">input_name</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
         <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_setup_runtime_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a RuntimeConfig with runtime cache for TensorRT-RTX.</span>
+
+<span class="sd">        The runtime cache stores JIT compilation results to avoid repeated</span>
+<span class="sd">        compilation of kernels/graphs across inference runs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_runtime_config</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="o">.</span><span class="n">set_execution_context_allocation_strategy</span><span class="p">(</span>
+            <span class="n">trt</span><span class="o">.</span><span class="n">ExecutionContextAllocationStrategy</span><span class="o">.</span><span class="n">STATIC</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_get_dynamic_shapes_kernel_strategy</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Dynamic shapes kernel specialization strategy: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="o">.</span><span class="n">create_runtime_cache</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_load_runtime_cache</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="o">.</span><span class="n">set_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;TensorRT-RTX runtime cache configured&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">trt</span><span class="o">.</span><span class="n">IExecutionContext</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an execution context, using RuntimeConfig for RTX.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load runtime cache from disk if it exists (with shared file lock).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No existing runtime cache at </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">filelock</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileLock</span>
+
+            <span class="n">lock</span> <span class="o">=</span> <span class="n">FileLock</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span> <span class="o">+</span> <span class="s2">&quot;.lock&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span><span class="o">.</span><span class="n">deserialize</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded runtime cache from </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load runtime cache: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save runtime cache to disk (with exclusive file lock).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">host_mem</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">host_mem</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="kn">from</span><span class="w"> </span><span class="nn">filelock</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileLock</span>
+
+            <span class="n">lock</span> <span class="o">=</span> <span class="n">FileLock</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span> <span class="o">+</span> <span class="s2">&quot;.lock&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">memoryview</span><span class="p">(</span><span class="n">host_mem</span><span class="p">))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved runtime cache to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to save runtime cache: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_check_initialized</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">initialized</span><span class="p">:</span>
@@ -841,6 +930,8 @@ document.write(`
         <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;engine&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_config&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">state</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -860,6 +951,7 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_runtime_cache</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">setup_input_tensors</span><span class="p">(</span>
@@ -1263,7 +1355,7 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">_check_initialized</span><span class="p">()</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
         <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_context</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span> <span class="o">=</span> <span class="kc">False</span></div>
 
 

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=3eb18c47"></script>
+    <script src="../../_static/documentation_options.js?v=8cb60082"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -680,6 +680,33 @@ a cold engine cache, because TRT can skip re-benchmarking known-fast kernels.</p
 </div>
 <p>The default path is
 <code class="docutils literal notranslate"><span class="pre">/tmp/torch_tensorrt_engine_cache/timing_cache.bin</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The timing cache is <strong>not used with TensorRT-RTX</strong>, which does not perform
+autotuning. For TensorRT-RTX, see the <em>Runtime Cache</em> section below.</p>
+</div>
+</section>
+<section id="runtime-cache-tensorrt-rtx">
+<h2>Runtime Cache (TensorRT-RTX)<a class="headerlink" href="#runtime-cache-tensorrt-rtx" title="Link to this heading">#</a></h2>
+<p>TensorRT-RTX uses JIT compilation at inference time. The <strong>runtime cache</strong> stores
+these compilation results so that kernels and execution graphs are not recompiled
+on subsequent runs. This is analogous to the timing cache but operates at inference
+time rather than build time.</p>
+<p>The runtime cache is automatically created when using TensorRT-RTX and can be
+persisted to disk via <code class="docutils literal notranslate"><span class="pre">runtime_cache_path</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exported_program</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">runtime_cache_path</span><span class="o">=</span><span class="s2">&quot;/data/trt_cache/runtime_cache.bin&quot;</span><span class="p">,</span>
+    <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The default path is
+<code class="docutils literal notranslate"><span class="pre">/tmp/torch_tensorrt_engine_cache/runtime_cache.bin</span></code>.</p>
+<p>The cache is saved to disk when the module is destroyed (garbage collected) and
+loaded on subsequent compilations with the same path. File locking is used to
+prevent corruption when multiple processes share the same cache file.</p>
 </section>
 <hr class="docutils" />
 <section id="custom-cache-backends">
@@ -804,6 +831,7 @@ set on TRT &lt; 10.14 (different cache key), but handled automatically by TRT it
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cache-invalidation">Cache Invalidation</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#lru-eviction">LRU Eviction</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#timing-cache">Timing Cache</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-cache-tensorrt-rtx">Runtime Cache (TensorRT-RTX)</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#custom-cache-backends">Custom Cache Backends</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#weightless-engines-trt-10-14">Weightless Engines (TRT ≥ 10.14)</a></li>
 </ul>

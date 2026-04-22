@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3eb18c47"></script>
+    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -568,6 +568,8 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -647,7 +649,9 @@ document.write(`
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
-<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
+<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
+<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
@@ -812,6 +816,8 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -844,6 +850,12 @@ document.write(`
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;arg: </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> is not supported for cross compilation for windows feature, hence it is disabled.&quot;</span>
             <span class="p">)</span>
+
+    <span class="k">if</span> <span class="s2">&quot;runtime_cache_path&quot;</span> <span class="ow">in</span> <span class="n">compilation_options</span><span class="p">:</span>
+        <span class="n">compilation_options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;runtime_cache_path is a JIT-time API and is not applicable to cross compilation for windows. Ignoring.&quot;</span>
+        <span class="p">)</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
@@ -919,6 +931,8 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -1013,7 +1027,9 @@ document.write(`
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
-<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
+<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
+<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
@@ -1221,6 +1237,8 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -1637,6 +1655,8 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -1712,7 +1732,9 @@ document.write(`
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
-<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
+<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
+<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
@@ -1886,6 +1908,8 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -1903,6 +1927,11 @@ document.write(`
         <span class="s2">&quot;decompose_attention&quot;</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">&quot;attn_bias_is_causal&quot;</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
     <span class="p">}</span>
+    <span class="k">if</span> <span class="s2">&quot;runtime_cache_path&quot;</span> <span class="ow">in</span> <span class="n">compilation_options</span><span class="p">:</span>
+        <span class="n">compilation_options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;runtime_cache_path is a JIT-time API and is not applicable to serialized engine export. Ignoring.&quot;</span>
+        <span class="p">)</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>

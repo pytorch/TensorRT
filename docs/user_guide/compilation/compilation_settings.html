@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=3eb18c47"></script>
+    <script src="../../_static/documentation_options.js?v=8cb60082"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1042,7 +1042,14 @@ settings (see <a class="reference internal" href="../../tutorials/resource_memor
 <td><p><code class="docutils literal notranslate"><span class="pre">/tmp/torch_tensorrt_engine_cache/timing_cache.bin</span></code></p></td>
 <td><p>Path for TRT’s timing cache file. The timing cache records kernel timing data
 across sessions, speeding up subsequent engine builds for similar subgraphs even
-when the engine cache itself is cold.</p></td>
+when the engine cache itself is cold. Not used for TensorRT-RTX (no autotuning).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">runtime_cache_path</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/tmp/torch_tensorrt_engine_cache/runtime_cache.bin</span></code></p></td>
+<td><p>Path for the TensorRT-RTX runtime cache file. The runtime cache stores JIT
+compilation results at inference time, preventing repeated compilation of
+kernels and graphs across sessions. Uses file locking for concurrent access
+safety. Only used with TensorRT-RTX; ignored for standard TensorRT.</p></td>
 </tr>
 </tbody>
 </table>

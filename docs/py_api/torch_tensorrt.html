@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=3eb18c47"></script>
+    <script src="../_static/documentation_options.js?v=8cb60082"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -819,7 +819,8 @@ Any modifications made to the MutableTorchTensorRTModule will be reflected in bo
 <li><p><strong>enable_experimental_decompositions</strong> (<em>bool</em>) – Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</p></li>
 <li><p><strong>dryrun</strong> (<em>bool</em>) – Toggle for “Dryrun” mode, running everything except conversion to TRT and logging outputs</p></li>
 <li><p><strong>hardware_compatible</strong> (<em>bool</em>) – Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</p></li>
-<li><p><strong>timing_cache_path</strong> (<em>str</em>) – Path to the timing cache if it exists (or) where it will be saved after compilation</p></li>
+<li><p><strong>timing_cache_path</strong> (<em>str</em>) – Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</p></li>
+<li><p><strong>runtime_cache_path</strong> (<em>str</em>) – Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</p></li>
 <li><p><strong>lazy_engine_init</strong> (<em>bool</em>) – Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</p></li>
 <li><p><strong>enabled_precisions</strong> (<em>Set</em><em>(</em><em>Union</em><em>(</em><em>torch.dpython:type</em><em>, </em><em>torch_tensorrt.dpython:type</em><em>)</em><em>)</em>) – The set of datatypes that TensorRT can use when selecting kernels</p></li>
 <li><p><strong>**kwargs</strong> – Any,</p></li>

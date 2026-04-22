@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3eb18c47"></script>
+    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -499,6 +499,7 @@ document.write(`
     <span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
     <span class="n">DRYRUN</span><span class="p">,</span>
+    <span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
     <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">ENABLE_AUTOCAST</span><span class="p">,</span>
     <span class="n">ENABLE_CROSS_COMPILE_FOR_WINDOWS</span><span class="p">,</span>
@@ -520,6 +521,7 @@ document.write(`
     <span class="n">REFIT_IDENTICAL_ENGINE_WEIGHTS</span><span class="p">,</span>
     <span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
     <span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
+    <span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
     <span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
     <span class="n">STRIP_ENGINE_WEIGHTS</span><span class="p">,</span>
     <span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
@@ -575,7 +577,9 @@ document.write(`
 <span class="sd">            TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the</span>
 <span class="sd">            output to a file if a string path is specified</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
-<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).</span>
+<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. The cache is loaded on engine setup and saved on module cleanup. Uses file locking for concurrent access safety. Not used for standard TensorRT.</span>
+<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for compiling shape-specialized kernels at runtime for dynamic shapes (TensorRT-RTX only). Options: &quot;lazy&quot; (compile in background, use fallback until ready), &quot;eager&quot; (compile immediately, blocking), &quot;none&quot; (always use fallback kernels). Default: &quot;lazy&quot;.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
 <span class="sd">        use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.</span>
@@ -629,6 +633,10 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">DRYRUN</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">HARDWARE_COMPATIBLE</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">TIMING_CACHE_PATH</span>
+    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">RUNTIME_CACHE_PATH</span>
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span>
+    <span class="p">)</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">LAZY_ENGINE_INIT</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">CACHE_BUILT_ENGINES</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REUSE_CACHED_ENGINES</span>

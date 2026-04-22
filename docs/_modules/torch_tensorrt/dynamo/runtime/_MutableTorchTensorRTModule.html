@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=3eb18c47"></script>
+    <script src="../../../../_static/documentation_options.js?v=8cb60082"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -590,7 +590,8 @@ document.write(`
 <span class="sd">            enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">            dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">            hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
-<span class="sd">            timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">            timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
+<span class="sd">            runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
 <span class="sd">            lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">            enabled_precisions (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
 <span class="sd">            **kwargs: Any,</span>
