@@ -269,8 +269,8 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     @unittest.skipIf(
-            torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-            "Engine caching compilation time assertion is unreliable with TensorRT-RTX",
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        "Engine caching compilation time assertion is unreliable with TensorRT-RTX",
     )
     def test_dynamo_compile_with_refittable_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
