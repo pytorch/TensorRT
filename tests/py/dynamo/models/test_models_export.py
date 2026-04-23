@@ -346,6 +346,140 @@ def test_base_fp4_static_shapes(ir):
 
 
 @unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
+@pytest.mark.unit
+def test_nvfp4_nd_input_quantizer(ir):
+    """Regression test for #4201: dynamic_block_quantize must handle N-D (>3D)
+    input tensors that arise when a reshape precedes the input_quantizer."""
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    dtype = torch.float16
+
+    class PatchEmbedLike(torch.nn.Module):
+        """Mimics the reshape->linear pattern from Qwen3-VL patch_embed.proj
+        that triggered the original crash: input is reshaped to 5-D before
+        the FP4 input_quantizer fires."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            # kernel decomposition: (C, kH, kW) -> embed_dim
+            self.proj = torch.nn.Linear(
+                in_features=3 * 2 * 16,  # C * kH * kW = 96
+                out_features=32,
+                bias=False,
+                dtype=dtype,
+            )
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            # x: (N, 3, 2, 16) — already 4-D from an upstream reshape
+            x = x.reshape(x.shape[0], -1)  # (N, 96)
+            return self.proj(x)
+
+    def calibrate_loop(model: torch.nn.Module) -> None:
+        model(input_tensor)
+
+    # 4-D input: (batch, C, kH, kW) where C*kH*kW must be divisible by
+    # the FP4 block size (16).
+    input_tensor = torch.randn(64, 3, 2, 16, dtype=dtype).cuda()
+    model = PatchEmbedLike().eval().cuda()
+
+    quant_cfg = mtq.NVFP4_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_explicit_typing=True,
+            )
+            expected = model(input_tensor)
+            outputs_trt = trt_model(input_tensor)
+            abs_diff = torch.abs(expected - outputs_trt)
+            assert torch.allclose(
+                expected, outputs_trt, rtol=0.3, atol=0.3
+            ), f"max abs diff: {abs_diff.max().item()}"
+
+
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (8, 9),
+    "FP8 quantization requires compute capability 8.9 or later",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
+@pytest.mark.unit
+def test_fp8_and_input_quantizer(ir):
+    """FP8 analogue of ``test_fp4_and_input_quantizer``: the input_quantizer must
+    handle N-D (>3D) input tensors flowing through a reshape into a Linear."""
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    dtype = torch.float16
+
+    class PatchEmbedLike(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.proj = torch.nn.Linear(
+                in_features=3 * 2 * 16,
+                out_features=32,
+                bias=False,
+                dtype=dtype,
+            )
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            # x: (N, 3, 2, 16) — 4-D from an upstream reshape
+            x = x.reshape(x.shape[0], -1)
+            return self.proj(x)
+
+    def calibrate_loop(model: torch.nn.Module) -> None:
+        model(input_tensor)
+
+    input_tensor = torch.randn(64, 3, 2, 16, dtype=dtype).cuda()
+    model = PatchEmbedLike().eval().cuda()
+
+    mtq.quantize(model, mtq.FP8_DEFAULT_CFG, forward_loop=calibrate_loop)
+
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_explicit_typing=True,
+            )
+            expected = model(input_tensor)
+            outputs_trt = trt_model(input_tensor)
+            abs_diff = torch.abs(expected - outputs_trt)
+            assert torch.allclose(
+                expected, outputs_trt, rtol=5e-2, atol=5e-2
+            ), f"max abs diff: {abs_diff.max().item()}"
+
+
+@unittest.skipIf(
     torch.cuda.get_device_capability() < (8, 9),
     "FP8 quantization requires compute capability 8.9 or later",
 )
