@@ -22,6 +22,7 @@ class ConversionContext:
         default_factory=CompilationSettings
     )
     requires_output_allocator: bool = False
+    requires_native_multidevice: bool = False
     weight_refit_map: dict[str, torch.Tensor] = field(default_factory=dict)
     cpu_weights_reference_holder: list[torch.Tensor] = field(default_factory=list)
 

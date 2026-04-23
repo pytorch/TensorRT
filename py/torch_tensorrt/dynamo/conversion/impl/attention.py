@@ -1,8 +1,6 @@
 import logging
 from typing import Optional, Tuple, Union
 
-import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -12,6 +10,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     prepend_ones,
 )
+
+import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -176,22 +177,8 @@ def scaled_dot_product_attention(
         scale_factor = get_trt_tensor(ctx, scale, f"{name}_scale_factor", query.dtype)
 
     mask_tensor = None
-    if is_causal:
-        assert attn_mask is None, "attn_mask should be None when is_causal is True"
-        # L = impl.shape.shape(ctx, target, source_ir, name + "_L", query, -2)
-        # S = impl.shape.shape(ctx, target, source_ir, name + "_S", key, -2)
-        # mask_tensor = tril(
-        #     ctx,
-        #     target,
-        #     source_ir,
-        #     name + "_tril",
-        #     L,
-        #     S,
-        # )
-        # diff = len(query.shape) - len(mask_tensor.shape)
-        # mask_tensor = prepend_ones(ctx, mask_tensor, name + "_prepend_ones", diff)
-
     if attn_mask is not None:
+        attn_mask = get_trt_tensor(ctx, attn_mask, name + "_attn_mask")
         if attn_mask.dtype == trt.DataType.BOOL:
             mask_tensor = attn_mask
         elif attn_mask.dtype != query.dtype:
@@ -205,6 +192,49 @@ def scaled_dot_product_attention(
             )
         else:
             mask_tensor = attn_mask
+
+    # TRT add_attention does not support is_causal=True together with an explicit
+    # mask.  When both are present, fold the causal lower-triangular mask into the
+    # user-supplied mask and pass use_causal=False to the layer.
+    use_causal = is_causal
+    if mask_tensor is not None and is_causal:
+        L = impl.shape.shape(ctx, target, source_ir, name + "_L", query, -2)
+        S = impl.shape.shape(ctx, target, source_ir, name + "_S", key, -2)
+        causal_mask = tril(ctx, target, source_ir, name + "_tril", L, S)
+        diff = len(query.shape) - len(causal_mask.shape)
+        causal_mask = prepend_ones(ctx, causal_mask, name + "_prepend_ones", diff)
+        if mask_tensor.dtype == trt.DataType.BOOL:
+            mask_tensor = impl.elementwise.logical_and(
+                ctx,
+                target,
+                source_ir,
+                name + "_causal_attn_and",
+                causal_mask,
+                mask_tensor,
+            )
+        else:
+            zero_bias = get_trt_tensor(ctx, 0.0, name + "_causal_zero", query.dtype)
+            neg_inf_bias = get_trt_tensor(
+                ctx, float("-inf"), name + "_causal_neg_inf", query.dtype
+            )
+            causal_additive_bias = impl.condition.where(
+                ctx,
+                target,
+                source_ir,
+                name + "_causal_additive",
+                zero_bias,
+                neg_inf_bias,
+                causal_mask,
+            )
+            mask_tensor = impl.elementwise.add(
+                ctx,
+                target,
+                source_ir,
+                name + "_mask_add_causal",
+                mask_tensor,
+                causal_additive_bias,
+            )
+        use_causal = False
 
     scaled_query = impl.elementwise.mul(
         ctx, target, source_ir, f"{name}_scaled_query", query, scale_factor
@@ -220,7 +250,7 @@ def scaled_dot_product_attention(
         )
 
     attention_layer = ctx.net.add_attention(
-        scaled_query, key, value, trt.AttentionNormalizationOp.SOFTMAX, is_causal
+        scaled_query, key, value, trt.AttentionNormalizationOp.SOFTMAX, use_causal
     )
     assert attention_layer is not None, "attention layer is None"
 

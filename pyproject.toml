@@ -83,10 +83,10 @@ test = [
 
 test-ext = [
     "timm>=1.0.3",
-    "transformers>=4.53.1",
-    "torchvision>=0.26.0.dev,<0.27.0",
+    "transformers>=5.0.0",
+    "torchvision>=0.27.0.dev,<0.28.0",
     "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
-    "nvidia-modelopt[all]>=0.27.1; python_version >'3.9' and python_version <'3.13'"
+    #"nvidia-modelopt[hf]@git+https://github.com/NVIDIA/Model-Optimizer.git; python_version >'3.10' and python_version <'3.14'"
 ]
 
 docs = [
@@ -100,13 +100,16 @@ docs = [
     "pillow",
 ]
 
-quantization = ["nvidia-modelopt[all]>=0.27.1"]
+quantization = ["nvidia-modelopt[hf]>=0.43.0"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
 Documentation = "https://pytorch.org/tensorrt"
 Repository = "https://github.com/pytorch/tensorrt.git"
 Changelog = "https://github.com/pytorch/tensorrt/releases"
+
+[project.scripts]
+torchtrtrun = "torch_tensorrt.distributed.run:main"
 
 [tool.setuptools]
 package-dir = { "" = "py" }
@@ -132,10 +135,17 @@ package = true
 environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
 required-environments = [
     "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'aarch64'",
     "sys_platform == 'win32' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'AMD64'"
 ]
 prerelease = "if-necessary-or-explicit"
 index-strategy = "unsafe-best-match"
+conflicts = [
+    [
+      { group = "test_ext" },
+      { group = "quantization" },
+    ],
+]
 
 [tool.uv.sources]
 torch = [
@@ -430,3 +440,4 @@ extend-ignore-identifiers-re = [
 
 [tool.typos.default.extend-words]
 arange = "arange"
+thw = "thw"

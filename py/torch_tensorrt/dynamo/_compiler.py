@@ -385,7 +385,11 @@ def cross_compile_for_windows(
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions, decompose_attention)
+        get_decompositions(
+            enable_experimental_decompositions,
+            decompose_attention,
+            use_distributed_mode_trace,
+        )
     )
 
     gm = exported_program.module()
@@ -793,7 +797,11 @@ def compile(
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions, decompose_attention)
+        get_decompositions(
+            enable_experimental_decompositions,
+            decompose_attention,
+            use_distributed_mode_trace,
+        )
     )
 
     gm = exported_program.module()
@@ -1456,7 +1464,11 @@ def convert_exported_program_to_serialized_trt_engine(
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions, decompose_attention)
+        get_decompositions(
+            enable_experimental_decompositions,
+            decompose_attention,
+            use_distributed_mode_trace,
+        )
     )
 
     gm = exported_program.module()

@@ -299,6 +299,39 @@ def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
     return False
 
 
+def check_native_trt_collectives(
+    torchtrt_lib_path: Optional[str] = None,
+    torchtrt_runtime_lib_path: Optional[str] = None,
+) -> bool:
+    """
+    Check if native TRT collectives are available (TRT 10.16+ with NCCL).
+
+    This function loads the torch_tensorrt runtime library to register torch ops,
+    then calls NATIVE_TRT_COLLECTIVES_AVAIL() to check if the runtime was compiled
+    with NCCL support and TensorRT 10.16+.
+
+    Args:
+        torchtrt_lib_path: Path to libtorchtrt.so (full library)
+        torchtrt_runtime_lib_path: Path to libtorchtrt_runtime.so (runtime-only library)
+
+    Returns:
+        bool: True if native TRT collectives are available, False otherwise.
+    """
+    try:
+        # Load the runtime library to register torch ops
+        # Prefer full library if available, otherwise runtime-only
+        if torchtrt_lib_path and os.path.isfile(torchtrt_lib_path):
+            torch.ops.load_library(torchtrt_lib_path)
+        elif torchtrt_runtime_lib_path and os.path.isfile(torchtrt_runtime_lib_path):
+            torch.ops.load_library(torchtrt_runtime_lib_path)
+        else:
+            return False
+
+        return bool(torch.ops.tensorrt.NATIVE_TRT_COLLECTIVES_AVAIL())
+    except Exception:
+        return False
+
+
 def load_tensorrt_llm_for_nccl() -> bool:
     """
     Attempts to load the TensorRT-LLM plugin and initialize it.

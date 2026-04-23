@@ -1,534 +1,619 @@
 name: Build and test Linux x86_64 wheels
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - nightly
-      - release/*
-    tags:
-      # NOTE: Binary build pipelines should only get triggered on release candidate builds
-      # Release candidate tags look like: v1.11.0-rc1
-      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
-  workflow_dispatch:
-
+    pull_request:
+    push:
+        branches:
+            - main
+            - nightly
+            - release/*
+        tags:
+            # NOTE: Binary build pipelines should only get triggered on release candidate builds
+            # Release candidate tags look like: v1.11.0-rc1
+            - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+    workflow_dispatch:
 
 jobs:
-  generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
-    with:
-      package-type: wheel
-      os: linux
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      with-rocm: false
-      with-cpu: false
-
-  filter-matrix:
-    needs: [generate-matrix]
-    outputs:
-      matrix: ${{ steps.generate.outputs.matrix }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/setup-python@v6
+    generate-matrix:
+        uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
         with:
-          python-version: '3.11'
-      - uses: actions/checkout@v6
+            package-type: wheel
+            os: linux
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            with-rocm: false
+            with-cpu: false
+
+    filter-matrix:
+        needs: [generate-matrix]
+        outputs:
+            matrix: ${{ steps.generate.outputs.matrix }}
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/setup-python@v6
+              with:
+                  python-version: "3.11"
+            - uses: actions/checkout@v6
+              with:
+                  repository: pytorch/tensorrt
+            - name: Generate matrix
+              id: generate
+              run: |
+                  set -eou pipefail
+                  MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+                  MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
+                  echo "${MATRIX_BLOB}"
+                  echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+    build:
+        needs: filter-matrix
+        permissions:
+            id-token: write
+            contents: read
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      env-var-script: packaging/env_vars.txt
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      package-name: torch_tensorrt
+                      display-name: Build Linux x86_64 torch-tensorrt whl package
+        name: ${{ matrix.display-name }}
+        uses: ./.github/workflows/build_linux.yml
         with:
-          repository: pytorch/tensorrt
-      - name: Generate matrix
-        id: generate
-        run: |
-          set -eou pipefail
-          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
-          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
-          echo "${MATRIX_BLOB}"
-          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+            repository: ${{ matrix.repository }}
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            env-var-script: ${{ matrix.env-var-script }}
+            post-script: ${{ matrix.post-script }}
+            package-name: ${{ matrix.package-name }}
+            smoke-test-script: ${{ matrix.smoke-test-script }}
+            trigger-event: ${{ github.event_name }}
+            architecture: "x86_64"
+            use-rtx: false
+            pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
 
-  build:
-    needs: filter-matrix
-    permissions:
-      id-token: write
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            pre-script: packaging/pre_build_script.sh
-            env-var-script: packaging/env_vars.txt
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            package-name: torch_tensorrt
-            display-name: Build Linux x86_64 torch-tensorrt whl package
-    name: ${{ matrix.display-name }}
-    uses: ./.github/workflows/build_linux.yml
-    with:
-      repository: ${{ matrix.repository }}
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      env-var-script: ${{ matrix.env-var-script }}
-      post-script: ${{ matrix.post-script }}
-      package-name: ${{ matrix.package-name }}
-      smoke-test-script: ${{ matrix.smoke-test-script }}
-      trigger-event: ${{ github.event_name }}
-      architecture: "x86_64"
-      use-rtx: false
-      pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
+    L0-dynamo-converter-tests:
+        name: ${{ matrix.display-name }}
+        needs: [filter-matrix, build]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L0 dynamo converter tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L0-dynamo-converter-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/dynamo
+                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
+                popd
 
-  L0-dynamo-converter-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L0 dynamo converter tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L0-dynamo-converter-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
-        popd
+    L0-dynamo-core-tests:
+        name: ${{ matrix.display-name }}
+        needs: [filter-matrix, build]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L0 dynamo core tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L0-dynamo-core-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py
+                cd dynamo
+                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
+                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/test_000_*
+                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
+                popd
 
-  L0-dynamo-core-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L0 dynamo core tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L0-dynamo-core-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/test_000_*
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
-        popd
+    L0-py-core-tests:
+        name: ${{ matrix.display-name }}
+        needs: [filter-matrix, build]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L0 core python tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L0-py-core-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/core
+                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
+                popd
 
-  L0-py-core-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L0 core python tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L0-py-core-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/core
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
-        popd
+    L0-torchscript-tests:
+        name: ${{ matrix.display-name }}
+        needs: [filter-matrix, build]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L0 torchscript tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L0-torchscript-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/modules
+                python hub.py
+                popd
+                pushd .
+                cd tests/py/ts
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
+                popd
 
-  L0-torchscript-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L0 torchscript tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L0-torchscript-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
-        popd
+    L1-dynamo-core-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L0-dynamo-converter-tests,
+                L0-dynamo-core-tests,
+                L0-py-core-tests,
+                L0-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L1 dynamo core tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L1-dynamo-core-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/dynamo
+                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
+                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_partitioning_tests_results.xml partitioning/test_001_*
 
-  L1-dynamo-core-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L1 dynamo core tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L1-dynamo-core-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_partitioning_tests_results.xml partitioning/test_001_*
+                popd
 
-        popd
+    L1-dynamo-compile-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L0-dynamo-converter-tests,
+                L0-dynamo-core-tests,
+                L0-py-core-tests,
+                L0-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L1 dynamo compile tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L1-dynamo-compile-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/dynamo/
+                python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
+                popd
 
-  L1-dynamo-compile-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L1 dynamo compile tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L1-dynamo-compile-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
-        popd
+    L1-torch-compile-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L0-dynamo-converter-tests,
+                L0-dynamo-core-tests,
+                L0-py-core-tests,
+                L0-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L1 torch compile tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L1-torch-compile-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/dynamo/
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
+                python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+                python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+                popd
 
-  L1-torch-compile-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L1 torch compile tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L1-torch-compile-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
-        python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-        python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
-        popd
+    L1-torchscript-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L0-dynamo-core-tests,
+                L0-dynamo-converter-tests,
+                L0-py-core-tests,
+                L0-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L1 torch script tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L1-torchscript-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/modules
+                python hub.py
+                popd
+                pushd .
+                cd tests/py/ts
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml   models/
+                popd
 
-  L1-torchscript-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L0-dynamo-core-tests, L0-dynamo-converter-tests, L0-py-core-tests, L0-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L1 torch script tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L1-torchscript-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml   models/
-        popd
+    L2-torch-compile-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L1-torch-compile-tests,
+                L1-dynamo-compile-tests,
+                L1-dynamo-core-tests,
+                L1-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L2 torch compile tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L2-torch-compile-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/dynamo/
+                python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+                python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+                popd
 
-  L2-torch-compile-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L2 torch compile tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-torch-compile-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
-        popd
+    L2-dynamo-compile-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L1-dynamo-compile-tests,
+                L1-dynamo-core-tests,
+                L1-torch-compile-tests,
+                L1-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L2 dynamo compile tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L2-dynamo-compile-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/dynamo/
+                python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
+                popd
 
-  L2-dynamo-compile-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L2 dynamo compile tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-dynamo-compile-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
-        popd
+    L2-dynamo-core-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L1-dynamo-core-tests,
+                L1-dynamo-compile-tests,
+                L1-torch-compile-tests,
+                L1-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L2 dynamo core tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L2-dynamo-core-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/dynamo
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
+                popd
 
-  L2-dynamo-core-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L2 dynamo core tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-dynamo-core-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
-        popd
+    L2-dynamo-plugin-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L1-dynamo-core-tests,
+                L1-dynamo-compile-tests,
+                L1-torch-compile-tests,
+                L1-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L2 dynamo plugin tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L2-dynamo-plugin-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/py/dynamo
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
+                popd
 
-  L2-dynamo-plugin-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L2 dynamo plugin tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-dynamo-plugin-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
-        popd
+    L2-torchscript-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L1-dynamo-core-tests,
+                L1-dynamo-compile-tests,
+                L1-torch-compile-tests,
+                L1-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L2 torch script tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L2-torchscript-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            script: |
+                set -euo pipefail
+                pushd .
+                cd tests/modules
+                python hub.py
+                popd
+                pushd .
+                cd tests/py/ts
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_ts_integrations_tests_results.xml   integrations/
+                popd
 
-  L2-torchscript-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L2 torch script tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-torchscript-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_ts_integrations_tests_results.xml   integrations/
-        popd
-
-  L2-dynamo-distributed-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: L2 dynamo distributed tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-dynamo-distributed-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
-        export USE_TRTLLM_PLUGINS=1
-        dnf install -y mpich mpich-devel openmpi openmpi-devel
-        pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml distributed/test_nccl_ops.py
-        popd
+    L2-dynamo-distributed-tests:
+        name: ${{ matrix.display-name }}
+        needs:
+            [
+                filter-matrix,
+                build,
+                L1-dynamo-core-tests,
+                L1-dynamo-compile-tests,
+                L1-torch-compile-tests,
+                L1-torchscript-tests,
+            ]
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repository: pytorch/tensorrt
+                      package-name: torch_tensorrt
+                      pre-script: packaging/pre_build_script.sh
+                      post-script: packaging/post_build_script.sh
+                      smoke-test-script: packaging/smoke_test_script.sh
+                      display-name: L2 dynamo distributed tests
+        uses: ./.github/workflows/linux-test.yml
+        with:
+            job-name: L2-dynamo-distributed-tests
+            repository: "pytorch/tensorrt"
+            ref: ""
+            test-infra-repository: pytorch/test-infra
+            test-infra-ref: main
+            build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+            pre-script: ${{ matrix.pre-script }}
+            runner: linux.g4dn.12xlarge.nvidia.gpu
+            script: |
+                set -euo pipefail
+                export USE_HOST_DEPS=1
+                export CI_BUILD=1
+                export USE_TRTLLM_PLUGINS=1
+                dnf install -y mpich mpich-devel openmpi openmpi-devel
+                pushd .
+                cd tests/py
+                cd dynamo
+                python -m pytest -ra -v --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml \
+                  distributed/test_nccl_ops.py \
+                  distributed/test_native_nccl.py \
+                  distributed/test_export_save_load.py
+                python -m torch_tensorrt.distributed.run --nproc_per_node=2 distributed/test_native_nccl.py --multirank
+                python -m torch_tensorrt.distributed.run --nproc_per_node=2 distributed/test_export_save_load.py --multirank
+                popd
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+    cancel-in-progress: true

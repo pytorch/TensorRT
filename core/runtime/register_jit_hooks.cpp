@@ -108,6 +108,47 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             &TRTEngine::set_device_memory_budget)
         .def_property("streamable_device_memory_budget", &TRTEngine::get_streamable_device_memory_budget)
         .def_property("automatic_device_memory_budget", &TRTEngine::get_automatic_device_memory_budget)
+        .def_readonly("requires_native_multidevice", &TRTEngine::requires_native_multidevice)
+        .def_readonly("rank", &TRTEngine::rank)
+        .def_readonly("world_size", &TRTEngine::world_size)
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+        .def(
+            "set_group_name",
+            [](c10::intrusive_ptr<TRTEngine> self, std::string group_name) {
+              // Only reset nccl_initialized when the group actually changes.
+              // Re-pinning the same group should be a no-op — calling
+              // setCommunicator() on an exec_ctx that already has one causes
+              // a TRT API error ("existing communicator must be null").
+              if (self->group_name != group_name) {
+                self->group_name = group_name;
+                self->nccl_initialized = false;
+                LOG_DEBUG("TRTEngine group_name changed to '" << group_name << "'");
+              }
+            })
+        .def("bind_nccl_comm", [](c10::intrusive_ptr<TRTEngine> self) { self->bind_nccl_comm(); })
+        .def("release_nccl_comm", [](c10::intrusive_ptr<TRTEngine> self) { self->release_nccl_comm(); })
+        .def_readonly("nccl_initialized", &TRTEngine::nccl_initialized)
+#else
+        .def(
+            "set_group_name",
+            [](c10::intrusive_ptr<TRTEngine> self, std::string group_name) {
+              LOG_ERROR(
+                  "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); set_group_name is a no-op");
+            })
+        .def(
+            "bind_nccl_comm",
+            [](c10::intrusive_ptr<TRTEngine> self) {
+              LOG_ERROR(
+                  "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); bind_nccl_comm is a no-op");
+            })
+        .def(
+            "release_nccl_comm",
+            [](c10::intrusive_ptr<TRTEngine> self) {
+              LOG_ERROR(
+                  "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); release_nccl_comm is a no-op");
+            })
+        .def_readonly("nccl_initialized", &TRTEngine::_native_nccl_support)
+#endif
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
@@ -150,6 +191,14 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("REQUIRES_OUTPUT_ALLOCATOR_IDX", []() -> int64_t { return REQUIRES_OUTPUT_ALLOCATOR_IDX; });
   m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
   m.def("RESOURCE_ALLOCATION_STRATEGY_IDX", []() -> int64_t { return RESOURCE_ALLOCATION_STRATEGY_IDX; });
+  m.def("REQUIRES_NATIVE_MULTIDEVICE_IDX", []() -> int64_t { return REQUIRES_NATIVE_MULTIDEVICE_IDX; });
+  m.def("NATIVE_TRT_COLLECTIVES_AVAIL", []() -> bool {
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+    return true;
+#else
+    return false;
+#endif
+  });
   m.def("_platform_linux_x86_64", []() -> std::string {
     auto it = get_platform_name_map().find(Platform::PlatformEnum::kLINUX_X86_64);
     return it->second;

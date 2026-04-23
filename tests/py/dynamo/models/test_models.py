@@ -282,7 +282,13 @@ def test_efficientnet_b0(ir, dtype):
 def test_bert_base_uncased(ir, dtype):
     from transformers import BertModel
 
-    model = BertModel.from_pretrained("bert-base-uncased").cuda().eval().to(dtype)
+    model = (
+        BertModel.from_pretrained(
+            "bert-base-uncased", torch_dtype=dtype, attn_implementation="sdpa"
+        )
+        .cuda()
+        .eval()
+    )
     input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
     input2 = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
 
