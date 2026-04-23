@@ -45,66 +45,32 @@ class TestConcatEmptyTensor(TestCase):
     @parameterized.expand(
         [
             (
-                "python_runtime_model_one_empty_0",
-                True,
+                "model_one_empty_0",
                 ConcatEmptyModel,
                 "two_inputs",
                 (0,),
             ),
             (
-                "cpp_runtime_model_one_empty_0",
-                False,
-                ConcatEmptyModel,
-                "two_inputs",
-                (0,),
-            ),
-            (
-                "python_runtime_model_one_empty_0_4",
-                True,
+                "model_one_empty_0_4",
                 ConcatEmptyModel,
                 "two_inputs",
                 (0, 4),
             ),
             (
-                "cpp_runtime_model_one_empty_0_4",
-                False,
-                ConcatEmptyModel,
-                "two_inputs",
-                (0, 4),
-            ),
-            (
-                "python_runtime_model_two_empty_0_4",
-                True,
+                "model_two_empty_0_4",
                 ConcatEmptyModelEmptyConstant,
                 "one_input",
                 (0, 4),
             ),
             (
-                "cpp_runtime_model_two_empty_0_4",
-                False,
-                ConcatEmptyModelEmptyConstant,
-                "one_input",
-                (0, 4),
-            ),
-            (
-                "python_runtime_model_three_empty_0",
-                True,
-                ConcatEmptyModelEmptyConstantMisMatchDim,
-                "one_input",
-                (0,),
-            ),
-            (
-                "cpp_runtime_model_three_empty_0",
-                False,
+                "model_three_empty_0",
                 ConcatEmptyModelEmptyConstantMisMatchDim,
                 "one_input",
                 (0,),
             ),
         ]
     )
-    def test_concat_empty_with_nonempty(
-        self, _, use_python_runtime, model_class, input_type, empty_shape
-    ):
+    def test_concat_empty_with_nonempty(self, _, model_class, input_type, empty_shape):
         """
         Test concatenation of empty tensor with non-empty tensor
         along a specific dimension using Torch-TensorRT compiled model.
@@ -145,13 +111,11 @@ class TestConcatEmptyTensor(TestCase):
 
     @parameterized.expand(
         [
-            ("python_runtime_empty_0", True, (0,)),
-            ("cpp_runtime_empty_0", False, (0,)),
-            ("python_runtime_empty_0_4", True, (0, 4)),
-            ("cpp_runtime_empty_0_4", False, (0, 4)),
+            ("empty_0", (0,)),
+            ("empty_0_4", (0, 4)),
         ]
     )
-    def test_concat_nonempty_with_empty(self, _, use_python_runtime, empty_shape):
+    def test_concat_nonempty_with_empty(self, _, empty_shape):
         """
         Concatenate non-empty tensor with empty tensor (opposite order)
         """
@@ -186,13 +150,7 @@ class TestEmptyTensorMemoryLeak(TestCase):
     do not cause memory leaks and produce correct results.
     """
 
-    @parameterized.expand(
-        [
-            ("cpp_runtime", False),
-            ("python_runtime", True),
-        ]
-    )
-    def test_repeated_empty_tensor_no_leak_and_correct(self, _, use_python_runtime):
+    def test_repeated_empty_tensor_no_leak_and_correct(self):
         """
         Run many inferences with empty tensor input to verify:
         1. Memory doesn't grow (placeholder is reused, not reallocated)

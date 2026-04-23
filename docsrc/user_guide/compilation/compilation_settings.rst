@@ -59,12 +59,6 @@ Core Parameters
    * - ``device``
      - current CUDA device
      - :class:`torch_tensorrt.Device` specifying the GPU to compile for.
-   * - ``use_python_runtime``
-     - ``False`` (auto)
-     - ``False`` uses the C++ runtime (recommended — serializable, CUDAGraphs,
-       multi-device safe). ``True`` forces the Python runtime (simpler to instrument
-       for debugging but not serializable to ``ExportedProgram``). ``None`` selects C++
-       if available.
    * - ``pass_through_build_failures``
      - ``False``
      - When ``True``, TRT engine build errors raise exceptions rather than fall back to PyTorch.
@@ -372,7 +366,7 @@ Compilation Workflow
      - ``False``
      - Defer TRT engine deserialization until all engines have been built.
        Works around resource contraints and builder overhad but engines
-       may be less well tuned to their deployment resource availablity
+       may be less well tuned to their deployment resource availability
    * - ``debug``
      - ``False``
      - Enable verbose TRT builder logs at ``DEBUG`` level.

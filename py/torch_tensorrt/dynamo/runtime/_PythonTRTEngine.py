@@ -524,14 +524,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         need_cudagraphs_record: bool,
     ) -> None:
         for i, input_name in enumerate(self.in_binding_names):
-            if not contiguous_inputs[i].is_cuda:
-                logger.warning(
-                    f"Detected input {input_name} of engine {self.name} is not on a cuda device. "
-                    "This tensor is being moved by the runtime but for performance considerations, "
-                    "ensure your inputs are all on GPU and open an issue here "
-                    "(https://github.com/pytorch/TensorRT/issues) if this warning persists."
-                )
-                contiguous_inputs[i] = contiguous_inputs[i].cuda()
 
             assert (
                 contiguous_inputs[i].dtype == self.input_dtypes[i]

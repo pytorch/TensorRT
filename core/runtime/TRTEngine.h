@@ -167,7 +167,6 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t get_streamable_device_memory_budget();
   int64_t get_automatic_device_memory_budget();
   std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
-  void set_pre_allocated_outputs(bool enable);
   void set_output_tensors_as_unowned(bool enable);
   bool are_output_tensors_unowned();
   TorchTRTRuntimeStates runtime_states;

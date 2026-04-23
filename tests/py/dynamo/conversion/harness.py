@@ -208,7 +208,7 @@ class TRTTestCase(TestCase):
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
             _LOGGER.info(f"Interpreter run time(s): {sec}")
-            serialized_engine = interpreter_result.engine.serialize()
+            serialized_engine = bytes(interpreter_result.engine.serialize())
             trt_mod = rt_cls(
                 serialized_engine=serialized_engine,
                 input_binding_names=list(interpreter_result.input_names),
@@ -292,7 +292,7 @@ class TRTTestCase(TestCase):
                 self.assert_has_op(mod, expected_ops)
 
             interpreter_result = interpreter.run()
-            serialized_engine = interpreter_result.engine.serialize()
+            serialized_engine = bytes(interpreter_result.engine.serialize())
             trt_mod = rt_cls(
                 serialized_engine=serialized_engine,
                 input_binding_names=list(interpreter_result.input_names),

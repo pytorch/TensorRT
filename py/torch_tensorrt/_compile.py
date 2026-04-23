@@ -904,8 +904,8 @@ def save(
                 logger.warning(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
-            _normalize_engine_constants_to_python(module)
             if output_format == "exported_program":
+                _normalize_engine_constants_to_python(module)
                 function_overload_with_kwargs(
                     torch.export.save,
                     module,
@@ -962,8 +962,8 @@ def save(
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
                 )
-                _normalize_engine_constants_to_python(exp_program)
                 if output_format == "exported_program":
+                    _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
                         exp_program,
@@ -1042,8 +1042,8 @@ def save(
                         strict=False,
                     )
 
-                _normalize_engine_constants_to_python(exp_program)
                 if output_format == "exported_program":
+                    _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
                         exp_program,

@@ -33,13 +33,7 @@ class SampleModel(torch.nn.Module):
 
 
 class TestWeightStreamingPython(TestCase):
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_weight_streaming_default(self, _, use_python_runtime):
+    def test_weight_streaming_default(self):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
@@ -83,13 +77,7 @@ class TestWeightStreamingPython(TestCase):
         )
         torch._dynamo.reset()
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_weight_streaming_manual(self, _, use_python_runtime):
+    def test_weight_streaming_manual(self):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
@@ -142,13 +130,11 @@ class TestWeightStreamingPython(TestCase):
 
     @parameterized.expand(
         [
-            ("python_runtime", True, False),
-            ("python_runtime_multi_rt", True, True),
-            ("cpp_runtime", False, False),
-            ("cpp_runtime_multi_rt", False, True),
+            ("default", False),
+            ("multi_rt", True),
         ]
     )
-    def test_weight_streaming_invalid_usage(self, _, use_python_runtime, multi_rt):
+    def test_weight_streaming_invalid_usage(self, _, multi_rt):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
@@ -188,13 +174,7 @@ class TestWeightStreamingPython(TestCase):
 
         torch._dynamo.reset()
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_weight_streaming_multi_rt(self, _, use_python_runtime):
+    def test_weight_streaming_multi_rt(self):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
@@ -232,13 +212,7 @@ class TestWeightStreamingPython(TestCase):
 
         torch._dynamo.reset()
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_weight_streaming_cudagraphs(self, _, use_python_runtime):
+    def test_weight_streaming_cudagraphs(self):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
@@ -281,19 +255,13 @@ class TestWeightStreamingPython(TestCase):
         )
         torch._dynamo.reset()
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
     @unittest.skipIf(
         torchtrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on cudagraphs"
     )
     @unittest.skipIf(
         is_orin(), "There is a bug on Orin platform, skip for now until bug is fixed"
     )
-    def test_runtime_state_change(self, _, use_python_runtime):
+    def test_runtime_state_change(self):
         class SampleModel(torch.nn.Module):
             def __init__(self):
                 super().__init__()

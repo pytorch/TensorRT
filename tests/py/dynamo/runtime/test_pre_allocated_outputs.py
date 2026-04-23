@@ -1,6 +1,5 @@
 import torch
 import torch_tensorrt as torchtrt
-from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 INPUT_SIZE = (3, 16, 16)
@@ -8,13 +7,7 @@ TRIALS = 5
 
 
 class TestPreAllocatedOutputs(TestCase):
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_pre_allocated_outputs_default(self, _, use_python_runtime):
+    def test_pre_allocated_outputs_default(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 return torch.softmax((x + 2) * 7, dim=0)
@@ -53,13 +46,7 @@ class TestPreAllocatedOutputs(TestCase):
 
         torch._dynamo.reset()
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_pre_allocated_outputs_dynamic(self, _, use_python_runtime):
+    def test_pre_allocated_outputs_dynamic(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 return torch.relu((x + 2) * 0.5)
@@ -144,32 +131,24 @@ class TestPreAllocatedOutputs(TestCase):
 
         with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
             _ = optimized_model(inputs[0])
-            output_tensors = [
-                trt_mod.pre_allocated_outputs
+            output_tensors_ptr = [
+                [t.data_ptr() for t in trt_mod.pre_allocated_outputs]
                 for name, trt_mod in optimized_model.named_children()
                 if "_run_on_acc" in name
             ]
             _ = optimized_model(inputs[0])
-            new_output_tensors = [
-                trt_mod.pre_allocated_outputs
+            new_output_tensors_ptr = [
+                [t.data_ptr() for t in trt_mod.pre_allocated_outputs]
                 for name, trt_mod in optimized_model.named_children()
                 if "_run_on_acc" in name
             ]
 
             # Run to run, output of intermediate engine is not reallocated
-            self.assertTrue(output_tensors[0] is new_output_tensors[0])
+            self.assertEqual(output_tensors_ptr[0], new_output_tensors_ptr[0])
             # Run to run, output of output engine is reallocated
-            self.assertTrue(output_tensors[1] is not new_output_tensors[1])
+            self.assertNotEqual(output_tensors_ptr[1], new_output_tensors_ptr[1])
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_pre_allocated_outputs_unowned_outputs_api_check(
-        self, _, use_python_runtime
-    ):
+    def test_pre_allocated_outputs_unowned_outputs_api_check(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 return torch.softmax(x * 7 + 2, dim=0)
@@ -203,13 +182,7 @@ class TestPreAllocatedOutputs(TestCase):
                 )
             )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_pre_allocated_outputs_unowned_outputs(self, _, use_python_runtime):
+    def test_pre_allocated_outputs_unowned_outputs(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 return torch.softmax(x * 7 + 2, dim=0)
@@ -300,15 +273,7 @@ class TestPreAllocatedOutputs(TestCase):
             # Run to run, output of output engine is reallocated
             self.assertTrue(output_tensors[1] != new_output_tensors[1])
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_pre_allocated_outputs_unowned_outputs_multiple_outputs_api_check(
-        self, _, use_python_runtime
-    ):
+    def test_pre_allocated_outputs_unowned_outputs_multiple_outputs_api_check(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 y = torch.ops.aten.mul(x, 7)
@@ -345,15 +310,7 @@ class TestPreAllocatedOutputs(TestCase):
                 )
             )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_pre_allocated_outputs_unowned_outputs_multi_outputs(
-        self, _, use_python_runtime
-    ):
+    def test_pre_allocated_outputs_unowned_outputs_multi_outputs(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 y = torch.ops.aten.mul(x, 7)

@@ -126,10 +126,6 @@ Runtime Errors
       the engine. Upgrade TRT or rebuild with ``version_compatible=True``.
     * The GPU compute capability is lower than on the build machine. Rebuild with
       ``hardware_compatible=True`` (requires Ampere or newer).
-    * The ``.ep`` export path does not support your compiled module layout (e.g. mixed
-      Python-runtime subgraphs in a specific exporter version). Try the default C++ path
-      at compile time or use ``torch_tensorrt`` module save/load APIs that preserve
-      ``TorchTensorRTModule`` state.
 
 **Shape mismatch at runtime / "Invalid input shape"**
 

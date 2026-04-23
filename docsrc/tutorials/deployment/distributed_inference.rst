@@ -99,7 +99,6 @@ handles DTensor inputs correctly:
         options={
             "use_distributed_mode_trace": True,
             "use_explicit_typing": True,  # enabled_precisions deprecated
-            "use_python_runtime": True,
             "min_block_size": 1,
         },
     )
@@ -152,10 +151,6 @@ Compilation Settings for Distributed Workloads
      - ``False``
      - Use ``aot_autograd`` for tracing instead of the default path. Required when the
        model contains DTensor or other distributed tensors.
-   * - ``use_python_runtime``
-     - ``None`` (auto)
-     - Use the Python runtime. Often set to ``True`` for tensor-parallel models that run
-       inside an existing distributed process group.
    * - ``use_explicit_typing``
      - ``True``
      - Respect dtypes set in model/inputs (recommended). Use ``model.half()`` or

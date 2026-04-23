@@ -35,7 +35,6 @@ stays identical:
     pipe.unet = torch_tensorrt.MutableTorchTensorRTModule(
         pipe.unet,
         use_explicit_typing=True,  # pipeline already loaded in float16 via torch_dtype
-        use_python_runtime=True,
     )
 
 The pipeline's ``unet`` is now backed by a TRT engine. The first call to ``pipe(...)``
@@ -167,13 +166,8 @@ because it carries extra state — dynamic-shape descriptors, refit state, etc.:
 
 .. code-block:: python
 
-    # Requires use_python_runtime=False (the default)
     torch_tensorrt.MutableTorchTensorRTModule.save(mutable_module, "module.pkl")
     mutable_module = torch_tensorrt.MutableTorchTensorRTModule.load("module.pkl")
-
-``use_python_runtime=True`` (used in the diffusers examples for pipeline compatibility)
-does **not** support save/load. Switch to the default C++ runtime if serialization is
-required.
 
 ----
 

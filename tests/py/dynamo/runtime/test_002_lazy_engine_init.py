@@ -88,7 +88,7 @@ class TestLazyEngineInit(TestCase):
             trt_output = trt_module(input_data_0, input_data_1).cpu()
 
         trt_module.setup_engine()
-        assertions.assertTrue(trt_module.engine, msg="Engine was not setup")
+        assertions.assertTrue(trt_module.engine is not None, msg="Engine was not setup")
 
         trt_output = trt_module(input_data_0, input_data_1).cpu()
 
@@ -144,7 +144,7 @@ class TestLazyEngineInit(TestCase):
             trt_output = trt_module(input_data).cpu()
 
         trt_module.setup_engine()
-        assertions.assertTrue(trt_module.engine, msg="Engine was not setup")
+        assertions.assertTrue(trt_module.engine is not None, msg="Engine was not setup")
 
         trt_output = trt_module(input_data).cpu()
 

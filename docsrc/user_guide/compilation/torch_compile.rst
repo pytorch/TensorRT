@@ -43,8 +43,7 @@ Custom Setting Usage
                                              "debug": True,
                                              "min_block_size": 2,
                                              "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
-                                             "optimization_level": 4,
-                                             "use_python_runtime": False,})
+                                             "optimization_level": 4,})
 
 .. note:: Supported precisions include FP32, FP16, BF16, INT8, FP8, and FP4. INT8/FP8 quantization requires the `ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library and a quantized model. FP4 requires TensorRT >= 10.8.0.
 
@@ -87,7 +86,7 @@ If key operators for your model are unsupported, see :ref:`dynamo_conversion` to
 
 Feasibility of Serialization
 ^^^^^^^^^^^^^^^^^
-Compilation can also be helpful in demonstrating graph breaks and the feasibility of serialization of a particular model. For instance, if a model has no graph breaks and compiles successfully with the Torch-TensorRT backend, then that model should be compilable and serializeable via the `torch_tensorrt` Dynamo IR, as discussed in :ref:`dynamic_shapes`. To determine the number of graph breaks in a model, the `torch._dynamo.explain` function is very useful:
+Compilation can also be helpful in demonstrating graph breaks and the feasibility of serialization of a particular model. For instance, if a model has no graph breaks and compiles successfully with the Torch-TensorRT backend, then that model should be compilable and serializable via the `torch_tensorrt` Dynamo IR, as discussed in :ref:`dynamic_shapes`. To determine the number of graph breaks in a model, the `torch._dynamo.explain` function is very useful:
 
 .. code-block:: python
 

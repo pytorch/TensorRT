@@ -565,14 +565,13 @@ def refit_module_weights(
         if isinstance(compiled_submodule, TorchTensorRTModule):
             new_serialized_engine = bytes(serialized_engine)
             compiled_submodule.serialized_engine = new_serialized_engine
-            if compiled_submodule._is_python_runtime:
+            if isinstance(compiled_submodule.engine, TRTEngine):
                 # Refit already updated ``cuda_engine`` in place; avoid deserialize (slow).
                 py_eng = compiled_submodule.engine
-                if isinstance(py_eng, TRTEngine):
-                    py_eng.serialized_info[ENGINE_IDX] = new_serialized_engine
-                    py_eng.serialized_engine = new_serialized_engine
+                py_eng.serialized_info[ENGINE_IDX] = new_serialized_engine
+                py_eng.serialized_engine = new_serialized_engine
             else:
-                compiled_submodule._cleanup_engine()
+                compiled_submodule.engine = None
                 compiled_submodule.setup_engine()
         elif inline_module:
             new_engine_info = list(engine_info)

@@ -30,8 +30,8 @@ Functions
 Runtime backend
 ---------------
 
-Execution uses the C++ Torch-TensorRT extension when it is installed; otherwise the
-Python ``TRTEngine`` path is used. There is no separate process-wide backend switch
+Execution uses the C++ runtime engine when it is installed in the build; otherwise the
+Python runtime engine is used. There is no separate process-wide backend switch
 in ``torch_tensorrt.runtime``.
 
 Classes

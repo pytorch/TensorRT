@@ -552,11 +552,6 @@ class TestWeightStrippedEngine(TestCase):
         pyt_results = pyt_model(*inputs)
 
         for i in range(2):
-            if i == 0:
-                use_python_runtime = True
-            else:
-                use_python_runtime = False
-
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
@@ -574,7 +569,7 @@ class TestWeightStrippedEngine(TestCase):
             cos_sim = cosine_similarity(pyt_results, refitted_output)
             assertions.assertTrue(
                 cos_sim > COSINE_THRESHOLD,
-                msg=f"{'python' if use_python_runtime else 'cpp'} runtime TorchTensorRTModule outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+                msg=f"iteration {i}: TorchTensorRTModule outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
             )
 
     @unittest.skip("Waiting for implementation")
