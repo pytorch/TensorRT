@@ -15,6 +15,7 @@ from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .insert_fp8_softmax_qdq import insert_fp8_softmax_qdq
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
@@ -43,6 +44,7 @@ post_lowering_pass_list = [
     complex_graph_detection,
     force_causal_efficient_attention,
     annotate_fp8_sdpa,
+    insert_fp8_softmax_qdq,
 ]
 
 if not is_tegra_platform():

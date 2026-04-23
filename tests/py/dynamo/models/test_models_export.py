@@ -713,3 +713,99 @@ def test_fp8_mha_fused_kernel(ir):
     assert (
         cos > 0.99
     ), f"FP8 MHA output deviates from PyTorch reference: cosine_similarity={cos}"
+
+
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (8, 9),
+    "FP8 quantization requires compute capability 8.9 or later",
+)
+@pytest.mark.unit
+def test_fp8_mha_fused_kernel_decomposed(ir):
+    """Regression test for the decomposed FP8 MHA path (TRT Method 2).
+
+    With ``decompose_attention=True`` the SDPA op is expanded into explicit
+    ``matmul → mul(1/sqrt(D)) → softmax → matmul`` primitives (no
+    ``IAttention``).  TRT fuses this into ``_gemm_mha_v2`` only when FP8
+    Q/DQ is present on Q, K, V **and** on the softmax output.
+
+    modelopt's HF ``_QuantAttention.softmax_quantizer`` is only applied in
+    the Triton FA path, so the standard FX graph lacks the softmax Q/DQ.
+    The ``insert_fp8_softmax_qdq`` lowering pass adds it back (scale = 1/448).
+    This test constructs the pattern manually and compiles with
+    ``decompose_attention=True`` to verify the fusion still triggers.
+    """
+    import json
+
+    import torch_tensorrt
+
+    import tensorrt as trt
+
+    B, H, S, D = 1, 2, 32, 64
+    torch.manual_seed(0)
+
+    class FP8MHAModel(torch.nn.Module):
+        def __init__(self, amax_val: float = 6.0):
+            super().__init__()
+            self.register_buffer("amax_q", torch.tensor(amax_val, dtype=torch.float32))
+            self.register_buffer("amax_k", torch.tensor(amax_val, dtype=torch.float32))
+            self.register_buffer("amax_v", torch.tensor(amax_val, dtype=torch.float32))
+
+        def forward(self, q, k, v):
+            q_fp8 = torch.ops.tensorrt.quantize_op(q, self.amax_q, 8, 4, False, False)
+            k_fp8 = torch.ops.tensorrt.quantize_op(k, self.amax_k, 8, 4, False, False)
+            v_fp8 = torch.ops.tensorrt.quantize_op(v, self.amax_v, 8, 4, False, False)
+            return torch.nn.functional.scaled_dot_product_attention(q_fp8, k_fp8, v_fp8)
+
+    q = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
+    k = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
+    v = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
+
+    model = FP8MHAModel().eval().cuda()
+    ref_out = torch.nn.functional.scaled_dot_product_attention(q, k, v)
+
+    exp_program = torch.export.export(model, (q, k, v), strict=False)
+    serialized_engine = (
+        torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+            exp_program,
+            inputs=[q, k, v],
+            use_explicit_typing=True,
+            min_block_size=1,
+            decompose_attention=True,
+        )
+    )
+
+    runtime = trt.Runtime(trt.Logger(trt.Logger.WARNING))
+    engine = runtime.deserialize_cuda_engine(serialized_engine)
+    inspector = engine.create_engine_inspector()
+    engine_json = json.loads(
+        inspector.get_engine_information(trt.LayerInformationFormat.JSON)
+    )
+    layers = engine_json.get("Layers", [])
+    layer_names = [
+        layer if isinstance(layer, str) else layer.get("Name", "") for layer in layers
+    ]
+    assert any("mha" in name.lower() for name in layer_names), (
+        f"No fused MHA kernel found on decomposed path. Expected a layer "
+        f"containing 'mha' (e.g. _gemm_mha_v2) — TRT fuses FP8 Q/K/V + "
+        f"softmax-output Q/DQ into _gemm_mha_v2 on Method 2 path. "
+        f"Layer names: {layer_names}"
+    )
+
+    # Numerical sanity
+    compiled = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        inputs=[q, k, v],
+        use_explicit_typing=True,
+        min_block_size=1,
+        decompose_attention=True,
+    )
+    with torch.no_grad():
+        trt_out = compiled(q, k, v)
+    cos = torch.nn.functional.cosine_similarity(
+        ref_out.flatten().float().unsqueeze(0),
+        trt_out.flatten().float().unsqueeze(0),
+    ).item()
+    assert (
+        cos > 0.99
+    ), f"Decomposed FP8 MHA output deviates from PyTorch reference: cos={cos}"
