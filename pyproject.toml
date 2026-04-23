@@ -102,7 +102,10 @@ docs = [
     "pillow",
 ]
 
-quantization = ["nvidia-modelopt[hf]>=0.43.0"]
+quantization = [
+    "nvidia-modelopt[hf] @ git+https://github.com/NVIDIA/Model-Optimizer.git@main",
+    "transformers>=5.5.4",
+]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"

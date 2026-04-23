@@ -512,3 +512,204 @@ def test_base_int8_dynamic_shape(ir, dtype):
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-2, atol=5e-2)
+
+
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@pytest.mark.unit
+def test_fp8_mha_softmax_quantizer_annotation(ir):
+    """Regression test for #4200: annotate_fp8_sdpa must tag an SDPA node whose
+    Q, K, V inputs are all FP8-quantized via ``tensorrt.quantize_op``.
+
+    This matches the FX pattern emitted by modelopt's
+    ``register_attention_for_kv_quant`` when ``NVFP4_FP8_MHA_CONFIG`` is applied:
+    the attention module's ``F.scaled_dot_product_attention`` call has its Q,
+    K, V arguments wrapped by ``q_bmm_quantizer``, ``k_bmm_quantizer``,
+    ``v_bmm_quantizer`` (all FP8).
+
+    The annotated ``_fp8_softmax_scale = 1/448`` on the SDPA node lets the
+    attention converter set ``IAttention.normalization_quantize_to_type = FP8``
+    and ``IAttention.normalization_quantize_scale`` so TRT can fuse the full
+    ``_gemm_mha_v2`` FP8 MHA kernel.
+
+    Also verifies that INT8 Q/K/V (exponent_bits=0) or a partially-FP8 input
+    (one of Q/K/V not quantized) do NOT trigger the annotation.
+    """
+    import torch.fx as fx
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering.passes.annotate_fp8_sdpa import (
+        _SDPA_TARGETS,
+        annotate_fp8_sdpa,
+    )
+
+    def _build_sdpa_input_quant_graph(
+        exponent_bits: int, quantize_v: bool = True
+    ) -> fx.GraphModule:
+        """Build FX graph where Q, K, V flow into SDPA through quantize_op nodes."""
+        graph = fx.Graph()
+        q = graph.placeholder("q")
+        k = graph.placeholder("k")
+        v = graph.placeholder("v")
+        amax = graph.placeholder("amax")
+        q_q = graph.call_function(
+            torch.ops.tensorrt.quantize_op.default,
+            args=(q, amax, 8, exponent_bits, False, False),
+        )
+        k_q = graph.call_function(
+            torch.ops.tensorrt.quantize_op.default,
+            args=(k, amax, 8, exponent_bits, False, False),
+        )
+        v_q = (
+            graph.call_function(
+                torch.ops.tensorrt.quantize_op.default,
+                args=(v, amax, 8, exponent_bits, False, False),
+            )
+            if quantize_v
+            else v
+        )
+        out = graph.call_function(
+            torch.ops.aten.scaled_dot_product_attention.default, args=(q_q, k_q, v_q)
+        )
+        graph.output(out)
+        return fx.GraphModule({}, graph)
+
+    settings = CompilationSettings()
+
+    # FP8 Q/K/V inputs (exponent_bits=4): SDPA node must be annotated with 1/448.
+    gm_fp8 = _build_sdpa_input_quant_graph(exponent_bits=4)
+    annotate_fp8_sdpa(gm_fp8, settings)
+    sdpa_nodes = [n for n in gm_fp8.graph.nodes if n.target in _SDPA_TARGETS]
+    assert sdpa_nodes, "No SDPA node found in graph"
+    assert all(
+        "_fp8_softmax_scale" in n.meta for n in sdpa_nodes
+    ), "annotate_fp8_sdpa did not annotate SDPA when Q/K/V inputs are FP8"
+    expected_scale = 1.0 / 448.0
+    for n in sdpa_nodes:
+        assert (
+            abs(n.meta["_fp8_softmax_scale"] - expected_scale) < 1e-12
+        ), f"Wrong softmax scale: {n.meta['_fp8_softmax_scale']}"
+
+    # INT8 Q/K/V inputs (exponent_bits=0): SDPA node must NOT be annotated.
+    gm_int8 = _build_sdpa_input_quant_graph(exponent_bits=0)
+    annotate_fp8_sdpa(gm_int8, settings)
+    sdpa_int8 = [n for n in gm_int8.graph.nodes if n.target in _SDPA_TARGETS]
+    assert all(
+        "_fp8_softmax_scale" not in n.meta for n in sdpa_int8
+    ), "annotate_fp8_sdpa incorrectly annotated SDPA when Q/K/V are INT8"
+
+    # Only Q and K are FP8-quantized, V is raw: SDPA must NOT be annotated.
+    gm_partial = _build_sdpa_input_quant_graph(exponent_bits=4, quantize_v=False)
+    annotate_fp8_sdpa(gm_partial, settings)
+    sdpa_partial = [n for n in gm_partial.graph.nodes if n.target in _SDPA_TARGETS]
+    assert all(
+        "_fp8_softmax_scale" not in n.meta for n in sdpa_partial
+    ), "annotate_fp8_sdpa incorrectly annotated SDPA when V input is not FP8"
+
+
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (8, 9),
+    "FP8 quantization requires compute capability 8.9 or later",
+)
+@pytest.mark.unit
+def test_fp8_mha_fused_kernel(ir):
+    """Regression test for #4200: FP8 MHA with FP8 Q/K/V inputs must produce a
+    fused ``_gemm_mha_v2`` MHA kernel with normalization_quantize_to_type set.
+
+    Hand-constructs the FX pattern that a future modelopt PyTorch-backend
+    version will emit for FP8 MHA (mirrors PR NVIDIA/Model-Optimizer#1289):
+
+        quantize_op(Q) ─┐
+        quantize_op(K) ─┤─ scaled_dot_product_attention
+        quantize_op(V) ─┘
+
+    Built directly via ``torch.ops.tensorrt.quantize_op`` so we do not depend
+    on modelopt actually supporting this pattern in its PyTorch backend today —
+    if/when it does, torch-tensorrt will compile that graph to the fused kernel.
+
+    Verifies:
+    1. Engine inspector shows a layer name containing ``mha`` (i.e.
+       ``_gemm_mha_v2``), confirming the FP8 MHA fusion triggered.
+    2. Numerics match PyTorch reference SDPA within FP8 tolerance
+       (cosine_similarity > 0.99).
+
+    D=64 meets TRT's head_dim >= 32 requirement for the
+    normalization_quantize FP8 kernel.
+    """
+    import json
+
+    import torch_tensorrt
+
+    import tensorrt as trt
+
+    B, H, S, D = 1, 2, 32, 64
+    torch.manual_seed(0)
+
+    class FP8MHAModel(torch.nn.Module):
+        """Mirror of what a modelopt FP8 MHA PyTorch export will look like:
+        tensorrt.quantize_op on Q, K, V feeding F.scaled_dot_product_attention."""
+
+        def __init__(self, amax_val: float = 6.0):
+            super().__init__()
+            self.register_buffer("amax_q", torch.tensor(amax_val, dtype=torch.float32))
+            self.register_buffer("amax_k", torch.tensor(amax_val, dtype=torch.float32))
+            self.register_buffer("amax_v", torch.tensor(amax_val, dtype=torch.float32))
+
+        def forward(self, q, k, v):
+            q_fp8 = torch.ops.tensorrt.quantize_op(q, self.amax_q, 8, 4, False, False)
+            k_fp8 = torch.ops.tensorrt.quantize_op(k, self.amax_k, 8, 4, False, False)
+            v_fp8 = torch.ops.tensorrt.quantize_op(v, self.amax_v, 8, 4, False, False)
+            return torch.nn.functional.scaled_dot_product_attention(q_fp8, k_fp8, v_fp8)
+
+    q = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
+    k = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
+    v = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
+
+    model = FP8MHAModel().eval().cuda()
+    ref_out = torch.nn.functional.scaled_dot_product_attention(q, k, v)
+
+    exp_program = torch.export.export(model, (q, k, v), strict=False)
+    serialized_engine = (
+        torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+            exp_program,
+            inputs=[q, k, v],
+            use_explicit_typing=True,
+            min_block_size=1,
+        )
+    )
+
+    runtime = trt.Runtime(trt.Logger(trt.Logger.WARNING))
+    engine = runtime.deserialize_cuda_engine(serialized_engine)
+    inspector = engine.create_engine_inspector()
+    engine_json = json.loads(
+        inspector.get_engine_information(trt.LayerInformationFormat.JSON)
+    )
+    layers = engine_json.get("Layers", [])
+    layer_names = [
+        layer if isinstance(layer, str) else layer.get("Name", "") for layer in layers
+    ]
+    assert any("mha" in name.lower() for name in layer_names), (
+        f"No fused MHA kernel found in compiled engine. Expected a layer "
+        f"containing 'mha' (e.g. _gemm_mha_v2) — TRT fuses FP8 Q/K/V + "
+        f"normalization_quantize_to_type into a single MHA kernel. "
+        f"Layer names present: {layer_names}"
+    )
+
+    # Numerical sanity: FP8-quantized MHA should agree with PyTorch SDPA.
+    compiled = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        inputs=[q, k, v],
+        use_explicit_typing=True,
+        min_block_size=1,
+    )
+    with torch.no_grad():
+        trt_out = compiled(q, k, v)
+    cos = torch.nn.functional.cosine_similarity(
+        ref_out.flatten().float().unsqueeze(0),
+        trt_out.flatten().float().unsqueeze(0),
+    ).item()
+    assert (
+        cos > 0.99
+    ), f"FP8 MHA output deviates from PyTorch reference: cosine_similarity={cos}"
