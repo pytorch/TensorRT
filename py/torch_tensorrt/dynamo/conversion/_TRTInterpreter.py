@@ -841,6 +841,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_native_multidevice = True
             _LOGGER.debug(f"{target} requires native multi-device support")
 
+        self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:
