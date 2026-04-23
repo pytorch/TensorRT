@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
+import torch.distributed as dist
 import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
@@ -24,6 +27,15 @@ from torch_tensorrt.runtime._utils import (
 import tensorrt as trt
 
 logger = logging.getLogger(__name__)
+
+
+def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
+    """Map strategy string to TRT enum. Only called on RTX builds."""
+    return {
+        "lazy": trt.DynamicShapesKernelSpecializationStrategy.LAZY,
+        "eager": trt.DynamicShapesKernelSpecializationStrategy.EAGER,
+        "none": trt.DynamicShapesKernelSpecializationStrategy.NONE,
+    }.get(strategy_str, trt.DynamicShapesKernelSpecializationStrategy.LAZY)
 
 
 class DynamicOutputAllocator(trt.IOutputAllocator):  # type: ignore[misc]
@@ -132,6 +144,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
+        requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         _debugger_config: Optional[DebuggerConfig] = None,
     ):
@@ -148,8 +161,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             symbolic_shape_expressions (List[str]): List of symbolic shape expressions for each output binding
-
         Example:
 
             .. code-block:: py
@@ -226,6 +239,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # If the output tensor is not owned by the engine (output_tensors_are_unowned=True), we need to create a new output tensor in each forward pass
         self.output_tensors_are_unowned = False
         self.symbolic_shape_expressions = symbolic_shape_expressions
+        self._nccl_comm: Optional[Any] = None
+        self._has_nccl_ops: bool = requires_native_multidevice
+
+        # Runtime cache state (TensorRT-RTX only)
+        self.runtime_config: Any = None
+        self.runtime_cache: Any = None
+        self.runtime_cache_path = settings.runtime_cache_path
+
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
@@ -257,7 +278,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.context is not None:
             del self.context
         budget_bytes = self._set_device_memory_budget(budget_bytes)
-        self.context = self.engine.create_execution_context()
+        self.context = self._create_context()
         self.runtime_states.context_changed = True
         return budget_bytes
 
@@ -280,6 +301,69 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         logger.debug(f"Weight streaming budget set to {budget_bytes}B")
         return self._set_device_memory_budget(budget_bytes)
 
+    # Distributed functions
+    @property
+    def is_distributed(self) -> bool:
+        """Check if this module is running inside an active distributed context."""
+        return bool(
+            dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1
+        )
+
+    def setup_nccl_comm(self) -> None:
+        """Set up NCCL communicator from the active ProcessGroup.
+
+        Uses the process group set by torch_tensorrt.distributed.distributed_context() if
+        active, otherwise falls back to the default world group.
+        Called lazily on first forward pass for distributed engines.
+        """
+        from torch_tensorrt.distributed._distributed import get_active_group
+
+        if not self.is_distributed:
+            return
+
+        pg = get_active_group()
+        if pg is None or dist.get_backend(pg) != "nccl":
+            raise RuntimeError(
+                "Active ProcessGroup must use NCCL backend. "
+                "Use torch_tensorrt.distributed.distributed_context(group) to select a non-default group."
+            )
+
+        backend = pg._get_backend(torch.device("cuda"))
+
+        # Force NCCL communicator initialization with a dummy collective
+        # Must use group=pg so the correct group's comm is initialized
+        # dist.all_reduce without group= only initializes the default world group.
+        dummy = torch.zeros(1, device="cuda")
+        dist.all_reduce(dummy, group=pg)
+
+        comm_ptr = backend._comm_ptr()
+        if comm_ptr is None or comm_ptr == 0:
+            raise RuntimeError("Failed to get NCCL communicator from ProcessGroup")
+
+        self._nccl_comm = comm_ptr
+
+        # Bind communicator to TRT execution context (PyCapsule required by TRT Python API)
+        if self.context is not None:
+            import ctypes
+
+            ctypes.pythonapi.PyCapsule_New.restype = ctypes.py_object
+            ctypes.pythonapi.PyCapsule_New.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_char_p,
+                ctypes.c_void_p,
+            ]
+            comm_capsule = ctypes.pythonapi.PyCapsule_New(comm_ptr, None, None)
+            ok = self.context.set_communicator(comm_capsule)
+            if not ok:
+                raise RuntimeError(
+                    f"TRT context.set_communicator() returned False for rank={dist.get_rank()}. "
+                    f"comm_ptr={comm_ptr:#x}. Failed to bind NCCL communicator to TRT execution context."
+                )
+
+        logger.info(
+            f"NCCL comm set up (rank={dist.get_rank()}, world_size={dist.get_world_size()})"
+        )
+
     def setup_engine(self) -> None:
         assert (
             self.target_platform == Platform.current_platform()
@@ -291,6 +375,33 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.settings.enable_weight_streaming:
             self.set_default_device_memory_budget()
         self.context = self.engine.create_execution_context()
+
+        if self._has_nccl_ops:
+            from torch_tensorrt.distributed._nccl_utils import (
+                check_nccl_engine_requirements,
+            )
+
+            check_nccl_engine_requirements()
+
+            # For engines with native NCCL collective layers, all ranks must
+            # have a live IExecutionContext before any rank executes a
+            # collective. Barrier here so a fast-compiling rank does not race
+            # ahead and issue an NCCL op while another rank is still inside
+            # deserialize_cuda_engine / create_execution_context.
+            if (
+                dist.is_available()
+                and dist.is_initialized()
+                and dist.get_world_size() > 1
+            ):
+                logger.debug(
+                    "Barrier after execution context creation (distributed NCCL engine)"
+                )
+                dist.barrier()
+
+        if ENABLED_FEATURES.tensorrt_rtx:
+            self._setup_runtime_config()
+
+        self.context = self._create_context()
         assert self.context is not None, "Failed to create execution context"
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)
@@ -323,6 +434,75 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             input_name: self.engine.is_shape_inference_io(input_name)
             for input_name in self.input_names
         }
+
+    def _setup_runtime_config(self) -> None:
+        """Create a RuntimeConfig with runtime cache for TensorRT-RTX.
+
+        The runtime cache stores JIT compilation results to avoid repeated
+        compilation of kernels/graphs across inference runs.
+        """
+        self.runtime_config = self.engine.create_runtime_config()
+        self.runtime_config.set_execution_context_allocation_strategy(
+            trt.ExecutionContextAllocationStrategy.STATIC
+        )
+        self.runtime_config.dynamic_shapes_kernel_specialization_strategy = (
+            _get_dynamic_shapes_kernel_strategy(
+                self.settings.dynamic_shapes_kernel_specialization_strategy
+            )
+        )
+        logger.info(
+            f"Dynamic shapes kernel specialization strategy: {self.settings.dynamic_shapes_kernel_specialization_strategy}"
+        )
+        self.runtime_cache = self.runtime_config.create_runtime_cache()
+        self._load_runtime_cache()
+        self.runtime_config.set_runtime_cache(self.runtime_cache)
+        logger.info("TensorRT-RTX runtime cache configured")
+
+    def _create_context(self) -> trt.IExecutionContext:
+        """Create an execution context, using RuntimeConfig for RTX."""
+        if ENABLED_FEATURES.tensorrt_rtx and self.runtime_config is not None:
+            return self.engine.create_execution_context(self.runtime_config)
+        return self.engine.create_execution_context()
+
+    def _load_runtime_cache(self) -> None:
+        """Load runtime cache from disk if it exists (with shared file lock)."""
+        if self.runtime_cache is None:
+            return
+        if not os.path.isfile(self.runtime_cache_path):
+            logger.debug(f"No existing runtime cache at {self.runtime_cache_path}")
+            return
+        try:
+            from filelock import FileLock
+
+            lock = FileLock(self.runtime_cache_path + ".lock")
+            with lock.acquire(timeout=10):
+                with open(self.runtime_cache_path, "rb") as f:
+                    data = f.read()
+            if data:
+                self.runtime_cache.deserialize(data)
+                logger.info(f"Loaded runtime cache from {self.runtime_cache_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load runtime cache: {e}")
+
+    def _save_runtime_cache(self) -> None:
+        """Save runtime cache to disk (with exclusive file lock)."""
+        if self.runtime_cache is None:
+            return
+        try:
+            host_mem = self.runtime_cache.serialize()
+            if host_mem is None:
+                return
+            os.makedirs(os.path.dirname(self.runtime_cache_path), exist_ok=True)
+
+            from filelock import FileLock
+
+            lock = FileLock(self.runtime_cache_path + ".lock")
+            with lock.acquire(timeout=10):
+                with open(self.runtime_cache_path, "wb") as f:
+                    f.write(memoryview(host_mem))
+            logger.info(f"Saved runtime cache to {self.runtime_cache_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save runtime cache: {e}")
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -357,10 +537,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         state = self.__dict__.copy()
         state.pop("engine", None)
         state.pop("context", None)
+        # NCCLcomm cannot be pickled
+        state.pop("_nccl_comm", None)
+        state.pop("runtime_config", None)
+        state.pop("runtime_cache", None)
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         self.__dict__.update(state)
+        # reset after unpickling, apbose: is this required though?
+        self._nccl_comm = None
         self.setup_engine()
 
     def __deepcopy__(self, memo: Any) -> PythonTorchTensorRTModule:
@@ -376,6 +562,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.cudagraph = None
 
     def __del__(self) -> None:
+        self._save_runtime_cache()
         self._reset_captured_graph()
 
     def setup_input_tensors(
@@ -699,6 +886,23 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         ):
             self._check_initialized()
 
+            if self._has_nccl_ops and self._nccl_comm is None:
+                nccl_type = (
+                    "native TRT collectives"
+                    if ENABLED_FEATURES.native_trt_collectives
+                    else (
+                        "TRT-LLM NCCL plugins"
+                        if ENABLED_FEATURES.trtllm_for_nccl
+                        else "unknown backend"
+                    )
+                )
+                logger.info(
+                    f"Setting up NCCL for distributed execution using {nccl_type} "
+                    f"(rank={dist.get_rank()}, world_size={dist.get_world_size()})"
+                )
+                self.setup_nccl_comm()
+                logger.info(f"NCCL setup complete, comm={self._nccl_comm}")
+
             # If in safe mode, check at each iteration for whether a switch is required
             if (
                 torch_tensorrt.runtime._multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
@@ -771,7 +975,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self._check_initialized()
         torch.cuda.synchronize()
         del self.context
-        self.context = self.engine.create_execution_context()
+        self.context = self._create_context()
         self.profiling_enabled = False
 
     def get_layer_info(self) -> str:

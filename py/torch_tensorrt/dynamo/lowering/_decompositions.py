@@ -647,6 +647,7 @@ ATTENTION_DECOMPOSITION_OPS = {
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
     decompose_attention: bool = False,
+    use_distributed_mode_trace: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
     trt_decomps = (
         TORCH_TRT_DECOMPOSITIONS
@@ -658,11 +659,19 @@ def get_decompositions(
         }
     )
 
+    # For distributed (DTensor) models, allow aten.linear to decompose to addmm
+    # so that DTensor's sharding dispatch can find a strategy.
+    discard_decompositions = (
+        torch_disabled_decompositions - {aten.linear.default}
+        if use_distributed_mode_trace
+        else torch_disabled_decompositions
+    )
+
     if enable_experimental_decompositions:
         CORE_ATEN_DECOMPOSITIONS_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
             decomp: _core_aten_decompositions[decomp]
             for decomp in _core_aten_decompositions
-            if decomp not in torch_disabled_decompositions
+            if decomp not in discard_decompositions
         }
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **trt_decomps}
     else:
@@ -674,7 +683,8 @@ def get_decompositions(
         DECOMP_TABLE_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
             decomp: decomp_table[decomp]
             for decomp in decomp_table
-            if decomp not in torch_disabled_decompositions
+            if decomp not in discard_decompositions
+            and decomp not in ATTENTION_DECOMPOSITION_OPS
         }
 
         return {

@@ -124,9 +124,23 @@ def get_zeroed_dynamic_cache_inputs(model: torch.fx.GraphModule):
     return tuple(zeroed_kv_cache_inputs)
 
 
-def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=True):
+def generate(
+    model,
+    input_seq,
+    max_output_seq_length,
+    eos_token_id,
+    benchmark=True,
+    dynamic_seqlen_range=None,
+):
     """
     Greedy decoding of the model. This generates up to max_tokens.
+
+    Args:
+        dynamic_seqlen_range: Optional (min, max) tuple.  When set, marks
+            dimension 1 of input_seq as dynamic before each model call so that
+            torch.compile + TensorRT builds a single engine covering the full
+            range instead of recompiling per sequence length.  Pass
+            ``(1, max_output_seq_length)`` to cover every possible step.
     """
     stopping_criteria = StoppingCriteriaList(
         [
@@ -139,7 +153,23 @@ def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=Tr
 
     num_tokens_generated = 0
     while num_tokens_generated < osl:
-        position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
+        if dynamic_seqlen_range is not None:
+            # Mark the sequence-length dimension as dynamic so that the
+            # torch.compile cache hits the same TRT engine across all steps
+            # instead of recompiling for every new sequence length.
+            # Note: we intentionally omit min/max bounds here.  Passing them
+            # triggers a compile-time guard-range check that fails for models
+            # whose attention math contains modulo operations (e.g. Qwen SDPA
+            # block-size padding produces s1*(8+s1-s1%8)>1 guards that the
+            # symbolic solver can't verify without concrete values).  Without
+            # bounds, dynamo traces symbolically and TRT infers the profile
+            # from the first concrete shape it sees.
+            torch._dynamo.mark_dynamic(input_seq, 1)
+        position_ids = torch.arange(
+            input_seq.shape[1], device=input_seq.device
+        ).unsqueeze(0)
+        if dynamic_seqlen_range is not None:
+            torch._dynamo.mark_dynamic(position_ids, 1)
         outputs = model(input_seq, position_ids=position_ids)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]

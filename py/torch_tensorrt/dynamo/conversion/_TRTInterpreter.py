@@ -17,7 +17,6 @@ from typing import (
 )
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -57,6 +56,8 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
+
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
@@ -70,10 +71,11 @@ class UnsupportedOperatorException(RuntimeError):
 
 class TRTInterpreterResult(NamedTuple):
     engine: trt.ICudaEngine
-    input_names: Sequence[str]
-    output_names: Sequence[str]
+    input_names: List[str]
+    output_names: List[str]
     weight_name_map: Optional[dict[Any, Any]]
     requires_output_allocator: bool
+    requires_native_multidevice: bool
 
 
 @cls_supports_debugger
@@ -113,9 +115,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
 
         self.compilation_settings = compilation_settings
-        if not CONVERTERS.compilation_settings:
-            # Configure user compilation settings to converters.
-            CONVERTERS.set_compilation_settings(compilation_settings)
+        # Always update the global converter registry with the current compilation
+        # settings.  The registry is a process-global singleton; without an
+        # unconditional update, torch_executed_ops set by one compilation leak
+        # into subsequent compilations in the same process (e.g. across tests in
+        # an xdist worker), making those ops incorrectly appear as disallowed.
+        CONVERTERS.set_compilation_settings(compilation_settings)
         self.validate_compile_settings()
         assert TRTInterpreter._all_precisions_supported(
             compilation_settings.enabled_precisions
@@ -202,8 +207,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     def validate_compile_settings(self) -> None:
         if ENABLED_FEATURES.tensorrt_rtx:
-            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
-                raise RuntimeError("TensorRT-RTX does not support bfloat16!")
+            # NOTE: bfloat16 check disabled — depthwise conv BF16 limitation
+            # is now handled per-layer via capability_validator
             return
 
         if (
@@ -224,6 +229,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         tactic_sources: Optional[int] = None,
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
+
+        if ENABLED_FEATURES.native_trt_collectives:
+            _LOGGER.info("Using native TRT collectives")
+            builder_config.set_preview_feature(
+                trt.PreviewFeature.MULTIDEVICE_RUNTIME_10_16, True
+            )
 
         if self._debugger_config and self._debugger_config.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
@@ -379,7 +390,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         """
         Create a timing cache to enable faster build time for TRT engines.
         By default the timing_cache_path="/tmp/timing_cache.bin"
+        Skipped for TensorRT-RTX since it does not use autotuning.
         """
+        if ENABLED_FEATURES.tensorrt_rtx:
+            _LOGGER.info(
+                "Skipping timing cache creation for TensorRT-RTX (no autotuning)"
+            )
+            return
+
         buffer = b""
         if os.path.isfile(timing_cache_path):
             # Load from existing cache
@@ -394,8 +412,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         timing_cache_path: str,
     ) -> None:
         """
-        This is called after a TensorRT engine is built. Save the timing cache
+        This is called after a TensorRT engine is built. Save the timing cache.
+        Skipped for TensorRT-RTX since it does not use autotuning.
         """
+        if ENABLED_FEATURES.tensorrt_rtx:
+            return
+
         timing_cache = builder_config.get_timing_cache()
         os.makedirs(os.path.dirname(timing_cache_path), exist_ok=True)
         with open(timing_cache_path, "wb") as timing_cache_file:
@@ -453,7 +475,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             except Exception:
                 return torch.all(sd_weight == network_weight)
 
-    @needs_refit  # type: ignore[misc]
+    @needs_refit  # type: ignore
     def _save_weight_mapping(self) -> None:
         """
         Construct the weight name mapping from engine weight name to state_dict weight name.
@@ -582,6 +604,41 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 weight_refit_map[engine_weight_name].dtype,
             ]
 
+        # Stage 3: Slice matching for unmatched non-scalar CONSTANT weights.
+        # complex_graph_detection unpacks complex buffers to real:
+        #   freqs (S,D complex64) → freqs_unpacked_complex (S,D,2 float32)
+        # The real and imag slices (freqs_unpacked_complex[...,0] and [...,1]) are
+        # embedded as separate TRT constants, but their shapes differ from the source
+        # buffer, so Stage 2 value matching fails. Here we try selecting each slice
+        # along the last dimension of every sd entry to find the match.
+        for engine_weight_name, val in list(weight_name_map.items()):
+            if not isinstance(val, list) or len(val) != 2:
+                continue
+            sd_weight_name, dtype_val = val
+            if sd_weight_name != "" or engine_weight_name not in weight_refit_map:
+                continue
+            ew_tensor = weight_refit_map[engine_weight_name].to(torch_device)
+            if ew_tensor.numel() <= 1:
+                continue  # scalars are handled via constant_mapping
+            matched = False
+            for sd_key, sd_tensor in sd.items():
+                if sd_tensor.dim() < 1 or sd_tensor.shape[-1] < 2:
+                    continue
+                last_dim = sd_tensor.dim() - 1
+                for idx in range(sd_tensor.shape[last_dim]):
+                    sd_slice = sd_tensor.select(last_dim, idx)
+                    if TRTInterpreter.check_weight_equal(
+                        sd_slice, ew_tensor, torch_device
+                    ):
+                        weight_name_map[engine_weight_name] = [
+                            (sd_key, last_dim, idx),
+                            dtype_val,
+                        ]
+                        matched = True
+                        break
+                if matched:
+                    break
+
         weight_name_map["constant_mapping"] = constant_mapping
         self.weight_name_map = weight_name_map
 
@@ -632,6 +689,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             serialized_engine = self.builder.build_serialized_network(
                 self.ctx.net, builder_config
             )
+            if serialized_engine is None:
+                raise RuntimeError(
+                    "TensorRT build_serialized_network returned None; engine build failed."
+                )
             runtime = trt.Runtime(TRT_LOGGER)
             cuda_engine = runtime.deserialize_cuda_engine(serialized_engine)
         else:
@@ -660,6 +721,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self._output_names,
             self.weight_name_map,
             self.ctx.requires_output_allocator,
+            self.ctx.requires_native_multidevice,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -774,6 +836,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if converter_info.get("requires_output_allocator", False):
             self.ctx.requires_output_allocator = True
             _LOGGER.debug(f"{target} requires output allocator")
+
+        if converter_info.get("requires_native_multidevice", False):
+            self.ctx.requires_native_multidevice = True
+            _LOGGER.debug(f"{target} requires native multi-device support")
 
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)

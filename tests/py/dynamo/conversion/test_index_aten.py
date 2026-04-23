@@ -160,7 +160,9 @@ class TestIndexConverter(DispatchTestCase):
 
         input = torch.randn(2, 2)
         index0 = torch.tensor([True, False])
-        self.run_test(TestModule(), [input, index0], enable_passes=True)
+        self.run_test(
+            TestModule(), [input, index0], use_dynamo_tracer=True, enable_passes=True
+        )
 
     def test_index_zero_index_three_dim_ITensor(self):
         class TestModule(nn.Module):
@@ -172,7 +174,9 @@ class TestIndexConverter(DispatchTestCase):
         input = torch.randn(2, 2, 2)
         index0 = torch.randint(0, 1, (1, 1))
         index0 = index0.to(torch.int32)
-        self.run_test(TestModule(), [input, index0])
+        self.run_test(
+            TestModule(), [input, index0], use_dynamo_tracer=True, enable_passes=True
+        )
 
     @unittest.skipIf(
         ENABLED_FEATURES.tensorrt_rtx,
@@ -187,7 +191,9 @@ class TestIndexConverter(DispatchTestCase):
 
         input = torch.randn(2, 2, 2)
         index0 = torch.tensor([True, False])
-        self.run_test(TestModule(), [input, index0])
+        self.run_test(
+            TestModule(), [input, index0], use_dynamo_tracer=True, enable_passes=True
+        )
 
 
 class TestIndexDynamicConstantConverter(DispatchTestCase):

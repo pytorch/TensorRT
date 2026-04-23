@@ -1,7 +1,12 @@
 #include "NvInferPlugin.h"
 #include "NvInferPluginUtils.h"
+#include "NvInferVersion.h"
 #include "core/plugins/impl/interpolate_plugin.h"
 #include "core/plugins/impl/normalize_plugin.h"
+// ScatterAdd plugin is not available on Jetpack (TRT 10.3.x / L4T) or TRT-RTX builds
+#if NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR > 3)
+#include "core/plugins/impl/scatter_add_plugin.h"
+#endif
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
 

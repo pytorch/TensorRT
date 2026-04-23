@@ -44,8 +44,11 @@ def replace_symint_with_sym_size(
     gm: torch.fx.GraphModule,
 ) -> torch.fx.GraphModule:
     """Replace SymInt placeholders with sym_size nodes"""
-    # Find all SymInt placeholders and their args
-    symint_node_arg_dict = {}
+    # Find all SymInt placeholders and their source tensor + dim index.
+    # src is a TensorPropertySource: src.base identifies the tensor, src.idx is the dim.
+    # We compare sources by equality rather than local_name so that GetItemSource bases
+    # (produced by torch.compile dynamic=True) are handled correctly.
+    symint_node_tensor_src_dict = {}
     for node in gm.graph.nodes:
         if (
             node.op == "placeholder"
@@ -55,9 +58,10 @@ def replace_symint_with_sym_size(
             ga = node.meta.get("grapharg", None)
             if ga is not None:
                 src = ga.source  # TensorPropertySource
-                symint_node_arg_dict[node] = (src.base.local_name, src.idx)
+                if hasattr(src, "base") and hasattr(src, "idx"):
+                    symint_node_tensor_src_dict[node] = (src.base, src.idx)
 
-    # Replace SymInt placeholders with sym_size nodes
+    # Replace SymInt placeholders with sym_size nodes by matching tensor sources directly.
     for node in gm.graph.nodes:
         if (
             node.op == "placeholder"
@@ -66,25 +70,23 @@ def replace_symint_with_sym_size(
         ):
             ga = node.meta.get("grapharg", None)
             if ga is not None:
-                src = ga.source
-                if hasattr(src, "local_name") and getattr(src, "is_input", False):
-                    node_local_name = src.local_name
-                    for symint_node, (
-                        symint_local_name,
-                        idx,
-                    ) in symint_node_arg_dict.items():
-                        if node_local_name == symint_local_name:
-                            with gm.graph.inserting_after(node):
-                                size_node = gm.graph.call_function(
-                                    torch.ops.aten.sym_size, args=(node, idx)
-                                )
-                            symint_node.replace_all_uses_with(size_node)
-                            logger.debug(
-                                f"The SymInt node {symint_node} is replaced with the sym_size node {size_node}"
+                tensor_src = ga.source
+                for symint_node, (
+                    symint_tensor_src,
+                    idx,
+                ) in symint_node_tensor_src_dict.items():
+                    if tensor_src == symint_tensor_src:
+                        with gm.graph.inserting_after(node):
+                            size_node = gm.graph.call_function(
+                                torch.ops.aten.sym_size, args=(node, idx)
                             )
-                            # the symint_node is not used anymore, but it cannot be directly erased here
-                            # because it will cause the number of positional arguments mismatch error.
-                            # The node will be removed in the outside of the function
+                        symint_node.replace_all_uses_with(size_node)
+                        logger.debug(
+                            f"The SymInt node {symint_node} is replaced with the sym_size node {size_node}"
+                        )
+                        # the symint_node is not used anymore, but it cannot be directly erased here
+                        # because it will cause the number of positional arguments mismatch error.
+                        # The node will be removed in the outside of the function
 
     gm.graph.lint()
     gm.recompile()

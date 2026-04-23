@@ -155,9 +155,17 @@ def scaled_dot_product_attention(
 
     assert is_causal == True, "is_causal should be set to True"
 
-    # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
-    use_fp32_acc = kwargs.get("use_fp32_acc", False)
-    sliding_window_size = kwargs.get("sliding_window_size", None)
+    # use_fp32_acc is read from compilation settings rather than node kwargs so
+    # that SDPA nodes which fall back to PyTorch execution are never called
+    # with an argument that torch.nn.functional.scaled_dot_product_attention
+    # does not accept.
+    use_fp32_acc = ctx.compilation_settings.use_fp32_acc
+    # sliding_window_size is model-specific (Gemma3 only).  The lowering pass
+    # stores it in node.meta["trt_sliding_window_size"], but ConversionContext
+    # does not expose the FX node directly.  Until the plumbing exists, we
+    # read it from kwargs (set to None for all non-Gemma3 models) so that
+    # Qwen/Llama compilation is unaffected.
+    sliding_window_size = kwargs.get("trt_sliding_window_size", None)
 
     query_dtype = query.dtype
 

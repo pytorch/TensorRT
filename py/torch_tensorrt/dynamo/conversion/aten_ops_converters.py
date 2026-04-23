@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
@@ -26,8 +27,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-
-from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -1092,10 +1091,72 @@ def aten_ops_select(
     )
 
 
+def _scatter_add_plugin_available() -> bool:
+    import tensorrt as trt
+
+    # ScatterAdd plugin is not built for Jetpack (TRT 10.3.x) or TRT-RTX builds
+    if trt.__version__.startswith("10.3.") or trt._package_name == "tensorrt_rtx":
+        return False
+    return (
+        trt.get_plugin_registry().get_creator("ScatterAdd", "1", "torch_tensorrt")
+        is not None
+    )
+
+
+def _index_put_accumulate_validator(
+    node: torch.fx.Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Validator for accumulate=True using the ScatterAdd IPluginV3.
+
+    Requires: dtype/bool checks pass, accumulate=True, and the
+    ScatterAdd plugin is present in the TRT plugin registry (registered
+    at library init time when torch_tensorrt_runtime is loaded).
+    Supports any number of non-None index tensors.
+    """
+    if not (
+        index_dtype_validator(node, settings)
+        and index_nonbool_validator(node, settings)
+    ):
+        return False
+    if not args_bounds_check(node.args, 3, False):
+        return False
+    return _scatter_add_plugin_available()
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_put.default,
+    capability_validator=_index_put_accumulate_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_index_put_accumulate(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.index_put_scatter_add_plugin(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+    )
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
     capability_validator=lambda node, settings: index_dtype_validator(node, settings)
-    and index_nonbool_validator(node, settings),
+    and index_nonbool_validator(node, settings)
+    and not args_bounds_check(node.args, 3, False),
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
@@ -1119,7 +1180,6 @@ def aten_ops_index_put(
         args[0],
         args[1],
         args[2],
-        args_bounds_check(args, 3, False),
     )
 
 
@@ -2694,8 +2754,55 @@ def aten_ops_le(
     )
 
 
+def convolution_capability_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject unsupported convolution variants on TensorRT-RTX.
+
+    Falls back to PyTorch for:
+    1. Depthwise convolutions in BF16 (no kernel support on TRT-RTX).
+    2. Grouped 3D deconvolutions (crash on TRT-RTX).
+    """
+    if not ENABLED_FEATURES.tensorrt_rtx:
+        return True
+
+    if (input_meta := getattr(node.args[0], "meta", {}).get("tensor_meta")) is None:
+        return True
+
+    groups = args_bounds_check(node.args, 8)
+    is_grouped = groups is not None and groups > 1
+    is_transposed = bool(args_bounds_check(node.args, 6))
+    is_3d = input_meta.shape is not None and len(input_meta.shape) == 5
+    is_bf16 = input_meta.dtype == torch.bfloat16
+
+    # WAR: Grouped 3D deconvolutions crash on TRT-RTX (any dtype).
+    if is_transposed and is_grouped and is_3d:
+        _LOGGER.debug(
+            "Grouped 3D deconvolution '%s' (groups=%d) is not supported on "
+            "TensorRT-RTX. Falling back to PyTorch for this layer.",
+            node.name,
+            groups,
+        )
+        return False
+
+    # WAR: Depthwise convolutions in BF16 are not supported on TRT-RTX.
+    if is_bf16 and is_grouped:
+        if (
+            weight_meta := getattr(node.args[1], "meta", {}).get("tensor_meta")
+        ) is not None and groups == weight_meta.shape[0]:
+            _LOGGER.debug(
+                "Depthwise convolution '%s' with BF16 is not supported on "
+                "TensorRT-RTX. Falling back to PyTorch for this layer.",
+                node.name,
+            )
+            return False
+
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.convolution.default,
+    capability_validator=convolution_capability_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
@@ -2904,7 +3011,6 @@ def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -
 
 
 def topk_sort_validator(k: int) -> bool:
-
     # topk layer supports dynamic k value but we cannot determine supported dynamic topk value at
     # compile time.
     if k == DYNAMIC_DIM or not isinstance(k, int):

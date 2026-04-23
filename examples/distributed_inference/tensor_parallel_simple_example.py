@@ -16,27 +16,51 @@ Usage
 -----
 .. code-block:: bash
 
-    mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
+   # JIT mode python runtime
+   mpirun -n 2 python tensor_parallel_simple_example.py --mode jit_cpp
+
+   # JIT mode cpp runtime
+   mpirun -n 2 python tensor_parallel_simple_example.py --mode jit_python
+
+   WIP: Export and load mode
+    mpirun -n 2 python tensor_parallel_simple_example.py --mode export --save-path /tmp/tp_model.ep
+    mpirun -n 2 python tensor_parallel_simple_example.py --mode load --save-path /tmp/tp_model.ep
+
 """
 
+import argparse
 import time
 
-import tensorrt as trt
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+import torch.utils._pytree
 from tensor_parallel_initialize_dist import (
     cleanup_distributed_env,
-    get_tensor_parallel_device_mesh,
     initialize_distributed_env,
 )
 
-# Initialize distributed environment and logger BEFORE importing torch_tensorrt
-# This ensures logging is configured before any import-time log messages
+torch.utils._pytree.register_constant(
+    torch.distributed.tensor._dtensor_spec.DTensorSpec
+)
+
+parser = argparse.ArgumentParser(description="Tensor Parallel Simple Example")
+parser.add_argument(
+    "--mode",
+    type=str,
+    choices=["jit_python", "jit_cpp", "export", "load"],
+    default="jit_python",
+)
+parser.add_argument("--save-path", type=str, default="/tmp/tp_model.ep")
+args = parser.parse_args()
+
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "tensor_parallel_simple_example"
 )
+import torch_tensorrt
+from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
 
+setup_nccl_for_torch_tensorrt()
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -92,29 +116,68 @@ torch.manual_seed(0)
 inp = torch.rand(20, 10, device="cuda")
 python_result = tp_model(inp)
 
-backend = "torch_tensorrt"
-tp_model = torch.compile(
-    tp_model,
-    backend=backend,
-    options={
-        "truncate_long_and_double": True,
-        "enabled_precisions": {torch.float32, torch.float16},
-        "use_python_runtime": True,
-        "min_block_size": 1,
-        "use_distributed_mode_trace": True,
-    },
-    dynamic=None,
-)
+if args.mode == "load":
+    # Load per-rank model: /tmp/tp_model.ep -> /tmp/tp_model_rank0_of_2.ep
+    logger.info(f"Loading from {args.save_path}")
+    loaded_program = torch_tensorrt.load(args.save_path)
+    output = loaded_program.module()(inp)
+    dist.barrier()
+    assert (python_result - output).std() < 0.01, "Result mismatch"
+    logger.info("Load successful!")
 
-# For TP, input needs to be same across all TP ranks.
-# Setting the random seed is to mimic the behavior of dataloader.
-torch.manual_seed(0)
-inp = torch.rand(20, 10, device="cuda")
-start = time.time()
-output = tp_model(inp)
-end = time.time()
-logger.info(f"Compilation time is {end - start}")
-assert (python_result - output).std() < 0.01, "Result is not correct."
+elif args.mode == "jit_python":
+    trt_model = torch.compile(
+        tp_model,
+        backend="torch_tensorrt",
+        options={
+            "truncate_long_and_double": True,
+            "enabled_precisions": {torch.float32, torch.float16},
+            "use_python_runtime": True,
+            "min_block_size": 1,
+        },
+    )
+    output = trt_model(inp)
+    dist.barrier()
 
-# This cleans up the distributed process group
+    assert (python_result - output).std() < 0.01, "Result mismatch"
+    logger.info("JIT compile successful!")
+
+elif args.mode == "jit_cpp":
+    trt_model = torch.compile(
+        tp_model,
+        backend="torch_tensorrt",
+        options={
+            "truncate_long_and_double": True,
+            "enabled_precisions": {torch.float32, torch.float16},
+            "use_python_runtime": False,
+            "min_block_size": 1,
+        },
+    )
+    output = trt_model(inp)
+    dist.barrier()
+    assert (python_result - output).std() < 0.01, "Result mismatch"
+    logger.info("JIT compile successful!")
+
+elif args.mode == "export":
+    # Export: torch.export + dynamo.compile - AOT compilation, can save
+    exported_program = torch.export.export(tp_model, (inp,), strict=False)
+    trt_model = torch_tensorrt.dynamo.compile(
+        exported_program,
+        inputs=[inp],
+        # enabled_precisions={torch.float32, torch.float16},
+        truncate_double=True,
+        use_python_runtime=False,
+        min_block_size=1,
+        use_distributed_mode_trace=True,
+    )
+    output = trt_model(inp)
+    dist.barrier()
+    assert (python_result - output).std() < 0.01, "Result mismatch"
+
+    # Save per-rank: /tmp/tp_model.ep -> /tmp/tp_model_rank0_of_2.ep
+    save_path = torch_tensorrt.save(trt_model, args.save_path, inputs=[inp])
+    logger.info(f"Saved to {save_path}")
+    dist.barrier()
+
 cleanup_distributed_env()
+logger.info("Done!")

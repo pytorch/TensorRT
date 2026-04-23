@@ -34,10 +34,12 @@ cc_library(
     hdrs = glob(
         [
             "include/torch/**/*.h",
+            "include/torch/**/*.hpp",
         ],
         allow_empty = True,
         exclude = [
             "include/torch/csrc/api/include/**/*.h",
+            "include/torch/csrc/api/include/**/*.hpp",
         ],
     ) + glob(
         [
