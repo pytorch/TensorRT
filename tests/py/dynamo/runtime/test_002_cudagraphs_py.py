@@ -13,6 +13,10 @@ TRIALS = 5
 
 
 class TestCudagraphsPython(TestCase):
+    def setUp(self):
+        # Ensure a clean cudagraphs state regardless of prior test ordering
+        torch_tensorrt.runtime.set_cudagraphs_mode(False)
+
     def tearDown(self):
         # Reset to default cuda graph mode after each test
         torch_tensorrt.runtime.set_cudagraphs_mode(False)

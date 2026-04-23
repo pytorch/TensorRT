@@ -52,6 +52,23 @@ tensor parallelism (splitting a single large model across multiple GPUs).
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="Reads RANK, WORLD_SIZE, MASTER_ADDR, MASTER_PORT from the environment so it works correctly wit...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/distributed_inference/images/thumb/sphx_glr_test_multinode_nccl_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_distributed_inference_test_multinode_nccl.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Two-node native TensorRT NCCL test.</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="Below example shows how to use Torch-TensorRT backend for distributed inference with tensor par...">
 
 .. only:: html
@@ -69,6 +86,40 @@ tensor parallelism (splitting a single large model across multiple GPUs).
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="Same model as tensor_parallel_simple_example.py but launched with torchrun / python -m torch_te...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/distributed_inference/images/thumb/sphx_glr_tensor_parallel_simple_example_mn_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_distributed_inference_tensor_parallel_simple_example_mn.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Tests the full serialization round-trip for tensor-parallel models with native TRT NCCL collect...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/distributed_inference/images/thumb/sphx_glr_test_multinode_export_save_load_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_distributed_inference_test_multinode_export_save_load.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Two-node test: torch.export → TRT AOT compile → save → load → inference.</div>
+    </div>
+
+
+.. raw:: html
+
     </div>
 
 
@@ -77,7 +128,10 @@ tensor parallelism (splitting a single large model across multiple GPUs).
 
    /tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
    /tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
+   /tutorials/_rendered_examples/distributed_inference/test_multinode_nccl
    /tutorials/_rendered_examples/distributed_inference/tensor_parallel_simple_example
+   /tutorials/_rendered_examples/distributed_inference/tensor_parallel_simple_example_mn
+   /tutorials/_rendered_examples/distributed_inference/test_multinode_export_save_load
 
 
 .. only:: html

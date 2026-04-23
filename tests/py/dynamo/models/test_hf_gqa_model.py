@@ -1,7 +1,12 @@
+import importlib
+import unittest
+
 import pytest
 import torch
 import torch_tensorrt
-from transformers import AutoModelForCausalLM
+
+if importlib.util.find_spec("transformers"):
+    import transformers
 
 
 @pytest.mark.unit
@@ -19,7 +24,13 @@ from transformers import AutoModelForCausalLM
     ],
 )
 @pytest.mark.parametrize("decompose_attention", [True, False])
+@unittest.skipIf(
+    not importlib.util.find_spec("transformers"),
+    "transformers is required to run this test",
+)
 def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
+    from transformers import AutoModelForCausalLM
+
     model_name = "Qwen/Qwen2.5-0.5B-Instruct"
 
     model = (

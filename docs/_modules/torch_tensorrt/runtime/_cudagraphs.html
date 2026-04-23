@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -566,8 +566,13 @@ document.write(`
             <span class="k">return</span> <span class="n">get_cuda_graph_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="c1"># Set cudagraphs back to old mode</span>
-        <span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span><span class="p">)</span>
+        <span class="c1"># Restore the exact integer mode (0=STANDARD, 1=SUBGRAPH, 2=WHOLE_GRAPH).</span>
+        <span class="c1"># Calling set_cudagraphs_mode(bool) would coerce 2 → 1 and can&#39;t restore</span>
+        <span class="c1"># WHOLE_GRAPH_CUDAGRAPHS, so we write the global and C++ op directly.</span>
+        <span class="k">global</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
+        <span class="n">_PY_RT_CUDAGRAPHS</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span>
+        <span class="k">if</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span><span class="p">)</span>
         <span class="c1"># __del__ is not entirely predictable, so we reset cudagraph here</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>

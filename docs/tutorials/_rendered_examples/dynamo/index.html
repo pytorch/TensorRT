@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -497,6 +497,7 @@ document.write(`
 <li><p><span class="xref std std-ref">_torch_export_sam2</span>: Compiling SAM2 model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
 <li><p><span class="xref std std-ref">_torch_export_flux_dev</span>: Compiling FLUX.1-dev model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
 <li><p><span class="xref std std-ref">debugger_example</span>: Debugging Torch-TensorRT Compilation</p></li>
+<li><p><span class="xref std std-ref">torch_export_3d_rope</span>: Compiling a 3D RoPE video-transformer block with complex numerics support</p></li>
 </ul>
 <div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_stable_diffusion_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_stable_diffusion.py</span></p>
@@ -588,6 +589,9 @@ document.write(`
 </div><div class="sphx-glr-thumbcontainer" tooltip="Automatically generate a TensorRT Plugin for RMSNorm module and apply it in Llama2 ============..."><img alt="" src="../../../_images/sphx_glr_llama2_flashinfer_rmsnorm_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_llama2_flashinfer_rmsnorm.py</span></p>
   <div class="sphx-glr-thumbnail-title">.._llama2_flashinfer_rmsnorm:</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="3D RoPE is the positional encoding used in video generation transformers such as CogVideoX, Wan..."><img alt="" src="../../../_images/sphx_glr_torch_export_3d_rope_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_export_3d_rope.py</span></p>
+  <div class="sphx-glr-thumbnail-title">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how a developer could include a custom kernel in a TensorRT engine ..."><img alt="" src="../../../_images/sphx_glr_custom_kernel_plugins_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_custom_kernel_plugins.py</span></p>
   <div class="sphx-glr-thumbnail-title">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</div>

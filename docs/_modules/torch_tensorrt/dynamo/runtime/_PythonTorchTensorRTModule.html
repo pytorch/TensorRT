@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -481,8 +481,8 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">nullcontext</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="kn">import</span> <span class="n">Module</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
@@ -499,6 +499,8 @@ document.write(`
     <span class="n">_select_rt_device</span><span class="p">,</span>
     <span class="n">multi_gpu_device_check</span><span class="p">,</span>
 <span class="p">)</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -622,6 +624,7 @@ document.write(`
         <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
         <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">requires_native_multidevice</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">_debugger_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DebuggerConfig</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
@@ -638,8 +641,8 @@ document.write(`
 <span class="sd">            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed</span>
 <span class="sd">            weight_name_map (dict): Mapping of engine weight name to state_dict weight name</span>
 <span class="sd">            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)</span>
+<span class="sd">            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)</span>
 <span class="sd">            symbolic_shape_expressions (List[str]): List of symbolic shape expressions for each output binding</span>
-
 <span class="sd">        Example:</span>
 
 <span class="sd">            .. code-block:: py</span>
@@ -716,6 +719,8 @@ document.write(`
         <span class="c1"># If the output tensor is not owned by the engine (output_tensors_are_unowned=True), we need to create a new output tensor in each forward pass</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">symbolic_shape_expressions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_has_nccl_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">requires_native_multidevice</span>
 
         <span class="c1"># Runtime cache state (TensorRT-RTX only)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
@@ -780,6 +785,72 @@ document.write(`
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Weight streaming budget set to </span><span class="si">{</span><span class="n">budget_bytes</span><span class="si">}</span><span class="s2">B&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_device_memory_budget</span><span class="p">(</span><span class="n">budget_bytes</span><span class="p">)</span>
 
+    <span class="c1"># Distributed functions</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_distributed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if this module is running inside an active distributed context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span>
+            <span class="n">dist</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span> <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.setup_nccl_comm">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.setup_nccl_comm">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup_nccl_comm</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set up NCCL communicator from the active ProcessGroup.</span>
+
+<span class="sd">        Uses the process group set by torch_tensorrt.distributed.distributed_context() if</span>
+<span class="sd">        active, otherwise falls back to the default world group.</span>
+<span class="sd">        Called lazily on first forward pass for distributed engines.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._distributed</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_active_group</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_distributed</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">pg</span> <span class="o">=</span> <span class="n">get_active_group</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">pg</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_backend</span><span class="p">(</span><span class="n">pg</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;nccl&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Active ProcessGroup must use NCCL backend. &quot;</span>
+                <span class="s2">&quot;Use torch_tensorrt.distributed.distributed_context(group) to select a non-default group.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">backend</span> <span class="o">=</span> <span class="n">pg</span><span class="o">.</span><span class="n">_get_backend</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span>
+
+        <span class="c1"># Force NCCL communicator initialization with a dummy collective</span>
+        <span class="c1"># Must use group=pg so the correct group&#39;s comm is initialized</span>
+        <span class="c1"># dist.all_reduce without group= only initializes the default world group.</span>
+        <span class="n">dummy</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">dummy</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">pg</span><span class="p">)</span>
+
+        <span class="n">comm_ptr</span> <span class="o">=</span> <span class="n">backend</span><span class="o">.</span><span class="n">_comm_ptr</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">comm_ptr</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">comm_ptr</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Failed to get NCCL communicator from ProcessGroup&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span> <span class="o">=</span> <span class="n">comm_ptr</span>
+
+        <span class="c1"># Bind communicator to TRT execution context (PyCapsule required by TRT Python API)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">ctypes</span>
+
+            <span class="n">ctypes</span><span class="o">.</span><span class="n">pythonapi</span><span class="o">.</span><span class="n">PyCapsule_New</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">py_object</span>
+            <span class="n">ctypes</span><span class="o">.</span><span class="n">pythonapi</span><span class="o">.</span><span class="n">PyCapsule_New</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">ctypes</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+                <span class="n">ctypes</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+                <span class="n">ctypes</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="n">comm_capsule</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">pythonapi</span><span class="o">.</span><span class="n">PyCapsule_New</span><span class="p">(</span><span class="n">comm_ptr</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">ok</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_communicator</span><span class="p">(</span><span class="n">comm_capsule</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">ok</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;TRT context.set_communicator() returned False for rank=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;comm_ptr=</span><span class="si">{</span><span class="n">comm_ptr</span><span class="si">:</span><span class="s2">#x</span><span class="si">}</span><span class="s2">. Failed to bind NCCL communicator to TRT execution context.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;NCCL comm set up (rank=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">, world_size=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span></div>
+
+
     <span class="k">def</span><span class="w"> </span><span class="nf">setup_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">assert</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
@@ -790,6 +861,29 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">runtime</span><span class="o">.</span><span class="n">deserialize_cuda_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_weight_streaming</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">set_default_device_memory_budget</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_nccl_ops</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._nccl_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                <span class="n">check_nccl_engine_requirements</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">check_nccl_engine_requirements</span><span class="p">()</span>
+
+            <span class="c1"># For engines with native NCCL collective layers, all ranks must</span>
+            <span class="c1"># have a live IExecutionContext before any rank executes a</span>
+            <span class="c1"># collective. Barrier here so a fast-compiling rank does not race</span>
+            <span class="c1"># ahead and issue an NCCL op while another rank is still inside</span>
+            <span class="c1"># deserialize_cuda_engine / create_execution_context.</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">dist</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span>
+                <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span>
+                <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span>
+            <span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Barrier after execution context creation (distributed NCCL engine)&quot;</span>
+                <span class="p">)</span>
+                <span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_setup_runtime_config</span><span class="p">()</span>
@@ -930,12 +1024,16 @@ document.write(`
         <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;engine&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="c1"># NCCLcomm cannot be pickled</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;_nccl_comm&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_config&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">state</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="c1"># reset after unpickling, apbose: is this required though?</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">:</span>
@@ -1276,6 +1374,23 @@ document.write(`
             <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
         <span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_check_initialized</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_nccl_ops</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">nccl_type</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">&quot;native TRT collectives&quot;</span>
+                    <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">native_trt_collectives</span>
+                    <span class="k">else</span> <span class="p">(</span>
+                        <span class="s2">&quot;TRT-LLM NCCL plugins&quot;</span>
+                        <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">trtllm_for_nccl</span>
+                        <span class="k">else</span> <span class="s2">&quot;unknown backend&quot;</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Setting up NCCL for distributed execution using </span><span class="si">{</span><span class="n">nccl_type</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(rank=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">, world_size=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_nccl_comm</span><span class="p">()</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;NCCL setup complete, comm=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
             <span class="c1"># If in safe mode, check at each iteration for whether a switch is required</span>
             <span class="k">if</span> <span class="p">(</span>

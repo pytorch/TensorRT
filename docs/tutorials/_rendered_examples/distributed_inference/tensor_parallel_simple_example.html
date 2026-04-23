@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -61,8 +61,8 @@
         </script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Operators Supported" href="../../../indices/supported_ops.html" />
-    <link rel="prev" title="Torch-TensorRT Distributed Inference" href="data_parallel_gpt2.html" />
+    <link rel="next" title="Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)" href="tensor_parallel_simple_example_mn.html" />
+    <link rel="prev" title="Usage" href="test_multinode_nccl.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -453,6 +453,7 @@ document.write(`
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/subgraph_builder.html">SubgraphBuilder — Cursor-Based FX Node Insertion</a></li>
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -504,13 +505,27 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../dynamo/cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../deployment/distributed_inference.html">Distributed Inference</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../deployment/complex_tensors.html">Complex Tensor Support</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../complex_numerics/index.html">Complex Numerics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../complex_numerics/complex_tensors.html">Complex Tensor Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/torch_export_3d_rope.html">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</a></li>
+
+
+
 </ul>
 </details></li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Example: Distributed Inference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="test_multinode_nccl.html">Usage</a></li>
+
+
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tensor_parallel_simple_example_mn.html">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="test_multinode_export_save_load.html">Usage</a></li>
+
+
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
@@ -580,31 +595,54 @@ document.write(`
 <p>This example demonstrates: - Setting up distributed environment for tensor parallelism - Model sharding across multiple GPUs - Compilation with Torch-TensorRT - Distributed inference execution</p>
 <section id="Usage">
 <h2>Usage<a class="headerlink" href="#Usage" title="Link to this heading">#</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>--allow-run-as-root<span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># JIT mode python runtime</span>
+mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py<span class="w"> </span>--mode<span class="w"> </span>jit_cpp
+
+<span class="c1"># JIT mode cpp runtime</span>
+mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py<span class="w"> </span>--mode<span class="w"> </span>jit_python
+
+WIP:<span class="w"> </span>Export<span class="w"> </span>and<span class="w"> </span>load<span class="w"> </span>mode
+<span class="w"> </span>mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py<span class="w"> </span>--mode<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--save-path<span class="w"> </span>/tmp/tp_model.ep
+<span class="w"> </span>mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py<span class="w"> </span>--mode<span class="w"> </span>load<span class="w"> </span>--save-path<span class="w"> </span>/tmp/tp_model.ep
 </pre></div>
 </div>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import time
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import argparse
+import time
 
-import tensorrt as trt
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+import torch.utils._pytree
 from tensor_parallel_initialize_dist import (
     cleanup_distributed_env,
-    get_tensor_parallel_device_mesh,
     initialize_distributed_env,
 )
 
-# Initialize distributed environment and logger BEFORE importing torch_tensorrt
-# This ensures logging is configured before any import-time log messages
+torch.utils._pytree.register_constant(
+    torch.distributed.tensor._dtensor_spec.DTensorSpec
+)
+
+parser = argparse.ArgumentParser(description=&quot;Tensor Parallel Simple Example&quot;)
+parser.add_argument(
+    &quot;--mode&quot;,
+    type=str,
+    choices=[&quot;jit_python&quot;, &quot;jit_cpp&quot;, &quot;export&quot;, &quot;load&quot;],
+    default=&quot;jit_python&quot;,
+)
+parser.add_argument(&quot;--save-path&quot;, type=str, default=&quot;/tmp/tp_model.ep&quot;)
+args = parser.parse_args()
+
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     &quot;tensor_parallel_simple_example&quot;
 )
+import torch_tensorrt
+from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
 
+setup_nccl_for_torch_tensorrt()
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -660,32 +698,71 @@ torch.manual_seed(0)
 inp = torch.rand(20, 10, device=&quot;cuda&quot;)
 python_result = tp_model(inp)
 
-backend = &quot;torch_tensorrt&quot;
-tp_model = torch.compile(
-    tp_model,
-    backend=backend,
-    options={
-        &quot;truncate_long_and_double&quot;: True,
-        &quot;enabled_precisions&quot;: {torch.float32, torch.float16},
-        &quot;use_python_runtime&quot;: True,
-        &quot;min_block_size&quot;: 1,
-        &quot;use_distributed_mode_trace&quot;: True,
-    },
-    dynamic=None,
-)
+if args.mode == &quot;load&quot;:
+    # Load per-rank model: /tmp/tp_model.ep -&gt; /tmp/tp_model_rank0_of_2.ep
+    logger.info(f&quot;Loading from {args.save_path}&quot;)
+    loaded_program = torch_tensorrt.load(args.save_path)
+    output = loaded_program.module()(inp)
+    dist.barrier()
+    assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
+    logger.info(&quot;Load successful!&quot;)
 
-# For TP, input needs to be same across all TP ranks.
-# Setting the random seed is to mimic the behavior of dataloader.
-torch.manual_seed(0)
-inp = torch.rand(20, 10, device=&quot;cuda&quot;)
-start = time.time()
-output = tp_model(inp)
-end = time.time()
-logger.info(f&quot;Compilation time is {end - start}&quot;)
-assert (python_result - output).std() &lt; 0.01, &quot;Result is not correct.&quot;
+elif args.mode == &quot;jit_python&quot;:
+    trt_model = torch.compile(
+        tp_model,
+        backend=&quot;torch_tensorrt&quot;,
+        options={
+            &quot;truncate_long_and_double&quot;: True,
+            &quot;enabled_precisions&quot;: {torch.float32, torch.float16},
+            &quot;use_python_runtime&quot;: True,
+            &quot;min_block_size&quot;: 1,
+        },
+    )
+    output = trt_model(inp)
+    dist.barrier()
 
-# This cleans up the distributed process group
+    assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
+    logger.info(&quot;JIT compile successful!&quot;)
+
+elif args.mode == &quot;jit_cpp&quot;:
+    trt_model = torch.compile(
+        tp_model,
+        backend=&quot;torch_tensorrt&quot;,
+        options={
+            &quot;truncate_long_and_double&quot;: True,
+            &quot;enabled_precisions&quot;: {torch.float32, torch.float16},
+            &quot;use_python_runtime&quot;: False,
+            &quot;min_block_size&quot;: 1,
+        },
+    )
+    output = trt_model(inp)
+    dist.barrier()
+    assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
+    logger.info(&quot;JIT compile successful!&quot;)
+
+elif args.mode == &quot;export&quot;:
+    # Export: torch.export + dynamo.compile - AOT compilation, can save
+    exported_program = torch.export.export(tp_model, (inp,), strict=False)
+    trt_model = torch_tensorrt.dynamo.compile(
+        exported_program,
+        inputs=[inp],
+        # enabled_precisions={torch.float32, torch.float16},
+        truncate_double=True,
+        use_python_runtime=False,
+        min_block_size=1,
+        use_distributed_mode_trace=True,
+    )
+    output = trt_model(inp)
+    dist.barrier()
+    assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
+
+    # Save per-rank: /tmp/tp_model.ep -&gt; /tmp/tp_model_rank0_of_2.ep
+    save_path = torch_tensorrt.save(trt_model, args.save_path, inputs=[inp])
+    logger.info(f&quot;Saved to {save_path}&quot;)
+    dist.barrier()
+
 cleanup_distributed_env()
+logger.info(&quot;Done!&quot;)
 </pre></div>
 </div>
 </div>
@@ -703,20 +780,20 @@ cleanup_distributed_env()
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="data_parallel_gpt2.html"
+       href="test_multinode_nccl.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Torch-TensorRT Distributed Inference</p>
+        <p class="prev-next-title">Usage</p>
       </div>
     </a>
     <a class="right-next"
-       href="../../../indices/supported_ops.html"
+       href="tensor_parallel_simple_example_mn.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Operators Supported</p>
+        <p class="prev-next-title">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

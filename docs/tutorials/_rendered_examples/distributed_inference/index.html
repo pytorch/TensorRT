@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -59,7 +59,7 @@
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Torch-TensorRT Distributed Inference" href="data_parallel_stable_diffusion.html" />
-    <link rel="prev" title="Complex Tensor Support" href="../../deployment/complex_tensors.html" />
+    <link rel="prev" title="3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT" href="../dynamo/torch_export_3d_rope.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -450,6 +450,7 @@ document.write(`
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/subgraph_builder.html">SubgraphBuilder — Cursor-Based FX Node Insertion</a></li>
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -501,13 +502,27 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../dynamo/cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../deployment/distributed_inference.html">Distributed Inference</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../deployment/complex_tensors.html">Complex Tensor Support</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../complex_numerics/index.html">Complex Numerics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../complex_numerics/complex_tensors.html">Complex Tensor Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/torch_export_3d_rope.html">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</a></li>
+
+
+
 </ul>
 </details></li>
 <li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Example: Distributed Inference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="test_multinode_nccl.html">Usage</a></li>
+
+
 <li class="toctree-l2"><a class="reference internal" href="tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tensor_parallel_simple_example_mn.html">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="test_multinode_export_save_load.html">Usage</a></li>
+
+
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
@@ -579,9 +594,18 @@ tensor parallelism (splitting a single large model across multiple GPUs).</p>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of distributed inference using data parallelism..."><img alt="" src="../../../_images/sphx_glr_data_parallel_gpt2_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_distributed_inference_data_parallel_gpt2.py</span></p>
   <div class="sphx-glr-thumbnail-title">Torch-TensorRT Distributed Inference</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Reads RANK, WORLD_SIZE, MASTER_ADDR, MASTER_PORT from the environment so it works correctly wit..."><img alt="" src="../../../_images/sphx_glr_test_multinode_nccl_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_distributed_inference_test_multinode_nccl.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Two-node native TensorRT NCCL test.</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Below example shows how to use Torch-TensorRT backend for distributed inference with tensor par..."><img alt="" src="../../../_images/sphx_glr_tensor_parallel_simple_example_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_distributed_inference_tensor_parallel_simple_example.py</span></p>
   <div class="sphx-glr-thumbnail-title">Tensor Parallel Distributed Inference with Torch-TensorRT</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Same model as tensor_parallel_simple_example.py but launched with torchrun / python -m torch_te..."><img alt="" src="../../../_images/sphx_glr_tensor_parallel_simple_example_mn_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_distributed_inference_tensor_parallel_simple_example_mn.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Tests the full serialization round-trip for tensor-parallel models with native TRT NCCL collect..."><img alt="" src="../../../_images/sphx_glr_test_multinode_export_save_load_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_distributed_inference_test_multinode_export_save_load.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Two-node test: torch.export → TRT AOT compile → save → load → inference.</div>
 </div></div><div class="toctree-wrapper compound">
 </div>
 <div class="sphx-glr-footer sphx-glr-footer-gallery docutils container">
@@ -606,12 +630,12 @@ tensor parallelism (splitting a single large model across multiple GPUs).</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../../deployment/complex_tensors.html"
+       href="../dynamo/torch_export_3d_rope.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Complex Tensor Support</p>
+        <p class="prev-next-title">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</p>
       </div>
     </a>
     <a class="right-next"

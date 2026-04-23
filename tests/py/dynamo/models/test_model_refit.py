@@ -528,6 +528,10 @@ def test_refit_one_engine_bert_with_weightmap():
 
 
 @unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
@@ -587,6 +591,10 @@ def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -779,6 +787,10 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
 
 
 @unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
@@ -898,6 +910,10 @@ def test_refit_one_engine_bert_without_weightmap():
 
 
 @unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
@@ -954,6 +970,10 @@ def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -1135,5 +1155,219 @@ def test_refit_cumsum():
             "Refit Result is not correct. Refit failed",
         )
         # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+def test_complex_buffer_refit():
+    """Refit a model whose weights include a complex-valued buffer (e.g. RoPE freqs).
+
+    Exercises the combined complex_graph_detection + refit_module_weights path:
+      - complex get_attr buffer is unpacked to real by the lowering pass
+      - complex placeholder input goes through view_as_real at the TRT boundary
+      - after refitting with new frequencies the output matches the new model
+    """
+
+    class ComplexFreqModel(nn.Module):
+        def __init__(self, freqs: torch.Tensor):
+            super().__init__()
+            self.register_buffer("freqs", freqs.cuda())
+
+        def forward(self, z: torch.Tensor) -> torch.Tensor:
+            # complex mul then expose as real so TRT can produce a real output
+            return torch.view_as_real(z * self.freqs)
+
+    SEQ, DIM = 8, 32
+
+    def make_freqs() -> torch.Tensor:
+        angles = torch.rand(SEQ, DIM // 2)
+        return torch.polar(torch.ones_like(angles), angles).cuda()
+
+    freqs1 = make_freqs()
+    freqs2 = make_freqs()
+
+    model1 = ComplexFreqModel(freqs1).eval()
+    model2 = ComplexFreqModel(freqs2).eval()
+
+    z = torch.randn(SEQ, DIM // 2, dtype=torch.complex64).cuda()
+    inputs = [z]
+
+    exp_program1 = torch.export.export(model1, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program1,
+        tuple(inputs),
+        use_python_runtime=True,
+        min_block_size=1,
+        immutable_weights=False,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+        use_weight_map_cache=True,
+        verify_output=True,
+    )
+
+    expected_output = exp_program2.module()(*inputs)
+    refitted_output = new_trt_gm(*inputs)
+
+    assertions.assertTrue(
+        torch.allclose(expected_output, refitted_output, atol=1e-2, rtol=1e-2),
+        "Refit with complex buffer failed: output mismatch after refit",
+    )
+
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+def test_complex_buffer_with_real_param_refit():
+    """Refit a model that mixes a complex buffer with a real nn.Linear weight.
+
+    Verifies that Stage 3 slice-matching for complex buffer constants coexists
+    correctly with ordinary weight-name-map entries for real parameters.
+    After refitting both the frequencies and the projection matrix, the output
+    should match the new model exactly.
+    """
+
+    SEQ, DIM = 8, 32
+
+    class ComplexRotateAndProject(nn.Module):
+        def __init__(self, freqs: torch.Tensor):
+            super().__init__()
+            self.register_buffer("freqs", freqs.cuda())
+            self.proj = nn.Linear(DIM, DIM, bias=False)
+
+        def forward(self, z: torch.Tensor) -> torch.Tensor:
+            rotated = z * self.freqs  # complex mul, (SEQ, DIM//2)
+            r = torch.view_as_real(rotated)  # (SEQ, DIM//2, 2)
+            flat = r.reshape(z.shape[0], -1)  # (SEQ, DIM)
+            return self.proj(flat)  # (SEQ, DIM) real output
+
+    def make_freqs() -> torch.Tensor:
+        angles = torch.rand(SEQ, DIM // 2)
+        return torch.polar(torch.ones_like(angles), angles).cuda()
+
+    model1 = ComplexRotateAndProject(make_freqs()).eval().cuda()
+    model2 = ComplexRotateAndProject(make_freqs()).eval().cuda()
+
+    z = torch.randn(SEQ, DIM // 2, dtype=torch.complex64).cuda()
+    inputs = [z]
+
+    exp_program1 = torch.export.export(model1, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program1,
+        tuple(inputs),
+        use_python_runtime=True,
+        min_block_size=1,
+        immutable_weights=False,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+        use_weight_map_cache=True,
+        verify_output=True,
+    )
+
+    expected_output = exp_program2.module()(*inputs)
+    refitted_output = new_trt_gm(*inputs)
+
+    assertions.assertTrue(
+        torch.allclose(expected_output, refitted_output, atol=1e-2, rtol=1e-2),
+        "Refit with complex buffer + real param failed: output mismatch",
+    )
+
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+def test_dual_complex_buffer_refit():
+    """Refit a model with two independent complex buffers.
+
+    Ensures Stage 3 value-based matching correctly distinguishes the real and
+    imaginary slices of freqs_a from those of freqs_b when both are unpacked to
+    separate _unpacked_complex state-dict entries with the same shape.
+    """
+
+    SEQ, DIM = 8, 32
+
+    class DualComplexFreqModel(nn.Module):
+        def __init__(self, freqs_a: torch.Tensor, freqs_b: torch.Tensor):
+            super().__init__()
+            self.register_buffer("freqs_a", freqs_a.cuda())
+            self.register_buffer("freqs_b", freqs_b.cuda())
+
+        def forward(self, z: torch.Tensor) -> torch.Tensor:
+            ra = torch.view_as_real(z * self.freqs_a)  # (SEQ, DIM//2, 2)
+            rb = torch.view_as_real(z * self.freqs_b)  # (SEQ, DIM//2, 2)
+            return ra + rb  # real output
+
+    def make_freqs() -> torch.Tensor:
+        angles = torch.rand(SEQ, DIM // 2)
+        return torch.polar(torch.ones_like(angles), angles).cuda()
+
+    model1 = DualComplexFreqModel(make_freqs(), make_freqs()).eval()
+    model2 = DualComplexFreqModel(make_freqs(), make_freqs()).eval()
+
+    z = torch.randn(SEQ, DIM // 2, dtype=torch.complex64).cuda()
+    inputs = [z]
+
+    exp_program1 = torch.export.export(model1, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program1,
+        tuple(inputs),
+        use_python_runtime=True,
+        min_block_size=1,
+        immutable_weights=False,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+        use_weight_map_cache=True,
+        verify_output=True,
+    )
+
+    expected_output = exp_program2.module()(*inputs)
+    refitted_output = new_trt_gm(*inputs)
+
+    assertions.assertTrue(
+        torch.allclose(expected_output, refitted_output, atol=1e-2, rtol=1e-2),
+        "Refit with dual complex buffers failed: output mismatch",
+    )
 
     torch._dynamo.reset()

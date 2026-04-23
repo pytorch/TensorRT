@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -630,10 +630,15 @@ for each complex input before feeding it to the engine.</p></li>
 <section id="key-implementation-invariants">
 <h2>Key Implementation Invariants<a class="headerlink" href="#key-implementation-invariants" title="Link to this heading">#</a></h2>
 <ul class="simple">
-<li><p><strong>``originally_complex`` set</strong> — the set of nodes that were complex-dtype
-<em>before</em> any rewrites. After <code class="docutils literal notranslate"><span class="pre">replace_input_node</span></code>, complex placeholders become
-<code class="docutils literal notranslate"><span class="pre">float32</span></code> so <code class="docutils literal notranslate"><span class="pre">is_complex_dtype()</span></code> returns <code class="docutils literal notranslate"><span class="pre">False</span></code>. The <code class="docutils literal notranslate"><span class="pre">originally_complex</span></code>
-set is used to decide which <code class="docutils literal notranslate"><span class="pre">mul.Tensor</span></code> nodes need the complex mul rewrite.</p></li>
+<li><p><strong>``node.meta[“is_complex_layout”]``</strong> — every node that represents a complex
+quantity (either originally complex-dtype, or a real <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">2)</span></code> tensor produced
+by the rewriter) is annotated with <code class="docutils literal notranslate"><span class="pre">node.meta[&quot;is_complex_layout&quot;]</span> <span class="pre">=</span> <span class="pre">True</span></code>.
+This annotation is set during the detection phase (before any rewrites begin) and
+propagated by every rewrite handler as it emits new nodes.  It survives dtype
+changes: after <code class="docutils literal notranslate"><span class="pre">replace_input_node</span></code> converts a <code class="docutils literal notranslate"><span class="pre">placeholder</span></code> from complex to
+<code class="docutils literal notranslate"><span class="pre">float32</span></code>, the dtype-based check <code class="docutils literal notranslate"><span class="pre">is_complex_dtype()</span></code> would return <code class="docutils literal notranslate"><span class="pre">False</span></code>,
+but the metadata flag remains.  <code class="docutils literal notranslate"><span class="pre">_is_complex_layout_node(n)</span></code> is simply
+<code class="docutils literal notranslate"><span class="pre">n.meta.get(&quot;is_complex_layout&quot;,</span> <span class="pre">False)</span></code> — no shape heuristics or recursion.</p></li>
 <li><p><strong>FakeTensorMode reuse</strong> — <code class="docutils literal notranslate"><span class="pre">propagate_metadata</span></code> must use the <code class="docutils literal notranslate"><span class="pre">FakeTensorMode</span></code>
 from existing placeholder fake tensors (not a fresh mode) to avoid mode-mismatch
 errors under <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> and to preserve SymInt for dynamic shapes.</p></li>
@@ -642,10 +647,205 @@ Nested submodule parameter names (e.g. <code class="docutils literal notranslate
 replaced with <code class="docutils literal notranslate"><span class="pre">__</span></code> before registration.</p></li>
 </ul>
 </section>
+<section id="the-decomposition-system-how-it-is-built">
+<h2>The Decomposition System — How It Is Built<a class="headerlink" href="#the-decomposition-system-how-it-is-built" title="Link to this heading">#</a></h2>
+<p>The rewriter is split across two classes and wired together by a lightweight
+dispatch mechanism.  This section walks through each piece and explains the
+design decisions.</p>
+<section id="complexopdetector-subgraph-discovery">
+<h3>ComplexOpDetector — Subgraph Discovery<a class="headerlink" href="#complexopdetector-subgraph-discovery" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">ComplexOpDetector</span></code> walks the graph to find the set of nodes that participate
+in complex arithmetic.</p>
+<section id="node-include-in-subgraph">
+<h4><code class="docutils literal notranslate"><span class="pre">node_include_in_subgraph</span></code><a class="headerlink" href="#node-include-in-subgraph" title="Link to this heading">#</a></h4>
+<p>A node is included in a complex subgraph if:</p>
+<ol class="arabic simple">
+<li><p>Its output dtype is <code class="docutils literal notranslate"><span class="pre">complex64</span></code> or <code class="docutils literal notranslate"><span class="pre">complex128</span></code> (<code class="docutils literal notranslate"><span class="pre">is_complex_dtype</span></code>), <strong>or</strong></p></li>
+<li><p>Any of its inputs are complex (<code class="docutils literal notranslate"><span class="pre">has_complex_input</span></code>).</p></li>
+</ol>
+<p>The second condition is necessary to catch real-output ops — <code class="docutils literal notranslate"><span class="pre">abs</span></code>, <code class="docutils literal notranslate"><span class="pre">angle</span></code>,
+<code class="docutils literal notranslate"><span class="pre">real</span></code>, <code class="docutils literal notranslate"><span class="pre">imag</span></code> — whose inputs are complex.  These must be rewritten alongside
+the rest of the subgraph even though their outputs are real.</p>
+</section>
+<section id="subgraph-from-anchor">
+<h4><code class="docutils literal notranslate"><span class="pre">subgraph_from_anchor</span></code><a class="headerlink" href="#subgraph-from-anchor" title="Link to this heading">#</a></h4>
+<p>For <code class="docutils literal notranslate"><span class="pre">view_as_real</span></code>-bounded subgraphs, detection starts at a <code class="docutils literal notranslate"><span class="pre">view_as_real</span></code>
+<em>anchor</em> node and performs a backward BFS:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>view_as_real  ←  mul (complex)  ←  reshape  ←  placeholder (complex)
+     ↑ anchor         ↑ subgraph              ↑ subgraph     ↑ input
+</pre></div>
+</div>
+<p>At each step, if an upstream node satisfies <code class="docutils literal notranslate"><span class="pre">node_include_in_subgraph</span></code> it is
+added to the subgraph; otherwise it becomes an <em>input node</em> (the boundary).  The
+result is a <code class="docutils literal notranslate"><span class="pre">ComplexSubGraphInfo</span></code> containing anchor nodes, subgraph nodes, and
+input nodes.</p>
+<p>After collection the subgraph is <strong>sorted in topological order</strong> (by position in
+the graph’s node list).  This is critical: without it a <code class="docutils literal notranslate"><span class="pre">mul</span></code> node could be
+processed before its <code class="docutils literal notranslate"><span class="pre">sin</span></code> or <code class="docutils literal notranslate"><span class="pre">cos</span></code> operands, causing the rewriter to see the
+original complex node instead of the already-rewritten real node.</p>
+</section>
+<section id="find-complex-op-subgraphs-and-subgraph-merging">
+<h4><code class="docutils literal notranslate"><span class="pre">find_complex_op_subgraphs</span></code> and subgraph merging<a class="headerlink" href="#find-complex-op-subgraphs-and-subgraph-merging" title="Link to this heading">#</a></h4>
+<p>When a model has multiple <code class="docutils literal notranslate"><span class="pre">view_as_real</span></code> anchors that share upstream nodes
+(e.g. <code class="docutils literal notranslate"><span class="pre">xq_out</span></code> and <code class="docutils literal notranslate"><span class="pre">xk_out</span></code> in a RoPE layer both descend from the same
+<code class="docutils literal notranslate"><span class="pre">freqs_cis</span></code> placeholder), their subgraphs would otherwise be detected
+separately.  <code class="docutils literal notranslate"><span class="pre">find_complex_op_subgraphs</span></code> merges overlapping subgraphs by
+set intersection so each node is rewritten exactly once.</p>
+</section>
+<section id="find-all-complex-subgraphs-unbounded-complex-ops">
+<h4><code class="docutils literal notranslate"><span class="pre">find_all_complex_subgraphs</span></code> — unbounded complex ops<a class="headerlink" href="#find-all-complex-subgraphs-unbounded-complex-ops" title="Link to this heading">#</a></h4>
+<p>Some models produce a complex tensor as a graph <em>output</em> without passing it
+through <code class="docutils literal notranslate"><span class="pre">view_as_real</span></code>.  <code class="docutils literal notranslate"><span class="pre">find_all_complex_subgraphs</span></code> is a forward scan that
+collects every <code class="docutils literal notranslate"><span class="pre">call_function</span></code> node with a complex output, regardless of
+anchoring.  The resulting subgraph is processed the same way as an
+anchor-bounded one.</p>
+</section>
+</section>
+<section id="complexgraphrewriter-dispatch-based-rewriting">
+<h3>ComplexGraphRewriter — Dispatch-Based Rewriting<a class="headerlink" href="#complexgraphrewriter-dispatch-based-rewriting" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">ComplexGraphRewriter</span></code> is decorated with <code class="docutils literal notranslate"><span class="pre">&#64;_register_unpackers</span></code>, which at
+class-definition time scans every method for the <code class="docutils literal notranslate"><span class="pre">&#64;_complex_unpacker(op,</span> <span class="pre">...)</span></code>
+decorator and builds a <code class="docutils literal notranslate"><span class="pre">cls._DISPATCH</span></code> dictionary mapping aten ops to rewrite
+methods.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@_complex_unpacker</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">mul</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_rewrite_mul</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">Node</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">SubgraphBuilder</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>The entry point <code class="docutils literal notranslate"><span class="pre">rewrite_subgraph_nodes</span></code> iterates over the (topologically
+ordered) subgraph nodes and for each node:</p>
+<ol class="arabic simple">
+<li><p>Looks up <code class="docutils literal notranslate"><span class="pre">node.target</span></code> in <code class="docutils literal notranslate"><span class="pre">_DISPATCH</span></code>.</p></li>
+<li><p>If found, calls the corresponding rewrite method.</p></li>
+<li><p>If not found but the op is in <code class="docutils literal notranslate"><span class="pre">_ELEMENTWISE_SAFE</span></code>, skips it (the op applies
+independently to every scalar, so the <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">2)</span></code> real layout is already
+correct).</p></li>
+<li><p>Otherwise logs a warning and leaves the node unchanged.</p></li>
+</ol>
+<section id="elementwise-safe">
+<h4><code class="docutils literal notranslate"><span class="pre">_ELEMENTWISE_SAFE</span></code><a class="headerlink" href="#elementwise-safe" title="Link to this heading">#</a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">_ELEMENTWISE_SAFE</span></code> set contains ops that apply to every element of the
+tensor independently — <code class="docutils literal notranslate"><span class="pre">add.Tensor</span></code>, <code class="docutils literal notranslate"><span class="pre">sub.Tensor</span></code>, <code class="docutils literal notranslate"><span class="pre">neg</span></code>, <code class="docutils literal notranslate"><span class="pre">mul.Scalar</span></code>,
+<code class="docutils literal notranslate"><span class="pre">clone</span></code>, <code class="docutils literal notranslate"><span class="pre">where</span></code>, etc.  On the <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">2)</span></code> real layout these are already
+correct: adding two complex tensors element-wise is the same as adding their
+real and imaginary parts independently.</p>
+<p>Notably <strong>excluded</strong> from this set:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">permute.default</span></code> — must append the trailing real/imag dim index.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">add.Scalar</span></code> / <code class="docutils literal notranslate"><span class="pre">sub.Scalar</span></code> — a scalar added to a complex number only
+shifts the real part; on the <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">2)</span></code> layout both parts would be shifted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reshape</span></code> / <code class="docutils literal notranslate"><span class="pre">view</span></code> — shape arguments need updating for the extra <code class="docutils literal notranslate"><span class="pre">2</span></code> dim.</p></li>
+</ul>
+</section>
+<section id="complex-multiply-decomposition">
+<h4>Complex Multiply Decomposition<a class="headerlink" href="#complex-multiply-decomposition" title="Link to this heading">#</a></h4>
+<p>The most important rewrite is <code class="docutils literal notranslate"><span class="pre">mul.Tensor</span></code> between two complex operands.
+The rewriter calls <code class="docutils literal notranslate"><span class="pre">complex_mul_replacement</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># inputs a, b have shape (..., 2) — last dim is [real, imag]</span>
+<span class="n">re_a</span> <span class="o">=</span> <span class="n">select</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>  <span class="n">im_a</span> <span class="o">=</span> <span class="n">select</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">re_b</span> <span class="o">=</span> <span class="n">select</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>  <span class="n">im_b</span> <span class="o">=</span> <span class="n">select</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">real_out</span> <span class="o">=</span> <span class="n">re_a</span> <span class="o">*</span> <span class="n">re_b</span> <span class="o">-</span> <span class="n">im_a</span> <span class="o">*</span> <span class="n">im_b</span>   <span class="c1"># ac - bd</span>
+<span class="n">imag_out</span> <span class="o">=</span> <span class="n">re_a</span> <span class="o">*</span> <span class="n">im_b</span> <span class="o">+</span> <span class="n">im_a</span> <span class="o">*</span> <span class="n">re_b</span>   <span class="c1"># ad + bc</span>
+<span class="n">result</span>   <span class="o">=</span> <span class="n">stack</span><span class="p">([</span><span class="n">real_out</span><span class="p">,</span> <span class="n">imag_out</span><span class="p">],</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Each step is inserted via a <code class="docutils literal notranslate"><span class="pre">SubgraphBuilder</span></code> anchored at the <code class="docutils literal notranslate"><span class="pre">mul</span></code> node,
+so all six new nodes appear immediately after it in topological order.  The
+original <code class="docutils literal notranslate"><span class="pre">mul</span></code> node is then replaced and erased.</p>
+<p>See <a class="reference internal" href="../tutorials/extensibility/lowering/subgraph_builder.html#subgraph-builder"><span class="std std-ref">SubgraphBuilder — Cursor-Based FX Node Insertion</span></a> for more on how <code class="docutils literal notranslate"><span class="pre">SubgraphBuilder</span></code> manages
+cursor-based insertion.</p>
+</section>
+<section id="the-is-complex-layout-metadata-invariant">
+<h4>The <code class="docutils literal notranslate"><span class="pre">is_complex_layout</span></code> Metadata Invariant<a class="headerlink" href="#the-is-complex-layout-metadata-invariant" title="Link to this heading">#</a></h4>
+<p>Input replacement (Stage 2) converts complex <code class="docutils literal notranslate"><span class="pre">placeholder</span></code> nodes to
+<code class="docutils literal notranslate"><span class="pre">float32</span></code>.  After that, <code class="docutils literal notranslate"><span class="pre">is_complex_dtype(node)</span></code> returns <code class="docutils literal notranslate"><span class="pre">False</span></code> for those
+nodes even though they logically represent complex quantities.</p>
+<p>To avoid missed rewrites, every node that represents a complex quantity is
+annotated with <code class="docutils literal notranslate"><span class="pre">node.meta[&quot;is_complex_layout&quot;]</span> <span class="pre">=</span> <span class="pre">True</span></code> during the detection
+phase (lines in <code class="docutils literal notranslate"><span class="pre">rewrite_subgraph_nodes</span></code> before any rewrites begin).  The
+annotation is then propagated forward by every rewrite handler:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">replace_input_node</span></code> stamps it on the new placeholder and <code class="docutils literal notranslate"><span class="pre">get_attr</span></code> nodes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_inline_cat_re_im</span></code> stamps it on every <code class="docutils literal notranslate"><span class="pre">[re_u,</span> <span class="pre">im_u]</span></code> concatenation node,
+covering all math handlers (<code class="docutils literal notranslate"><span class="pre">exp</span></code>, <code class="docutils literal notranslate"><span class="pre">log</span></code>, <code class="docutils literal notranslate"><span class="pre">sin</span></code>, <code class="docutils literal notranslate"><span class="pre">mul</span></code>, etc.) at once.</p></li>
+<li><p>Each shape-manipulation handler (<code class="docutils literal notranslate"><span class="pre">reshape</span></code>, <code class="docutils literal notranslate"><span class="pre">permute</span></code>, <code class="docutils literal notranslate"><span class="pre">unsqueeze</span></code>,
+<code class="docutils literal notranslate"><span class="pre">cat</span></code>, <code class="docutils literal notranslate"><span class="pre">stack</span></code>, etc.) stamps it on its output node explicitly.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">_is_complex_layout_node(n)</span></code> is therefore a direct metadata lookup — no shape
+heuristics (<code class="docutils literal notranslate"><span class="pre">val.shape[-1]</span> <span class="pre">==</span> <span class="pre">2</span></code>), no recursive <code class="docutils literal notranslate"><span class="pre">_SHAPE_TRANSPARENT_OPS</span></code>
+propagation.  This also eliminates false-positives on real parameters that
+coincidentally have a trailing dimension of size 2.</p>
+</section>
+<section id="faketensormode-reuse-for-dynamic-shapes">
+<h4>FakeTensorMode Reuse for Dynamic Shapes<a class="headerlink" href="#faketensormode-reuse-for-dynamic-shapes" title="Link to this heading">#</a></h4>
+<p>When inserting a new <code class="docutils literal notranslate"><span class="pre">placeholder</span></code> for a complex input, the pass must populate
+<code class="docutils literal notranslate"><span class="pre">meta[&quot;val&quot;]</span></code> with a <code class="docutils literal notranslate"><span class="pre">FakeTensor</span></code> of the new real shape.  Using a fresh
+<code class="docutils literal notranslate"><span class="pre">FakeTensorMode()</span></code> would create a <em>new</em> <code class="docutils literal notranslate"><span class="pre">ShapeEnv</span></code>, which is incompatible
+with the one that <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> used to encode dynamic shape constraints
+(SymInt ranges).</p>
+<p>The fix is to extract the <code class="docutils literal notranslate"><span class="pre">FakeTensorMode</span></code> from the <em>original</em> placeholder’s
+<code class="docutils literal notranslate"><span class="pre">meta[&quot;val&quot;].fake_mode</span></code> and reuse it.  The new fake tensor is then constructed
+by appending a concrete <code class="docutils literal notranslate"><span class="pre">2</span></code> to the symbolic shape list:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">orig_fake</span> <span class="o">=</span> <span class="n">input_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+<span class="n">sym_shape</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">orig_fake</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+<span class="k">with</span> <span class="n">orig_fake</span><span class="o">.</span><span class="n">fake_mode</span><span class="p">:</span>
+    <span class="n">fake_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">sym_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">new_dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This preserves all SymInt identity across the graph and keeps
+dynamic-shape exports working correctly.</p>
+</section>
+</section>
+<section id="entry-point-complex-graph-detection">
+<h3>Entry Point: <code class="docutils literal notranslate"><span class="pre">complex_graph_detection</span></code><a class="headerlink" href="#entry-point-complex-graph-detection" title="Link to this heading">#</a></h3>
+<p>The public entry point called by the lowering pipeline is
+<code class="docutils literal notranslate"><span class="pre">complex_graph_detection(gm,</span> <span class="pre">settings)</span></code>.  It:</p>
+<ol class="arabic simple">
+<li><p>Instantiates <code class="docutils literal notranslate"><span class="pre">ComplexOpDetector</span></code> and <code class="docutils literal notranslate"><span class="pre">ComplexGraphRewriter</span></code>.</p></li>
+<li><p>Calls <code class="docutils literal notranslate"><span class="pre">find_complex_op_subgraphs</span></code> anchored on <code class="docutils literal notranslate"><span class="pre">view_as_real</span></code> to find
+bounded complex subgraphs.</p></li>
+<li><p>Calls <code class="docutils literal notranslate"><span class="pre">find_all_complex_subgraphs</span></code> for any remaining complex nodes that
+are not <code class="docutils literal notranslate"><span class="pre">view_as_real</span></code>-bounded.</p></li>
+<li><p>For each subgraph:</p>
+<ol class="loweralpha simple">
+<li><p>Calls <code class="docutils literal notranslate"><span class="pre">replace_input_node</span></code> on every boundary input node (Stage 2).</p></li>
+<li><p>Calls <code class="docutils literal notranslate"><span class="pre">rewrite_subgraph_nodes</span></code> on the ordered subgraph (Stage 3).</p></li>
+<li><p>Calls <code class="docutils literal notranslate"><span class="pre">clean_up_graph_after_modifications</span></code> to remove dead nodes.</p></li>
+</ol>
+</li>
+<li><p>Returns the modified <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code>.</p></li>
+</ol>
+</section>
+<section id="adding-new-op-rewrites">
+<h3>Adding New Op Rewrites<a class="headerlink" href="#adding-new-op-rewrites" title="Link to this heading">#</a></h3>
+<p>To teach the rewriter about a new complex op, add a method to
+<code class="docutils literal notranslate"><span class="pre">ComplexGraphRewriter</span></code> tagged with <code class="docutils literal notranslate"><span class="pre">&#64;_complex_unpacker</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@_complex_unpacker</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">my_new_op</span><span class="o">.</span><span class="n">default</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_rewrite_my_new_op</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">Node</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="n">inp</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">with</span> <span class="n">SubgraphBuilder</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span> <span class="k">as</span> <span class="n">b</span><span class="p">:</span>
+        <span class="n">re</span> <span class="o">=</span> <span class="n">b</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">int</span><span class="p">,</span> <span class="n">inp</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">im</span> <span class="o">=</span> <span class="n">b</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">int</span><span class="p">,</span> <span class="n">inp</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">b</span><span class="p">(</span><span class="n">my_real_impl</span><span class="p">,</span> <span class="n">re</span><span class="p">,</span> <span class="n">im</span><span class="p">)</span>
+        <span class="c1"># If the output is still a complex-layout [..., 2] tensor, annotate it.</span>
+        <span class="c1"># (Not needed if using _inline_cat_re_im, which sets the flag automatically.)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;is_complex_layout&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">&#64;_register_unpackers</span></code> (applied to the class) picks up the new entry
+automatically at import time — no other registration is required.</p>
+<p>If the new op is elementwise-safe on the <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">2)</span></code> layout (i.e. it acts
+independently on every scalar), add it to <code class="docutils literal notranslate"><span class="pre">_ELEMENTWISE_SAFE</span></code> instead.</p>
+</section>
+</section>
 <section id="related">
 <h2>Related<a class="headerlink" href="#related" title="Link to this heading">#</a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="lowering.html#lowering"><span class="std std-ref">Lowering Phase</span></a> — the complex rewrite is a lowering pass.</p></li>
+<li><p><a class="reference internal" href="../tutorials/extensibility/lowering/subgraph_builder.html#subgraph-builder"><span class="std std-ref">SubgraphBuilder — Cursor-Based FX Node Insertion</span></a> — the <code class="docutils literal notranslate"><span class="pre">SubgraphBuilder</span></code> helper used in every rewrite method.</p></li>
 <li><p><a class="reference internal" href="lowering_passes.html#lowering-passes-catalog"><span class="std std-ref">Built-in Dynamo Lowering Passes</span></a> — pass ordering and management.</p></li>
 </ul>
 </section>
@@ -707,6 +907,25 @@ replaced with <code class="docutils literal notranslate"><span class="pre">__</s
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-changes">Runtime Changes</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#key-implementation-invariants">Key Implementation Invariants</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-decomposition-system-how-it-is-built">The Decomposition System — How It Is Built</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#complexopdetector-subgraph-discovery">ComplexOpDetector — Subgraph Discovery</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#node-include-in-subgraph"><code class="docutils literal notranslate"><span class="pre">node_include_in_subgraph</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#subgraph-from-anchor"><code class="docutils literal notranslate"><span class="pre">subgraph_from_anchor</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#find-complex-op-subgraphs-and-subgraph-merging"><code class="docutils literal notranslate"><span class="pre">find_complex_op_subgraphs</span></code> and subgraph merging</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#find-all-complex-subgraphs-unbounded-complex-ops"><code class="docutils literal notranslate"><span class="pre">find_all_complex_subgraphs</span></code> — unbounded complex ops</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#complexgraphrewriter-dispatch-based-rewriting">ComplexGraphRewriter — Dispatch-Based Rewriting</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#elementwise-safe"><code class="docutils literal notranslate"><span class="pre">_ELEMENTWISE_SAFE</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#complex-multiply-decomposition">Complex Multiply Decomposition</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#the-is-complex-layout-metadata-invariant">The <code class="docutils literal notranslate"><span class="pre">is_complex_layout</span></code> Metadata Invariant</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#faketensormode-reuse-for-dynamic-shapes">FakeTensorMode Reuse for Dynamic Shapes</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#entry-point-complex-graph-detection">Entry Point: <code class="docutils literal notranslate"><span class="pre">complex_graph_detection</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#adding-new-op-rewrites">Adding New Op Rewrites</a></li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#related">Related</a></li>
 </ul>
   </nav></div>

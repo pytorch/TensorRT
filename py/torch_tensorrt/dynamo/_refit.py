@@ -43,6 +43,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 from torch_tensorrt.dynamo.utils import (
     CPU_DEVICE,
     check_module_output,
+    check_output_equal,
     get_model_device,
     get_torch_inputs,
     to_torch_device,
@@ -108,6 +109,17 @@ def construct_refit_mapping_from_weight_name_map(
             # Set scale to scale or shift to shift
             engine_weight_map[engine_weight_name] = eval(
                 engine_weight_name.split(" ")[-1].lower()
+            )
+
+        elif isinstance(sd_weight_name, tuple):
+            # Buffer-slice mapping created by Stage 3 of _save_weight_mapping.
+            # Encodes (state_dict_key, dim, index) for weights that are slices
+            # of a source buffer (e.g. real/imag parts of an unpacked complex buffer).
+            sd_key, dim, idx = sd_weight_name
+            if sd_key not in state_dict:
+                continue
+            engine_weight_map[engine_weight_name] = (
+                state_dict[sd_key].select(dim, idx).to(to_torch_device(settings.device))
             )
 
         elif sd_weight_name not in state_dict:
@@ -588,15 +600,34 @@ def refit_module_weights(
         torch.cuda.empty_cache()
 
     if verify_output and arg_inputs is not None:
-        new_gm.to(to_torch_device(settings.device))
-        if check_module_output(
-            new_module=new_gm,
-            refitted_module=compiled_module,
-            arg_inputs=torch_inputs,
-            kwarg_inputs=torch_kwarg_inputs,
-        ):
+        new_gm.to(to_torch_device(settings.device))  # move to device for inference
+        # complex_graph_detection rewrites complex placeholders to real (view_as_real).
+        # The compiled TRT module handles complex→real internally, but the lowered
+        # PyTorch reference module (new_gm) expects real-unpacked inputs directly.
+        has_complex_inputs = any(
+            isinstance(x, torch.Tensor) and x.is_complex() for x in torch_inputs
+        )
+        if has_complex_inputs:
+            lowered_inputs = [
+                (
+                    torch.view_as_real(x).contiguous()
+                    if isinstance(x, torch.Tensor) and x.is_complex()
+                    else x
+                )
+                for x in torch_inputs
+            ]
+            trt_outputs = compiled_module(*torch_inputs)
+            ref_outputs = new_gm(*lowered_inputs, **torch_kwarg_inputs)
+            outputs_match = check_output_equal(trt_outputs, ref_outputs)
+        else:
+            outputs_match = check_module_output(
+                new_module=new_gm,
+                refitted_module=compiled_module,
+                arg_inputs=torch_inputs,
+                kwarg_inputs=torch_kwarg_inputs,
+            )
+        if outputs_match:
             logger.info("Refitting Succeed!")
-            new_gm.to(CPU_DEVICE)
         else:
             if weight_name_map:
                 logger.warning(
@@ -612,7 +643,6 @@ def refit_module_weights(
                     in_place=in_place,
                 )
             logger.error("Refitting Failed! The outputs do not match.")
-            new_gm.to(CPU_DEVICE)
     else:
         logger.info("Refitting Completed! Output verification skipped.")
 

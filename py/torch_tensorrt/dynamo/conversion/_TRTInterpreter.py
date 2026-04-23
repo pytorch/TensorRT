@@ -115,9 +115,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
 
         self.compilation_settings = compilation_settings
-        if not CONVERTERS.compilation_settings:
-            # Configure user compilation settings to converters.
-            CONVERTERS.set_compilation_settings(compilation_settings)
+        # Always update the global converter registry with the current compilation
+        # settings.  The registry is a process-global singleton; without an
+        # unconditional update, torch_executed_ops set by one compilation leak
+        # into subsequent compilations in the same process (e.g. across tests in
+        # an xdist worker), making those ops incorrectly appear as disallowed.
+        CONVERTERS.set_compilation_settings(compilation_settings)
         self.validate_compile_settings()
         assert TRTInterpreter._all_precisions_supported(
             compilation_settings.enabled_precisions
@@ -600,6 +603,41 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 weight_name_map[engine_weight_name],
                 weight_refit_map[engine_weight_name].dtype,
             ]
+
+        # Stage 3: Slice matching for unmatched non-scalar CONSTANT weights.
+        # complex_graph_detection unpacks complex buffers to real:
+        #   freqs (S,D complex64) → freqs_unpacked_complex (S,D,2 float32)
+        # The real and imag slices (freqs_unpacked_complex[...,0] and [...,1]) are
+        # embedded as separate TRT constants, but their shapes differ from the source
+        # buffer, so Stage 2 value matching fails. Here we try selecting each slice
+        # along the last dimension of every sd entry to find the match.
+        for engine_weight_name, val in list(weight_name_map.items()):
+            if not isinstance(val, list) or len(val) != 2:
+                continue
+            sd_weight_name, dtype_val = val
+            if sd_weight_name != "" or engine_weight_name not in weight_refit_map:
+                continue
+            ew_tensor = weight_refit_map[engine_weight_name].to(torch_device)
+            if ew_tensor.numel() <= 1:
+                continue  # scalars are handled via constant_mapping
+            matched = False
+            for sd_key, sd_tensor in sd.items():
+                if sd_tensor.dim() < 1 or sd_tensor.shape[-1] < 2:
+                    continue
+                last_dim = sd_tensor.dim() - 1
+                for idx in range(sd_tensor.shape[last_dim]):
+                    sd_slice = sd_tensor.select(last_dim, idx)
+                    if TRTInterpreter.check_weight_equal(
+                        sd_slice, ew_tensor, torch_device
+                    ):
+                        weight_name_map[engine_weight_name] = [
+                            (sd_key, last_dim, idx),
+                            dtype_val,
+                        ]
+                        matched = True
+                        break
+                if matched:
+                    break
 
         weight_name_map["constant_mapping"] = constant_mapping
         self.weight_name_map = weight_name_map

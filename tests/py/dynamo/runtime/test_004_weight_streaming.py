@@ -33,6 +33,12 @@ class SampleModel(torch.nn.Module):
 
 
 class TestWeightStreamingPython(TestCase):
+    def setUp(self):
+        torchtrt.runtime.set_cudagraphs_mode(False)
+
+    def tearDown(self):
+        torchtrt.runtime.set_cudagraphs_mode(False)
+
     @parameterized.expand(
         [
             ("python_runtime", True),

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -861,7 +861,11 @@ document.write(`
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">,</span> <span class="n">decompose_attention</span><span class="p">)</span>
+        <span class="n">get_decompositions</span><span class="p">(</span>
+            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+            <span class="n">decompose_attention</span><span class="p">,</span>
+            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+        <span class="p">)</span>
     <span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
@@ -1271,7 +1275,11 @@ document.write(`
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">,</span> <span class="n">decompose_attention</span><span class="p">)</span>
+        <span class="n">get_decompositions</span><span class="p">(</span>
+            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+            <span class="n">decompose_attention</span><span class="p">,</span>
+            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+        <span class="p">)</span>
     <span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
@@ -1302,6 +1310,106 @@ document.write(`
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">trt_gm</span></div>
 
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_insert_complex_io_adapters</span><span class="p">(</span>
+    <span class="n">partitioned_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Insert view_as_real / view_as_complex boundary nodes for complex I/O.</span>
+
+<span class="sd">    complex_graph_detection rewrites complex subgraphs to real arithmetic before</span>
+<span class="sd">    partitioning, but when a model has complex inputs or outputs the outer wrapper</span>
+<span class="sd">    graph still needs adapters at the TRT block boundary:</span>
+
+<span class="sd">      Inputs:  insert view_as_real (+ optional cast for complex128+truncate_double)</span>
+<span class="sd">               after each placeholder that was unpacked by the rewriter.</span>
+<span class="sd">      Outputs: insert view_as_complex before the output node for each originally-complex</span>
+<span class="sd">               output that comes from a TRT block.</span>
+
+<span class="sd">    Leverages metadata that was captued when the complex rewriter pass was run</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">complex_input_names</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;complex_input_names&quot;</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">complex_input_dtypes</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;complex_input_dtypes&quot;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">complex_output_indices</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;complex_output_indices&quot;</span><span class="p">,</span> <span class="p">[])</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">complex_input_names</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">complex_output_indices</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># --- Input boundary: view_as_real for complex inputs ---</span>
+    <span class="c1"># complex_graph_detection renames complex placeholder &#39;foo&#39; to &#39;foo_unpacked_complex&#39;</span>
+    <span class="c1"># with float dtype. The outer graph still has &#39;foo_unpacked_complex&#39; as a placeholder,</span>
+    <span class="c1"># but the caller passes the original complex tensor. Insert view_as_real after</span>
+    <span class="c1"># each such placeholder so the graph unpacks it transparently.</span>
+    <span class="n">reshaped_names</span> <span class="o">=</span> <span class="p">{</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">_unpacked_complex&quot;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">complex_input_names</span><span class="p">}</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">&quot;placeholder&quot;</span> <span class="ow">or</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reshaped_names</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="n">real_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">view_as_real</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">node</span><span class="p">,)</span>
+            <span class="p">)</span>
+        <span class="c1"># For complex128 with truncate_double, the rewriter produced float32</span>
+        <span class="c1"># TRT engine inputs but view_as_real gives float64 — add an explicit cast.</span>
+        <span class="n">orig_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">[:</span> <span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;_unpacked_complex&quot;</span><span class="p">)]</span>
+        <span class="n">orig_dtype</span> <span class="o">=</span> <span class="n">complex_input_dtypes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">orig_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">orig_dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">complex128</span> <span class="ow">and</span> <span class="n">settings</span><span class="o">.</span><span class="n">truncate_double</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Input &#39;</span><span class="si">{</span><span class="n">orig_name</span><span class="si">}</span><span class="s2">&#39; is complex128 with truncate_double=True: unpacked &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;float64 components will be cast to float32.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">real_node</span><span class="p">):</span>
+                <span class="n">cast_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">to</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+                    <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">real_node</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span>
+                <span class="p">)</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">cast_node</span><span class="p">)</span>
+            <span class="n">cast_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">real_node</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+            <span class="n">real_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">node</span><span class="p">,)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Inserted view_as_real + cast-to-float32 for complex128 input placeholder &#39;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39; (truncate_double=True)&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">real_node</span><span class="p">)</span>
+            <span class="c1"># fix the self-reference created by replace_all_uses_with</span>
+            <span class="n">real_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">node</span><span class="p">,)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Inserted view_as_real for complex input placeholder &#39;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+            <span class="p">)</span>
+        <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="c1"># --- Output boundary: view_as_complex for complex outputs from TRT blocks ---</span>
+    <span class="k">if</span> <span class="n">complex_output_indices</span><span class="p">:</span>
+        <span class="n">output_node</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">complex_output_indices</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">src</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_module&quot;</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;_run_on_gpu&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">output_node</span><span class="p">):</span>
+                    <span class="n">complex_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                        <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">view_as_complex</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">src</span><span class="p">,)</span>
+                    <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Inserted view_as_complex for complex output index </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;from TRT block &#39;</span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+                <span class="p">)</span>
+                <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">complex_node</span>
+                <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">),)</span>
+
+    <span class="k">if</span> <span class="n">graph_modified</span><span class="p">:</span>
+        <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+        <span class="n">partitioned_module</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
 
 
 <span class="nd">@fn_supports_debugger</span>  <span class="c1"># type: ignore[misc]</span>
@@ -1599,6 +1707,10 @@ document.write(`
         <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">enable_cross_compile_for_windows</span><span class="p">:</span>
             <span class="n">trt_module</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
             <span class="n">trt_module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
+
+    <span class="c1"># Post-partition complex I/O boundary pass — runs in both normal and dryrun mode</span>
+    <span class="c1"># so the wrapper graph reflects the exact graph that will be executed/built.</span>
+    <span class="n">_insert_complex_io_adapters</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
 
     <span class="c1"># Only set output tensors as unowned if not in dryrun mode (TRT modules exist)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
@@ -1937,7 +2049,11 @@ document.write(`
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">,</span> <span class="n">decompose_attention</span><span class="p">)</span>
+        <span class="n">get_decompositions</span><span class="p">(</span>
+            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+            <span class="n">decompose_attention</span><span class="p">,</span>
+            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+        <span class="p">)</span>
     <span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>

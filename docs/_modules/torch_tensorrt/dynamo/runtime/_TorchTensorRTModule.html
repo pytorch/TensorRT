@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -512,6 +512,7 @@ document.write(`
 <span class="n">TARGET_PLATFORM_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
+<span class="n">REQUIRES_NATIVE_MULTIDEVICE_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 
 <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
     <span class="n">ABI_TARGET_IDX</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ABI_TARGET_IDX</span><span class="p">()</span>  <span class="c1"># 0</span>
@@ -529,7 +530,10 @@ document.write(`
     <span class="n">RESOURCE_ALLOCATION_STRATEGY_IDX</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">RESOURCE_ALLOCATION_STRATEGY_IDX</span><span class="p">()</span>
     <span class="p">)</span>  <span class="c1"># 10</span>
-    <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZATION_LEN</span><span class="p">()</span>  <span class="c1"># 11</span>
+    <span class="n">REQUIRES_NATIVE_MULTIDEVICE_IDX</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">REQUIRES_NATIVE_MULTIDEVICE_IDX</span><span class="p">()</span>
+    <span class="p">)</span>  <span class="c1"># 11</span>
+    <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZATION_LEN</span><span class="p">()</span>  <span class="c1"># 12</span>
 
 
 <div class="viewcode-block" id="TorchTensorRTModule">
@@ -565,6 +569,7 @@ document.write(`
         <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>  <span class="c1"># Assumes engine was built with default compilation settings if object not passed</span>
         <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">requires_native_multidevice</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
@@ -585,6 +590,7 @@ document.write(`
 <span class="sd">            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed</span>
 <span class="sd">            weight_name_map (dict): Mapping of engine weight name to state_dict weight name</span>
 <span class="sd">            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)</span>
+<span class="sd">            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)</span>
 <span class="sd">            symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding</span>
 
 <span class="sd">        Example:</span>
@@ -624,6 +630,7 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">symbolic_shape_expressions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">requires_native_multidevice</span> <span class="o">=</span> <span class="n">requires_native_multidevice</span>
 
         <span class="k">if</span> <span class="p">(</span>
             <span class="n">serialized_engine</span>
@@ -631,6 +638,21 @@ document.write(`
             <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_cross_compile_for_windows</span>
         <span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;TorchTensorRTModule&quot;</span><span class="p">:</span>
+        <span class="c1"># The C++ TRTEngine is not safely deep-copyable for distributed (NCCL)</span>
+        <span class="c1"># engines — creating a new execution context during copy can crash at</span>
+        <span class="c1"># destruction time.  Since the exporter only reads the engine (never</span>
+        <span class="c1"># executes it), sharing the same C++ object is safe.</span>
+        <span class="bp">cls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+        <span class="n">memo</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">&quot;engine&quot;</span><span class="p">:</span>
+                <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>  <span class="c1"># shallow: reuse the same C++ Engine</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">memo</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">result</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_pack_engine_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]:</span>
         <span class="n">target_device</span> <span class="o">=</span> <span class="p">(</span>
@@ -681,6 +703,10 @@ document.write(`
         <span class="n">engine_info</span><span class="p">[</span><span class="n">RESOURCE_ALLOCATION_STRATEGY_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
             <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span><span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_NATIVE_MULTIDEVICE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requires_native_multidevice</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="c1"># rank/world_size are runtime facts; queried from ProcessGroup at execution time</span>
 
         <span class="k">return</span> <span class="n">engine_info</span>
 
@@ -729,6 +755,36 @@ document.write(`
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">())</span>
+
+        <span class="c1"># requires_native_multidevice is set by the C++ constructor from the serialized REQUIRES_NATIVE_MULTIDEVICE_IDX field.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">requires_native_multidevice</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._nccl_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                <span class="n">check_nccl_engine_requirements</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">check_nccl_engine_requirements</span><span class="p">()</span>
+
+        <span class="c1"># Store the active process group name on the C++ engine so that the</span>
+        <span class="c1"># lazy NCCL setup in execute_engine() can find the right communicator</span>
+        <span class="c1"># without needing any further Python involvement.</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span>
+            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">requires_native_multidevice</span>
+        <span class="p">):</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._distributed</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                <span class="n">get_active_group_name</span><span class="p">,</span>
+                <span class="n">register_md_engine</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">group_name</span> <span class="o">=</span> <span class="n">get_active_group_name</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">group_name</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">set_group_name</span><span class="p">(</span><span class="n">group_name</span><span class="p">)</span>
+
+            <span class="c1"># Register the C++ engine for teardown tracking so</span>
+            <span class="c1"># distributed_context().__exit__ can release the NCCL comm even</span>
+            <span class="c1"># for torch.compile models where the engine lives in dynamo&#39;s</span>
+            <span class="c1"># code cache and isn&#39;t reachable via module tree walking.</span>
+            <span class="n">register_md_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">encode_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metadata</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
@@ -828,10 +884,19 @@ document.write(`
         <span class="c1"># directly cast the input to a Torch Tensor.</span>
         <span class="c1">#</span>
         <span class="c1"># This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors</span>
-        <span class="n">input_tensors</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="p">(</span><span class="n">i</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span>
-        <span class="p">]</span>
+        <span class="n">input_tensors</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">i</span><span class="o">.</span><span class="n">is_cuda</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;Input tensor is not on a CUDA device. Moving it to CUDA automatically. &quot;</span>
+                        <span class="s2">&quot;For best performance, ensure all inputs are on the correct CUDA device &quot;</span>
+                        <span class="s2">&quot;before calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device)).&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">i</span> <span class="o">=</span> <span class="n">i</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+                <span class="n">input_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">input_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 
         <span class="n">outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="p">(</span>
             <span class="nb">list</span><span class="p">(</span><span class="n">input_tensors</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span>

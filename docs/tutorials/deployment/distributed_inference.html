@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../_static/documentation_options.js?v=c3d35e0c"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -58,7 +58,7 @@
         </script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Complex Tensor Support" href="complex_tensors.html" />
+    <link rel="next" title="Complex Numerics" href="../complex_numerics/index.html" />
     <link rel="prev" title="Cross runtime compilation for windows example" href="../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -450,6 +450,7 @@ document.write(`
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l3"><a class="reference internal" href="../extensibility/lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/lowering/subgraph_builder.html">SubgraphBuilder — Cursor-Based FX Node Insertion</a></li>
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -501,13 +502,27 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="cross_compile_windows.html">Cross-Compiling for Windows</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Distributed Inference</a></li>
-<li class="toctree-l2"><a class="reference internal" href="complex_tensors.html">Complex Tensor Support</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../complex_numerics/index.html">Complex Numerics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../complex_numerics/complex_tensors.html">Complex Tensor Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_3d_rope.html">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</a></li>
+
+
+
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../_rendered_examples/distributed_inference/index.html">Example: Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/test_multinode_nccl.html">Usage</a></li>
+
+
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/tensor_parallel_simple_example_mn.html">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/test_multinode_export_save_load.html">Usage</a></li>
+
+
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="../../indices/supported_ops.html">Operators Supported</a></li>
@@ -619,12 +634,23 @@ examples for complete Accelerate-based workflows with GPT-2 and Stable Diffusion
 <section id="tensor-parallel-inference">
 <h2>Tensor Parallel Inference<a class="headerlink" href="#tensor-parallel-inference" title="Link to this heading">#</a></h2>
 <p>Tensor parallelism shards model weights across GPUs. Each GPU holds a slice of every
-weight tensor and participates in collective operations (all-gather, reduce-scatter) to
-execute the full model forward pass.</p>
-<p>Torch-TensorRT compiles the per-GPU shard of the model. Use
-<code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace=True</span></code> to switch the export path to <code class="docutils literal notranslate"><span class="pre">aot_autograd</span></code>, which
-handles DTensor inputs correctly:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+weight tensor and participates in collective operations (all-reduce, all-gather,
+reduce-scatter) to execute the full model forward pass.</p>
+<p>Torch-TensorRT supports two compilation workflows for tensor-parallel models:</p>
+<ol class="arabic simple">
+<li><p><strong>torch.compile</strong> (JIT) — uses <code class="docutils literal notranslate"><span class="pre">torch._dynamo</span></code> to trace the model at runtime.
+Works with DTensor-parallelized models directly.</p></li>
+<li><p><strong>torch.export</strong> (AOT) — ahead-of-time export, TRT compilation, and save/load.
+Requires manual weight slicing (DTensor is not yet supported by <code class="docutils literal notranslate"><span class="pre">torch.export</span></code>).</p></li>
+</ol>
+<hr class="docutils" />
+<section id="workflow-1-torch-compile-jit">
+<h3>Workflow 1: torch.compile (JIT)<a class="headerlink" href="#workflow-1-torch-compile-jit" title="Link to this heading">#</a></h3>
+<p>The simplest path for tensor-parallel inference. Shard the model with
+<code class="docutils literal notranslate"><span class="pre">parallelize_module</span></code> (DTensor), compile with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>, and wrap
+inference in <code class="docutils literal notranslate"><span class="pre">distributed_context</span></code> for safe NCCL lifecycle management:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.tensor.parallel</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ColwiseParallel</span><span class="p">,</span>
@@ -633,64 +659,489 @@ handles DTensor inputs correctly:</p>
 <span class="p">)</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
-<span class="c1"># --- Initialize process group ---</span>
 <span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">&quot;nccl&quot;</span><span class="p">)</span>
-<span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
-<span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="n">tp_mesh</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">device_mesh</span><span class="o">.</span><span class="n">init_device_mesh</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">(),))</span>
 
-<span class="c1"># --- Shard the model across GPUs ---</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 <span class="n">parallelize_module</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">tp_mesh</span><span class="p">,</span>
     <span class="p">{</span>
-        <span class="s2">&quot;fc1&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
-        <span class="s2">&quot;fc2&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(),</span>
+        <span class="s2">&quot;attn.q_proj&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+        <span class="s2">&quot;attn.o_proj&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(),</span>
+        <span class="s2">&quot;mlp.gate_proj&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+        <span class="s2">&quot;mlp.down_proj&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(),</span>
     <span class="p">},</span>
 <span class="p">)</span>
 
-<span class="c1"># --- Compile each GPU&#39;s shard with Torch-TensorRT ---</span>
-<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">512</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)]</span>
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span>
+    <span class="n">dynamic</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">options</span><span class="o">=</span><span class="p">{</span>
-        <span class="s2">&quot;use_distributed_mode_trace&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="s2">&quot;use_explicit_typing&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>  <span class="c1"># enabled_precisions deprecated</span>
-        <span class="s2">&quot;use_python_runtime&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;use_explicit_typing&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;use_fp32_acc&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;use_python_runtime&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>  <span class="c1"># C++ runtime</span>
         <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
     <span class="p">},</span>
 <span class="p">)</span>
 
-<span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+<span class="c1"># Warmup — triggers engine build</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">input_ids</span><span class="p">,</span> <span class="n">position_ids</span><span class="o">=</span><span class="n">position_ids</span><span class="p">)</span>
+<span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+
+<span class="c1"># Use distributed_context to manage the NCCL lifecycle.</span>
+<span class="c1"># On __exit__ it releases NCCL communicators from TRT engines,</span>
+<span class="c1"># making dist.destroy_process_group() safe to call afterward.</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">group</span><span class="o">.</span><span class="n">WORLD</span><span class="p">,</span> <span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">model</span><span class="p">:</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_ids</span><span class="p">,</span> <span class="n">position_ids</span><span class="o">=</span><span class="n">position_ids</span><span class="p">)</span>
+
+<span class="n">dist</span><span class="o">.</span><span class="n">destroy_process_group</span><span class="p">()</span>
+<span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># bypass Python GC destructor races</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace=True</span></code> is <strong>required</strong> whenever:</p>
-<ul class="simple">
-<li><p>The model contains <code class="docutils literal notranslate"><span class="pre">DTensor</span></code> parameters (from <code class="docutils literal notranslate"><span class="pre">parallelize_module</span></code>).</p></li>
-<li><p>The model uses <code class="docutils literal notranslate"><span class="pre">torch.distributed</span></code> collective ops that appear as graph nodes.</p></li>
+<p><strong>Key points:</strong></p>
+<ul>
+<li><p><strong>Use</strong> <code class="docutils literal notranslate"><span class="pre">distributed_context</span></code> <strong>for safe teardown</strong> — TRT engines hold a raw
+pointer to the NCCL communicator.  <code class="docutils literal notranslate"><span class="pre">distributed_context(group,</span> <span class="pre">module)</span></code> tracks
+all multi-device engines and calls <code class="docutils literal notranslate"><span class="pre">release_nccl_comm()</span></code> on <code class="docutils literal notranslate"><span class="pre">__exit__</span></code>,
+detaching the communicator so <code class="docutils literal notranslate"><span class="pre">dist.destroy_process_group()</span></code> doesn’t cause a
+use-after-free.  Always follow the block with <code class="docutils literal notranslate"><span class="pre">dist.destroy_process_group()</span></code>
+and <code class="docutils literal notranslate"><span class="pre">os._exit(0)</span></code>.</p></li>
+<li><p><strong>Automatic distributed tracing</strong> — when <code class="docutils literal notranslate"><span class="pre">dist.init_process_group()</span></code> has been
+called and <code class="docutils literal notranslate"><span class="pre">world_size</span> <span class="pre">&gt;</span> <span class="pre">1</span></code>, Torch-TensorRT detects the active distributed context
+and automatically switches the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend tracer from the default
+<code class="docutils literal notranslate"><span class="pre">torch._dynamo</span></code> path to <code class="docutils literal notranslate"><span class="pre">aot_autograd</span></code>. You do not need to set
+<code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace=True</span></code> explicitly.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dynamic=True</span></code> enables dynamic sequence lengths — TRT builds a single engine that
+handles varying input shapes without recompiling.</p></li>
+<li><p>NCCL all-reduce ops from <code class="docutils literal notranslate"><span class="pre">RowwiseParallel</span></code> are fused and converted to native TRT
+<code class="docutils literal notranslate"><span class="pre">DistCollective</span></code> layers (TRT 10.16+) or TRT-LLM plugin layers (TRT &lt; 10.16).</p></li>
+<li><p>The warmup forward pass should use <code class="docutils literal notranslate"><span class="pre">torch._dynamo.mark_dynamic()</span></code> to match the
+generate loop and avoid a recompile.</p></li>
+<li><p><strong>Non-default TP subgroup</strong> — if the TRT engine should use a subgroup communicator
+(e.g. tensor-parallel inside a data-parallel job), pass the subgroup instead of
+<code class="docutils literal notranslate"><span class="pre">dist.group.WORLD</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">tp_group</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">new_group</span><span class="p">(</span><span class="n">ranks</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">tp_group</span><span class="p">,</span> <span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">model</span><span class="p">:</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
 </ul>
-<p>Without it, the default export path (<code class="docutils literal notranslate"><span class="pre">aot_export_joint_simple</span></code>) will fail on DTensor
-inputs and Torch-TensorRT will emit a warning.</p>
+<p>For a complete LLM example, see
+<a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/tools/llm/tensor_parallel_llama_llm.py">tensor_parallel_llama_llm.py</a>
+and the multinode variant
+<a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/tools/llm/tensor_parallel_llama_multinode.py">tensor_parallel_llama_multinode.py</a>.</p>
 </section>
 <hr class="docutils" />
-<section id="nccl-collective-ops-in-trt-graphs">
-<h2>NCCL Collective Ops in TRT Graphs<a class="headerlink" href="#nccl-collective-ops-in-trt-graphs" title="Link to this heading">#</a></h2>
-<p>For models where collective ops (all-gather, reduce-scatter) appear inside the
-TRT-compiled subgraph, Torch-TensorRT can fuse them using TensorRT-LLM plugins.</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">fuse_distributed_ops</span></code> lowering pass automatically rewrites consecutive
-<code class="docutils literal notranslate"><span class="pre">_c10d_functional.all_gather_into_tensor</span></code> / <code class="docutils literal notranslate"><span class="pre">reduce_scatter_tensor</span></code> +
-<code class="docutils literal notranslate"><span class="pre">wait_tensor</span></code> pairs into fused custom ops:</p>
+<section id="workflow-2-torch-export-aot-with-save-load">
+<h3>Workflow 2: torch.export (AOT) with Save / Load<a class="headerlink" href="#workflow-2-torch-export-aot-with-save-load" title="Link to this heading">#</a></h3>
+<p>For deployment scenarios where you want to compile once and load many times (e.g.
+serving), use the export → compile → save → load workflow.</p>
+<p><strong>Limitation:</strong> <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> does not currently support <code class="docutils literal notranslate"><span class="pre">DTensor</span></code>-parallelized
+models (sharding propagation fails on symbolic reshapes). The workaround is to manually
+slice weights per-rank and insert explicit <code class="docutils literal notranslate"><span class="pre">_c10d_functional.all_reduce</span></code> ops for
+row-parallel layers.</p>
+<section id="step-1-export-and-save">
+<h4>Step 1: Export and Save<a class="headerlink" href="#step-1-export-and-save" title="Link to this heading">#</a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="c1"># Manual row-parallel wrapper (replaces DTensor RowwiseParallel)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">RowParallelLinear</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">linear</span><span class="p">,</span> <span class="n">group_name</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">linear</span> <span class="o">=</span> <span class="n">linear</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">group_name</span> <span class="o">=</span> <span class="n">group_name</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">_c10d_functional</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="s2">&quot;sum&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_name</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">_c10d_functional</span><span class="o">.</span><span class="n">wait_tensor</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">out</span>
+
+<span class="c1"># Slice weights for this rank and wrap row-parallel layers</span>
+<span class="n">group_name</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">distributed_c10d</span><span class="o">.</span><span class="n">_get_default_group</span><span class="p">()</span><span class="o">.</span><span class="n">group_name</span>
+<span class="c1"># ... slice column-parallel weights on dim 0, row-parallel on dim 1 ...</span>
+<span class="n">model</span><span class="o">.</span><span class="n">o_proj</span> <span class="o">=</span> <span class="n">RowParallelLinear</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">o_proj</span><span class="p">,</span> <span class="n">group_name</span><span class="p">)</span>
+
+<span class="c1"># Export (no DTensor → export succeeds)</span>
+<span class="n">ep</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">input_ids</span><span class="p">,),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># Compile with TRT</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">ep</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">input_ids</span><span class="p">],</span>
+    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">use_fp32_acc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">use_distributed_mode_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Save per-rank engine</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep&quot;</span><span class="p">,</span>
+                    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">input_ids</span><span class="p">],</span> <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="step-2-load-and-run">
+<h4>Step 2: Load and Run<a class="headerlink" href="#step-2-load-and-run" title="Link to this heading">#</a></h4>
+<p><strong>Default world group</strong> (most common — all ranks share one TP group):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed</span><span class="w"> </span><span class="kn">import</span> <span class="n">setup_nccl_for_torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._nccl_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">initialize_nccl_comm</span>
+
+<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">&quot;nccl&quot;</span><span class="p">)</span>
+<span class="n">setup_nccl_for_torch_tensorrt</span><span class="p">()</span>
+<span class="n">initialize_nccl_comm</span><span class="p">()</span>  <span class="c1"># eagerly create NCCL communicator for TRT</span>
+<span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+
+<span class="c1"># Load the per-rank engine</span>
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep&quot;</span><span class="p">)</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">group</span><span class="o">.</span><span class="n">WORLD</span><span class="p">,</span> <span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">model</span><span class="p">:</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_ids</span><span class="p">)</span>
+
+<span class="n">dist</span><span class="o">.</span><span class="n">destroy_process_group</span><span class="p">()</span>
+<span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Non-default TP subgroup</strong> (e.g. tensor-parallel inside a data-parallel job):</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">distributed_context(group,</span> <span class="pre">module)</span></code> to pin the group on all TRT engines
+in the loaded module and get the configured model back as the context value:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed</span><span class="w"> </span><span class="kn">import</span> <span class="n">setup_nccl_for_torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._nccl_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">initialize_nccl_comm</span>
+
+<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">&quot;nccl&quot;</span><span class="p">)</span>
+<span class="n">setup_nccl_for_torch_tensorrt</span><span class="p">()</span>
+<span class="n">initialize_nccl_comm</span><span class="p">()</span>
+
+<span class="n">tp_group</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">new_group</span><span class="p">(</span><span class="n">ranks</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>  <span class="c1"># tensor-parallel ranks</span>
+<span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep&quot;</span><span class="p">)</span>
+<span class="n">raw_model</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">tp_group</span><span class="p">,</span> <span class="n">raw_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">trt_model</span><span class="p">:</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">input_ids</span><span class="p">)</span>
+
+<span class="n">dist</span><span class="o">.</span><span class="n">destroy_process_group</span><span class="p">()</span>
+<span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>What happens under the hood:</strong></p>
 <ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">_c10d_functional.all_reduce</span></code> + <code class="docutils literal notranslate"><span class="pre">wait_tensor</span></code> are fused into
+<code class="docutils literal notranslate"><span class="pre">tensorrt_fused_nccl_all_reduce_op</span></code> by the <code class="docutils literal notranslate"><span class="pre">fuse_distributed_ops</span></code> lowering pass.</p></li>
+<li><p>The fused op is converted to a native TRT <code class="docutils literal notranslate"><span class="pre">DistCollective</span></code> layer inside the engine.</p></li>
+<li><p>At load time, the C++ runtime auto-resolves the NCCL process group name from the
+c10d registry.  <code class="docutils literal notranslate"><span class="pre">initialize_nccl_comm()</span></code> eagerly creates PyTorch’s lazy NCCL
+communicator is initialized before TRT tries to bind to it.</p></li>
+<li><p>The engine is serialized with <code class="docutils literal notranslate"><span class="pre">requires_native_multidevice=True</span></code>, which tells the C++ runtime to bind
+the NCCL communicator on first execution.</p></li>
+</ul>
+<p>For a complete example, see
+<a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/tools/llm/tensor_parallel_llama_export.py">tensor_parallel_llama_export.py</a>.</p>
+</section>
+</section>
+</section>
+<hr class="docutils" />
+<section id="multinode-inference">
+<h2>Multinode Inference<a class="headerlink" href="#multinode-inference" title="Link to this heading">#</a></h2>
+<p>For tensor parallelism across multiple nodes (one GPU per node), use
+<code class="docutils literal notranslate"><span class="pre">torchtrtrun</span></code> — a <code class="docutils literal notranslate"><span class="pre">torchrun</span></code>-compatible launcher included in Torch-TensorRT
+that automatically sets up NCCL before spawning worker processes.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Node 0 (rank 0):</span>
+torchtrtrun<span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">1</span><span class="w"> </span>--nnodes<span class="o">=</span><span class="m">2</span><span class="w"> </span>--node_rank<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--rdzv_endpoint<span class="o">=</span>&lt;node0-ip&gt;:29500<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>tensor_parallel_llama_multinode.py
+
+<span class="c1"># Node 1 (rank 1):</span>
+torchtrtrun<span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">1</span><span class="w"> </span>--nnodes<span class="o">=</span><span class="m">2</span><span class="w"> </span>--node_rank<span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--rdzv_endpoint<span class="o">=</span>&lt;node0-ip&gt;:29500<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>tensor_parallel_llama_multinode.py
+</pre></div>
+</div>
+<p>Single-node multi-GPU also works:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>torchtrtrun<span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">2</span><span class="w"> </span>tensor_parallel_llama_llm.py
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>TRT 10.x NCCL library workaround</strong> — In TRT 10.x,
+<code class="docutils literal notranslate"><span class="pre">IExecutionContext::setCommunicator</span></code> calls <code class="docutils literal notranslate"><span class="pre">dlopen(&quot;libnccl.so&quot;)</span></code>
+at runtime via TRT’s internal <code class="docutils literal notranslate"><span class="pre">libLoader</span></code>. This happens inside the C++
+runtime before any Python code executes, so setting <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>
+or <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code> inside the script is too late. This is fixed in TRT 11.0.</p>
+<p><code class="docutils literal notranslate"><span class="pre">torchtrtrun</span></code> works around this by:</p>
+<ol class="arabic simple">
+<li><p>Finding the <code class="docutils literal notranslate"><span class="pre">nvidia-nccl</span></code> pip package (<code class="docutils literal notranslate"><span class="pre">nvidia.nccl</span></code>).</p></li>
+<li><p>Creating a <code class="docutils literal notranslate"><span class="pre">libnccl.so</span> <span class="pre">→</span> <span class="pre">libnccl.so.2</span></code> symlink if missing (pip only
+ships <code class="docutils literal notranslate"><span class="pre">libnccl.so.2</span></code>).</p></li>
+<li><p>Prepending the NCCL lib directory to <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>.</p></li>
+<li><p>Setting <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code> to <code class="docutils literal notranslate"><span class="pre">libnccl.so.2</span></code> so TRT’s <code class="docutils literal notranslate"><span class="pre">dlopen</span></code> finds
+the library already resident in the process.</p></li>
+<li><p>Spawning worker processes with <code class="docutils literal notranslate"><span class="pre">RANK</span></code>, <code class="docutils literal notranslate"><span class="pre">LOCAL_RANK</span></code>, <code class="docutils literal notranslate"><span class="pre">WORLD_SIZE</span></code>,
+<code class="docutils literal notranslate"><span class="pre">MASTER_ADDR</span></code>, and <code class="docutils literal notranslate"><span class="pre">MASTER_PORT</span></code> set.</p></li>
+</ol>
+</div>
+<p><strong>Manual setup (without</strong> <code class="docutils literal notranslate"><span class="pre">torchtrtrun</span></code> <strong>):</strong></p>
+<p>If you prefer to launch processes yourself, replicate the NCCL setup manually:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Step 1 — create the libnccl.so symlink</span>
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+<span class="s2">from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt</span>
+<span class="s2">setup_nccl_for_torch_tensorrt()</span>
+<span class="s2">&quot;</span>
+
+<span class="c1"># Step 2 — find the NCCL lib directory</span>
+<span class="nv">NCCL_LIB</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+<span class="s2">from torch_tensorrt.distributed._nccl_utils import get_nccl_library_path</span>
+<span class="s2">print(get_nccl_library_path())</span>
+<span class="s2">&quot;</span><span class="k">)</span>
+
+<span class="c1"># Step 3 — launch with LD_PRELOAD and LD_LIBRARY_PATH set before the process starts</span>
+<span class="c1"># Node 0:</span>
+<span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NCCL_LIB</span><span class="s2">/libnccl.so.2&quot;</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NCCL_LIB</span><span class="s2">:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">RANK</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="nv">WORLD_SIZE</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">MASTER_ADDR</span><span class="o">=</span>&lt;node0-ip&gt;<span class="w"> </span><span class="nv">MASTER_PORT</span><span class="o">=</span><span class="m">29500</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>tensor_parallel_llama_multinode.py
+
+<span class="c1"># Node 1:</span>
+<span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NCCL_LIB</span><span class="s2">/libnccl.so.2&quot;</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NCCL_LIB</span><span class="s2">:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">RANK</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">WORLD_SIZE</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">MASTER_ADDR</span><span class="o">=</span>&lt;node0-ip&gt;<span class="w"> </span><span class="nv">MASTER_PORT</span><span class="o">=</span><span class="m">29500</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>tensor_parallel_llama_multinode.py
+</pre></div>
+</div>
+<p><strong>Important considerations for multinode:</strong></p>
+<ul class="simple">
+<li><p>Set a long NCCL timeout (e.g. 2 hours) via
+<code class="docutils literal notranslate"><span class="pre">dist.init_process_group(timeout=datetime.timedelta(hours=2))</span></code>
+to prevent watchdog timeouts during TRT engine building.</p></li>
+<li><p>Add a <code class="docutils literal notranslate"><span class="pre">dist.barrier()</span></code> after the warmup forward pass so all ranks finish
+engine building before starting inference.</p></li>
+<li><p>If using NGC or a system-installed NCCL (<code class="docutils literal notranslate"><span class="pre">libnccl.so</span></code> already on
+<code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>), the <code class="docutils literal notranslate"><span class="pre">torchtrtrun</span></code> setup step is skipped automatically.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="nccl-collective-ops-in-trt-engines">
+<h2>NCCL Collective Ops in TRT Engines<a class="headerlink" href="#nccl-collective-ops-in-trt-engines" title="Link to this heading">#</a></h2>
+<p>Torch-TensorRT compiles NCCL collective ops (all-reduce, all-gather, reduce-scatter)
+directly into the TRT engine binary. There are two backend paths, selected automatically
+at import time based on what is available in your TRT build.</p>
+<p><strong>Selection priority (highest to lowest):</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Native TRT DistCollective</strong> (TRT 10.16+ — preferred)</p></li>
+<li><p><strong>TRT-LLM plugin</strong> (TRT &lt; 10.16 fallback)</p></li>
+<li><p><strong>PyTorch fallback</strong> (ops remain outside the TRT subgraph)</p></li>
+</ol>
+<p>Check which path is active in your environment:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">native_trt_collectives</span><span class="p">)</span>  <span class="c1"># True → native path</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">trtllm_for_nccl</span><span class="p">)</span>         <span class="c1"># True → TRT-LLM path</span>
+</pre></div>
+</div>
+<hr class="docutils" />
+<section id="path-1-native-trt-distcollective-trt-10-16">
+<h3>Path 1: Native TRT DistCollective (TRT 10.16+)<a class="headerlink" href="#path-1-native-trt-distcollective-trt-10-16" title="Link to this heading">#</a></h3>
+<p>The preferred path. No external libraries needed — NCCL collectives are first-class
+TRT layers compiled into the engine. Requires:</p>
+<ul class="simple">
+<li><p>TensorRT ≥ 10.16</p></li>
+<li><p>Torch-TensorRT built with <code class="docutils literal notranslate"><span class="pre">ENABLE_TRT_NCCL_COLLECTIVES=ON</span></code> (default for CUDA builds)</p></li>
+</ul>
+<p><strong>How it works end-to-end:</strong></p>
+<ol class="arabic">
+<li><p><strong>Graph lowering</strong> — the <code class="docutils literal notranslate"><span class="pre">fuse_distributed_ops</span></code> pass rewrites each
+<code class="docutils literal notranslate"><span class="pre">_c10d_functional.&lt;collective&gt;</span> <span class="pre">+</span> <span class="pre">wait_tensor</span></code> pair into a single fused custom op:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tensorrt_fused_nccl_all_reduce_op</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">tensorrt_fused_nccl_all_gather_op</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">tensorrt_fused_nccl_reduce_scatter_op</span></code></p></li>
 </ul>
-<p>These are then converted by custom converters into TensorRT-LLM AllGather / ReduceScatter
-plugin layers (requires <code class="docutils literal notranslate"><span class="pre">ENABLED_FEATURES.trtllm_for_nccl</span></code>). When the TRT-LLM plugin is
-unavailable, the ops fall back to PyTorch execution transparently.</p>
-<p>See the <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/examples/distributed_inference/tensor_parallel_rotary_embedding.py">tensor_parallel_rotary_embedding.py</a>
-example for a Llama-style model with NCCL collective ops compiled end-to-end.</p>
+</li>
+<li><p><strong>TRT compilation</strong> — the <code class="docutils literal notranslate"><span class="pre">_TRTInterpreter</span></code> sets
+<code class="docutils literal notranslate"><span class="pre">PreviewFeature.MULTIDEVICE_RUNTIME_10_16</span></code> on the builder config and then
+each fused op converter calls <code class="docutils literal notranslate"><span class="pre">INetworkDefinition.add_dist_collective()</span></code> to
+insert a native <code class="docutils literal notranslate"><span class="pre">DistCollective</span></code> layer (<code class="docutils literal notranslate"><span class="pre">trt.CollectiveOperation.ALL_REDUCE</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ALL_GATHER</span></code>, or <code class="docutils literal notranslate"><span class="pre">REDUCE_SCATTER</span></code>) into the TRT network.</p></li>
+<li><p><strong>Serialization</strong> — the engine is serialized with the <code class="docutils literal notranslate"><span class="pre">requires_native_multidevice=True</span></code> flag in the
+Torch-TRT metadata, signalling to the C++ runtime that NCCL communicator binding is
+required at load time.</p></li>
+<li><p><strong>Runtime — NCCL communicator binding</strong> — on first execution, the C++ runtime calls
+<code class="docutils literal notranslate"><span class="pre">TRTEngine::bind_nccl_comm()</span></code>:</p>
+<ul class="simple">
+<li><p>It resolves the process group via the group name stored on the engine (or probes
+the c10d registry for the first group with an NCCL backend).</p></li>
+<li><p>It fetches the <code class="docutils literal notranslate"><span class="pre">ncclComm_t</span></code> pointer from PyTorch’s <code class="docutils literal notranslate"><span class="pre">ProcessGroupNCCL</span></code>.</p></li>
+<li><p>It calls <code class="docutils literal notranslate"><span class="pre">IExecutionContext::setCommunicator()</span></code> to pass the communicator to TRT.</p></li>
+</ul>
+<p>This is why <code class="docutils literal notranslate"><span class="pre">initialize_nccl_comm()</span></code> must be called before the first inference on a
+<strong>loaded</strong> engine: PyTorch creates the NCCL communicator lazily (on the first
+collective), so without the eager-init call, <code class="docutils literal notranslate"><span class="pre">bind_nccl_comm()</span></code> would find a null
+pointer.</p>
+</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The communicator binding happens inside the C++ runtime <strong>after</strong> the process
+launches. <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> and <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code> must therefore be set <strong>before</strong>
+the process starts (TRT’s internal <code class="docutils literal notranslate"><span class="pre">libLoader</span></code> calls <code class="docutils literal notranslate"><span class="pre">dlopen(&quot;libnccl.so&quot;)</span></code> at
+startup). <code class="docutils literal notranslate"><span class="pre">torchtrtrun</span></code> handles this automatically.</p>
+</div>
+</section>
+<hr class="docutils" />
+<section id="path-2-trt-llm-plugin-trt-10-16">
+<h3>Path 2: TRT-LLM Plugin (TRT &lt; 10.16)<a class="headerlink" href="#path-2-trt-llm-plugin-trt-10-16" title="Link to this heading">#</a></h3>
+<p>Used automatically when native TRT collectives are not available. Requires:</p>
+<ul class="simple">
+<li><p>The TRT-LLM plugin library (<code class="docutils literal notranslate"><span class="pre">libnvinfer_plugin_tensorrt_llm.so</span></code>)</p></li>
+<li><p>Either <code class="docutils literal notranslate"><span class="pre">TRTLLM_PLUGINS_PATH=/path/to/lib</span></code> set in the environment, or
+<code class="docutils literal notranslate"><span class="pre">USE_TRTLLM_PLUGINS=1</span></code> (downloads the TRT-LLM distribution automatically)</p></li>
+</ul>
+<p>The same <code class="docutils literal notranslate"><span class="pre">fuse_distributed_ops</span></code> lowering pass runs, but the converter calls
+TRT-LLM’s plugin API instead of <code class="docutils literal notranslate"><span class="pre">add_dist_collective()</span></code>. The runtime behaviour and
+<code class="docutils literal notranslate"><span class="pre">requires_native_multidevice</span></code> flag are identical.</p>
+</section>
+<hr class="docutils" />
+<section id="path-3-pytorch-fallback">
+<h3>Path 3: PyTorch Fallback<a class="headerlink" href="#path-3-pytorch-fallback" title="Link to this heading">#</a></h3>
+<p>If neither backend is available, the <code class="docutils literal notranslate"><span class="pre">_c10d_functional</span></code> ops are not registered as TRT
+converters and remain outside the TRT subgraph. They execute in PyTorch on every call.
+This produces correct results but loses the performance benefit of in-engine collectives.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Compile with <code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace=True</span></code> regardless of which backend is
+active. Without it, the FX tracer may not see the collective ops at all.</p>
+</div>
+</section>
+<hr class="docutils" />
+<section id="confirming-the-active-backend">
+<h3>Confirming the active backend<a class="headerlink" href="#confirming-the-active-backend" title="Link to this heading">#</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+
+<span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">native_trt_collectives</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Native TRT DistCollective (TRT 10.16+)&quot;</span><span class="p">)</span>
+<span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">trtllm_for_nccl</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;TRT-LLM plugin&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;PyTorch fallback — collectives will NOT be inside the TRT engine&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="process-group-management-and-teardown">
+<h2>Process Group Management and Teardown<a class="headerlink" href="#process-group-management-and-teardown" title="Link to this heading">#</a></h2>
+<section id="torch-tensorrt-distributed-distributed-context-group-module-none">
+<h3><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.distributed.distributed_context(group,</span> <span class="pre">module=None)</span></code><a class="headerlink" href="#torch-tensorrt-distributed-distributed-context-group-module-none" title="Link to this heading">#</a></h3>
+<p>The <strong>recommended</strong> way to manage the NCCL lifecycle for distributed TRT
+engines.  This context manager:</p>
+<ol class="arabic simple">
+<li><p><strong>On enter</strong> — sets the active process group and pins it on all TRT engines
+in <em>module</em> (both submodule and inlined engine storage patterns).</p></li>
+<li><p><strong>During the block</strong> — inference uses the specified NCCL communicator.</p></li>
+<li><p><strong>On exit</strong> — calls <code class="docutils literal notranslate"><span class="pre">release_nccl_comm()</span></code> on every tracked multi-device
+engine, detaching the NCCL communicator from TRT’s execution context.  This
+makes <code class="docutils literal notranslate"><span class="pre">dist.destroy_process_group()</span></code> safe to call afterward.</p></li>
+</ol>
+<p><em>module</em> may be a single compiled module, a list of modules, or omitted:</p>
+<p><strong>Single module</strong> — yields the module as the context value:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>  <span class="c1"># warmup — triggers engine build</span>
+<span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">group</span><span class="o">.</span><span class="n">WORLD</span><span class="p">,</span> <span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">model</span><span class="p">:</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>
+
+<span class="n">dist</span><span class="o">.</span><span class="n">destroy_process_group</span><span class="p">()</span>
+<span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Multiple modules</strong> — pass a list; yields a list in the same order.  Useful
+when you have separately compiled programs (e.g. an encoder and a decoder)
+that both need NCCL teardown:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span>
+    <span class="n">tp_group</span><span class="p">,</span> <span class="p">[</span><span class="n">encoder_trt</span><span class="p">,</span> <span class="n">decoder_trt</span><span class="p">]</span>
+<span class="p">)</span> <span class="k">as</span> <span class="p">(</span><span class="n">enc</span><span class="p">,</span> <span class="n">dec</span><span class="p">):</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">dec</span><span class="p">(</span><span class="n">enc</span><span class="p">(</span><span class="n">inp</span><span class="p">))</span>
+
+<span class="n">dist</span><span class="o">.</span><span class="n">destroy_process_group</span><span class="p">()</span>
+<span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Non-default TP subgroup</strong> (e.g. tensor-parallel inside a data-parallel job):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">tp_group</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">new_group</span><span class="p">(</span><span class="n">ranks</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">tp_group</span><span class="p">,</span> <span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">model</span><span class="p">:</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Without module</strong> — use at compile time when the model is created inside the
+block:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">tp_group</span><span class="p">):</span>
+    <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="torch-tensorrt-distributed-set-distributed-mode-group-module">
+<h3><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.distributed.set_distributed_mode(group,</span> <span class="pre">module)</span></code><a class="headerlink" href="#torch-tensorrt-distributed-set-distributed-mode-group-module" title="Link to this heading">#</a></h3>
+<p>Permanently pins <em>group</em> on all TRT engines in <em>module</em> without entering a
+context manager.  Use this when the group should remain set across multiple
+calls outside any <code class="docutils literal notranslate"><span class="pre">with</span></code> block:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">set_distributed_mode</span><span class="p">(</span><span class="n">tp_group</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+<span class="n">output1</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">inp1</span><span class="p">)</span>  <span class="c1"># group already pinned</span>
+<span class="n">output2</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">inp2</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">set_distributed_mode</span></code> pins the group but does <strong>not</strong> handle teardown.
+Prefer <code class="docutils literal notranslate"><span class="pre">distributed_context(group,</span> <span class="pre">module)</span></code> when you need safe cleanup.</p>
+</div>
+<p>Both APIs handle three engine storage patterns:</p>
+<ul class="simple">
+<li><p><strong>Submodule engines</strong> — <code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> children produced by
+<code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> or <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile()</span></code>.</p></li>
+<li><p><strong>Inlined engines</strong> — <code class="docutils literal notranslate"><span class="pre">torch.classes.tensorrt.Engine</span></code> objects stored as
+plain attributes on an <code class="docutils literal notranslate"><span class="pre">fx.GraphModule</span></code> after
+<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code> / <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.load()</span></code>.</p></li>
+<li><p><strong>torch.compile engines</strong> — engines inside dynamo’s code cache, tracked via
+a thread-local registry populated at engine creation time.</p></li>
+</ul>
+<p>For <code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code> (<code class="docutils literal notranslate"><span class="pre">use_python_runtime=True</span></code>), the group is
+read lazily from the active context on the first forward call, so
+<code class="docutils literal notranslate"><span class="pre">distributed_context</span></code> (without the <em>module</em> argument) is sufficient — keep the
+context manager active for the duration of inference.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Always end distributed scripts with</strong> <code class="docutils literal notranslate"><span class="pre">os._exit(0)</span></code> <strong>after</strong>
+<code class="docutils literal notranslate"><span class="pre">dist.destroy_process_group()</span></code>.</p>
+<p>TRT engines and CUDA contexts register C++ destructors that can race with
+Python’s garbage collector during normal interpreter shutdown, causing
+segfaults or hangs.  <code class="docutils literal notranslate"><span class="pre">os._exit(0)</span></code> bypasses the GC and exits immediately
+with a clean exit code, avoiding this entirely.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dist</span><span class="o">.</span><span class="n">destroy_process_group</span><span class="p">()</span>
+<span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># bypass Python GC — TRT/CUDA destructors race during shutdown</span>
+</pre></div>
+</div>
+<p>This applies to all distributed workflows: <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>, export/load,
+and multinode.  It is safe because all meaningful work has completed before
+this point.</p>
+</div>
+</section>
 </section>
 <hr class="docutils" />
 <section id="compilation-settings-for-distributed-workloads">
@@ -710,18 +1161,30 @@ example for a Llama-style model with NCCL collective ops compiled end-to-end.</p
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
-<td><p>Use <code class="docutils literal notranslate"><span class="pre">aot_autograd</span></code> for tracing instead of the default path. Required when the
-model contains DTensor or other distributed tensors.</p></td>
+<td><p>Use <code class="docutils literal notranslate"><span class="pre">aot_autograd</span></code> for tracing instead of the default <code class="docutils literal notranslate"><span class="pre">torch._dynamo</span></code> path.
+<strong>Auto-enabled</strong> for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> when <code class="docutils literal notranslate"><span class="pre">dist.is_initialized()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">world_size</span> <span class="pre">&gt;</span> <span class="pre">1</span></code> — no explicit flag needed. Must be set manually when using
+<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile()</span></code> directly (e.g. AOT export workflows).</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">use_python_runtime</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> (auto)</p></td>
-<td><p>Use the Python runtime. Often set to <code class="docutils literal notranslate"><span class="pre">True</span></code> for tensor-parallel models that run
-inside an existing distributed process group.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code> (C++ runtime) is recommended for production. The C++ runtime handles
+NCCL via TRT’s native <code class="docutils literal notranslate"><span class="pre">DistCollective</span></code> layers. The Python runtime uses
+Python-level NCCL wrappers.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_explicit_typing</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
 <td><p>Respect dtypes set in model/inputs (recommended). Use <code class="docutils literal notranslate"><span class="pre">model.half()</span></code> or
-<code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code> for lower-precision workloads. <code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code> is <strong>deprecated</strong>.</p></td>
+<code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code> for lower-precision workloads. <code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code>
+is <strong>deprecated</strong> and must not be used alongside <code class="docutils literal notranslate"><span class="pre">use_explicit_typing</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">assume_dynamic_shape_support</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Set to <code class="docutils literal notranslate"><span class="pre">True</span></code> for dynamic sequence lengths in LLM generation loops.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_fp32_acc</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Use FP32 accumulation for FP16 models. Improves numerical accuracy.</p></td>
 </tr>
 </tbody>
 </table>
@@ -730,25 +1193,33 @@ inside an existing distributed process group.</p></td>
 <hr class="docutils" />
 <section id="launching-distributed-scripts">
 <h2>Launching Distributed Scripts<a class="headerlink" href="#launching-distributed-scripts" title="Link to this heading">#</a></h2>
-<p>Use <code class="docutils literal notranslate"><span class="pre">torchrun</span></code> to launch multi-GPU scripts:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># 4-GPU tensor-parallel job</span>
-torchrun<span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">4</span><span class="w"> </span>tensor_parallel_example.py
+<p><strong>Single node, multiple GPUs</strong> — use <code class="docutils literal notranslate"><span class="pre">torchrun</span></code> or <code class="docutils literal notranslate"><span class="pre">mpirun</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># torchrun</span>
+torchrun<span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">2</span><span class="w"> </span>tensor_parallel_llama_llm.py
 
-<span class="c1"># 2-node, 8-GPU data-parallel job</span>
-torchrun<span class="w"> </span>--nnodes<span class="o">=</span><span class="m">2</span><span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">4</span><span class="w"> </span>--rdzv_backend<span class="o">=</span>c10d<span class="w"> </span><span class="se">\</span>
-<span class="w">         </span>--rdzv_endpoint<span class="o">=</span><span class="nv">$MASTER_ADDR</span>:<span class="nv">$MASTER_PORT</span><span class="w"> </span>data_parallel_example.py
+<span class="c1"># mpirun</span>
+mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_llama_llm.py
+</pre></div>
+</div>
+<p><strong>Multiple nodes</strong> — use environment variables:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Node 0</span>
+<span class="nv">RANK</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="nv">WORLD_SIZE</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">MASTER_ADDR</span><span class="o">=</span>&lt;ip&gt;<span class="w"> </span><span class="nv">MASTER_PORT</span><span class="o">=</span><span class="m">29500</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>tensor_parallel_llama_multinode.py
+
+<span class="c1"># Node 1</span>
+<span class="nv">RANK</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">WORLD_SIZE</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">MASTER_ADDR</span><span class="o">=</span>&lt;ip&gt;<span class="w"> </span><span class="nv">MASTER_PORT</span><span class="o">=</span><span class="m">29500</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>tensor_parallel_llama_multinode.py
 </pre></div>
 </div>
 </section>
 <hr class="docutils" />
 <section id="examples">
 <h2>Examples<a class="headerlink" href="#examples" title="Link to this heading">#</a></h2>
-<p>The following complete examples are available in the Torch-TensorRT repository under
-<code class="docutils literal notranslate"><span class="pre">examples/distributed_inference/</span></code>:</p>
+<p>The following complete examples are available in the Torch-TensorRT repository:</p>
 <div class="pst-scrollable-table-container"><table class="table">
 <colgroup>
-<col style="width: 40.0%" />
-<col style="width: 60.0%" />
+<col style="width: 45.0%" />
+<col style="width: 55.0%" />
 </colgroup>
 <thead>
 <tr class="row-odd"><th class="head"><p>Script</p></th>
@@ -756,17 +1227,32 @@ torchrun<span class="w"> </span>--nnodes<span class="o">=</span><span class="m">
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">data_parallel_gpt2.py</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/distributed_inference/data_parallel_gpt2.py</span></code></p></td>
 <td><p>Data-parallel GPT-2 inference with Accelerate</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">data_parallel_stable_diffusion.py</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/distributed_inference/data_parallel_stable_diffusion.py</span></code></p></td>
 <td><p>Data-parallel Stable Diffusion with Accelerate</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tensor_parallel_simple_example.py</span></code></p></td>
-<td><p>Two-layer MLP with column / row parallel sharding</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/distributed_inference/tensor_parallel_simple_example.py</span></code></p></td>
+<td><p>Two-layer MLP with column / row parallel sharding (torch.compile)</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tensor_parallel_rotary_embedding.py</span></code></p></td>
-<td><p>Llama-3 RoPE module with NCCL collective ops</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/distributed_inference/tensor_parallel_rotary_embedding.py</span></code></p></td>
+<td><p>Tensor-parallel attention with rotary positional embeddings (RoPE)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/distributed_inference/test_multinode_nccl.py</span></code></p></td>
+<td><p>Multinode NCCL test (C++ and Python runtime)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/distributed_inference/test_multinode_export_save_load.py</span></code></p></td>
+<td><p>Export → save → load round-trip test for distributed engines</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tools/llm/tensor_parallel_llama_multinode.py</span></code></p></td>
+<td><p>Llama TP with torch.compile (multinode, C++ runtime)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tools/llm/tensor_parallel_llama_export.py</span></code></p></td>
+<td><p>Llama TP: export + save + load workflow (multinode)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tools/llm/tensor_parallel_qwen_multinode.py</span></code></p></td>
+<td><p>Qwen TP with torch.compile (multinode)</p></td>
 </tr>
 </tbody>
 </table>
@@ -794,11 +1280,11 @@ torchrun<span class="w"> </span>--nnodes<span class="o">=</span><span class="m">
       </div>
     </a>
     <a class="right-next"
-       href="complex_tensors.html"
+       href="../complex_numerics/index.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Complex Tensor Support</p>
+        <p class="prev-next-title">Complex Numerics</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -821,8 +1307,28 @@ torchrun<span class="w"> </span>--nnodes<span class="o">=</span><span class="m">
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#data-parallel-inference">Data Parallel Inference</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tensor-parallel-inference">Tensor Parallel Inference</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nccl-collective-ops-in-trt-graphs">NCCL Collective Ops in TRT Graphs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tensor-parallel-inference">Tensor Parallel Inference</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#workflow-1-torch-compile-jit">Workflow 1: torch.compile (JIT)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#workflow-2-torch-export-aot-with-save-load">Workflow 2: torch.export (AOT) with Save / Load</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-1-export-and-save">Step 1: Export and Save</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-2-load-and-run">Step 2: Load and Run</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#multinode-inference">Multinode Inference</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nccl-collective-ops-in-trt-engines">NCCL Collective Ops in TRT Engines</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#path-1-native-trt-distcollective-trt-10-16">Path 1: Native TRT DistCollective (TRT 10.16+)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#path-2-trt-llm-plugin-trt-10-16">Path 2: TRT-LLM Plugin (TRT &lt; 10.16)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#path-3-pytorch-fallback">Path 3: PyTorch Fallback</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#confirming-the-active-backend">Confirming the active backend</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#process-group-management-and-teardown">Process Group Management and Teardown</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-tensorrt-distributed-distributed-context-group-module-none"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.distributed.distributed_context(group,</span> <span class="pre">module=None)</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-tensorrt-distributed-set-distributed-mode-group-module"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.distributed.set_distributed_mode(group,</span> <span class="pre">module)</span></code></a></li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compilation-settings-for-distributed-workloads">Compilation Settings for Distributed Workloads</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#launching-distributed-scripts">Launching Distributed Scripts</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#examples">Examples</a></li>
