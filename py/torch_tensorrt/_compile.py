@@ -6,7 +6,18 @@ import logging
 import platform
 import warnings
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 
 import torch
 from torch_tensorrt._enums import dtype
@@ -534,23 +545,29 @@ def convert_method_to_trt_engine(
 
         from torch_tensorrt.dynamo.utils import prepare_inputs
 
-        if not isinstance(arg_inputs, collections.abc.Sequence):
-            arg_inputs = [arg_inputs]  # type: ignore
+        normalized_arg_inputs: Sequence[Any]
+        if isinstance(arg_inputs, collections.abc.Sequence):
+            normalized_arg_inputs = arg_inputs
+        else:
+            normalized_arg_inputs = [arg_inputs]
 
         # Export the module
-        torchtrt_arg_inputs = prepare_inputs(arg_inputs)
+        torchtrt_arg_inputs = prepare_inputs(normalized_arg_inputs)
         torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
 
         exp_program = torch_tensorrt.dynamo.trace(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(
-            exp_program,
-            arg_inputs=tuple(arg_inputs),
-            kwarg_inputs=torchtrt_kwarg_inputs,
-            enabled_precisions=enabled_precisions_set,
-            **kwargs,
+        return cast(
+            bytes,
+            dynamo_convert_exported_program_to_serialized_trt_engine(
+                exp_program,
+                arg_inputs=tuple(normalized_arg_inputs),
+                kwarg_inputs=torchtrt_kwarg_inputs,
+                enabled_precisions=enabled_precisions_set,
+                **kwargs,
+            ),
         )
     elif target_ir == _IRType.torch_compile:
         raise RuntimeError(
@@ -722,6 +739,9 @@ def save(
 
                 - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes
                   parameter takes precedence.
+        kwargs: Additional format-specific kwargs. ``partitioners=`` is only used
+                with ``output_format="executorch"``; otherwise it is ignored with
+                a warning.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -745,6 +765,8 @@ def save(
 
     if kwarg_inputs and any(value is None for value in kwarg_inputs.values()):
         raise ValueError("kwargs should not include None.")
+
+    executorch_partitioners = kwargs.pop("partitioners", None)
 
     def _all_are_input_objects(obj: Any) -> bool:
         """Recursively check if all elements in nested collections are Input objects."""
@@ -805,8 +827,8 @@ def save(
                     f"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: {dynamic_shapes}"
                 )
 
-        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))  # type: ignore
-        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())  # type: ignore
+        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))
+        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())
 
     else:
         # Mixed case: some inputs are Tensors, some are Input objects
@@ -848,6 +870,11 @@ def save(
     if output_format not in accepted_formats:
         raise ValueError(
             f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript | aot_inductor | executorch"
+        )
+    if executorch_partitioners and output_format != "executorch":
+        logger.warning(
+            "partitioners= is only used with output_format='executorch' and will be "
+            f"ignored for output_format='{output_format}'."
         )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
@@ -911,7 +938,11 @@ def save(
                     package_path=file_path,
                 )
             elif output_format == "executorch":
-                _save_as_executorch(module, file_path)
+                _save_as_executorch(
+                    module,
+                    file_path,
+                    partitioners=executorch_partitioners,
+                )
             else:
                 raise RuntimeError(
                     "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
@@ -970,7 +1001,11 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
-                    _save_as_executorch(exp_program, file_path)
+                    _save_as_executorch(
+                        exp_program,
+                        file_path,
+                        partitioners=executorch_partitioners,
+                    )
                 else:
                     raise RuntimeError(
                         "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
@@ -1050,11 +1085,60 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
-                    _save_as_executorch(exp_program, file_path)
+                    _save_as_executorch(
+                        exp_program,
+                        file_path,
+                        partitioners=executorch_partitioners,
+                    )
                 else:
                     raise RuntimeError(
                         "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
                     )
+
+
+def _get_engine_info_from_state(engine_obj: Any) -> List[Any]:
+    """Normalize TensorRT engine state into the serialized engine-info list."""
+    state = engine_obj.__getstate__()
+    engine_info = state[0] if isinstance(state, tuple) else state
+    return list(engine_info)
+
+
+def _validate_executorch_engine_info(
+    engine_info: Sequence[Any], *, node_name: str = ""
+) -> None:
+    """Reject engine configurations unsupported by the ExecuTorch export path."""
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        REQUIRES_OUTPUT_ALLOCATOR_IDX,
+    )
+
+    if (
+        len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
+        and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
+    ):
+        node_suffix = f" for node '{node_name}'" if node_name else ""
+        raise RuntimeError(
+            "ExecuTorch export does not support TensorRT engines that require "
+            "an output allocator (data-dependent output shapes)"
+            f"{node_suffix}."
+        )
+
+
+def _count_executorch_engine_nodes(exp_program: Any) -> int:
+    """Count TRT execute-engine nodes in an ExportedProgram."""
+    count = 0
+    for node in exp_program.graph_module.graph.nodes:
+        if node.op != "call_function":
+            continue
+        if node.target is torch.ops.tensorrt.execute_engine.default:
+            count += 1
+            continue
+        target = node.target
+        if (
+            hasattr(target, "_schema")
+            and target._schema.name == "tensorrt::no_op_placeholder_for_execute_engine"
+        ):
+            count += 1
+    return count
 
 
 def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
@@ -1114,8 +1198,8 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
                 f"'{engine_node.op}'"
             )
 
-        engine_info = list(engine_obj.__getstate__())
-        engine_info = engine_info[0]
+        engine_info = _get_engine_info_from_state(engine_obj)
+        _validate_executorch_engine_info(engine_info, node_name=node.name)
         # Ensure the engine bytes slot is a base64 string (no_op takes str args).
         engine_bytes = engine_info[ENGINE_IDX]
         if isinstance(engine_bytes, (bytes, bytearray)):
@@ -1160,17 +1244,33 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
         )
     try:
-        from executorch.exir import EdgeCompileConfig, to_edge_transform_and_lower
+        from executorch.exir import to_edge_transform_and_lower
     except ImportError:
         raise ImportError(
             "ExecuTorch is not installed. Please install it to use output_format='executorch'. "
             "See https://pytorch.org/executorch/stable/getting-started-setup.html"
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
-    from torch_tensorrt.executorch import TensorRTPartitioner
+    from torch_tensorrt.executorch import (
+        TensorRTPartitioner,
+        get_edge_compile_config,
+    )
 
-    extra_partitioners = kwargs.get("partitioners", [])
-    partitioners = [TensorRTPartitioner()] + extra_partitioners
+    extra_partitioners = kwargs.get("partitioners") or []
+    if not isinstance(extra_partitioners, (list, tuple)):
+        raise TypeError(
+            "partitioners must be a list or tuple when using "
+            "output_format='executorch'"
+        )
+    partitioners = [TensorRTPartitioner()] + list(extra_partitioners)
+
+    engine_count = _count_executorch_engine_nodes(exp_program)
+    if engine_count > 1:
+        logger.warning(
+            "%d TRT engines detected. Multi-engine .pte exports can incur extra "
+            "delegate boundary overhead.",
+            engine_count,
+        )
 
     # Replace execute_engine nodes (ScriptObject arg) with no_op_placeholder_for_execute_engine
     # (string args only) before to_edge_transform_and_lower runs ExportPass subclasses that
@@ -1180,7 +1280,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     edge_program = to_edge_transform_and_lower(
         exp_program,
         partitioner=partitioners,
-        compile_config=EdgeCompileConfig(_check_ir_validity=False),
+        compile_config=get_edge_compile_config(),
     )
     executorch_program = edge_program.to_executorch()
     with open(file_path, "wb") as f:

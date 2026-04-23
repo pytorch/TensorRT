@@ -9,6 +9,7 @@ set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/execute_engine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/register_jit_hooks.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Platform.cpp"
 )
 
@@ -46,3 +47,7 @@ endif(NOT WIN32)
 
 # Install
 install(FILES ${HEADER_FILES} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/torch_tensorrt/core/runtime")
+
+if(BUILD_TORCHTRT_EXECUTORCH)
+    add_subdirectory(executorch)
+endif()

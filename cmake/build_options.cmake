@@ -24,3 +24,5 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
                                                      ${VALID_BUILD_TYPES})
     endif()
 endif()
+
+option(BUILD_TORCHTRT_EXECUTORCH "Build the ExecuTorch TensorRT backend and example runner" OFF)

@@ -35,8 +35,6 @@ __tensorrt_llm_version__: str = "0.0"
 LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 # CI_PIPELINE_ID is the environment variable set by DLFW ci build
 IS_DLFW_CI = os.environ.get("CI_PIPELINE_ID") is not None
-# TODO: remove this in future, this is just for test executorch which try to use whatever torch version executorch uses
-IS_DLFW_CI = True
 
 
 def get_root_dir() -> Path:
@@ -100,6 +98,7 @@ LEGACY = False
 RELEASE = False
 CI_BUILD = False
 USE_TRT_RTX = False
+
 
 if "--use-rtx" in sys.argv:
     USE_TRT_RTX = True
@@ -261,11 +260,44 @@ def build_libtorchtrt_cxx11_abi(
         else:
             cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
 
+    env = os.environ.copy()
+    if "TORCH_PATH" not in env:
+        stable_torch_path = resolve_torch_path()
+        if stable_torch_path is not None:
+            env["TORCH_PATH"] = stable_torch_path
+            print(f"Using TORCH_PATH={stable_torch_path}")
+
     print(f"building libtorchtrt {cmd=}")
-    status_code = subprocess.run(cmd).returncode
+    status_code = subprocess.run(cmd, env=env).returncode
 
     if status_code != 0:
         sys.exit(status_code)
+
+
+def resolve_torch_path():
+    explicit_torch_path = os.environ.get("TORCH_PATH")
+    if explicit_torch_path:
+        return explicit_torch_path
+
+    version_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    for env_var in ("CONDA_PREFIX", "VIRTUAL_ENV"):
+        prefix = os.environ.get(env_var)
+        if not prefix:
+            continue
+
+        candidate = os.path.join(prefix, "lib", version_dir, "site-packages", "torch")
+        if os.path.isdir(os.path.join(candidate, "include", "c10")) and os.path.isdir(
+            os.path.join(candidate, "lib")
+        ):
+            return candidate
+
+    torch_path = os.path.dirname(torch.__file__)
+    if os.path.isdir(os.path.join(torch_path, "include", "c10")) and os.path.isdir(
+        os.path.join(torch_path, "lib")
+    ):
+        return torch_path
+
+    return None
 
 
 def gen_version_file():
@@ -401,8 +433,8 @@ class EditableWheelCommand(editable_wheel):
             editable_wheel.run(self)
         else:
             build_libtorchtrt_cxx11_abi(develop=True, rt_only=NO_TS)
-            gen_version_file()
             copy_libtorchtrt(rt_only=NO_TS)
+            gen_version_file()
             editable_wheel.run(self)
 
 
@@ -789,7 +821,10 @@ def get_x86_64_requirements(base_requirements):
     if IS_DLFW_CI:
         return requirements
     else:
-        requirements = requirements + ["torch>=2.12.0.dev,<2.13.0"]
+        requirements = requirements + [
+            "torch>=2.12.0.dev,<2.13.0",
+            "executorch>=1.3.0.dev,<1.4.0",
+        ]
         if USE_TRT_RTX:
             return requirements + [
                 "tensorrt_rtx>=1.4.0.76",
@@ -858,4 +893,5 @@ setup(
     include_package_data=False,
     package_data=package_data,
     exclude_package_data=exclude_package_data,
+    extras_require={"executorch": ["executorch>=1.2.0"]},
 )

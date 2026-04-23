@@ -101,13 +101,16 @@ cc_library(
 
 cc_library(
     name = "caffe2",
+    # buildifier: disable=constant-glob
     srcs = select({
-        ":windows": [
-            "lib/caffe2_nvrtc.lib",
-        ],
-        "//conditions:default": [
-            "lib/libcaffe2_nvrtc.so",
-        ],
+        ":windows": glob(
+            ["lib/caffe2_nvrtc.lib"],
+            allow_empty = True,
+        ),
+        "//conditions:default": glob(
+            ["lib/libcaffe2_nvrtc.so"],
+            allow_empty = True,
+        ),
     }),
     hdrs = glob(
         [

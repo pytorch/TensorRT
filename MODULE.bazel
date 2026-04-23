@@ -28,9 +28,11 @@ local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 
 local_executorch = use_repo_rule("//toolchains:local_executorch.bzl", "local_executorch")
 
-# Detect the locally installed ExecuTorch source tree at build time.
-# Set EXECUTORCH_PATH to the directory containing runtime/, extension/, cmake-out/.
-# Requires cmake-out/libexecutorch_core.a to be built first.
+# Detect ExecuTorch from the active Python environment (VIRTUAL_ENV / CONDA_PREFIX / PATH).
+# Supports both pip-installed wheel layout and source-tree layout.
+# Optional overrides:
+#   EXECUTORCH_PATH=/path/to/executorch
+#   EXECUTORCH_CORE_PATH=/path/to/libexecutorch_core.a
 local_executorch(name = "executorch")
 
 # External dependency for torch_tensorrt if you already have precompiled binaries.
@@ -84,13 +86,13 @@ local_torch(name = "libtorch")
 #    build_file = "third_party/libtorch/BUILD"
 #)
 
-# ExecuTorch source tree.  The repository root is the *parent* of the
-# executorch/ directory so that headers resolve as <executorch/runtime/...>.
-# Requires a cmake-out/ build inside the executorch source tree.
+# Explicit ExecuTorch override. The repository rule above is preferred.
+# If you use this manually, point the path either at the installed
+# ExecuTorch package root or a compatible source-tree root.
 #new_local_repository(
 #    name = "executorch",
 #    build_file = "@//third_party/executorch:BUILD",
-#    path = "/home/lanl/git/executorch",
+#    path = "/path/to/executorch",
 #)
 
 #new_local_repository(

@@ -6,7 +6,7 @@
  *
  * Serialization utilities shared by TRTEngine and register_jit_hooks.
  * Kept in a separate translation unit so that the ExecuTorch backend
- * (libtrt_executorch_backend.so) can link these without pulling in the
+ * can link these without pulling in the
  * TorchScript torch::class_ / TORCH_LIBRARY registrations in
  * register_jit_hooks.cpp, which would cause a duplicate-registration
  * crash when libtorchtrt.so is also loaded in the same process.

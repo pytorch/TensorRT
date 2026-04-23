@@ -10,9 +10,9 @@ as an ExecuTorch ``.pte`` file, which can be loaded by the ExecuTorch runtime
 
 Prerequisites
 -------------
-Install ExecuTorch before running this example::
+Install Torch-TensorRT with the ExecuTorch extra before running this example::
 
-    pip install executorch
+    pip install -e ".[executorch]"
 
 See https://pytorch.org/executorch/stable/getting-started-setup.html for details.
 """
@@ -21,8 +21,16 @@ See https://pytorch.org/executorch/stable/getting-started-setup.html for details
 # Imports and Model Definition
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+import argparse
+
 import torch
 import torch_tensorrt
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--model_path", default="model.pte", help="Path to save the .pte file"
+)
+args = parser.parse_args()
 
 
 class MyModel(torch.nn.Module):
@@ -58,10 +66,10 @@ with torch.no_grad():
     # when ExecuTorch's partitioner runs the graph.
     torch_tensorrt.save(
         trt_gm,
-        "model.pte",
+        args.model_path,
         output_format="executorch",
         arg_inputs=example_input,
         retrace=False,
     )
 
-    print("Saved model.pte successfully.")
+    print(f"Saved {args.model_path} successfully.")

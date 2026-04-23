@@ -55,22 +55,6 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "libtrt_executorch_backend.so",
-    srcs = [],
-    # Allow undefined symbols: ExecuTorch runtime functions (register_backend,
-    # find_backend, FreeableBuffer, …) are intentionally left unresolved at
-    # link time.  They are resolved at dlopen() time from
-    # libqnn_executorch_backend.so, which _portable_lib.so has already loaded
-    # into the process with RTLD_GLOBAL.
-    linkopts = ["-Wl,--allow-shlib-undefined"],
-    linkshared = True,
-    linkstatic = True,
-    deps = [
-        "//core/runtime/executorch:tensorrt_executorch_backend",
-    ],
-)
-
 pkg_files(
     name = "lib_pkg_files",
     srcs = ["torchtrt.dll"],

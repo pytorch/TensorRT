@@ -14,9 +14,9 @@ at execute() time based on the actual input shapes.
 
 Prerequisites
 -------------
-Install ExecuTorch before running this example::
+Install Torch-TensorRT with the ExecuTorch extra before running this example::
 
-    pip install executorch
+    pip install -e ".[executorch]"
 
 See https://pytorch.org/executorch/stable/getting-started-setup.html for details.
 """
@@ -25,8 +25,16 @@ See https://pytorch.org/executorch/stable/getting-started-setup.html for details
 # Imports and Model Definition
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+import argparse
+
 import torch
 import torch_tensorrt
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--model_path", default="model_dynamic.pte", help="Path to save the .pte file"
+)
+args = parser.parse_args()
 
 
 class MyModel(torch.nn.Module):
@@ -75,10 +83,10 @@ with torch.no_grad():
     # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     torch_tensorrt.save(
         trt_gm,
-        "model_dynamic.pte",
+        args.model_path,
         output_format="executorch",
         arg_inputs=opt_input,
         retrace=False,
     )
 
-    print("Saved model_dynamic.pte successfully.")
+    print(f"Saved {args.model_path} successfully.")

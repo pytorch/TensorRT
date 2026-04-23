@@ -23,11 +23,8 @@ cc_binary(
         "@executorch//:executorch_core",
         # FileDataLoader (extension/data_loader/file_data_loader.cpp).
         "@executorch//:executorch_file_data_loader",
-        # libqnn_executorch_backend.so — carries the 6 backend-registry symbols
-        # that TensorRTBackend.o leaves undefined (register_backend, vlogf, …).
-        # Also needed at runtime: load it with RTLD_GLOBAL before executing.
-        "@executorch//:executorch_runtime",
-        # Registers TensorRTBackend via static initialiser (alwayslink = True).
+        # Registers TensorRTBackend via static initialiser (alwayslink = True)
+        # and links it directly into the application binary.
         "//core/runtime/executorch:tensorrt_executorch_backend",
     ],
 )

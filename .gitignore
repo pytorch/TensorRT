@@ -82,3 +82,4 @@ coverage.xml
 *.pt2
 examples/torchtrt_aoti_example/torchtrt_aoti_example
 CLAUDE.md
+build-executorch/

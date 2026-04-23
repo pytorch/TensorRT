@@ -19,6 +19,36 @@ add_definitions(-DTORCH_VERSION_MAJOR=${Torch_VERSION_MAJOR})
 add_definitions(-DTORCH_VERSION_MINOR=${Torch_VERSION_MINOR})
 add_definitions(-DTORCH_VERSION_PATCH=${Torch_VERSION_PATCH})
 
+if(BUILD_TORCHTRT_EXECUTORCH)
+    if(NOT DEFINED EXECUTORCH_ROOT AND EXISTS "/home/lanl/git/executorch")
+        set(
+            EXECUTORCH_ROOT
+            "/home/lanl/git/executorch"
+            CACHE PATH "Path to the ExecuTorch source tree"
+        )
+    endif()
+
+    if(NOT DEFINED EXECUTORCH_ROOT OR EXECUTORCH_ROOT STREQUAL "")
+        message(FATAL_ERROR "BUILD_TORCHTRT_EXECUTORCH requires EXECUTORCH_ROOT to point to an ExecuTorch source tree")
+    endif()
+
+    if(NOT EXISTS "${EXECUTORCH_ROOT}/runtime")
+        message(FATAL_ERROR "EXECUTORCH_ROOT='${EXECUTORCH_ROOT}' is missing runtime/")
+    endif()
+
+    if(NOT DEFINED EXECUTORCH_CORE_LIBRARY)
+        set(
+            EXECUTORCH_CORE_LIBRARY
+            "${EXECUTORCH_ROOT}/cmake-out/libexecutorch_core.a"
+            CACHE FILEPATH "Path to the ExecuTorch static runtime library"
+        )
+    endif()
+
+    if(NOT EXISTS "${EXECUTORCH_CORE_LIBRARY}")
+        message(FATAL_ERROR "EXECUTORCH_CORE_LIBRARY='${EXECUTORCH_CORE_LIBRARY}' does not exist")
+    endif()
+endif()
+
 if (WITH_TESTS)
 	include(FetchContent)
 	include(${CMAKE_SOURCE_DIR}/third_party/googletest/googletest.cmake)

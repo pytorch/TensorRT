@@ -61,8 +61,8 @@ config_setting(
 
 # runtime_base: TRTEngine + device management + serialization utilities.
 # Does NOT include register_jit_hooks.cpp (TorchScript torch::class_ /
-# TORCH_LIBRARY registrations), so it can be linked into
-# libtrt_executorch_backend.so without causing a duplicate-registration
+# TORCH_LIBRARY registrations), so it can be linked into the static
+# ExecuTorch TensorRT backend without causing a duplicate-registration
 # crash when libtorchtrt.so is also loaded in the same process.
 cc_library(
     name = "runtime_base",

@@ -61,11 +61,9 @@ cc_library(
     name = "tensorrt_executorch_backend",
     srcs = ["TensorRTBackend.cpp"],
     hdrs = ["TensorRTBackend.h"],
-    # Use executorch_headers (no static link) so that register_backend /
-    # find_backend / FreeableBuffer etc. remain undefined symbols in the
-    # final libtrt_executorch_backend.so.  At runtime they are resolved from
-    # libqnn_executorch_backend.so, which _portable_lib.so loads with
-    # RTLD_GLOBAL, ensuring both share the same registry instance.
+    # Build the TensorRT backend as a static library. The final application
+    # links this target together with the ExecuTorch runtime it was compiled
+    # against, avoiding any runtime plugin/dlopen dependency.
     deps = [
         "//core/runtime:runtime_base",
         "//core/util:prelude",
