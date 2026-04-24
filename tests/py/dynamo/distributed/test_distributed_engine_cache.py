@@ -15,8 +15,11 @@ Run via torchrun:
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
+import time
+import unittest
 
 import torch
 import torch.distributed as dist
@@ -29,12 +32,24 @@ from torch.testing._internal.common_distributed import (
 from torch.testing._internal.common_utils import run_tests
 
 # ---------------------------------------------------------------------------
-# Multi-rank distributed caching test
+# Capability checks
+# ---------------------------------------------------------------------------
+
+
+def is_nccl_available() -> bool:
+    try:
+        return dist.is_nccl_available()
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Models
 # ---------------------------------------------------------------------------
 
 
 class SimpleModel(nn.Module):
-    """Small model for cache coordination testing."""
+    """Small model for cache coordination testing (no TP)."""
 
     def __init__(self):
         super().__init__()
@@ -46,66 +61,24 @@ class SimpleModel(nn.Module):
         return self.fc2(self.relu(self.fc1(x)))
 
 
-def _multirank_distributed_cache_test(
-    rank: int, world_size: int, device: torch.device, cache_dir: str
-) -> None:
-    """Test that distributed caching coordinates engine builds across ranks.
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
 
-    Compiles the same model on both ranks with cache_built_engines=True and
-    reuse_cached_engines=True. All ranks must use the same cache_dir for
-    filelock coordination to work.
 
-    Verifies:
-      1. Both ranks produce correct output
-      2. Cache directory has engine files
-      3. Second compile hits cache on both ranks
-    """
+def _clean_cache_dir(cache_dir: str, rank: int) -> None:
+    """Rank 0 cleans cache dir, all ranks wait then recreate."""
+    if rank == 0 and os.path.exists(cache_dir):
+        shutil.rmtree(cache_dir)
+    dist.barrier()
+    os.makedirs(cache_dir, exist_ok=True)
+
+
+def _compile_with_cache(model, cache_dir, use_distributed_mode_trace=False):
+    """Compile model with TRT + engine caching enabled."""
     import torch_tensorrt
 
-    torch.manual_seed(42)
-    model = SimpleModel().eval().to(device)
-    inp = torch.randn(2, 32, device=device)
-
-    # PyTorch reference
-    with torch.no_grad():
-        ref_output = model(inp)
-
-    # Phase 1: Compile with caching enabled
-    with torch.no_grad():
-        torch._dynamo.reset()
-        trt_model = torch.compile(
-            model,
-            backend="torch_tensorrt",
-            options={
-                "enabled_precisions": {torch.float32},
-                "use_python_runtime": False,
-                "min_block_size": 1,
-                "cache_built_engines": True,
-                "reuse_cached_engines": True,
-                "immutable_weights": False,
-                "engine_cache_dir": cache_dir,
-                "engine_cache_size": 1 << 30,
-            },
-        )
-        trt_output = trt_model(inp)
-
-    diff = (ref_output - trt_output).abs().max().item()
-    assert diff < 0.01, f"Rank {rank}: output mismatch, max diff={diff}"
-    print(f"[Rank {rank}] Compile + cache OK (max_diff={diff:.6f})", flush=True)
-
-    # Verify cache has files (ignore .lock files)
-    cache_files = [f for f in os.listdir(cache_dir) if not f.endswith(".lock")]
-    print(
-        f"[Rank {rank}] Cache dir has {len(cache_files)} entries: {cache_files[:5]}",
-        flush=True,
-    )
-    assert len(cache_files) > 0, f"Rank {rank}: cache dir is empty"
-
-    dist.barrier()
-
-    # Phase 2: Second compile — should hit cache on both ranks
-    torch._dynamo.reset()
-    trt_model2 = torch.compile(
+    return torch.compile(
         model,
         backend="torch_tensorrt",
         options={
@@ -115,23 +88,139 @@ def _multirank_distributed_cache_test(
             "cache_built_engines": True,
             "reuse_cached_engines": True,
             "immutable_weights": False,
+            "use_distributed_mode_trace": use_distributed_mode_trace,
             "engine_cache_dir": cache_dir,
             "engine_cache_size": 1 << 30,
         },
     )
+
+
+def _assert_cache_has_files(cache_dir: str, rank: int) -> int:
+    """Assert cache dir has engine files (ignoring .lock files)."""
+    cache_files = [f for f in os.listdir(cache_dir) if not f.endswith(".lock")]
+    assert len(cache_files) > 0, f"Rank {rank}: cache dir is empty"
+    return len(cache_files)
+
+
+# ---------------------------------------------------------------------------
+# Test logic
+# ---------------------------------------------------------------------------
+
+
+def _multirank_distributed_cache_test(
+    rank: int, world_size: int, device: torch.device, cache_dir: str
+) -> None:
+    """Test cache coordination with simple model (same weights on all ranks).
+
+    Phase 1: First compile — one rank builds, other loads from cache.
+    Phase 2: Second compile — both ranks load from cache (refit).
+    """
+    torch.manual_seed(42)
+    model = SimpleModel().eval().to(device)
+    inp = torch.randn(2, 32, device=device)
+
     with torch.no_grad():
+        ref_output = model(inp)
+
+    # Phase 1: compile + cache
+    torch._dynamo.reset()
+    trt_model = _compile_with_cache(model, cache_dir)
+    with torch.no_grad():
+        t0 = time.time()
+        trt_output = trt_model(inp)
+        build_time = time.time() - t0
+
+    diff = (ref_output - trt_output).abs().max().item()
+    assert diff < 0.01, f"Rank {rank}: output mismatch, max diff={diff}"
+    n_files = _assert_cache_has_files(cache_dir, rank)
+    print(
+        f"[Rank {rank}] Compile + cache OK "
+        f"(max_diff={diff:.6f}, build_time={build_time:.2f}s, cache_entries={n_files})",
+        flush=True,
+    )
+
+    dist.barrier()
+
+    # Phase 2: cache reuse
+    torch._dynamo.reset()
+    trt_model2 = _compile_with_cache(model, cache_dir)
+    with torch.no_grad():
+        t0 = time.time()
         trt_output2 = trt_model2(inp)
+        refit_time = time.time() - t0
 
     diff2 = (ref_output - trt_output2).abs().max().item()
     assert diff2 < 0.01, f"Rank {rank}: cached output mismatch, max diff={diff2}"
-    print(f"[Rank {rank}] Cache reuse OK (max_diff={diff2:.6f})", flush=True)
+    print(
+        f"[Rank {rank}] Cache reuse OK "
+        f"(max_diff={diff2:.6f}, refit_time={refit_time:.2f}s, "
+        f"speedup={build_time / max(refit_time, 0.001):.1f}x)",
+        flush=True,
+    )
+
+
+def _multirank_tp_cache_test(
+    rank: int, world_size: int, device: torch.device, cache_dir: str
+) -> None:
+    """Test cache coordination with TP-sharded model (different weights per rank).
+
+    Each rank holds ColwiseParallel/RowwiseParallel sharded weights.
+    Engine structure is identical — only weights differ.
+    One rank builds, other loads from cache and refits with its own weights.
+    """
+    from torch.distributed.device_mesh import init_device_mesh
+    from torch.distributed.tensor.parallel import (
+        ColwiseParallel,
+        RowwiseParallel,
+        parallelize_module,
+    )
+
+    mesh = init_device_mesh("cuda", (world_size,))
+
+    torch.manual_seed(42)
+    model = (
+        nn.Sequential(
+            nn.Linear(64, 128, bias=False),
+            nn.ReLU(),
+            nn.Linear(128, 64, bias=False),
+        )
+        .eval()
+        .to(device)
+    )
+
+    inp = torch.randn(2, 64, device=device)
+
+    with torch.no_grad():
+        ref_output = model(inp)
+
+    tp_plan = {"0": ColwiseParallel(), "2": RowwiseParallel()}
+    parallelize_module(model, mesh, tp_plan)
+
+    torch._dynamo.reset()
+    trt_model = _compile_with_cache(model, cache_dir, use_distributed_mode_trace=True)
+    with torch.no_grad():
+        trt_output = trt_model(inp)
+
+    diff = (ref_output - trt_output).abs().max().item()
+    assert diff < 0.05, f"Rank {rank}: TP output mismatch, max diff={diff}"
+    n_files = _assert_cache_has_files(cache_dir, rank)
+    print(
+        f"[Rank {rank}] TP compile + cache OK "
+        f"(max_diff={diff:.6f}, cache_entries={n_files})",
+        flush=True,
+    )
 
 
 # ---------------------------------------------------------------------------
-# Multi-rank pytest (MultiProcessTestCase)
+# pytest path (MultiProcessTestCase)
 # ---------------------------------------------------------------------------
 
 
+@unittest.skipIf(not is_nccl_available(), "NCCL not available")
+@unittest.skipIf(
+    not torch.cuda.is_available() or torch.cuda.device_count() < 2,
+    "Requires at least 2 GPUs",
+)
 class TestMultirankDistributedCache(MultiProcessTestCase):
     """Distributed engine cache tests as pytest-compatible MultiProcessTestCase."""
 
@@ -141,7 +230,8 @@ class TestMultirankDistributedCache(MultiProcessTestCase):
         super().setUp()
         self._spawn_processes()
 
-    def _init_dist(self) -> torch.device:
+    def _init_dist(self, cache_dir: str) -> torch.device:
+        """Initialize dist, clean cache, return device."""
         store = dist.FileStore(self.file_name, self.world_size)
         dist.init_process_group(
             backend="nccl",
@@ -151,16 +241,22 @@ class TestMultirankDistributedCache(MultiProcessTestCase):
         )
         local = self.rank % torch.cuda.device_count()
         torch.cuda.set_device(local)
-        dist.barrier()
+        _clean_cache_dir(cache_dir, self.rank)
         return torch.device(f"cuda:{local}")
 
     @requires_nccl()
-    @skip_if_lt_x_gpu(2)
     def test_distributed_cache_coordination(self) -> None:
         """Both ranks compile same model with caching — output matches reference."""
-        device = self._init_dist()
         cache_dir = tempfile.mkdtemp(prefix="trt_dist_cache_pytest_")
+        device = self._init_dist(cache_dir)
         _multirank_distributed_cache_test(self.rank, self.world_size, device, cache_dir)
+
+    @requires_nccl()
+    def test_tp_cache_coordination(self) -> None:
+        """TP-sharded model: one rank builds, other loads from cache + refits."""
+        cache_dir = tempfile.mkdtemp(prefix="trt_dist_tp_cache_pytest_")
+        device = self._init_dist(cache_dir)
+        _multirank_tp_cache_test(self.rank, self.world_size, device, cache_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -178,33 +274,44 @@ def _multirank_setup() -> tuple:
 
 
 def run_multirank_tests() -> None:
+    """Entry point for --multirank mode (called by torchrun workers)."""
     rank, world_size, device = _multirank_setup()
     print(f"[Rank {rank}/{world_size}] device={device}", flush=True)
 
-    # All ranks must share the same cache dir.
-    # Clean up from previous runs so filelock coordination is tested fresh.
-    import shutil
+    base_cache_dir = os.path.join(tempfile.gettempdir(), "trt_dist_cache_torchrun")
 
-    cache_dir = os.path.join(tempfile.gettempdir(), "trt_dist_cache_test_shared")
-    if rank == 0:
-        if os.path.exists(cache_dir):
-            shutil.rmtree(cache_dir)
-    dist.barrier()
-    os.makedirs(cache_dir, exist_ok=True)
+    tests = [
+        (
+            "simple_model_cache",
+            base_cache_dir + "_simple",
+            _multirank_distributed_cache_test,
+        ),
+        ("tp_model_cache", base_cache_dir + "_tp", _multirank_tp_cache_test),
+    ]
 
-    try:
-        _multirank_distributed_cache_test(rank, world_size, device, cache_dir)
-    except Exception as e:
-        print(f"[Rank {rank}] FAIL: {e}", flush=True)
-        import traceback
+    failed = []
+    for name, cache_dir, test_fn in tests:
+        _clean_cache_dir(cache_dir, rank)
+        dist.barrier()
+        try:
+            test_fn(rank, world_size, device, cache_dir)
+        except Exception as e:
+            failed.append((name, str(e)))
+            print(f"[Rank {rank}] FAIL {name}: {e}", flush=True)
+            import traceback
 
-        traceback.print_exc()
-        dist.destroy_process_group()
-        sys.exit(1)
+            traceback.print_exc()
 
     dist.barrier()
     dist.destroy_process_group()
-    print(f"[Rank {rank}] All distributed cache tests PASSED.", flush=True)
+
+    if failed:
+        print(f"[Rank {rank}] {len(failed)} test(s) FAILED:", flush=True)
+        for name, err in failed:
+            print(f"  - {name}: {err}", flush=True)
+        sys.exit(1)
+    else:
+        print(f"[Rank {rank}] All distributed cache tests PASSED.", flush=True)
 
 
 if __name__ == "__main__":
