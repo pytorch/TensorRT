@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import logging
-from functools import partial
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence
 
 import tensorrt as trt
@@ -10,12 +9,7 @@ import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
-from torch_tensorrt.distributed._distributed import (
-    is_distributed_caching_enabled,
-    signal_distributed_engine_build_complete,
-    wait_for_distributed_engine_build,
-)
-from torch_tensorrt.distributed._lock import DistributedFileLock
+from torch_tensorrt.distributed._distributed import is_distributed_caching_enabled
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings, settings_are_compatible
 from torch_tensorrt.dynamo.conversion._symbolic_shape_capture import (
@@ -275,33 +269,33 @@ def interpret_module_to_result(
         settings.cache_built_engines,
         settings.reuse_cached_engines,
     )
-    _build_lock = None
+    _lock: Optional[Any] = None
 
     if _distributed_caching:
+        import os as _os
+
+        from filelock import FileLock
+
         # is_distributed_caching_enabled guarantees engine_cache and hash_val are set.
         assert engine_cache is not None
         assert hash_val is not None
-        _build_lock = DistributedFileLock(engine_cache.engine_cache_dir, hash_val)
-        if _build_lock.acquire():
-            logger.info("Acquired engine build lock — this rank builds")
-        else:
-            logger.info("Lock held by another rank — polling for cached engine")
-            _pull_fn = partial(
-                pull_cached_engine,
-                hash_val,
-                module,
-                engine_cache,
-                settings,
-                inputs,
-                symbolic_shape_expressions,
-            )
-            cached: Optional[SerializedInterpreterResult] = (
-                wait_for_distributed_engine_build(
-                    _pull_fn, engine_cache.engine_cache_dir, hash_val
-                )
-            )
-            if cached is not None:
-                return cached
+
+        _lock_path = _os.path.join(engine_cache.engine_cache_dir, f".{hash_val}.lock")
+        _lock = FileLock(_lock_path, timeout=600)
+        _lock.acquire()
+
+        # Check cache again — another rank may have built while we waited
+        cached = pull_cached_engine(
+            hash_val,
+            module,
+            engine_cache,
+            settings,
+            inputs,
+            symbolic_shape_expressions,
+        )
+        if cached is not None:
+            _lock.release()
+            return cached
 
     output_dtypes = infer_module_output_dtypes(
         module, truncate_double=settings.truncate_double
@@ -348,9 +342,9 @@ def interpret_module_to_result(
                 hash_val, interpreter_result, engine_cache, settings, inputs
             )
 
-    # Signal other ranks that the engine is cached and ready
-    if _build_lock is not None and _build_lock.acquired:
-        signal_distributed_engine_build_complete(_build_lock)
+    # Release the filelock so other ranks can proceed
+    if _distributed_caching and _lock is not None:
+        _lock.release()
 
     serialized_engine = interpreter_result.engine.serialize()
     with io.BytesIO() as engine_bytes:
