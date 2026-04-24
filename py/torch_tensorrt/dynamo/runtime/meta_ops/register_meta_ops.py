@@ -3,55 +3,9 @@ import logging
 from typing import Any, Dict, List
 
 import torch
-from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
-    SERIALIZED_METADATA_IDX,
-)
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 logger = logging.getLogger(__name__)
-
-
-def _trt_metadata_blob(engine: Any) -> Any:
-    """Base64 pickle blob from engine metadata (fake/meta execution).
-
-    1) Call ``get_serialized_metadata()`` on the wrapper, then on ``real_obj``.
-    2) If missing (some C++ engines in tracing), read the same field from pickle state.
-    """
-    unwrapped = getattr(engine, "real_obj", None)
-
-    for obj in (engine, unwrapped):
-        if obj is None:
-            continue
-        get_meta = getattr(obj, "get_serialized_metadata", None)
-        if callable(get_meta):
-            return get_meta()
-
-    # C++ torch.classes.tensorrt.Engine: metadata lives in __getstate__()[0][SERIALIZED_METADATA_IDX]
-    for obj in (unwrapped, engine):
-        if obj is None:
-            continue
-        getstate = getattr(obj, "__getstate__", None)
-        if not callable(getstate):
-            continue
-        try:
-            outer = getstate()
-            packed = outer[0] if outer else None
-            if (
-                isinstance(packed, (list, tuple))
-                and len(packed) > SERIALIZED_METADATA_IDX
-            ):
-                blob = packed[SERIALIZED_METADATA_IDX]
-                if blob:
-                    return blob
-        except (TypeError, IndexError, AttributeError):
-            continue
-
-    raise RuntimeError("TensorRT meta kernel: could not read engine metadata")
-
-
-def _shape_info_from_trt_engine(engine: Any) -> Any:
-    metadata = TorchTensorRTModule.decode_metadata(_trt_metadata_blob(engine))
-    return metadata.get("inout_symexprs") if metadata else None
 
 
 def _apply_symbolic_shape_expressions(
@@ -245,9 +199,24 @@ def fake_tensorrt_execute_engine(
     Uses symbolic shape expressions captured at compile time to correctly infer
     output shapes while preserving symbolic SymInt relationships.
     """
-    shape_info = _shape_info_from_trt_engine(fake_trt_engine)
+
+    metadata = None
+    if hasattr(fake_trt_engine, "real_obj"):
+        # Wrapped C++ engine with real_obj
+        trt_engine = fake_trt_engine.real_obj
+        metadata = TorchTensorRTModule.decode_metadata(
+            trt_engine.get_serialized_metadata()
+        )
+    else:
+        metadata = TorchTensorRTModule.decode_metadata(
+            fake_trt_engine.get_serialized_metadata()
+        )
+
+    shape_info = metadata.get("inout_symexprs") if metadata else None
 
     if shape_info:
+        # Apply the symbolic shape expressions to create output fake tensors
+        # shape_info now contains both 'inputs' and 'outputs' keys
         return _apply_symbolic_shape_expressions(inputs, shape_info)
     else:
         raise RuntimeError(
@@ -354,6 +323,5 @@ def no_op_placeholder_for_execute_engine(
     serialized_resource_allocation_strategy: str,
 ) -> List[torch.Tensor]:
     raise RuntimeError(
-        "TensorRT engine placeholder reached eager execution; load this artifact with "
-        "torch_tensorrt.load() so placeholders are lowered to execute_engine."
+        "The saved model is cross compiled for windows in Linux, should only be loadded in Windows via torch_tensorrt.load_cross_compiled_exported_program() api."
     )
