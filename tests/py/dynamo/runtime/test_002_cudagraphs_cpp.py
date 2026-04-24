@@ -17,6 +17,10 @@ TRIALS = 5
     "Torch-TensorRT runtime is not available",
 )
 class TestCudagraphsCPP(TestCase):
+    def setUp(self):
+        # Ensure a clean cudagraphs state regardless of prior test ordering
+        torch_tensorrt.runtime.set_cudagraphs_mode(False)
+
     def tearDown(self):
         # Reset to default cuda graph mode after each test
         torch_tensorrt.runtime.set_cudagraphs_mode(False)

@@ -28,6 +28,8 @@ from torch._subclasses.fake_tensor import FakeTensor
 from torch._subclasses.fake_tensor import FakeScriptObject
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._sympy.numbers import int_oo
+
+from packaging import version
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -37,8 +39,6 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
-
-from packaging import version
 
 from .types import TRTDataType
 
@@ -98,6 +98,14 @@ if is_tensorrt_version_supported("7.0"):
         Frameworks.TORCH: torch.bool,
         Frameworks.TRT: trt.bool,
     }
+
+
+COMPLEX_TO_REAL_DTYPE: Dict[torch.dtype, torch.dtype] = {
+    torch.complex64: torch.float32,
+    torch.complex128: torch.float64,
+}
+
+COMPLEX_DTYPES: frozenset = frozenset(COMPLEX_TO_REAL_DTYPE)
 
 
 def unified_dtype_converter(
@@ -314,6 +322,20 @@ def prepare_inputs(
             return inputs
 
         elif isinstance(inputs, torch.Tensor):
+            if inputs.is_complex():
+                # Complex tensors are lowered to real tensors with an extra last
+                # dimension of size 2 (real, imag) by complex_graph_detection.
+                # Build an Input whose shape/dtype reflects the lowered representation
+                # while keeping the original complex tensor for tracing (torch.export
+                # needs the complex tensor to trace the model correctly).
+                real_view = torch.view_as_real(inputs.contiguous())
+                inp = Input.from_tensor(
+                    real_view, disable_memory_format_check=disable_memory_format_check
+                )
+                # Restore the original complex tensor so dynamo_trace can export
+                # the model with the correct input dtype.
+                inp.torch_tensor = inputs
+                return inp
             # Pass the tensor directly — torch.tensor() would create a full
             # data copy, which wastes GPU memory when torch.compile lifts
             # model parameters as graph inputs.
@@ -871,10 +893,13 @@ def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]
                 # Placeholder output (e.g. unused slot in flash attention return tuple)
                 pass
             elif isinstance(output_meta, (FakeTensor, torch.Tensor)):
-                if truncate_double and output_meta.dtype == torch.float64:
+                out_dtype = output_meta.dtype
+                if out_dtype in COMPLEX_TO_REAL_DTYPE:
+                    out_dtype = COMPLEX_TO_REAL_DTYPE[out_dtype]
+                if truncate_double and out_dtype == torch.float64:
                     output_dtypes.append(dtype.float32)
                 else:
-                    output_dtypes.append(dtype._from(output_meta.dtype))
+                    output_dtypes.append(dtype._from(out_dtype))
             elif isinstance(output_meta, torch.SymInt):
                 output_dtypes.append(dtype.int64)
         elif "tensor_meta" in output.meta:

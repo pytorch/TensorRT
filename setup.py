@@ -780,7 +780,7 @@ def get_sbsa_requirements(base_requirements):
         # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
         # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
         return requirements + [
-            "torch>=2.12.0.dev,<2.13.0",
+            "torch>=2.13.0.dev,<2.14.0",
             "tensorrt>=10.16.1,<10.17.0",
         ]
 
@@ -791,7 +791,7 @@ def get_x86_64_requirements(base_requirements):
     if IS_DLFW_CI:
         return requirements
     else:
-        requirements = requirements + ["torch>=2.12.0.dev,<2.13.0"]
+        requirements = requirements + ["torch>=2.13.0.dev,<2.14.0"]
         if USE_TRT_RTX:
             return requirements + [
                 "tensorrt_rtx>=1.4.0.76",

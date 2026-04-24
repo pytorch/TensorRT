@@ -22,6 +22,9 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.partitioning._global_partitioner import (
+    TorchTensorRTOperatorSupport,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,14 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
+
+        if TorchTensorRTOperatorSupport._has_complex_dtype(node):
+            # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            return False
 
         if (
             (node in CONVERTERS or node.op == "get_attr")
