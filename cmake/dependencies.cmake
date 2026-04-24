@@ -20,14 +20,6 @@ add_definitions(-DTORCH_VERSION_MINOR=${Torch_VERSION_MINOR})
 add_definitions(-DTORCH_VERSION_PATCH=${Torch_VERSION_PATCH})
 
 if(BUILD_TORCHTRT_EXECUTORCH)
-    if(NOT DEFINED EXECUTORCH_ROOT AND EXISTS "/home/lanl/git/executorch")
-        set(
-            EXECUTORCH_ROOT
-            "/home/lanl/git/executorch"
-            CACHE PATH "Path to the ExecuTorch source tree"
-        )
-    endif()
-
     if(NOT DEFINED EXECUTORCH_ROOT OR EXECUTORCH_ROOT STREQUAL "")
         message(FATAL_ERROR "BUILD_TORCHTRT_EXECUTORCH requires EXECUTORCH_ROOT to point to an ExecuTorch source tree")
     endif()

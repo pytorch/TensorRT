@@ -23,7 +23,7 @@ If your local ExecuTorch source tree lives outside the active Python
 environment, point builds at it explicitly:
 
 ```bash
-export EXECUTORCH_PATH=/home/lanl/git/executorch
+export EXECUTORCH_ROOT=/home/lanl/git/executorch
 ```
 
 ## Quickstart

@@ -1,13 +1,12 @@
 """Repository rule that locates ExecuTorch from a local source tree or Python installation.
 
 Discovery order:
-  1. EXECUTORCH_PATH env var  — absolute path to the ExecuTorch source/package directory
-  2. /home/lanl/git/executorch when present (local developer default)
-  3. VIRTUAL_ENV env var      — virtualenv / uv venv ($VIRTUAL_ENV/bin/python3)
-  4. CONDA_PREFIX env var     — conda environment ($CONDA_PREFIX/bin/python3)
-  5. .venv/bin/python3 relative to the workspace root (uv / virtualenv default)
-  6. venv/bin/python3 relative to the workspace root
-  7. python3 / python on PATH
+  1. EXECUTORCH_ROOT env var  — absolute path to the ExecuTorch source/package directory
+  2. VIRTUAL_ENV env var      — virtualenv / uv venv ($VIRTUAL_ENV/bin/python3)
+  3. CONDA_PREFIX env var     — conda environment ($CONDA_PREFIX/bin/python3)
+  4. .venv/bin/python3 relative to the workspace root (uv / virtualenv default)
+  5. venv/bin/python3 relative to the workspace root
+  6. python3 / python on PATH
 """
 
 def _find_python(ctx):
@@ -43,19 +42,14 @@ def _find_python(ctx):
 def _local_executorch_impl(ctx):
     # 1. Env-var override (takes priority over auto-detection).
     #    setup.py sets this when building via pip's isolated build environment.
-    et_dir_str = ctx.os.environ.get("EXECUTORCH_PATH", "").strip()
-
-    if not et_dir_str:
-        local_source_default = ctx.path("/home/lanl/git/executorch")
-        if local_source_default.exists:
-            et_dir_str = "/home/lanl/git/executorch"
+    et_dir_str = ctx.os.environ.get("EXECUTORCH_ROOT", "").strip()
 
     if not et_dir_str:
         python = _find_python(ctx)
         if not python:
             fail(
                 "Cannot locate a Python interpreter that has executorch installed. " +
-                "Either activate the project venv, or set EXECUTORCH_PATH to the " +
+                "Either activate the project venv, or set EXECUTORCH_ROOT to the " +
                 "executorch package directory (e.g. .venv/lib/pythonX.Y/site-packages/executorch).",
             )
         result = ctx.execute(
@@ -66,7 +60,7 @@ def _local_executorch_impl(ctx):
         et_dir_str = result.stdout.strip()
 
     if not et_dir_str:
-        fail("EXECUTORCH_PATH is empty. Set it or ensure executorch is installed in the active Python.")
+        fail("EXECUTORCH_ROOT is empty. Set it or ensure executorch is installed in the active Python.")
 
     et_dir = ctx.path(et_dir_str)
 
@@ -77,7 +71,7 @@ def _local_executorch_impl(ctx):
         fail(
             "executorch at '" + et_dir_str + "' is missing headers. " +
             "Expected include/executorch/ (wheel) or runtime/ (source). " +
-            "Install a full executorch package or set EXECUTORCH_PATH correctly.",
+            "Install a full executorch package or set EXECUTORCH_ROOT correctly.",
         )
 
     # Normalize to source layout so the static BUILD file always works.
@@ -126,7 +120,7 @@ def _local_executorch_impl(ctx):
 local_executorch = repository_rule(
     implementation = _local_executorch_impl,
     environ = [
-        "EXECUTORCH_PATH",
+        "EXECUTORCH_ROOT",
         "VIRTUAL_ENV",
         "CONDA_PREFIX",
     ],
