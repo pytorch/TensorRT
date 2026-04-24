@@ -10,6 +10,7 @@ This script illustrates Torch-TensorRT workflow with dynamo backend on popular L
 import argparse
 import copy
 import json
+import logging
 import os
 import timeit
 from contextlib import nullcontext
@@ -19,6 +20,9 @@ from contextlib import nullcontext
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
+# Quiet torch_tensorrt's default verbose output. `--debug` still re-enables
+# Debug-level logging during compile via torch_tensorrt.logging.debug().
+torch_tensorrt.logging.set_level(logging.ERROR)
 from modelopt.torch.quantization.utils import export_torch_mode
 from quantize_utils import (
     convert_linear_to_tensorrt_quantized,
@@ -31,8 +35,8 @@ from utils import (
     export_llm,
     generate,
     generate_with_static_cache,
-    record_stats,
-    time_generate,
+    record_stats_split,
+    time_generate_split,
 )
 
 DEVICE = torch.device("cuda:0")
@@ -66,8 +70,9 @@ def get_model(args):
             .eval()
             .cuda()
         )
-        # register SDPA variant for the model
-        # register_sdpa.enable_sdpa_converter(args.model, model.config)
+        # Keep SDPA as a single op (no decomposition) so static_v1/v2 KV cache
+        # passes can find attention nodes to splice KV inputs around.
+        register_sdpa.enable_sdpa_converter(args.model, model.config)
 
     hf_quant_config = load_quantization_config(args.model)
     if hf_quant_config:
@@ -296,20 +301,19 @@ if __name__ == "__main__":
                 model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
             )
             if args.benchmark:
-                pyt_timings = time_generate(
-                    generate,
+                pyt_results = time_generate_split(
                     model,
                     input_ids.clone(),
                     MAX_OUTPUT_SEQ_LENGTH,
                     tokenizer.eos_token_id,
                     iterations=args.iterations,
+                    use_cache=False,
                 )
-                pyt_stats = record_stats(
+                pyt_stats = record_stats_split(
                     "PyTorch",
-                    pyt_timings,
+                    pyt_results,
                     args.model_precision,
                     batch_size=args.batch_size,
-                    compile_time_s=None,
                 )
 
         if args.cache == "static_v1":
@@ -336,13 +340,13 @@ if __name__ == "__main__":
             )
 
             if args.benchmark:
-                trt_timings = time_generate(
-                    generate_with_static_cache,
+                trt_results = time_generate_split(
                     trt_model,
                     input_ids.clone(),
                     MAX_OUTPUT_SEQ_LENGTH,
                     tokenizer.eos_token_id,
                     iterations=args.iterations,
+                    use_cache=True,
                 )
         else:
             trt_gen_tokens = generate(
@@ -353,23 +357,22 @@ if __name__ == "__main__":
                 dynamic_seqlen_range=(1, MAX_OUTPUT_SEQ_LENGTH)
             )
             if args.benchmark:
-                trt_timings = time_generate(
-                    generate,
+                trt_results = time_generate_split(
                     trt_model,
                     input_ids.clone(),
                     MAX_OUTPUT_SEQ_LENGTH,
                     tokenizer.eos_token_id,
                     iterations=args.iterations,
-                    dynamic_seqlen_range=(1, MAX_OUTPUT_SEQ_LENGTH)
+                    use_cache=False,
+                    dynamic_seqlen_range=(1, MAX_OUTPUT_SEQ_LENGTH),
                 )
 
         if args.benchmark:
-            trt_stats = record_stats(
+            trt_stats = record_stats_split(
                 "TensorRT",
-                trt_timings,
+                trt_results,
                 args.model_precision,
                 batch_size=args.batch_size,
-                compile_time_s=None,
             )
 
         if not args.benchmark:

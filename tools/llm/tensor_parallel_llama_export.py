@@ -39,6 +39,13 @@ import torch.distributed as dist
 import torch.distributed.tensor._dtensor_spec
 import torch.utils._pytree
 
+from utils import (
+    generate,
+    generate_with_static_cache,
+    record_stats_split,
+    time_generate_split,
+)
+
 # DTensorSpec must be a pytree constant before torch.export traces a TP model.
 torch.utils._pytree.register_constant(
     torch.distributed.tensor._dtensor_spec.DTensorSpec
@@ -60,6 +67,7 @@ from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
 
 setup_nccl_for_torch_tensorrt()
 
+from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 logging.basicConfig(
@@ -67,6 +75,9 @@ logging.basicConfig(
     format=f"[Rank {rank}] %(levelname)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+# Quiet torch_tensorrt's default verbose output. `--debug` still re-enables
+# Debug-level logging during compile via torch_tensorrt.logging.debug().
+torch_tensorrt.logging.set_level(logging.ERROR)
 logger.info(f"dist init OK  rank={rank}/{world_size}  device={DEVICE}")
 
 
@@ -102,15 +113,22 @@ def generate_greedy(model, input_ids, max_len, eos_token_id):
     return seq
 
 
-def time_generate(model, input_ids, max_len, eos_token_id, iterations=5):
+def time_generate(generate_fn, model, input_ids, max_len, eos_token_id, iterations=5):
     """Measure end-to-end generation latency over multiple iterations."""
     timings = []
     for _ in range(iterations):
         start = timeit.default_timer()
-        generate_greedy(model, input_ids.clone(), max_len, eos_token_id)
+        generate_fn(model, input_ids.clone(), max_len, eos_token_id)
         torch.cuda.synchronize()
         timings.append(timeit.default_timer() - start)
     return timings
+
+
+def _pick_generate_fn(args):
+    """Pick the right greedy-decode helper based on the --cache flag."""
+    if args.cache in ("static_v1", "static_v2"):
+        return generate_with_static_cache
+    return generate
 
 
 def record_stats(backend, timings, precision, batch_size=1):
@@ -171,6 +189,9 @@ def get_exportable_model(args, rank, world_size):
             .eval()
             .to(DEVICE)
         )
+        # Keep SDPA as a single op so the TRT custom converter (and optional
+        # static KV cache lowering pass) can pattern-match it.
+        register_sdpa.enable_sdpa_converter(args.model, model.config)
 
     # Get the default process group name for NCCL all-reduce.
     default_pg = dist.distributed_c10d._get_default_group()
@@ -262,6 +283,13 @@ def export_and_save(input_ids, args):
             )
     logger.info("Export succeeded.")
 
+    # Importing these modules registers the static KV cache lowering passes
+    # via @_aten_lowering_pass. Must happen before torch_tensorrt.dynamo.compile.
+    if args.cache == "static_v1":
+        import static_cache_v1  # noqa: F401
+    elif args.cache == "static_v2":
+        import static_cache_v2  # noqa: F401
+
     logger.info("Compiling exported program with TRT (AOT) ...")
     with (
         torch_tensorrt.logging.debug()
@@ -308,11 +336,17 @@ def export_and_save(input_ids, args):
     logger.info("NCCL communicator eagerly initialized for export verification")
 
     # Verify
-    logger.info("Verifying compiled model ...")
-    with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16):
-        ref = _extract_logits(model(input_ids, position_ids=position_ids))
-        trt = _extract_logits(trt_model(input_ids, position_ids=position_ids))
-    logger.info(f"Max logit diff: {(ref.float() - trt.float()).abs().max().item():.6f}")
+    if args.cache:
+        # With KV cache, the engine takes (input_ids, position_ids, *kv_cache,
+        # start_idx, end_idx) and the reference model doesn't — logit
+        # comparison requires a separate KV-aware driver. Skip.
+        logger.info("Skipping logit-diff verify (KV cache enabled).")
+    else:
+        logger.info("Verifying compiled model ...")
+        with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16):
+            ref = _extract_logits(model(input_ids, position_ids=position_ids))
+            trt = _extract_logits(trt_model(input_ids, position_ids=position_ids))
+        logger.info(f"Max logit diff: {(ref.float() - trt.float()).abs().max().item():.6f}")
 
     # Save outside autocast — serialization doesn't need it and retrace=True
     # would fail (execute_engine has no AutocastCUDA kernel for torch.export).
@@ -354,7 +388,8 @@ def load_and_run(input_ids, tokenizer, args):
     logger.info("Engine loaded.")
 
     max_len = input_ids.shape[1] + args.num_tokens
-    loaded_tokens = generate_greedy(
+    gen_fn = _pick_generate_fn(args)
+    loaded_tokens = gen_fn(
         trt_model,
         input_ids.clone(),
         max_len,
@@ -387,6 +422,12 @@ if __name__ == "__main__":
         help="export: AOT compile + save engines | load: load engines + infer",
     )
     parser.add_argument("--save_dir", default="/tmp/llama_tp_engines")
+    parser.add_argument(
+        "--cache",
+        choices=["", "static_v1", "static_v2"],
+        default="",
+        help="KV cache lowering pass. '' disables cache (full-seq recompute).",
+    )
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--benchmark", action="store_true", help="Measure generation latency")
     parser.add_argument("--iterations", type=int, default=5, help="Benchmark iterations")
@@ -407,11 +448,13 @@ if __name__ == "__main__":
 
     trt_model = None
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+        gen_fn = _pick_generate_fn(args)
+
         if args.mode == "export":
             trt_model = export_and_save(input_ids.clone(), args)
 
             logger.info("Running freshly compiled model ...")
-            trt_tokens = generate_greedy(
+            trt_tokens = gen_fn(
                 trt_model,
                 input_ids.clone(),
                 max_len,
@@ -424,13 +467,15 @@ if __name__ == "__main__":
                     sys.stdout.flush()
             else:
                 # All ranks must participate in the benchmark loop.
-                trt_timings = time_generate(
+                use_cache = args.cache in ("static_v1", "static_v2")
+                trt_results = time_generate_split(
                     trt_model, input_ids.clone(), max_len,
                     tokenizer.eos_token_id, iterations=args.iterations,
+                    use_cache=use_cache,
                 )
                 if rank == 0:
-                    stats = record_stats(
-                        "TensorRT-TP (export)", trt_timings,
+                    stats = record_stats_split(
+                        "TensorRT-TP (export)", trt_results,
                         "FP16", batch_size=args.batch_size,
                     )
                     print("\n=========TensorRT-TP (export) PERFORMANCE============")
@@ -440,15 +485,17 @@ if __name__ == "__main__":
         elif args.mode == "load":
             trt_model, _ = load_and_run(input_ids, tokenizer, args)
             if args.benchmark:
-                # All ranks must participate — generate_greedy contains NCCL
+                # All ranks must participate — the decode loop contains NCCL
                 # all-reduce ops that require every rank to call in lockstep.
-                trt_timings = time_generate(
+                use_cache = args.cache in ("static_v1", "static_v2")
+                trt_results = time_generate_split(
                     trt_model, input_ids.clone(), max_len,
                     tokenizer.eos_token_id, iterations=args.iterations,
+                    use_cache=use_cache,
                 )
                 if rank == 0:
-                    stats = record_stats(
-                        "TensorRT-TP (load)", trt_timings,
+                    stats = record_stats_split(
+                        "TensorRT-TP (load)", trt_results,
                         "FP16", batch_size=args.batch_size,
                     )
                     print("\n=========TensorRT-TP (load) PERFORMANCE============")

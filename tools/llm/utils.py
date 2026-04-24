@@ -82,12 +82,11 @@ def get_zeroed_static_cache_inputs(
     kv_cache_inputs = placeholder_nodes[kv_start:kv_end]
     zeroed_kv_cache_inputs = []
     for input in kv_cache_inputs:
+        # Use the placeholder's traced device so TP ranks put each KV cache on
+        # the same GPU as the engine, not always cuda:0.
+        fake = input.meta["val"]
         zeroed_kv_cache_inputs.append(
-            torch.zeros(
-                input.meta["val"].shape,
-                dtype=input.meta["val"].dtype,
-                device=torch.device(device),
-            )
+            torch.zeros(fake.shape, dtype=fake.dtype, device=fake.device)
         )
 
     return tuple(zeroed_kv_cache_inputs)
@@ -189,14 +188,15 @@ def generate_with_static_cache(model, input_seq, max_output_seq_length, eos_toke
     """
     start_idx = 0
     end_idx = input_seq.shape[1]
-    position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
+    device = input_seq.device
+    position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).to(device)
     output_seq = input_seq.clone()
     # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
     num_tokens_generated = 0
     kv_cache = get_zeroed_static_cache_inputs(model)
     while end_idx < max_output_seq_length:
         position_ids = (
-            torch.tensor([[start_idx]], dtype=torch.int64).cuda()
+            torch.tensor([[start_idx]], dtype=torch.int64, device=device)
             if input_seq.shape[1] == 1
             else position_ids
         )
@@ -245,18 +245,182 @@ def generate_with_dynamic_cache(model, input_seq, max_output_seq_length, eos_tok
     return output_seq
 
 
+def _timed_generate_static_cache(model, input_seq, max_output_seq_length):
+    """One greedy-decode pass with static KV cache, splitting prefill (TTFT)
+    from decode timings. Mirrors `generate_with_static_cache` but with explicit
+    cuda.synchronize() bracketing — kept separate so the production helper
+    stays sync-free."""
+    prefill_tokens = input_seq.shape[1]
+    seq = input_seq.clone()
+    device = seq.device
+    start_idx, end_idx = 0, seq.shape[1]
+    position_ids = torch.arange(end_idx, device=device).unsqueeze(0)
+    kv_cache = get_zeroed_static_cache_inputs(model)
+
+    torch.cuda.synchronize()
+    t0 = timeit.default_timer()
+    out = model(seq, position_ids, *kv_cache, start_idx, end_idx)
+    torch.cuda.synchronize()
+    ttft = timeit.default_timer() - t0
+
+    logits, kv_cache = out[0], out[1:]
+    seq = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
+    start_idx, end_idx = end_idx, end_idx + 1
+
+    decode_tokens = 0
+    t1 = timeit.default_timer()
+    while end_idx < max_output_seq_length:
+        position_ids = torch.tensor([[start_idx]], dtype=torch.int64, device=device)
+        out = model(seq, position_ids, *kv_cache, start_idx, end_idx)
+        logits, kv_cache = out[0], out[1:]
+        seq = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
+        start_idx, end_idx = end_idx, end_idx + 1
+        decode_tokens += 1
+    torch.cuda.synchronize()
+    decode_time = timeit.default_timer() - t1
+
+    return {
+        "ttft_s": ttft,
+        "decode_s": decode_time,
+        "total_s": ttft + decode_time,
+        "prefill_tokens": prefill_tokens,
+        "decode_tokens": decode_tokens,
+    }
+
+
+def _timed_generate_no_cache(
+    model, input_seq, max_output_seq_length, dynamic_seqlen_range=None,
+):
+    """One greedy-decode pass without KV cache, splitting prefill/decode
+    timings. Mirrors `generate` but with explicit cuda.synchronize()
+    bracketing — kept separate so the production helper stays sync-free."""
+    prefill_tokens = input_seq.shape[1]
+    seq = input_seq.clone()
+    device = seq.device
+
+    def _pos(s):
+        if dynamic_seqlen_range is not None:
+            torch._dynamo.mark_dynamic(s, 1)
+        pos = torch.arange(s.shape[1], device=device).unsqueeze(0)
+        if dynamic_seqlen_range is not None:
+            torch._dynamo.mark_dynamic(pos, 1)
+        return pos
+
+    torch.cuda.synchronize()
+    t0 = timeit.default_timer()
+    outputs = model(seq, position_ids=_pos(seq))
+    torch.cuda.synchronize()
+    ttft = timeit.default_timer() - t0
+
+    logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
+    seq = torch.cat([seq, torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)], dim=-1)
+
+    decode_tokens = 0
+    t1 = timeit.default_timer()
+    while seq.shape[1] < max_output_seq_length:
+        outputs = model(seq, position_ids=_pos(seq))
+        logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
+        seq = torch.cat(
+            [seq, torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)], dim=-1
+        )
+        decode_tokens += 1
+    torch.cuda.synchronize()
+    decode_time = timeit.default_timer() - t1
+
+    return {
+        "ttft_s": ttft,
+        "decode_s": decode_time,
+        "total_s": ttft + decode_time,
+        "prefill_tokens": prefill_tokens,
+        "decode_tokens": decode_tokens,
+    }
+
+
+def time_generate_split(
+    model, input_seq, max_output_seq_length, eos_token_id,
+    iterations=5, warmup=3, use_cache=False, dynamic_seqlen_range=None,
+):
+    """Run greedy decode with split prefill/decode timing.
+
+    Warmup runs are not measured — they cover one-time per-engine costs like
+    cuBLAS heuristic search, TRT workspace allocation, and first-call NCCL
+    lazy init. Set warmup=0 to surface those costs.
+
+    dynamic_seqlen_range only applies to the no-cache path; it enables
+    torch._dynamo.mark_dynamic so a single TRT engine handles every step.
+    """
+    if use_cache:
+        for _ in range(warmup):
+            generate_with_static_cache(
+                model, input_seq.clone(), max_output_seq_length, eos_token_id,
+            )
+        return [
+            _timed_generate_static_cache(model, input_seq, max_output_seq_length)
+            for _ in range(iterations)
+        ]
+    for _ in range(warmup):
+        generate(
+            model, input_seq.clone(), max_output_seq_length, eos_token_id,
+            dynamic_seqlen_range=dynamic_seqlen_range,
+        )
+    return [
+        _timed_generate_no_cache(
+            model, input_seq, max_output_seq_length, dynamic_seqlen_range,
+        )
+        for _ in range(iterations)
+    ]
+
+
+def record_stats_split(backend, results, precision, batch_size=1):
+    """Per-stage stats for a split-timing benchmark: TTFT/TPOT plus three
+    throughput numbers — prefill tok/s, decode tok/s, and end-to-end tok/s."""
+    ttft_med = float(np.median([r["ttft_s"] for r in results]))
+    decode_med = float(np.median([r["decode_s"] for r in results]))
+    total_med = float(np.median([r["total_s"] for r in results]))
+    prefill_tokens = results[0]["prefill_tokens"]
+    decode_tokens = results[0]["decode_tokens"]
+    # +1 because the prefill call also emits one token
+    total_tokens = decode_tokens + 1
+    tpot_med = decode_med / decode_tokens if decode_tokens else float("nan")
+    decode_tps = (
+        batch_size * decode_tokens / decode_med if decode_tokens else float("nan")
+    )
+
+    return {
+        "Backend": backend,
+        "Model Precision": precision,
+        "Batch size": batch_size,
+        "Prefill tokens": prefill_tokens,
+        "Decode tokens": decode_tokens,
+        "TTFT (ms)": ttft_med * 1000,
+        "TPOT (ms)": tpot_med * 1000,
+        "Prefill (tok/s)": batch_size * prefill_tokens / ttft_med,
+        "Decode (tok/s)": decode_tps,
+        "E2E (tok/s)": batch_size * total_tokens / total_med,
+        "E2E-Latency (ms)": total_med * 1000,
+    }
+
+
 def time_generate(
     generate_fn, model, inputs, output_seq_length, eos_token_id, iterations=10,
-    dynamic_seqlen_range=None,
+    warmup=3, dynamic_seqlen_range=None,
 ):
     """
-    Measure the time for generating a sentence over certain number of iterations
+    Measure the time for generating a sentence over certain number of iterations.
+    Warmup iterations are not measured.
     """
     timings = []
+    extra_kwargs = (
+        {"dynamic_seqlen_range": dynamic_seqlen_range}
+        if dynamic_seqlen_range is not None
+        else {}
+    )
+    for _ in range(warmup):
+        _ = generate_fn(model, inputs, output_seq_length, eos_token_id, **extra_kwargs)
+    torch.cuda.synchronize()
     for _ in range(iterations):
         start_time = timeit.default_timer()
-        _ = generate_fn(model, inputs, output_seq_length, eos_token_id,
-                        dynamic_seqlen_range=dynamic_seqlen_range)
+        _ = generate_fn(model, inputs, output_seq_length, eos_token_id, **extra_kwargs)
         torch.cuda.synchronize()
         end_time = timeit.default_timer()
         timings.append(end_time - start_time)
