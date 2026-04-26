@@ -2,6 +2,10 @@ load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files([
+    "libexecutorch_core.a",
+])
+
 # Headers are normalized to source layout (runtime/, extension/) by local_executorch.bzl
 # regardless of whether the installation is a pip wheel or a source tree.
 cc_library(
