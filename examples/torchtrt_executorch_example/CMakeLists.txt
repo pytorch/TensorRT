@@ -22,12 +22,13 @@ target_sources(trt_executor_runner
         $<TARGET_OBJECTS:core_util>
         $<TARGET_OBJECTS:core_util_logging>
         $<TARGET_OBJECTS:core_runtime>
-        $<TARGET_OBJECTS:core_runtime_executorch_backend>
 )
 target_link_libraries(trt_executor_runner
     PRIVATE
         ${TORCH_LIBRARIES}
         "${EXECUTORCH_CORE_LIBRARY}"
+        -Wl,--whole-archive executorch_trt_backend -Wl,--no-whole-archive
+        CUDA::cudart
         TensorRT::nvinfer
         ${executorch_file_data_loader_lib}
 )

@@ -104,17 +104,65 @@ bazel build //examples/torchtrt_executorch_example:trt_executor_runner
 There is also a matching CMake path for local source builds:
 
 ```bash
+export EXECUTORCH_ROOT=/home/lanl/git/executorch
+export CMAKE_PREFIX_PATH=/home/lanl/miniconda3/envs/torch_tensorrt_py310/lib/python3.10/site-packages/torch/share/cmake
+
+# 1. Build the ExecuTorch runtime static library.
+cmake -S "${EXECUTORCH_ROOT}" -B "${EXECUTORCH_ROOT}/cmake-out" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=OFF \
+  -DEXECUTORCH_BUILD_PYBIND=OFF \
+  -DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON \
+  -DEXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR=ON \
+  -DEXECUTORCH_BUILD_EXTENSION_MODULE=ON
+cmake --build "${EXECUTORCH_ROOT}/cmake-out" --target executorch_core -j
+
+# 2. Configure Torch-TensorRT with ExecuTorch support.
 cmake -S . -B build-executorch \
   -DBUILD_TORCHTRT_EXECUTORCH=ON \
-  -DEXECUTORCH_ROOT=/home/lanl/git/executorch \
-  -DEXECUTORCH_CORE_LIBRARY=/home/lanl/git/executorch/cmake-out/libexecutorch_core.a
+  -DEXECUTORCH_ROOT="${EXECUTORCH_ROOT}" \
+  -DEXECUTORCH_CORE_LIBRARY="${EXECUTORCH_ROOT}/cmake-out/libexecutorch_core.a" \
+  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+
+# 3. Build the standalone ExecuTorch TensorRT backend archive.
+cmake --build build-executorch --target executorch_trt_backend -j
+
+# 4. Build the runtime-only runner binary.
 cmake --build build-executorch --target trt_executor_runner -j
 ```
+
+This produces:
+
+- `EXECUTORCH_ROOT/cmake-out/libexecutorch_core.a`
+- `build-executorch/lib/libexecutorch_trt_backend.a`
+- `build-executorch/bin/trt_executor_runner`
+
+The `trt_executor_runner` binary statically links the application code,
+ExecuTorch runtime integration, and the TensorRT ExecuTorch backend. It still
+depends on the TensorRT, CUDA, and LibTorch shared libraries present on the
+system, but it does not require the `torch_tensorrt` Python wheel at runtime.
 
 Use it with a generated `.pte` file:
 
 ```bash
 ./bazel-bin/examples/torchtrt_executorch_example/trt_executor_runner --model_path=/path/to/model.pte
 # or
-./build-executorch/examples/torchtrt_executorch_example/trt_executor_runner --model_path=/path/to/model.pte
+./build-executorch/bin/trt_executor_runner --model_path=/path/to/model.pte
 ```
+
+## Export vs Runtime
+
+Exporting a `.pte` file requires the Python packages:
+
+- `torch_tensorrt`
+- `executorch`
+
+For example:
+
+```bash
+python examples/torchtrt_executorch_example/export_static_shape.py --model_path=model.pte
+```
+
+Loading and executing that saved `.pte` file only requires
+`trt_executor_runner` plus the native TensorRT/CUDA/LibTorch dependencies. The
+Python `torch_tensorrt` wheel is not needed for inference.

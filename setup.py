@@ -525,6 +525,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.tools",
+    "torch_tensorrt.executorch",
     "torch_tensorrt.runtime",
 ]
 
@@ -561,6 +562,7 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
+    "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
 
@@ -827,7 +829,7 @@ def get_x86_64_requirements(base_requirements):
     else:
         requirements = requirements + [
             "torch>=2.13.0.dev,<2.14.0",
-            "executorch>=1.3.0.dev,<1.4.0",
+            "executorch>=1.2.0",
         ]
         if USE_TRT_RTX:
             return requirements + [
@@ -898,5 +900,4 @@ setup(
     include_package_data=False,
     package_data=package_data,
     exclude_package_data=exclude_package_data,
-    extras_require={"executorch": ["executorch>=1.2.0"]},
 )
