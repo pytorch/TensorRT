@@ -5,8 +5,9 @@ import logging
 import os
 import platform
 import warnings
-from typing import Any, Collection, List, Optional, Sequence, Union
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
+import sympy
 import torch
 from torch.export import ExportedProgram
 from torch.fx.node import Target
@@ -396,6 +397,7 @@ def cross_compile_for_windows(
         trt_arg_inputs,
         trt_kwarg_inputs,
         settings,
+        graph_signature=exported_program.graph_signature,
     )
     return trt_gm
 
@@ -782,6 +784,7 @@ def compile(
         trt_kwarg_inputs,
         settings,
         engine_cache,
+        graph_signature=exported_program.graph_signature,
     )
     return trt_gm
 
@@ -886,6 +889,91 @@ def _insert_complex_io_adapters(
         partitioned_module.recompile()
 
 
+def _build_user_symbol_bounds(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: dict[Any, Any],
+    graph_signature: torch.export.graph_signature.ExportGraphSignature,
+) -> Dict[sympy.Symbol, Tuple[int, int]]:
+    """Collect ``{sympy.Symbol: (min, max)}`` from user-supplied ``Input``s.
+
+    This is a *read-only* bridge between ``torch_tensorrt.Input`` (where the
+    user declares ``min_shape``/``max_shape``) and the partitioner's shape
+    reader (``extract_var_range_info``). Each sympy symbol that appears in a
+    top-level placeholder's ``meta["val"].shape`` is recorded once with the
+    corresponding ``(min_shape[d], max_shape[d])`` from the user-provided
+    dynamic ``Input``.
+
+    The map is consulted only to *fill* missing upper bounds (``int_oo`` /
+    unbounded) left by ``Dim.DYNAMIC``; the parent ``ShapeEnv`` is never
+    mutated. As a result, downstream consumers such as
+    :func:`torch_tensorrt.save(..., output_format="exported_program")` see
+    the original ``range_constraints`` from the exporter.
+    """
+    name_to_node = {n.name: n for n in gm.graph.nodes if n.op == "placeholder"}
+    placeholders = [name_to_node[name] for name in graph_signature.user_inputs]
+
+    in_spec = getattr(gm, "_in_spec", None)
+    assert in_spec is not None, "Exported graph module missing _in_spec"
+    flat_inputs = in_spec.flatten_up_to((list(sample_arg_inputs), sample_kwarg_inputs))
+
+    user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
+
+    for node, inp in zip(placeholders, flat_inputs):
+        if not (isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC):
+            continue
+        fake_val = node.meta.get("val")
+        if not isinstance(fake_val, torch.Tensor):
+            continue
+
+        min_shape = inp.shape["min_shape"]
+        max_shape = inp.shape["max_shape"]
+
+        if len(fake_val.size()) != len(min_shape):
+            raise ValueError(
+                f"Input '{node.target}' has {len(fake_val.size())} dimensions in "
+                f"the exported program, but the provided Input specifies "
+                f"{len(min_shape)} dimensions. Ensure Input.min_shape, "
+                f"Input.opt_shape, and Input.max_shape each have "
+                f"{len(fake_val.size())} entries."
+            )
+
+        for d, dim in enumerate(fake_val.size()):
+            if not isinstance(dim, torch.SymInt):
+                if min_shape[d] != dim or max_shape[d] != dim:
+                    raise ValueError(
+                        f"Input '{node.target}' dim {d} is static (size={int(dim)}) "
+                        f"in the exported program, but the provided Input has "
+                        f"min_shape[{d}]={min_shape[d]}, max_shape[{d}]={max_shape[d]}. "
+                        f"Static dimensions must be fixed."
+                    )
+                continue
+            expr = dim.node.expr
+            # Composite exprs (e.g. ``2*s0``) are recomputed by
+            # ``ShapeEnv.bound_sympy``; overriding them directly would lie.
+            if not isinstance(expr, sympy.Symbol):
+                logger.debug(
+                    "Input '%s' dim %d is a composite symbolic expression (%s) "
+                    "bounded by another dynamic dimension; its range will be "
+                    "derived from constituent symbols via bound_sympy.",
+                    node.target,
+                    d,
+                    expr,
+                )
+                continue
+            if expr in user_symbol_bounds:
+                continue
+            user_symbol_bounds[expr] = (int(min_shape[d]), int(max_shape[d]))
+            logger.debug(
+                "Recorded user-supplied bounds for %s: [%d, %d]",
+                expr,
+                int(min_shape[d]),
+                int(max_shape[d]),
+            )
+
+    return user_symbol_bounds
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -893,6 +981,7 @@ def compile_module(
     sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
+    graph_signature: Optional[torch.export.graph_signature.ExportGraphSignature] = None,
     *,
     _debugger_config: Optional[DebuggerConfig] = None,
 ) -> torch.fx.GraphModule:
@@ -924,6 +1013,20 @@ def compile_module(
             "fallback_data_dependent_ops runs data-dependent ops in PyTorch, which "
             "is incompatible with require_full_compilation=True; enable only one."
         )
+
+    # Build a read-only ``{sympy.Symbol: (min, max)}`` map from the user's
+    # sample ``Input`` objects. This is forwarded to the partitioner so that
+    # symbols whose upper bound is left unbounded by ``Dim.DYNAMIC`` get
+    # filled in with the user's declared bounds, *without* mutating the
+    # exporter's ``ShapeEnv.var_to_range`` (which preserves the original
+    # ``range_constraints`` on save / re-export).
+    if graph_signature is not None:
+        user_symbol_bounds = _build_user_symbol_bounds(
+            gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
+        )
+    else:
+        user_symbol_bounds = {}
+
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
 
@@ -1129,6 +1232,7 @@ def compile_module(
             submodule,
             profile_source_bounds=profile_source_bounds,
             num_profiles=num_profiles,
+            user_symbol_bounds=user_symbol_bounds,
         )
 
         assert submodule_inputs is not None
