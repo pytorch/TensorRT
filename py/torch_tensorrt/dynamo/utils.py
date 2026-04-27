@@ -406,9 +406,24 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
     return any(isinstance(dim, torch.SymInt) for dim in tensor)
 
 
-def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional[int]]:
+def extract_var_range_info(
+    symbolic_integer: torch.SymInt,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+) -> Dict[str, Optional[int]]:
     """
     This function returns the min, max, opt values of a symbolic integer.
+
+    Args:
+        symbolic_integer: The ``torch.SymInt`` whose range is being queried.
+        user_symbol_bounds: Optional read-only map from a top-level sympy symbol
+            to ``(min, max)`` bounds supplied by the user via
+            ``torch_tensorrt.Input``. These are used **only** to fill the gap
+            when the exporter's ``ShapeEnv`` reports an unbounded upper range
+            (``int_oo``). The exporter's bounds always win when they are
+            finite; the lower bound is intersected (``max(exporter_lower,
+            user_lower)``) so we never widen the exporter's 0/1 specialization
+            (e.g. ``lower == 2 -> 1``) to ``0`` when the user passes
+            ``min_shape=0``. ``ShapeEnv`` itself is never mutated.
     """
     node = symbolic_integer.node
     expr = node.expr
@@ -442,6 +457,23 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional
 
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
+
+    # If the exporter left this symbol with an unbounded upper range (i.e.
+    # the user used ``Dim.DYNAMIC`` without an explicit upper), fall back to
+    # the bounds the user supplied via ``torch_tensorrt.Input(min_shape=...,
+    # max_shape=...)``. Only fills the gap; never overrides a finite exporter
+    # max. The lower bound is intersected so the exporter's specialization
+    # (e.g. lower == 1) is preserved.
+    if (
+        max_val is None
+        and user_symbol_bounds
+        and isinstance(expr, sympy.Symbol)
+        and expr in user_symbol_bounds
+    ):
+        user_min, user_max = user_symbol_bounds[expr]
+        min_val = max(min_val, int(user_min))
+        max_val = int(user_max)
+
     min_max_opt: Dict[str, Optional[int]] = {}
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
