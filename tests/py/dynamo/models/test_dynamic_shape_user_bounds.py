@@ -365,9 +365,24 @@ def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
     }
     assertions.assertEqual(expected_constraints, reloaded_constraints)
 
-    # Sanity: the compiled engine must accept up to the user's max_shape.
-    big_input = torch.randn(8, 8, device="cuda")
-    trt_module(big_input)
+    # Sanity: the compiled engine must accept inputs across the user's
+    # declared profile - both at the lower edge (min_shape=1) and at the
+    # upper edge (max_shape=8).
+    trt_module(torch.randn(1, 8, device="cuda"))
+    trt_module(torch.randn(4, 8, device="cuda"))
+    trt_module(torch.randn(8, 8, device="cuda"))
+
+    # And it must REJECT inputs beyond max_shape, even though the model
+    # graph (exported with ``Dim.DYNAMIC``) is itself unbounded and could
+    # theoretically handle batch=16 in eager. The TRT engine's profile is
+    # the binding runtime envelope: ``Input(max_shape=8)`` is the user
+    # opting into a strict cap. If a user wants batch=16 they must either
+    # re-compile with ``max_shape>=16`` or omit ``max_shape`` (heuristic
+    # fallback). This pins down the contract to prevent regressions where
+    # ``Input.max_shape`` would silently widen back to the heuristic.
+    too_big = torch.randn(16, 8, device="cuda")
+    with assertions.assertRaises(Exception):
+        trt_module(too_big)
 
 
 if __name__ == "__main__":
