@@ -669,11 +669,23 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 for o, output_name in enumerate(self.output_names):
                     shape = self.output_allocator.shapes.get(output_name, None)
                     dtype = self.output_dtypes[o]
-                    output = (
-                        self.output_allocator.buffers.get(output_name, None)
-                        .clone()
-                        .detach()
-                    )
+                    buffer = self.output_allocator.buffers.get(output_name, None)
+                    if buffer is None or shape is None:
+                        # If `execute_async_v3` failed (e.g. TRT shape-inference
+                        # error), the OutputAllocator's `reallocate_output`
+                        # callback never fires and the buffer/shape stays None.
+                        # Surface a clear error instead of crashing later with
+                        # `'NoneType' object has no attribute 'clone'`, which
+                        # hides the real TRT failure logged just above.
+                        raise RuntimeError(
+                            f"TensorRT OutputAllocator has no "
+                            f"{'buffer' if buffer is None else 'shape'} for "
+                            f"output '{output_name}'. This usually means "
+                            f"`context.execute_async_v3` failed; check the "
+                            f"TensorRT logger output above for the actual "
+                            f"error (e.g. shape-inference / reshape failures)."
+                        )
+                    output = buffer.clone().detach()
                     prod = int(torch.prod(torch.tensor(shape)))
                     # When using the OutputAllocator, the allocated buffer might be larger than the size of the output,
                     # so we need to reshape the buffer to the output shape

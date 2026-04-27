@@ -63,6 +63,13 @@ TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], Non
     Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
 )
 
+# Optional override for engine output binding names. When set to a list of
+# strings, the i-th marked output will be named OUTPUT_NAMES_OVERRIDE[i]
+# instead of the default "outputN". Useful when a downstream runtime expects
+# specific tensor names (e.g. TRT-Edge-LLM expects "logits",
+# "present_key_values_<i>", "hidden_states", ...). Reset to None when done.
+OUTPUT_NAMES_OVERRIDE: Optional[List[str]] = None
+
 
 class UnsupportedOperatorException(RuntimeError):
     pass
@@ -127,8 +134,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 + "\n".join(f"{i}" for i in missing_ops)
             )
 
+        # NOTE: TRT-Edge-LLM's LLMEngineRunner requires two optimization
+        # profiles (prefill = index 0, generation = index 1). Create two
+        # identical profiles here so both indices exist; placeholder() below
+        # writes the same min/opt/max shape into each profile.
         self.optimization_profiles: Optional[List[trt.IOptimizationProfile]] = (
-            [self.builder.create_optimization_profile()]
+            [
+                self.builder.create_optimization_profile(),
+                self.builder.create_optimization_profile(),
+            ]
             if any(
                 input_spec.shape_mode == Input._ShapeMode.DYNAMIC
                 for input_spec in input_specs
@@ -696,6 +710,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._input_names.append(target)
         current_input = self.input_specs[self.input_specs_iter]
         self.input_specs_iter += 1
+        # Use the user-provided Input.name (if set) as the engine binding name
+        # so callers can rename inputs (e.g. deepstack_visual_embeds_0 ->
+        # deepstack_embeds_0) without modifying the underlying model's forward
+        # signature.
+        binding_name = (
+            current_input.name
+            if getattr(current_input, "name", "")
+            else target
+        )
         # Set optimization profile for dynamic input shape
         shape = None
         if current_input.shape_mode == Input._ShapeMode.DYNAMIC:
@@ -710,14 +733,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if current_input.is_shape_tensor:
                 # For shape_tensors, min/opt/max_shapes correspond to actual values
                 # of the shapes provided during runtime
-                self.optimization_profiles[0].set_shape_input(
-                    target, min_shape, opt_shape, max_shape
-                )
+                for profile in self.optimization_profiles:
+                    profile.set_shape_input(
+                        binding_name, min_shape, opt_shape, max_shape
+                    )
                 shape.append(len(opt_shape))
             else:
-                self.optimization_profiles[0].set_shape(
-                    target, min_shape, opt_shape, max_shape
-                )
+                for profile in self.optimization_profiles:
+                    profile.set_shape(
+                        binding_name, min_shape, opt_shape, max_shape
+                    )
 
                 for i in range(len(min_shape)):
                     if min_shape[i] == opt_shape[i] == max_shape[i]:
@@ -738,11 +763,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         trt_input_dtype = current_input.dtype.to(trt.DataType, use_default=True)
         _LOGGER.debug(
-            f"Adding input to in-progress INetwork: {target} [shape={shape}, dtype={trt_input_dtype}]"
+            f"Adding input to in-progress INetwork: {binding_name} [shape={shape}, dtype={trt_input_dtype}]"
         )
 
         return self.ctx.net.add_input(
-            name=target,
+            name=binding_name,
             shape=tuple(shape),
             dtype=trt_input_dtype,
         )
@@ -839,6 +864,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
 
         marked_outputs_ids = []
+        marked_idx = 0
         for i, output in enumerate(outputs):
             # In some cases, the same output tensor may be marked multiple times, such as _to_copy,
             # so we skip marking if the output is already marked
@@ -846,7 +872,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 continue
             marked_outputs_ids.append(id(output))
 
-            name = f"output{i}"
+            if (
+                OUTPUT_NAMES_OVERRIDE is not None
+                and marked_idx < len(OUTPUT_NAMES_OVERRIDE)
+            ):
+                name = OUTPUT_NAMES_OVERRIDE[marked_idx]
+            else:
+                name = f"output{i}"
+            marked_idx += 1
 
             output_dtype = dtype.unknown
             if any(
