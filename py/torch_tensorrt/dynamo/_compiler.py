@@ -5,8 +5,9 @@ import logging
 import os
 import platform
 import warnings
-from typing import Any, Collection, List, Optional, Sequence, Union
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
+import sympy
 import torch
 from torch.export import ExportedProgram
 from torch.fx.node import Target
@@ -791,7 +792,7 @@ def _insert_complex_io_adapters(
       Outputs: insert view_as_complex before the output node for each originally-complex
                output that comes from a TRT block.
 
-    Leverages metadata that was captued when the complex rewriter pass was run
+    Leverages metadata that was captured when the complex rewriter pass was run
     """
     complex_input_names = gm.meta.get("complex_input_names", [])
     complex_input_dtypes = gm.meta.get("complex_input_dtypes", {})
@@ -875,6 +876,75 @@ def _insert_complex_io_adapters(
         partitioned_module.recompile()
 
 
+def _build_user_symbol_bounds(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: dict[Any, Any],
+) -> Dict[sympy.Symbol, Tuple[int, int]]:
+    """Collect ``{sympy.Symbol: (min, max)}`` from user-supplied ``Input``s.
+
+    This is a *read-only* bridge between ``torch_tensorrt.Input`` (where the
+    user declares ``min_shape``/``max_shape``) and the partitioner's shape
+    reader (``extract_var_range_info``). Each sympy symbol that appears in a
+    top-level placeholder's ``meta["val"].shape`` is recorded once with the
+    corresponding ``(min_shape[d], max_shape[d])`` from the user-provided
+    dynamic ``Input``.
+
+    The map is consulted only to *fill* missing upper bounds (``int_oo`` /
+    unbounded) left by ``Dim.DYNAMIC``; the parent ``ShapeEnv`` is never
+    mutated. As a result, downstream consumers such as
+    :func:`torch_tensorrt.save(..., output_format="exported_program")` see
+    the original ``range_constraints`` from the exporter.
+    """
+    placeholders = [n for n in gm.graph.nodes if n.op == "placeholder"]
+
+    sample_by_name: dict[str, Input] = {}
+    for i, node in enumerate(placeholders):
+        if i < len(sample_arg_inputs):
+            inp = sample_arg_inputs[i]
+            if isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC:
+                sample_by_name[node.target] = inp
+    for name, inp in sample_kwarg_inputs.items():
+        if isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC:
+            sample_by_name[name] = inp
+
+    user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
+    if not sample_by_name:
+        return user_symbol_bounds
+
+    for node in placeholders:
+        if node.target not in sample_by_name:
+            continue
+        sample_input = sample_by_name[node.target]
+        fake_val = node.meta.get("val")
+        if not isinstance(fake_val, torch.Tensor):
+            continue
+
+        min_shape = sample_input.shape["min_shape"]
+        max_shape = sample_input.shape["max_shape"]
+
+        for d, dim in enumerate(fake_val.size()):
+            if not isinstance(dim, torch.SymInt) or d >= len(min_shape):
+                continue
+            expr = dim.node.expr
+            # Only record bounds for plain symbols. Composite expressions
+            # (e.g. ``2*s0``) are reconstructed by ShapeEnv.bound_sympy and
+            # would be incorrect to override directly.
+            if not isinstance(expr, sympy.Symbol):
+                continue
+            if expr in user_symbol_bounds:
+                continue
+            user_symbol_bounds[expr] = (int(min_shape[d]), int(max_shape[d]))
+            logger.debug(
+                "Recorded user-supplied bounds for %s: [%d, %d]",
+                expr,
+                int(min_shape[d]),
+                int(max_shape[d]),
+            )
+
+    return user_symbol_bounds
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -905,6 +975,16 @@ def compile_module(
     dryrun_tracker = DryRunTracker()
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
+
+    # Build a read-only ``{sympy.Symbol: (min, max)}`` map from the user's
+    # sample ``Input`` objects. This is forwarded to the partitioner so that
+    # symbols whose upper bound is left unbounded by ``Dim.DYNAMIC`` get
+    # filled in with the user's declared bounds, *without* mutating the
+    # exporter's ``ShapeEnv.var_to_range`` (which preserves the original
+    # ``range_constraints`` on save / re-export).
+    user_symbol_bounds = _build_user_symbol_bounds(
+        gm, sample_arg_inputs, sample_kwarg_inputs
+    )
 
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
@@ -1087,7 +1167,9 @@ def compile_module(
         )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
-        submodule_inputs = partitioning.construct_submodule_inputs(submodule)
+        submodule_inputs = partitioning.construct_submodule_inputs(
+            submodule, user_symbol_bounds=user_symbol_bounds
+        )
 
         assert submodule_inputs is not None
 
