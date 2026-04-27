@@ -80,10 +80,6 @@ jobs:
           -DEXECUTORCH_BUILD_PORTABLE_OPS=OFF
         cmake --build "${EXECUTORCH_BUILD}" --target executorch_core -j"$(nproc)"
 
-        TORCH_CMAKE_PREFIX="$(python3 -c 'import torch; print(torch.utils.cmake_prefix_path)')"
-        cmake -S . -B build-executorch \
-          -DCMAKE_PREFIX_PATH="${TORCH_CMAKE_PREFIX}" \
-          -DBUILD_TORCHTRT_EXECUTORCH=ON \
-          -DEXECUTORCH_ROOT="${EXECUTORCH_SRC}" \
-          -DEXECUTORCH_CORE_LIBRARY="${EXECUTORCH_BUILD}/libexecutorch_core.a"
-        cmake --build build-executorch --target trt_executor_runner -j"$(nproc)"
+        export EXECUTORCH_ROOT="${EXECUTORCH_SRC}"
+        bazel build //:executorch_trt_backend --compilation_mode opt --config=linux
+        bazel build //:libtorchtrt_executorch --compilation_mode opt --config=linux

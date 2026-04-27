@@ -95,6 +95,11 @@ exit 1
 """,
 )
 
+alias(
+    name = "executorch_trt_backend",
+    actual = ":executorch_trt_backend_archive",
+)
+
 pkg_files(
     name = "executorch_lib_pkg_files",
     srcs = [
