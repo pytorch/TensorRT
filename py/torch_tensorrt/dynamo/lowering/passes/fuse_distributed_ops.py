@@ -33,6 +33,14 @@ def tensorrt_fused_nccl_reduce_scatter_op(
     )
 
 
+def tensorrt_fused_nccl_all_reduce_op(
+    inp: Any, reduce_op: str, group_name: str
+) -> torch.Tensor:
+    return torch.ops._c10d_functional.wait_tensor.default(
+        torch.ops._c10d_functional.all_reduce.default(inp, reduce_op, group_name)
+    )
+
+
 def fuse_distributed_ops(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
@@ -43,6 +51,7 @@ def fuse_distributed_ops(
             in (
                 torch.ops._c10d_functional.all_gather_into_tensor.default,
                 torch.ops._c10d_functional.reduce_scatter_tensor.default,
+                torch.ops._c10d_functional.all_reduce.default,
             )
             and len(node.users) == 1
             and list(node.users)[0].target
@@ -53,15 +62,24 @@ def fuse_distributed_ops(
                 with gm.graph.inserting_after(wait_tensor_node):
                     fused_node = gm.graph.create_node(
                         op="call_function",
-                        target=tensorrt_fused_nccl_all_gather_op,  # Define your custom fused function
+                        target=tensorrt_fused_nccl_all_gather_op,
                         args=(node.args[0], node.args[1], node.args[2]),
+                    )
+            elif (
+                node.target == torch.ops._c10d_functional.reduce_scatter_tensor.default
+            ):
+                with gm.graph.inserting_after(wait_tensor_node):
+                    fused_node = gm.graph.create_node(
+                        op="call_function",
+                        target=tensorrt_fused_nccl_reduce_scatter_op,
+                        args=(node.args[0], node.args[1], node.args[2], node.args[3]),
                     )
             else:
                 with gm.graph.inserting_after(wait_tensor_node):
                     fused_node = gm.graph.create_node(
                         op="call_function",
-                        target=tensorrt_fused_nccl_reduce_scatter_op,  # Define your custom fused function
-                        args=(node.args[0], node.args[1], node.args[2], node.args[3]),
+                        target=tensorrt_fused_nccl_all_reduce_op,
+                        args=(node.args[0], node.args[1], node.args[2]),
                     )
 
             wait_tensor_node.replace_all_uses_with(fused_node)

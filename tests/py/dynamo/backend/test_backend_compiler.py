@@ -78,8 +78,8 @@ class TestTRTModuleNextCompilation(TestCase):
         unexpected_ops = {torch.ops.aten.add.Tensor}
 
         inputs = [
-            torch.randint(-40, 40, (16, 7, 5), dtype=torch.int).cuda(),
-            torch.randint(1, 40, (16, 7, 5), dtype=torch.int).cuda(),
+            torch.randn(16, 7, 5, dtype=torch.float).cuda(),
+            torch.randn(16, 7, 5, dtype=torch.float).cuda(),
         ]
 
         (

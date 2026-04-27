@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
 
 logger = logging.getLogger(__name__)
 
@@ -144,10 +145,40 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         self.unsupported_operators: Dict[str, int] = {}
         self.torch_executed_ops: Collection[Target] = torch_executed_ops
 
+    @staticmethod
+    def _has_complex_dtype(node: torch.fx.Node) -> bool:
+        """Return True if the node output or any of its tensor inputs is complex-dtype.
+
+        TensorRT has no native complex-type support.  Any node that produces or
+        consumes a complex tensor must run in the PyTorch fallback so the graph
+        breaks naturally around it.
+
+        """
+
+        def _dtype(n: torch.fx.Node) -> Optional[torch.dtype]:
+            val = n.meta.get("val")
+            return getattr(val, "dtype", None) if val is not None else None
+
+        if _dtype(node) in COMPLEX_DTYPES:
+            return True
+        for arg in node.all_input_nodes:
+            if _dtype(arg) in COMPLEX_DTYPES:
+                return True
+        return False
+
     def is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
+
+        if self._has_complex_dtype(node):
+            # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
+            # so the graph breaks around the complex cluster inserted by complex_graph_detection.
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            return False
 
         if (
             (node in CONVERTERS or node.op == "get_attr")

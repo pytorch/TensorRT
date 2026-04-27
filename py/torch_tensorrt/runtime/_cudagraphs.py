@@ -81,8 +81,13 @@ class _CudagraphsContextManager(object):
             return get_cuda_graph_module(self.compiled_module)
 
     def __exit__(self, *args: Any) -> None:
-        # Set cudagraphs back to old mode
-        set_cudagraphs_mode(self.old_mode)
+        # Restore the exact integer mode (0=STANDARD, 1=SUBGRAPH, 2=WHOLE_GRAPH).
+        # Calling set_cudagraphs_mode(bool) would coerce 2 → 1 and can't restore
+        # WHOLE_GRAPH_CUDAGRAPHS, so we write the global and C++ op directly.
+        global _PY_RT_CUDAGRAPHS
+        _PY_RT_CUDAGRAPHS = self.old_mode
+        if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_cudagraphs_mode(self.old_mode)
         # __del__ is not entirely predictable, so we reset cudagraph here
         if self.cudagraphs_module:
             self.cudagraphs_module._reset_captured_graph()

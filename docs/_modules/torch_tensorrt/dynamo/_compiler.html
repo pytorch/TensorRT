@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3eb18c47"></script>
+    <script src="../../../_static/documentation_options.js?v=8cbdb921"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -568,6 +568,8 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -647,7 +649,9 @@ document.write(`
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
-<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
+<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
+<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
@@ -812,6 +816,8 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -845,11 +851,21 @@ document.write(`
                 <span class="sa">f</span><span class="s2">&quot;arg: </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> is not supported for cross compilation for windows feature, hence it is disabled.&quot;</span>
             <span class="p">)</span>
 
+    <span class="k">if</span> <span class="s2">&quot;runtime_cache_path&quot;</span> <span class="ow">in</span> <span class="n">compilation_options</span><span class="p">:</span>
+        <span class="n">compilation_options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;runtime_cache_path is a JIT-time API and is not applicable to cross compilation for windows. Ignoring.&quot;</span>
+        <span class="p">)</span>
+
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">,</span> <span class="n">decompose_attention</span><span class="p">)</span>
+        <span class="n">get_decompositions</span><span class="p">(</span>
+            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+            <span class="n">decompose_attention</span><span class="p">,</span>
+            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+        <span class="p">)</span>
     <span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
@@ -919,6 +935,8 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -1013,7 +1031,9 @@ document.write(`
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
-<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
+<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
+<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
@@ -1221,6 +1241,8 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -1253,7 +1275,11 @@ document.write(`
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">,</span> <span class="n">decompose_attention</span><span class="p">)</span>
+        <span class="n">get_decompositions</span><span class="p">(</span>
+            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+            <span class="n">decompose_attention</span><span class="p">,</span>
+            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+        <span class="p">)</span>
     <span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
@@ -1284,6 +1310,106 @@ document.write(`
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">trt_gm</span></div>
 
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_insert_complex_io_adapters</span><span class="p">(</span>
+    <span class="n">partitioned_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Insert view_as_real / view_as_complex boundary nodes for complex I/O.</span>
+
+<span class="sd">    complex_graph_detection rewrites complex subgraphs to real arithmetic before</span>
+<span class="sd">    partitioning, but when a model has complex inputs or outputs the outer wrapper</span>
+<span class="sd">    graph still needs adapters at the TRT block boundary:</span>
+
+<span class="sd">      Inputs:  insert view_as_real (+ optional cast for complex128+truncate_double)</span>
+<span class="sd">               after each placeholder that was unpacked by the rewriter.</span>
+<span class="sd">      Outputs: insert view_as_complex before the output node for each originally-complex</span>
+<span class="sd">               output that comes from a TRT block.</span>
+
+<span class="sd">    Leverages metadata that was captued when the complex rewriter pass was run</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">complex_input_names</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;complex_input_names&quot;</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">complex_input_dtypes</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;complex_input_dtypes&quot;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">complex_output_indices</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;complex_output_indices&quot;</span><span class="p">,</span> <span class="p">[])</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">complex_input_names</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">complex_output_indices</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># --- Input boundary: view_as_real for complex inputs ---</span>
+    <span class="c1"># complex_graph_detection renames complex placeholder &#39;foo&#39; to &#39;foo_unpacked_complex&#39;</span>
+    <span class="c1"># with float dtype. The outer graph still has &#39;foo_unpacked_complex&#39; as a placeholder,</span>
+    <span class="c1"># but the caller passes the original complex tensor. Insert view_as_real after</span>
+    <span class="c1"># each such placeholder so the graph unpacks it transparently.</span>
+    <span class="n">reshaped_names</span> <span class="o">=</span> <span class="p">{</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">_unpacked_complex&quot;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">complex_input_names</span><span class="p">}</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">&quot;placeholder&quot;</span> <span class="ow">or</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reshaped_names</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="n">real_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">view_as_real</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">node</span><span class="p">,)</span>
+            <span class="p">)</span>
+        <span class="c1"># For complex128 with truncate_double, the rewriter produced float32</span>
+        <span class="c1"># TRT engine inputs but view_as_real gives float64 — add an explicit cast.</span>
+        <span class="n">orig_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">[:</span> <span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;_unpacked_complex&quot;</span><span class="p">)]</span>
+        <span class="n">orig_dtype</span> <span class="o">=</span> <span class="n">complex_input_dtypes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">orig_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">orig_dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">complex128</span> <span class="ow">and</span> <span class="n">settings</span><span class="o">.</span><span class="n">truncate_double</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Input &#39;</span><span class="si">{</span><span class="n">orig_name</span><span class="si">}</span><span class="s2">&#39; is complex128 with truncate_double=True: unpacked &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;float64 components will be cast to float32.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">real_node</span><span class="p">):</span>
+                <span class="n">cast_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">to</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+                    <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">real_node</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span>
+                <span class="p">)</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">cast_node</span><span class="p">)</span>
+            <span class="n">cast_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">real_node</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+            <span class="n">real_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">node</span><span class="p">,)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Inserted view_as_real + cast-to-float32 for complex128 input placeholder &#39;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39; (truncate_double=True)&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">real_node</span><span class="p">)</span>
+            <span class="c1"># fix the self-reference created by replace_all_uses_with</span>
+            <span class="n">real_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">node</span><span class="p">,)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Inserted view_as_real for complex input placeholder &#39;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+            <span class="p">)</span>
+        <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="c1"># --- Output boundary: view_as_complex for complex outputs from TRT blocks ---</span>
+    <span class="k">if</span> <span class="n">complex_output_indices</span><span class="p">:</span>
+        <span class="n">output_node</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">complex_output_indices</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">src</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_module&quot;</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;_run_on_gpu&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">output_node</span><span class="p">):</span>
+                    <span class="n">complex_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                        <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">view_as_complex</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">src</span><span class="p">,)</span>
+                    <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Inserted view_as_complex for complex output index </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;from TRT block &#39;</span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+                <span class="p">)</span>
+                <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">complex_node</span>
+                <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">),)</span>
+
+    <span class="k">if</span> <span class="n">graph_modified</span><span class="p">:</span>
+        <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+        <span class="n">partitioned_module</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
 
 
 <span class="nd">@fn_supports_debugger</span>  <span class="c1"># type: ignore[misc]</span>
@@ -1582,6 +1708,10 @@ document.write(`
             <span class="n">trt_module</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
             <span class="n">trt_module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
+    <span class="c1"># Post-partition complex I/O boundary pass — runs in both normal and dryrun mode</span>
+    <span class="c1"># so the wrapper graph reflects the exact graph that will be executed/built.</span>
+    <span class="n">_insert_complex_io_adapters</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+
     <span class="c1"># Only set output tensors as unowned if not in dryrun mode (TRT modules exist)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
         <span class="n">output_node</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -1637,6 +1767,8 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -1712,7 +1844,9 @@ document.write(`
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
-<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
+<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
+<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
@@ -1886,6 +2020,8 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -1903,12 +2039,21 @@ document.write(`
         <span class="s2">&quot;decompose_attention&quot;</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">&quot;attn_bias_is_causal&quot;</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
     <span class="p">}</span>
+    <span class="k">if</span> <span class="s2">&quot;runtime_cache_path&quot;</span> <span class="ow">in</span> <span class="n">compilation_options</span><span class="p">:</span>
+        <span class="n">compilation_options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;runtime_cache_path is a JIT-time API and is not applicable to serialized engine export. Ignoring.&quot;</span>
+        <span class="p">)</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">,</span> <span class="n">decompose_attention</span><span class="p">)</span>
+        <span class="n">get_decompositions</span><span class="p">(</span>
+            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+            <span class="n">decompose_attention</span><span class="p">,</span>
+            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+        <span class="p">)</span>
     <span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>

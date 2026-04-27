@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Sequence
 
 import torch
+from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
 
 
 def clean_up_graph_after_modifications(
@@ -58,13 +59,10 @@ def is_node_complex(node: torch.fx.Node, complexNodes):
             elif hasattr(arg, "meta") and "val" in arg.meta:
                 if isinstance(arg.meta["val"], (list, tuple)):
                     for eachFakeTensorMeta in arg.meta["val"]:
-                        if eachFakeTensorMeta.dtype in (
-                            torch.complex64,
-                            torch.complex128,
-                        ):
+                        if eachFakeTensorMeta.dtype in COMPLEX_DTYPES:
                             complexNodes[node.name] = True
                             return True
-                elif arg.meta["val"].dtype in (torch.complex64, torch.complex128):
+                elif arg.meta["val"].dtype in COMPLEX_DTYPES:
                     complexNodes[node.name] = True
                     return True
     return False

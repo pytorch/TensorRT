@@ -10,6 +10,13 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+#include "torch/csrc/distributed/c10d/GroupRegistry.hpp"
+#include "torch/csrc/distributed/c10d/NCCLUtils.hpp"
+#include "torch/csrc/distributed/c10d/ProcessGroup.hpp"
+#include "torch/csrc/distributed/c10d/ProcessGroupNCCL.hpp"
+#endif
+
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
@@ -88,7 +95,12 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           serialized_info[SERIALIZED_METADATA_IDX],
           (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]))
                ? ResourceAllocationStrategy::kDynamic
-               : ResourceAllocationStrategy::kStatic)) {}
+               : ResourceAllocationStrategy::kStatic)) {
+  this->requires_native_multidevice = std::stoi(serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]);
+  if (this->requires_native_multidevice) {
+    LOG_INFO("Loaded distributed TRT engine (contains NCCL collectives); NCCL comm will be bound on first execution");
+  }
+}
 
 TRTEngine::TRTEngine(
     const std::string& mod_name,
@@ -261,10 +273,21 @@ TRTEngine::TRTEngine(
   this->enable_profiling();
 #endif
   LOG_DEBUG(*this);
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // Attempt to bind the NCCL communicator immediately after exec_ctx is ready.
+  // This handles the common case where dist.init_process_group() and an initial
+  // collective have already been called before the engine is constructed.
+  // If the communicator isn't available yet (e.g. engine constructed before the
+  // first collective), bind_nccl_comm returns false and execute_engine() will
+  // retry on its first invocation.
+  if (this->requires_native_multidevice) {
+    bind_nccl_comm();
+  }
+#endif
 }
 
 TRTEngine::~TRTEngine() {
-  torch::cuda::synchronize(device_info.id);
   trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
@@ -383,6 +406,13 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
   if (profile_execution) {
     enable_profiling();
   }
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // exec_ctx was recreated — re-bind the NCCL communicator if this is a
+  // distributed engine that has already been set up.
+  if (nccl_initialized) {
+    bind_nccl_comm();
+  }
+#endif
   // Indicates to reevaluate the runtime settings
   runtime_states.context_changed = true;
 
@@ -428,6 +458,7 @@ std::string TRTEngine::to_str() const {
   ss << "  Hardware Compatibility: " << (hardware_compatible ? "Enabled" : "Disabled") << std::endl;
   ss << "  Target Platform: " << target_platform << std::endl;
   ss << "  Resource Allocation Strategy: " << (resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "Dynamic" : "Static") << std::endl;
+  ss << "  Multi-Device Engine: " << (requires_native_multidevice) << std::endl;
   // clang-format on
   return ss.str();
 }
@@ -435,15 +466,6 @@ std::string TRTEngine::to_str() const {
 std::ostream& operator<<(std::ostream& os, const TRTEngine& engine) {
   os << engine.to_str();
   return os;
-}
-
-TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
-  rt = other.rt;
-  cuda_engine = other.cuda_engine;
-  device_info = other.device_info;
-  exec_ctx = other.exec_ctx;
-  num_io = other.num_io;
-  return (*this);
 }
 
 void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& serialized_info) {
@@ -472,7 +494,8 @@ FlattenedState TRTEngine::__obj_flatten__() {
       std::tuple("serialized_metadata", serialized_info[SERIALIZED_METADATA_IDX]),
       std::tuple("requires_output_allocator", serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]),
       std::tuple("target_platform", serialized_info[TARGET_PLATFORM_IDX]),
-      std::tuple("resource_allocation_strategy", serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]));
+      std::tuple("resource_allocation_strategy", serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]),
+      std::tuple("requires_native_multidevice", serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]));
 }
 
 std::vector<std::string> TRTEngine::serialize() {
@@ -497,6 +520,8 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[TARGET_PLATFORM_IDX] = this->target_platform.serialize();
   serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
+  serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = this->requires_native_multidevice ? "1" : "0";
+  // rank/world_size are runtime facts (may differ at load time); not serialized.
 
   return serialized_info;
 }
@@ -518,6 +543,112 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
     }
   }
 }
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+bool TRTEngine::bind_nccl_comm() {
+  // When group_name is empty (e.g. engine loaded from a serialized
+  // ExportedProgram where the Python TorchTensorRTModule wrapper was
+  // inlined and set_group_name() was never called), auto-resolve the
+  // process group from the c10d registry.  PyTorch assigns sequential
+  // numeric names ("0", "1", ...) to process groups; probe until we
+  // find one with an NCCL backend.
+  if (this->group_name.empty() && this->requires_native_multidevice) {
+    // PyTorch assigns sequential numeric names ("0", "1", ...) to process
+    // groups.  Collect every group that has an NCCL backend; we can only
+    // auto-resolve when there is exactly one — if there are several (TP+DP,
+    // Megatron 4-D parallelism, etc.) we cannot know which group this engine
+    // belongs to and the caller must pin it explicitly.
+    std::vector<std::string> nccl_groups;
+    for (int i = 0; i < 20; ++i) {
+      auto candidate = std::to_string(i);
+      auto probe = c10d::resolve_process_group(candidate);
+      if (probe != nullptr && probe->getBackendType() == c10d::ProcessGroup::BackendType::NCCL) {
+        nccl_groups.push_back(candidate);
+      }
+    }
+
+    if (nccl_groups.size() == 1) {
+      this->group_name = nccl_groups[0];
+      LOG_INFO("Auto-resolved distributed group name to '" << this->group_name << "'");
+    } else if (nccl_groups.size() > 1) {
+      std::string names;
+      for (const auto& n : nccl_groups) {
+        if (!names.empty())
+          names += ", ";
+        names += "'" + n + "'";
+      }
+      LOG_WARNING(
+          "This TRT engine requires NCCL but multiple NCCL process groups are registered ("
+          << names
+          << "). Cannot auto-select a group — NCCL bind deferred. "
+             "Use the recommended workflow: "
+             "with torch_tensorrt.distributed.distributed_context(group, model) as m: m(inp)");
+    } else {
+      LOG_WARNING(
+          "This TRT engine requires NCCL (requires_native_multidevice=true) but no NCCL process group "
+          "was found in the c10d registry. Ensure dist.init_process_group(backend='nccl') "
+          "has been called before loading the engine. You can also set the group name "
+          "manually via: torch_tensorrt.distributed.distributed_context(group, model)");
+    }
+  }
+
+  // Soft-return when the process group isn't available yet (e.g. at engine
+  // construction time when the caller hasn't called dist.init_process_group()).
+  auto pg = c10d::resolve_process_group(this->group_name);
+  if (pg == nullptr) {
+    LOG_DEBUG("ProcessGroup '" << this->group_name << "' not yet registered in c10d; NCCL bind deferred.");
+    return false;
+  }
+
+  this->rank = pg->getRank();
+  this->world_size = pg->getSize();
+
+  auto backend = pg->getBackend(c10d::ProcessGroup::BackendType::NCCL);
+  TORCHTRT_CHECK(backend != nullptr, "ProcessGroup '" << this->group_name << "' has no NCCL backend");
+
+  auto* nccl_pg = dynamic_cast<c10d::ProcessGroupNCCL*>(backend.get());
+  TORCHTRT_CHECK(nccl_pg != nullptr, "Backend is not ProcessGroupNCCL");
+
+  at::cuda::set_device(this->device_info.id);
+
+  int64_t comm_ptr = nccl_pg->getCommPtr();
+  // Soft-return when NCCL hasn't run a collective yet.  The communicator is
+  // created lazily by PyTorch on the first collective — callers should ensure
+  // at least one collective (e.g. dist.barrier()) has been issued before the
+  // first TRT forward pass.
+  if (comm_ptr == 0) {
+    LOG_DEBUG(
+        "NCCL communicator not yet initialized for device " << this->device_info.id
+                                                            << "; NCCL bind deferred until first execute_engine call.");
+    return false;
+  }
+
+  TORCHTRT_CHECK(exec_ctx.get() != nullptr, "Cannot bind NCCL communicator: execution context is null");
+  exec_ctx->setCommunicator(reinterpret_cast<void*>(comm_ptr));
+  this->nccl_initialized = true;
+  LOG_INFO("NCCL comm bound (rank=" << this->rank << ", device=" << this->device_info.id << ")");
+  return true;
+}
+
+void TRTEngine::release_nccl_comm() {
+  if (!this->nccl_initialized) {
+    return;
+  }
+  LOG_INFO("Releasing NCCL communicator from engine '" << this->name << "'");
+  torch::cuda::synchronize(device_info.id);
+  this->exec_ctx.reset();
+  if (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic) {
+    this->exec_ctx =
+        make_trt(cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED));
+  } else {
+    this->exec_ctx = make_trt(cuda_engine->createExecutionContext());
+  }
+  TORCHTRT_CHECK(
+      (exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context after releasing NCCL comm");
+  this->nccl_initialized = false;
+  LOG_INFO("NCCL communicator released from engine '" << this->name << "'");
+}
+#endif // ENABLE_TRT_NCCL_COLLECTIVES
 
 } // namespace runtime
 } // namespace core

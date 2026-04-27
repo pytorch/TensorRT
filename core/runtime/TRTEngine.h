@@ -9,13 +9,27 @@
 #include "ATen/core/function_schema.h"
 #include "ATen/cuda/CUDAGraph.h"
 #include "NvInfer.h"
+#include "NvInferVersion.h"
 #include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
 #include "core/runtime/TRTEngineProfiler.h"
 #include "core/util/prelude.h"
 
+// TensorRT 10.16+ has native NCCL collective support via IExecutionContext::setCommunicator()
+#if NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 16)
+#define TRT_HAS_NATIVE_NCCL 1
+#endif
+
+// Full TRT NCCL collectives support requires both:
+// 1. PyTorch built with NCCL (USE_C10D_NCCL defined via Bazel)
+// 2. TensorRT 10.16+ (TRT_HAS_NATIVE_NCCL defined above)
+#if defined(USE_C10D_NCCL) && defined(TRT_HAS_NATIVE_NCCL)
+#define ENABLE_TRT_NCCL_COLLECTIVES 1
+#endif
+
 namespace torch_tensorrt {
+
 namespace core {
 namespace runtime {
 
@@ -30,7 +44,8 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // requires_output_allocator
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>, // Platform
-    std::tuple<std::string, std::string>>; // Resource Allocation Strategy
+    std::tuple<std::string, std::string>, // Resource Allocation Strategy
+    std::tuple<std::string, std::string>>; // requires_native_multidevice
 
 struct TorchTRTRuntimeStates {
   // Indicates whether CUDAGraphs were enabled in the previous execute_engine
@@ -151,7 +166,6 @@ struct TRTEngine : torch::CustomClassHolder {
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
           TRTEngine::ResourceAllocationStrategy::kStatic);
 
-  TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
   void enable_profiling();
@@ -195,6 +209,32 @@ struct TRTEngine : torch::CustomClassHolder {
   bool requires_output_allocator = false; // engine requires output allocator
   bool use_output_allocator_outputs = false; // users specify to use output allocator
   std::shared_ptr<DynamicOutputAllocator> output_allocator;
+
+  // Member variables for distributed inference
+  bool requires_native_multidevice = false; // compile-time flag: engine contains NCCL collectives
+  int64_t rank = -1; // populated at runtime by setup_nccl_comm()
+  int64_t world_size = -1; // populated at runtime by setup_nccl_comm()
+  std::string group_name = ""; // c10d registry name; "" = default world group
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  const bool _native_nccl_support = true; // Support value that is mostly here to back the torchbind hooks
+  bool nccl_initialized = false; // guards lazy one-shot NCCL setup in execute_engine
+
+  // Resolve ProcessGroup via group_name, fetch the NCCL comm from PyTorch,
+  // and bind it to exec_ctx.  Returns true on success.  Returns false (without
+  // throwing) when the process group or NCCL communicator is not yet available
+  // so callers can retry later.  Throws on hard misconfiguration (wrong backend).
+  bool bind_nccl_comm();
+
+  // Detach the NCCL communicator from the execution context by recreating it.
+  // After this call the process group can be safely destroyed without causing a
+  // use-after-free in the TRT engine destructor.  If the engine is used again
+  // later (with a new PG), execute_engine() will see nccl_initialized=false
+  // and re-bind automatically.
+  void release_nccl_comm();
+#else
+  const bool _native_nccl_support = false;
+#endif
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

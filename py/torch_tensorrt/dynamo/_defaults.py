@@ -39,6 +39,9 @@ SUPPORTED_KERNEL_PRECISIONS = {
 TIMING_CACHE_PATH = os.path.join(
     tempfile.gettempdir(), "torch_tensorrt_engine_cache", "timing_cache.bin"
 )
+RUNTIME_CACHE_PATH = os.path.join(
+    tempfile.gettempdir(), "torch_tensorrt_engine_cache", "runtime_cache.bin"
+)
 LAZY_ENGINE_INIT = False
 CACHE_BUILT_ENGINES = False
 REUSE_CACHED_ENGINES = False
@@ -67,6 +70,7 @@ CPU_MEMORY_BUDGET = None
 DYNAMICALLY_ALLOCATE_RESOURCES = False
 DECOMPOSE_ATTENTION = False
 ATTN_BIAS_IS_CAUSAL = True
+DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY = "lazy"
 
 if platform.system() == "Linux":
     import pwd
