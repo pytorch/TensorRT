@@ -282,8 +282,8 @@ jobs:
               if [[ ${{ inputs.is-release-tarball }} == true ]]; then
                   mkdir -p release/tarball
                   TRT_VERSION=$(cat dev_dep_versions.yml | grep __tensorrt_version__ | sed 's/__tensorrt_version__: //g' | sed 's/"//g')
-                  bazel build //:libtorchtrt_executorch --compilation_mode opt --config=linux
-                  cp bazel-bin/libtorchtrt_executorch.tar.gz \
+                  bazel build //:libtorchtrt --compilation_mode opt --config=linux
+                  cp bazel-bin/libtorchtrt.tar.gz \
                   release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-${{inputs.architecture}}-linux.tar.gz
                   return 0
               else

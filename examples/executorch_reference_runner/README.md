@@ -13,108 +13,31 @@ setup with your application's real input buffers.
 
 ## Input Model
 
-Create or obtain a Torch-TensorRT compiled ExecuTorch model:
-
-```python
-import torch
-import torch_tensorrt
-
-class MyModel(torch.nn.Module):
-    def forward(self, x):
-        return torch.relu(x + 1)
-
-model = MyModel().eval().cuda()
-example_input = (torch.randn(1, 3, 224, 224, device="cuda"),)
-
-exported_program = torch.export.export(model, example_input)
-compile_settings = {
-    "arg_inputs": [
-        torch_tensorrt.Input(shape=(1, 3, 224, 224), dtype=torch.float32),
-    ],
-    "min_block_size": 1,
-}
-trt_gm = torch_tensorrt.dynamo.compile(exported_program, **compile_settings)
-
-torch_tensorrt.save(
-    trt_gm,
-    "model.pte",
-    output_format="executorch",
-    arg_inputs=example_input,
-    retrace=False,
-)
-```
-
 You can also generate a sample `.pte` from the Torch-TensorRT source tree:
 
 ```bash
 python examples/torchtrt_executorch_example/export_static_shape.py --model_path=model.pte
 ```
 
-## 1. Build `libexecutorch_core.a`
+## Build The Reference Runner
 
-Build the ExecuTorch core runtime from an ExecuTorch source checkout:
+A normal reference runner build does not need separate steps for
+`libexecutorch_core.a` and `libexecutorch_trt_backend.a`. The runner CMake adds
+both ExecuTorch and the Torch-TensorRT ExecuTorch source package, and linking
+`torchtrt::executorch_backend` makes the backend archive a dependency of
+`my_runner`.
 
 ```bash
+# get the executorch source code
 git clone https://github.com/pytorch/executorch.git
+# download the libtorchtrt.tar.gz
+tar xvf libtorchtrt.tar.gz
 
-export EXECUTORCH_ROOT=/path/to/executorch
-
-cmake -S "${EXECUTORCH_ROOT}" -B "${EXECUTORCH_ROOT}/cmake-out" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=OFF \
-  -DEXECUTORCH_BUILD_PYBIND=OFF \
-  -DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON \
-  -DEXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR=ON \
-  -DEXECUTORCH_BUILD_EXTENSION_MODULE=ON
-
-cmake --build "${EXECUTORCH_ROOT}/cmake-out" --target executorch_core -j
-```
-
-Expected artifact:
-
-```text
-${EXECUTORCH_ROOT}/cmake-out/libexecutorch_core.a
-```
-
-## 2. Build `libexecutorch_trt_backend.a`
-
-Build the Torch-TensorRT ExecuTorch backend from the
-`libtorchtrt_executorch.tar.gz` release package:
-
-```bash
-
-# Download libtorchtrt_executorch.tar.gz
-tar xvf libtorchtrt_executorch.tar.gz
-
-export EXECUTORCH_ROOT=/path/to/executorch
+export EXECUTORCH_SOURCE_DIR=/path/to/executorch
+export TORCHTRT_EXECUTORCH_SOURCE_DIR="${PWD}/libtorchtrt_executorch"
 export CMAKE_PREFIX_PATH=$(python -c "import torch; print(torch.utils.cmake_prefix_path)")
 
-cmake -S libtorchtrt_executorch -B build-libtorchtrt-executorch \
-  -DEXECUTORCH_ROOT="${EXECUTORCH_ROOT}" \
-  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
-
-cmake --build build-libtorchtrt-executorch \
-  --target executorch_trt_backend \
-  -j
-```
-
-Expected artifact:
-
-```text
-build-libtorchtrt-executorch/lib/libexecutorch_trt_backend.a
-```
-
-## 3. Build The Reference Runner
-
-Build `my_runner` from the unpacked source package:
-
-```bash
-export EXECUTORCH_ROOT=/path/to/executorch
-export CMAKE_PREFIX_PATH=$(python -c "import torch; print(torch.utils.cmake_prefix_path)")
-export EXECUTORCH_SOURCE_DIR="${EXECUTORCH_ROOT}"
-export TORCHTRT_EXECUTORCH_SOURCE_DIR=/path/to/untarred/libtorchtrt_executorch
-
-cmake -S libtorchtrt_executorch/examples/executorch_reference_runner \
+cmake -S "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/examples/executorch_reference_runner" \
   -B build-executorch-reference-runner \
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}" \
@@ -129,7 +52,14 @@ Expected artifact:
 build-executorch-reference-runner/my_runner
 ```
 
-## 4. Load And Run A `.pte` Model
+The build also creates the executorch core and tensorrt backend archive as a dependency:
+
+```text
+build-executorch-reference-runner/executorch/libexecutorch_core.a
+build-executorch-reference-runner/libtorchtrt_executorch/lib/libexecutorch_trt_backend.a
+```
+
+## Load And Run A `.pte` Model
 
 Run the reference runner against a Torch-TensorRT compiled ExecuTorch model:
 
