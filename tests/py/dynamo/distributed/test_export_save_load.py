@@ -221,7 +221,6 @@ def _multirank_export_compile_save(
     trt_model = torch_tensorrt.dynamo.compile(
         ep,
         inputs=[inp],
-        use_explicit_typing=True,
         use_fp32_acc=True,
         device=device,
         disable_tf32=True,

@@ -200,12 +200,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
 
-        if ENABLED_FEATURES.native_trt_collectives:
-            _LOGGER.info("Using native TRT collectives")
-            builder_config.set_preview_feature(
-                trt.PreviewFeature.MULTIDEVICE_RUNTIME_10_16, True
-            )
-
         if self._debugger_config and self._debugger_config.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
 

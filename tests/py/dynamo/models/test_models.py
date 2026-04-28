@@ -633,7 +633,6 @@ def test_grouped_deconv3d_fallback(ir):
     compile_spec = {
         "inputs": [torchtrt.Input(input.shape, dtype=torch.float32)],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float32},
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,

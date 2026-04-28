@@ -160,16 +160,7 @@ def get_model(args, device_mesh):
 
 
 def compile_torchtrt(model, input_ids, args):
-    use_fp32_acc = False
-    use_explicit_typing = False
-    if args.model_precision == "FP16":
-        enabled_precisions = {torch.float32}
-        use_fp32_acc = True
-        use_explicit_typing = True
-    elif args.model_precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-    else:
-        enabled_precisions = {torch.float32}
+    use_fp32_acc = args.model_precision == "FP16"
 
     # torch.export does not support DTensor-parallelized models (sharding propagation
     # fails during run_decompositions). Use torch.compile with dynamic=True so that
@@ -181,7 +172,6 @@ def compile_torchtrt(model, input_ids, args):
             backend="torch_tensorrt",
             dynamic=True,
             options={
-                "use_explicit_typing": True,
                 "use_fp32_acc": use_fp32_acc,
                 "device": DEVICE,
                 "disable_tf32": True,
