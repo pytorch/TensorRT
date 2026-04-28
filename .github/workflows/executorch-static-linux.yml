@@ -69,18 +69,8 @@ jobs:
       script: |
         set -euo pipefail
         EXECUTORCH_SRC="${RUNNER_TEMP}/executorch"
-        EXECUTORCH_BUILD="${EXECUTORCH_SRC}/cmake-out"
 
         git clone --depth 1 https://github.com/pytorch/executorch.git "${EXECUTORCH_SRC}"
-        cmake -S "${EXECUTORCH_SRC}" -B "${EXECUTORCH_BUILD}" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_TESTING=OFF \
-          -DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=OFF \
-          -DEXECUTORCH_BUILD_PYBIND=OFF \
-          -DEXECUTORCH_BUILD_PORTABLE_OPS=OFF
-        cmake --build "${EXECUTORCH_BUILD}" --target executorch_core -j"$(nproc)"
-
-        export EXECUTORCH_ROOT="${EXECUTORCH_SRC}"
         export EXECUTORCH_SOURCE_DIR="${EXECUTORCH_SRC}"
         export PYTHONPATH="$(dirname "${EXECUTORCH_SRC}")${PYTHONPATH:+:${PYTHONPATH}}"
         python - <<'PY'

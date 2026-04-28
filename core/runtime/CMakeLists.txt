@@ -47,7 +47,3 @@ endif(NOT WIN32)
 
 # Install
 install(FILES ${HEADER_FILES} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/torch_tensorrt/core/runtime")
-
-if(BUILD_TORCHTRT_EXECUTORCH)
-    add_subdirectory(executorch)
-endif()
