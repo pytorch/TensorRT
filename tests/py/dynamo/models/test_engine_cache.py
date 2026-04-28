@@ -162,7 +162,6 @@ class TestHashFunction(TestCase):
             immutable_weights=False,
             cache_built_engines=True,
             reuse_cached_engines=True,
-            enabled_precisions={torch.float32},
         )
         hash1 = BaseEngineCache.get_hash(exp_program1.module(), input_specs1, settings1)
 
@@ -173,14 +172,13 @@ class TestHashFunction(TestCase):
             torch_trt.Input(
                 min_shape=(1, 3, 224, 224),
                 opt_shape=(100, 3, 224, 224),
-                max_shape=(200, 3, 224, 224),
+                max_shape=(400, 3, 224, 224),
             ),
         )
         settings2 = CompilationSettings(
             immutable_weights=False,
             cache_built_engines=True,
             reuse_cached_engines=True,
-            enabled_precisions={torch.float32, torch.float16},
         )
         hash2 = BaseEngineCache.get_hash(exp_program2.module(), input_specs2, settings2)
 
@@ -235,7 +233,6 @@ class TestEngineCache(TestCase):
                 exp_program,
                 tuple(inputs),
                 use_python_runtime=True,
-                enabled_precisions={torch.float},
                 min_block_size=1,
                 immutable_weights=False,
                 cache_built_engines=cache_built_engines,
@@ -310,8 +307,6 @@ class TestEngineCache(TestCase):
                 exp_program,
                 tuple(inputs),
                 use_python_runtime=True,
-                use_explicit_typing=False,
-                enabled_precisions={torch.float},
                 min_block_size=1,
                 immutable_weights=False,
                 cache_built_engines=cache_built_engines,
@@ -369,7 +364,6 @@ class TestEngineCache(TestCase):
                 torch.export.export(model, args=inputs),
                 inputs=inputs,
                 use_python_runtime=False,
-                enabled_precisions={torch.float},
                 min_block_size=1,
                 immutable_weights=False,
                 cache_built_engines=True,
@@ -430,8 +424,6 @@ class TestEngineCache(TestCase):
                 backend="tensorrt",
                 options={
                     "use_python_runtime": False,
-                    "use_explicit_typing": False,
-                    "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -496,8 +488,6 @@ class TestEngineCache(TestCase):
                 backend="tensorrt",
                 options={
                     "use_python_runtime": False,
-                    "use_explicit_typing": False,
-                    "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -553,8 +543,6 @@ class TestEngineCache(TestCase):
                 inputs=inputs,
                 **{
                     "use_python_runtime": True,
-                    "use_explicit_typing": False,
-                    "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,
@@ -596,8 +584,6 @@ class TestEngineCache(TestCase):
                 backend="tensorrt",
                 options={
                     "use_python_runtime": True,
-                    "use_explicit_typing": False,
-                    "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,
@@ -697,7 +683,6 @@ class TestEngineCache(TestCase):
             exp_program,
             inputs,
             use_python_runtime=True,
-            enabled_precisions={torch.float},
             min_block_size=1,
             immutable_weights=False,
             cache_built_engines=False,
@@ -749,7 +734,6 @@ class TestEngineCache(TestCase):
                 exp_program,
                 tuple(inputs),
                 use_python_runtime=True,
-                enabled_precisions={torch.float},
                 min_block_size=1,
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
@@ -926,7 +910,6 @@ class TestEngineCache(TestCase):
             llama2_ep,
             inputs=[input_ids],
             use_python_runtime=True,
-            enabled_precisions={torch.float32},
             min_block_size=1,
             immutable_weights=False,
             truncate_double=True,
@@ -979,7 +962,6 @@ class TestEngineCache(TestCase):
                 llama2_ep,
                 inputs=[input_ids],
                 use_python_runtime=True,
-                enabled_precisions={torch.float32},
                 min_block_size=1,
                 truncate_double=True,
                 device=DEVICE,

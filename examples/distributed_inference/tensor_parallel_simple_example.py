@@ -131,7 +131,6 @@ elif args.mode == "jit_python":
         backend="torch_tensorrt",
         options={
             "truncate_long_and_double": True,
-            "enabled_precisions": {torch.float32, torch.float16},
             "use_python_runtime": True,
             "min_block_size": 1,
         },
@@ -148,7 +147,6 @@ elif args.mode == "jit_cpp":
         backend="torch_tensorrt",
         options={
             "truncate_long_and_double": True,
-            "enabled_precisions": {torch.float32, torch.float16},
             "use_python_runtime": False,
             "min_block_size": 1,
         },
@@ -164,7 +162,6 @@ elif args.mode == "export":
     trt_model = torch_tensorrt.dynamo.compile(
         exported_program,
         inputs=[inp],
-        # enabled_precisions={torch.float32, torch.float16},
         truncate_double=True,
         use_python_runtime=False,
         min_block_size=1,

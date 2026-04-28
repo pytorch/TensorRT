@@ -13,7 +13,8 @@ from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes import shape_prop
 from torch.fx.passes.infra.pass_base import PassResult
 from torch.testing._internal.common_utils import TestCase
-from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
+from torch_tensorrt.fx.fx2trt import TRTInterpreter
+from torch_tensorrt.fx.input_tensor_spec import InputTensorSpec
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
@@ -27,6 +28,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     run_const_fold,
 )
 from torch_tensorrt.fx.passes.pass_utils import chain_passes
+from torch_tensorrt.fx.trt_module import TRTModule
 from torch_tensorrt.fx.utils import LowerPrecision, proxytensor_trace
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

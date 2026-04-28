@@ -17,6 +17,20 @@ from tensorrt import ITensor as TRTTensor
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
+def _normalize_attention_mask_rank(
+    ctx: ConversionContext,
+    mask: TRTTensor,
+    query: TRTTensor,
+    name: str,
+) -> TRTTensor:
+    """Make PyTorch-broadcastable attention masks rank-compatible with TensorRT."""
+    rank_diff = len(query.shape) - len(mask.shape)
+    if rank_diff > 0:
+        mask = prepend_ones(ctx, mask, name + "_prepend_ones", rank_diff)
+
+    return mask
+
+
 def tril(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -192,6 +206,9 @@ def scaled_dot_product_attention(
             )
         else:
             mask_tensor = attn_mask
+        mask_tensor = _normalize_attention_mask_rank(
+            ctx, mask_tensor, query, name + "_attn_mask"
+        )
 
     # TRT add_attention does not support is_causal=True together with an explicit
     # mask.  When both are present, fold the causal lower-triangular mask into the
@@ -387,6 +404,9 @@ def scaled_dot_product_efficient_attention(
             )
         else:
             mask_tensor = attn_bias
+        mask_tensor = _normalize_attention_mask_rank(
+            ctx, mask_tensor, query, name + "_attn_bias"
+        )
 
     # TensorRT IAttention does not allow setting both causal=True and mask.
     # If both are requested, fold causal into mask and disable causal flag.

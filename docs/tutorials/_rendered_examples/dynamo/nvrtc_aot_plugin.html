@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -606,7 +606,6 @@ document.write(`
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from typing import List, Tuple, Union
 
 import torch
-
 import torch_tensorrt
 
 # ============================================================================
@@ -818,7 +817,6 @@ if __name__ == &quot;__main__&quot;:
         model_trt = torch_tensorrt.compile(
             model,
             inputs=trt_inputs,
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         print(&quot;Model compiled successfully!&quot;)

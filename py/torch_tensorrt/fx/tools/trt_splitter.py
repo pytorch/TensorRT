@@ -3,33 +3,22 @@ from typing import Any, Dict, Iterable, Sequence
 import torch
 import torch.fx.passes.operator_support as ops
 import torch.fx.passes.splitter_base as splitter_base
-from torch.fx.passes.tools_common import get_acc_ops_name, Tensors
+from torch.fx.passes.tools_common import Tensors, get_acc_ops_name
 
-from .. import (
-    CONVERTERS,
-    InputTensorSpec,
-    NO_EXPLICIT_BATCH_DIM_SUPPORT,
-    NO_IMPLICIT_BATCH_DIM_SUPPORT,
-    TRTInterpreter,
-    TRTModule,
-)
+from ..converter_registry import CONVERTERS
+from ..fx2trt import TRTInterpreter
+from ..input_tensor_spec import InputTensorSpec
 from ..tools.trt_minimizer import TensorRTMinimizer
+from ..trt_module import TRTModule
 
 
 def create_trt_operator_support(
-    use_implicit_batch_dim=True,
     exclude_support_node_name: set = (),
 ) -> ops.OperatorSupportBase:
     """Creates an `OperatorSupportBase` instance used for TRT splitting purpose."""
-    # Create an `OperatorSupport` that declares a node supported if it
-    # finds a registered TRT converter.
-    support_dict: Dict[str, None] = {}
-    for k in CONVERTERS.keys():
-        if use_implicit_batch_dim:
-            if k not in NO_IMPLICIT_BATCH_DIM_SUPPORT.keys():
-                support_dict[get_acc_ops_name(k)] = None
-        elif k not in NO_EXPLICIT_BATCH_DIM_SUPPORT.keys():
-            support_dict[get_acc_ops_name(k)] = None
+    support_dict: Dict[str, None] = {
+        get_acc_ops_name(k): None for k in CONVERTERS.keys()
+    }
     supported_if_converter_registered = ops.OperatorSupport(support_dict=support_dict)
 
     return ops.chain(
@@ -46,17 +35,8 @@ class TRTSplitterSetting(splitter_base._SplitterSettingBase):
     def __init__(self):
         super().__init__()
 
-        # Determines what batch mode we'll use for lowering.
-        # During split, we'll split out the operators that
-        # don't support the batch dim.
-        self.use_implicit_batch_dim: bool = True
         self.exclude_support_node_name: set = set()
         self.use_experimental_rt: bool = False
-
-        if self.use_experimental_rt and self.use_implicit_batch_dim:
-            raise ValueError(
-                "The experimental unifed runtime only supports explicit batch. Please make sure to set use_implicit_batch_dim=False when use_experimental_rt=True"
-            )
 
 
 class TRTSplitter(splitter_base._SplitterBase):
@@ -71,7 +51,7 @@ class TRTSplitter(splitter_base._SplitterBase):
             settings = TRTSplitterSetting()
         if not operator_support:
             operator_support = create_trt_operator_support(
-                settings.use_implicit_batch_dim, settings.exclude_support_node_name
+                settings.exclude_support_node_name
             )
         super().__init__(
             module,

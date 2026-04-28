@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -535,7 +535,6 @@ Dynamo compilation. It is passed (directly or via keyword arguments) to
 <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># respects dtypes set in model/inputs</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
     <span class="n">optimization_level</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
 <span class="p">)</span>
@@ -558,43 +557,35 @@ Dynamo compilation. It is passed (directly or via keyword arguments) to
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code> (<strong>DEPRECATED</strong>)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">{dtype.f32}</span></code></p></td>
-<td><p>Set of precisions the TensorRT builder may use. Any combination of
-<code class="docutils literal notranslate"><span class="pre">torch.float32</span></code>, <code class="docutils literal notranslate"><span class="pre">torch.float16</span></code>, <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>, <code class="docutils literal notranslate"><span class="pre">torch.int8</span></code>,
-<code class="docutils literal notranslate"><span class="pre">torch.float8_e4m3fn</span></code>. Adding a lower precision does not force its use — TRT
-selects the best kernel per layer. For INT8 calibration or FP8, use ModelOpt
-quantization first.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_block_size</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_block_size</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">5</span></code></p></td>
 <td><p>Minimum number of consecutive TRT-capable operators required to form a TRT
 engine block. Subgraphs smaller than this are merged back into PyTorch. Lower
 values increase TRT coverage but may add engine-launch overhead for tiny blocks.
 Use <a class="reference internal" href="../../tutorials/compilation_analysis/dryrun.html#dryrun"><span class="std std-ref">dryrun mode</span></a> to find the sweet spot.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">set()</span></code></p></td>
 <td><p>Force specific <code class="docutils literal notranslate"><span class="pre">torch.ops</span></code> targets to run in PyTorch regardless of converter
 support. Example: <code class="docutils literal notranslate"><span class="pre">{torch.ops.aten.add.Tensor}</span></code> to keep all adds in PyTorch.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">require_full_compilation</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">require_full_compilation</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
 <td><p>Raise an error if any node cannot be placed in TensorRT. Useful for CI
 correctness gates on models that are known to be fully TRT-compatible.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">device</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">device</span></code></p></td>
 <td><p>current CUDA device</p></td>
 <td><p><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.Device</span></code> specifying the GPU to compile for.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">use_python_runtime</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_python_runtime</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code> (auto)</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code> uses the C++ runtime (recommended — serializable, CUDAGraphs,
 multi-device safe). <code class="docutils literal notranslate"><span class="pre">True</span></code> forces the Python runtime (simpler to instrument
 for debugging but not serializable to <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code>). <code class="docutils literal notranslate"><span class="pre">None</span></code> selects C++
 if available.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
 <td><p>When <code class="docutils literal notranslate"><span class="pre">True</span></code>, TRT engine build errors raise exceptions rather than fall back to PyTorch.
 Useful during development when some subgraphs are not yet fully convertible.</p></td>
@@ -704,14 +695,7 @@ compile models that use double without changing the model code.</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
 <td><p>Insert FP32 cast nodes around matmul layers so that accumulation happens in
 FP32 even when the network runs in FP16. Improves numerical accuracy for
-transformer models at a small throughput cost. Requires <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_explicit_typing</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
-<td><p>Respect the dtypes set in the PyTorch model (strong typing). When <code class="docutils literal notranslate"><span class="pre">True</span></code>,
-TRT will not silently up/downcast layers. This is the recommended approach for
-controlling precision — set dtypes in your model/inputs directly. Required by
-autocast and <code class="docutils literal notranslate"><span class="pre">use_fp32_acc</span></code>.</p></td>
+transformer models at a small throughput cost.</p></td>
 </tr>
 </tbody>
 </table>
@@ -725,8 +709,7 @@ selectively lowers eligible operations to a reduced precision, skipping nodes th
 numerically sensitive. Enable it with <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>When <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code>, <code class="docutils literal notranslate"><span class="pre">use_explicit_typing</span></code> is automatically set to
-<code class="docutils literal notranslate"><span class="pre">True</span></code> as well.</p>
+<p>Strong typing (explicit typing) is always enabled in the Dynamo path.</p>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">,</span>
@@ -1094,7 +1077,7 @@ DRIVE platforms. Set <code class="docutils literal notranslate"><span class="pre
 <h2>Engine-Invariant Settings<a class="headerlink" href="#engine-invariant-settings" title="Link to this heading">#</a></h2>
 <p>Changing any of the following settings invalidates cached engines — the engine must be
 rebuilt from scratch:</p>
-<p><code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code>, <code class="docutils literal notranslate"><span class="pre">max_aux_streams</span></code>, <code class="docutils literal notranslate"><span class="pre">version_compatible</span></code>,
+<p><code class="docutils literal notranslate"><span class="pre">max_aux_streams</span></code>, <code class="docutils literal notranslate"><span class="pre">version_compatible</span></code>,
 <code class="docutils literal notranslate"><span class="pre">optimization_level</span></code>, <code class="docutils literal notranslate"><span class="pre">disable_tf32</span></code>, <code class="docutils literal notranslate"><span class="pre">sparse_weights</span></code>,
 <code class="docutils literal notranslate"><span class="pre">engine_capability</span></code>, <code class="docutils literal notranslate"><span class="pre">hardware_compatible</span></code>, <code class="docutils literal notranslate"><span class="pre">refit_identical_engine_weights</span></code>,
 <code class="docutils literal notranslate"><span class="pre">immutable_weights</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_weight_streaming</span></code>, <code class="docutils literal notranslate"><span class="pre">tiling_optimization_level</span></code>,

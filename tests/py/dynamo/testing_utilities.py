@@ -178,7 +178,7 @@ def lower_graph_testing(
         torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
         testing_partitioning: Whether partitioning is being tested (to analyze only TRT-supported ops)
         use_fast_partitioner: Whether to use the fast or global partitioner
-        use_fp32_acc: This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        use_fp32_acc: This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
         decompose_attention: Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
     Returns:
         If testing_partitioning:

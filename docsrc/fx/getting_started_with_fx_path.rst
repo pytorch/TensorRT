@@ -29,7 +29,6 @@ wrapper API that consists of the major steps needed to finish this converison. P
         input,
         max_batch_size=2048,
         max_workspace_size=33554432,
-        explicit_batch_dimension=False,
         lower_precision=LowerPrecision.FP16,
         verbose_log=False,
         timing_cache_prefix="",
@@ -47,7 +46,6 @@ wrapper API that consists of the major steps needed to finish this converison. P
             input: Input for module.
             max_batch_size: Maximum batch size (must be >= 1 to be set, 0 means not set)
             max_workspace_size: Maximum size of workspace given to TensorRT.
-            explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.
             lower_precision: lower_precision config given to TRTModule.
             verbose_log: Enable verbose log for TensorRT if set True.
             timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
@@ -83,9 +81,8 @@ symbolically traced variables cannot be used as inputs to control flow
 This means the model contains dynamic control flow. Please refer to section “Dynamic Control Flow” in `FX guide <https://pytorch.org/docs/stable/fx.html#dynamic-control-flow>`_.
 
 * **Step 2: Build TensorRT engine**
-There are `two different modes <https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#explicit-implicit-batch>`_ for how TensorRT handles batch dimension, explicit batch dimension and implicit batch dimension. This mode was used by early versions of TensorRT, and is now deprecated but continues to be supported for backwards compatibility. In explicit batch mode, all dimensions are explicit and can be dynamic, that is their length can change at execution time. Many new features, such as dynamic shapes and loops, are available only in this mode. User can still choose to use implicit batch mode when they set ``explicit_batch_dimension=False`` in ``compile()``. We do not recommend to use it since it will lack of support in future TensorRT versions.
+TensorRT 10+ uses explicit batch mode exclusively — all dimensions are explicit and can be dynamic (their length can change at execution time). Dynamic shapes and loops require explicit batch mode. For most vision tasks, enabling ``dynamic_batch`` in ``compile()`` allows only the batch dimension to vary. Requirements for ``dynamic_batch``:
 
-Explicit batch is the default mode and it must be set for dynamic shape. For most of vision task, user can choose to enable ``dynamic_batch`` in ``compile()`` if they want to get the similar effects as implicit mode where only batch dimension changes. It has some requirements:
 1. Shapes of inputs, outputs and activations are fixed except batch dimension.
 2. Inputs, outputs and activations have batch dimension as the major dimension.
 3. All the operators in the model do not modify batch dimension (permute, transpose, split, etc.) or compute over batch dimension (sum, softmax, etc.).
@@ -126,10 +123,8 @@ For examples of the last path, if we have a 3D tensor t shaped as (batch, sequen
         InputTensorSpec(shape=(1, 4, 5), dtype=torch.float32),
     ]
 
-    # Build a TRT interpreter. Set explicit_batch_dimension accordingly.
-    interpreter = TRTInterpreter(
-        acc_mod, input_specs, explicit_batch_dimension=True/False
-    )
+    # Build a TRT interpreter.
+    interpreter = TRTInterpreter(acc_mod, input_specs)
 
     # The output of TRTInterpreter run() is wrapped as TRTInterpreterResult.
     # The TRTInterpreterResult contains required parameter to build TRTModule,

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -617,7 +617,6 @@ np.random.seed(0)
 torch.manual_seed(0)
 
 model = models.resnet18(pretrained=True).to(&quot;cuda&quot;).eval()
-enabled_precisions = {torch.float}
 min_block_size = 1
 use_python_runtime = False
 
@@ -665,7 +664,6 @@ constructed, with <code class="docutils literal notranslate"><span class="pre">c
             backend=&quot;tensorrt&quot;,
             options={
                 &quot;use_python_runtime&quot;: True,
-                &quot;enabled_precisions&quot;: enabled_precisions,
                 &quot;min_block_size&quot;: min_block_size,
                 &quot;immutable_weights&quot;: False,
                 &quot;cache_built_engines&quot;: cache_built_engines,
@@ -727,7 +725,6 @@ torch_compile()
             exp_program,
             tuple(inputs),
             use_python_runtime=use_python_runtime,
-            enabled_precisions=enabled_precisions,
             min_block_size=min_block_size,
             immutable_weights=False,
             cache_built_engines=cache_built_engines,
@@ -831,7 +828,6 @@ def torch_compile_my_cache(iterations=3):
             backend=&quot;tensorrt&quot;,
             options={
                 &quot;use_python_runtime&quot;: True,
-                &quot;enabled_precisions&quot;: enabled_precisions,
                 &quot;min_block_size&quot;: min_block_size,
                 &quot;immutable_weights&quot;: False,
                 &quot;cache_built_engines&quot;: cache_built_engines,

@@ -34,7 +34,6 @@ stays identical:
     # The only extra line you need
     pipe.unet = torch_tensorrt.MutableTorchTensorRTModule(
         pipe.unet,
-        use_explicit_typing=True,  # pipeline already loaded in float16 via torch_dtype
         use_python_runtime=True,
     )
 
@@ -99,10 +98,7 @@ For a simpler illustration without diffusers, see the ResNet portion of
     import torchvision.models as models
 
     model = models.resnet18(pretrained=True).eval().cuda()
-    mutable_module = torch_tensorrt.MutableTorchTensorRTModule(
-        model,
-        use_explicit_typing=True,  # enabled_precisions deprecated
-    )
+    mutable_module = torch_tensorrt.MutableTorchTensorRTModule(model)
 
     inputs = [torch.rand(1, 3, 224, 224).cuda()]
 
@@ -149,7 +145,6 @@ recompiling on subsequent process starts:
 
     mutable_module = torch_tensorrt.MutableTorchTensorRTModule(
         model,
-        use_explicit_typing=True,  # enabled_precisions deprecated
         cache_built_engines=True,
         reuse_cached_engines=True,
         engine_cache_size=1 << 30,  # 1 GiB

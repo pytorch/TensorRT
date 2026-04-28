@@ -40,7 +40,6 @@ model.forward = torch.compile(
     backend="torch_tensorrt",
     options={
         "truncate_long_and_double": True,
-        "enabled_precisions": {torch.float16},
     },
     dynamic=False,
 )

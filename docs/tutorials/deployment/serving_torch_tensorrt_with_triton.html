@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -630,7 +630,6 @@ Sign up and login with your key (follow the instructions
 <span class="cp"># Compile with Torch TensorRT;</span>
 <span class="n">trt_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span>
 <span class="w">    </span><span class="n">arg_inputs</span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">))],</span>
-<span class="w">    </span><span class="n">use_explicit_typing</span><span class="o">=</span><span class="n">True</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">enabled_precisions</span><span class="w"> </span><span class="n">deprecated</span><span class="p">;</span><span class="w"> </span><span class="n">use</span><span class="w"> </span><span class="n">model</span><span class="p">.</span><span class="n">half</span><span class="p">()</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">FP16</span>
 <span class="p">)</span>
 
 <span class="n">ts_trt_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">jit</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">).</span><span class="n">to</span><span class="p">(</span><span class="s">&quot;cuda&quot;</span><span class="p">))</span>

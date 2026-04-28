@@ -4,10 +4,9 @@ import operator
 from typing import List, Mapping, Optional
 
 import torch
-
 from tensorrt import tensorrt as trt
 
-from .. import TRTModule
+from ..trt_module import TRTModule
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

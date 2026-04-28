@@ -34,7 +34,6 @@ def _compile_simple(runtime_cache_path=None):
     kwargs = {
         "ir": "dynamo",
         "inputs": inputs,
-        "enabled_precisions": {torch.float32},
         "use_python_runtime": True,
         "min_block_size": 1,
     }

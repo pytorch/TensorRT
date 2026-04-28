@@ -1310,7 +1310,7 @@ def add_acc_ops_dim_reduce(network, target, args, kwargs, name, reduce_op):
     return shuffle_layer0.get_output(0), shuffle_layer1.get_output(0)
 
 
-@tensorrt_converter(acc_ops.max_full_reduce, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.max_full_reduce)
 def acc_ops_max_full_reduce(
     network: TRTNetwork,
     target: Target,
@@ -1323,7 +1323,7 @@ def acc_ops_max_full_reduce(
     )
 
 
-@tensorrt_converter(acc_ops.min_full_reduce, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.min_full_reduce)
 def acc_ops_min_full_reduce(
     network: TRTNetwork,
     target: Target,
@@ -1456,8 +1456,8 @@ def acc_ops_logical_not(
     return add_unary_layer(network, input_val, operation_type, target, name)
 
 
-@tensorrt_converter(acc_ops.logical_and, no_implicit_batch_dim=True)
-@tensorrt_converter(acc_ops.bitwise_and, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.logical_and)
+@tensorrt_converter(acc_ops.bitwise_and)
 def acc_ops_logical_and(
     network: TRTNetwork,
     target: Target,
@@ -1504,7 +1504,7 @@ def acc_ops_logical_and(
     )
 
 
-@tensorrt_converter(acc_ops.ne, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.ne)
 def acc_ops_ne(
     network: TRTNetwork,
     target: Target,
@@ -1531,7 +1531,7 @@ def acc_ops_ne(
     return add_unary_layer(network, eq_t, trt.UnaryOperation.NOT, target, name)
 
 
-@tensorrt_converter(acc_ops.eq, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.eq)
 def acc_ops_eq(
     network: TRTNetwork,
     target: Target,
@@ -1556,7 +1556,7 @@ def acc_ops_eq(
     )
 
 
-@tensorrt_converter(acc_ops.gt, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.gt)
 def acc_ops_gt(
     network: TRTNetwork,
     target: Target,
@@ -1581,7 +1581,7 @@ def acc_ops_gt(
     )
 
 
-@tensorrt_converter(acc_ops.lt, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.lt)
 def acc_ops_lt(
     network: TRTNetwork,
     target: Target,
@@ -1606,7 +1606,7 @@ def acc_ops_lt(
     )
 
 
-@tensorrt_converter(acc_ops.logical_or, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.logical_or)
 def acc_ops_logical_or(
     network: TRTNetwork,
     target: Target,
@@ -1643,7 +1643,7 @@ def acc_ops_logical_or(
     )
 
 
-@tensorrt_converter(acc_ops.logical_xor, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.logical_xor)
 def acc_ops_logical_xor(
     network: TRTNetwork,
     target: Target,
@@ -1796,7 +1796,7 @@ def acc_ops_fmod(
 
 # T113156424 embedding implemenatation is very limited and shows no usage in hf models due to the indices are int64.
 # if we cast to int32, it will create accuracy issues. We'd better leave it to future implementation.
-# @tensorrt_converter(acc_ops.embedding, no_implicit_batch_dim=True)
+# @tensorrt_converter(acc_ops.embedding)
 # def acc_ops_embedding(
 #     network: TRTNetwork,
 #     target: Target,
@@ -2571,7 +2571,7 @@ def acc_ops_where(
     return select_layer.get_output(0)
 
 
-@tensorrt_converter(acc_ops.masked_fill, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.masked_fill)
 def acc_ops_masked_fill_tensor(
     network: TRTNetwork,
     target: Target,
@@ -3272,7 +3272,7 @@ def acc_ops_dequantize(
     return layer.get_output(0)
 
 
-@tensorrt_converter(acc_ops.gelu, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.gelu)
 def acc_ops_gelu(
     network: TRTNetwork,
     target: Target,
@@ -3375,7 +3375,7 @@ def acc_ops_chunk(
     return output
 
 
-@tensorrt_converter(acc_ops.cumsum, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.cumsum)
 def acc_ops_cumsum(
     network: TRTNetwork,
     target: Target,

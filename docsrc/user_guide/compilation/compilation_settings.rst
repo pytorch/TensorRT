@@ -16,7 +16,6 @@ Dynamo compilation. It is passed (directly or via keyword arguments) to
     trt_gm = torch_tensorrt.dynamo.compile(
         exported_program,
         arg_inputs=inputs,
-        use_explicit_typing=True,  # respects dtypes set in model/inputs
         min_block_size=3,
         optimization_level=4,
     )
@@ -35,13 +34,6 @@ Core Parameters
    * - Parameter
      - Default
      - Description
-   * - ``enabled_precisions`` (**DEPRECATED**)
-     - ``{dtype.f32}``
-     - Set of precisions the TensorRT builder may use. Any combination of
-       ``torch.float32``, ``torch.float16``, ``torch.bfloat16``, ``torch.int8``,
-       ``torch.float8_e4m3fn``. Adding a lower precision does not force its use — TRT
-       selects the best kernel per layer. For INT8 calibration or FP8, use ModelOpt
-       quantization first.
    * - ``min_block_size``
      - ``5``
      - Minimum number of consecutive TRT-capable operators required to form a TRT
@@ -150,13 +142,7 @@ Precision and Typing
      - ``False``
      - Insert FP32 cast nodes around matmul layers so that accumulation happens in
        FP32 even when the network runs in FP16. Improves numerical accuracy for
-       transformer models at a small throughput cost. Requires ``use_explicit_typing=True``.
-   * - ``use_explicit_typing``
-     - ``True``
-     - Respect the dtypes set in the PyTorch model (strong typing). When ``True``,
-       TRT will not silently up/downcast layers. This is the recommended approach for
-       controlling precision — set dtypes in your model/inputs directly. Required by
-       autocast and ``use_fp32_acc``.
+       transformer models at a small throughput cost.
 
 ----
 
@@ -169,8 +155,7 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
 
 .. note::
 
-   When ``enable_autocast=True``, ``use_explicit_typing`` is automatically set to
-   ``True`` as well.
+   Strong typing (explicit typing) is always enabled in the Dynamo path.
 
 .. code-block:: python
 
@@ -452,7 +437,7 @@ Engine-Invariant Settings
 Changing any of the following settings invalidates cached engines — the engine must be
 rebuilt from scratch:
 
-``enabled_precisions``, ``max_aux_streams``, ``version_compatible``,
+``max_aux_streams``, ``version_compatible``,
 ``optimization_level``, ``disable_tf32``, ``sparse_weights``,
 ``engine_capability``, ``hardware_compatible``, ``refit_identical_engine_weights``,
 ``immutable_weights``, ``enable_weight_streaming``, ``tiling_optimization_level``,

@@ -15,6 +15,7 @@ import pandas as pd
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_engine
 from utils import (
     BENCHMARK_MODELS,
@@ -24,7 +25,6 @@ from utils import (
     parse_precisions,
     precision_to_dtype,
     time_generate,
-    torch_device_from_trt,
     torch_dtype_from_trt,
 )
 
@@ -220,7 +220,6 @@ def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
     iters = params.get("iterations", 20)
 
     compilation_options = {
-        "enabled_precisions": {precision_to_dtype(precision)},
         "min_block_size": params.get("min_block_size", 1),
         "truncate_double": params.get("truncate", False),
         "immutable_weights": params.get("immutable_weights", True),
@@ -290,7 +289,6 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         return run_hf_dynamo(model, input_tensors, params, precision, batch_size)
 
     compilation_options = {
-        "enabled_precisions": {precision_to_dtype(precision)},
         "min_block_size": params.get("min_block_size", 1),
         "truncate_double": params.get("truncate", False),
         "immutable_weights": params.get("immutable_weights", True),
@@ -353,7 +351,6 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
     )
     compile_spec = {
         "inputs": input_tensors,
-        "enabled_precisions": {precision_to_dtype(precision)},
         "truncate": params.get("truncate", False),
         "min_block_size": params.get("min_block_size", 1),
         "use_python_runtime": params.get("use_python_runtime", False),
@@ -491,9 +488,13 @@ def run_onnx_trt(
             )
         start_compile = timeit.default_timer()
         builder = trt.Builder(logger)
-        network = builder.create_network(
-            1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        )
+        flag = 0
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            STRONGLY_TYPED = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+            )
+            flag |= STRONGLY_TYPED
+        network = builder.create_network(flag)
         parser = trt.OnnxParser(network, logger)
         success = parser.parse_from_file(onnx_path)
         if not success:

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -541,10 +541,7 @@ inputs = [
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Enabled precision for TensorRT optimization
-enabled_precisions = {torch.float}
-
-# Workspace size for TensorRT
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Workspace size for TensorRT
 workspace_size = 20 &lt;&lt; 30
 
 # Maximum number of TRT Engines
@@ -565,7 +562,6 @@ torch_executed_ops = {}
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Define backend compilation keyword arguments
 compilation_kwargs = {
-    &quot;enabled_precisions&quot;: enabled_precisions,
     &quot;workspace_size&quot;: workspace_size,
     &quot;min_block_size&quot;: min_block_size,
     &quot;torch_executed_ops&quot;: torch_executed_ops,

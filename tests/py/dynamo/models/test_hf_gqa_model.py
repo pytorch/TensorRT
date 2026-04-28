@@ -67,7 +67,6 @@ def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
     trt_model = torch_tensorrt.dynamo.compile(
         ep,
         inputs=[input_ids, position_ids],
-        use_explicit_typing=True,
         use_fp32_acc=True,
         device=torch.device("cuda:0"),
         min_block_size=1,

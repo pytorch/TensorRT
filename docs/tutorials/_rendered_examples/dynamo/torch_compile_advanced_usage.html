@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -617,7 +617,6 @@ model_half = Model().cuda().eval()
 # For accepted backend options, see the CompilationSettings dataclass:
 # py/torch_tensorrt/dynamo/_settings.py
 backend_kwargs = {
-    &quot;enabled_precisions&quot;: {torch.half},
     &quot;min_block_size&quot;: 2,
     &quot;torch_executed_ops&quot;: {&quot;torch.ops.aten.sub.Tensor&quot;},
     &quot;optimization_level&quot;: 4,

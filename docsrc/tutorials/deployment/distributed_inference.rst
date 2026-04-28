@@ -41,7 +41,6 @@ compiles its own TRT engine independently.
             model,
             ir="dynamo",
             arg_inputs=local_inputs,
-            use_explicit_typing=True,  # enabled_precisions deprecated; cast model/inputs to target dtype
             min_block_size=1,
         )
         output = trt_model(*local_inputs)
@@ -108,9 +107,8 @@ inference in ``distributed_context`` for safe NCCL lifecycle management:
         backend="torch_tensorrt",
         dynamic=True,
         options={
-            "use_explicit_typing": True,
-            "use_fp32_acc": True,
-            "use_python_runtime": False,  # C++ runtime
+            "use_distributed_mode_trace": True,
+            "use_python_runtime": False,
             "min_block_size": 1,
         },
     )

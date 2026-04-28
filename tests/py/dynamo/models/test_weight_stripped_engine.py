@@ -35,7 +35,6 @@ class TestWeightStrippedEngine(TestCase):
 
         settings = {
             "use_python_runtime": False,
-            "enabled_precisions": {torch.float},
             "min_block_size": 1,
             "immutable_weights": False,
             "strip_engine_weights": False,
@@ -85,7 +84,6 @@ class TestWeightStrippedEngine(TestCase):
 
         settings = {
             "use_python_runtime": False,
-            "enabled_precisions": {torch.float},
             "min_block_size": 1,
             "immutable_weights": False,
             "strip_engine_weights": True,
@@ -172,7 +170,6 @@ class TestWeightStrippedEngine(TestCase):
             exp_program,
             tuple(inputs),
             use_python_runtime=True,
-            enabled_precisions={torch.float},
             min_block_size=1,
             immutable_weights=False,
             strip_engine_weights=True,
@@ -197,7 +194,6 @@ class TestWeightStrippedEngine(TestCase):
             backend="tensorrt",
             options={
                 "use_python_runtime": False,
-                "enabled_precisions": {torch.float},
                 "min_block_size": 1,
                 "immutable_weights": False,
                 "cache_built_engines": False,
@@ -244,7 +240,6 @@ class TestWeightStrippedEngine(TestCase):
             exp_program,
             tuple(example_inputs),
             use_python_runtime=True,
-            enabled_precisions={torch.float},
             min_block_size=1,
             immutable_weights=False,
             strip_engine_weights=False,
@@ -322,7 +317,6 @@ class TestWeightStrippedEngine(TestCase):
                 exp_program,
                 tuple(inputs),
                 use_python_runtime=True,
-                enabled_precisions={torch.float},
                 min_block_size=1,
                 immutable_weights=False,
                 cache_built_engines=cache_built_engines,
@@ -406,7 +400,6 @@ class TestWeightStrippedEngine(TestCase):
                 backend="tensorrt",
                 options={
                     "use_python_runtime": False,
-                    "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -483,7 +476,6 @@ class TestWeightStrippedEngine(TestCase):
                 backend="tensorrt",
                 options={
                     "use_python_runtime": True,
-                    "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,
@@ -609,7 +601,6 @@ class TestWeightStrippedEngine(TestCase):
             exp_program,
             tuple(example_inputs),
             use_python_runtime=True,
-            enabled_precisions={torch.float},
             min_block_size=1,
             immutable_weights=False,
             strip_engine_weights=True,
@@ -662,7 +653,6 @@ class TestWeightStrippedEngine(TestCase):
             exp_program,
             inputs,
             use_python_runtime=True,
-            enabled_precisions={torch.float},
             min_block_size=1,
             immutable_weights=False,
             cache_built_engines=False,
@@ -703,7 +693,6 @@ class TestWeightStrippedEngine(TestCase):
             backend="tensorrt",
             options={
                 "use_python_runtime": False,
-                "enabled_precisions": {torch.float},
                 "min_block_size": 1,
                 "immutable_weights": False,
                 "cache_built_engines": False,

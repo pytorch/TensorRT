@@ -135,21 +135,12 @@ def get_model(args, device_mesh):
 
 
 def compile_torchtrt(model, args):
-    if args.precision == "FP16":
-        enabled_precisions = {torch.float16}
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-    else:
-        enabled_precisions = {torch.float32}
-
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_model = torch.compile(
             model,
             backend="torch_tensorrt",
             dynamic=True,
             options={
-                "enabled_precisions": enabled_precisions,
-                "use_explicit_typing": True,
                 "use_fp32_acc": True,
                 "device": DEVICE,
                 "disable_tf32": True,

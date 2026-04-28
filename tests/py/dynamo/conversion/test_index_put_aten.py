@@ -430,7 +430,6 @@ class TestIndexPutConverter(DispatchTestCase):
             inputs=[source_tensor, value_tensor],
             enable_passes=True,
             use_dynamo_tracer=True,
-            use_explicit_typing=True,
         )
 
     def test_index_add_dynamic_shape(self):
@@ -470,9 +469,7 @@ class TestIndexPutConverter(DispatchTestCase):
         trt_mod = torchtrt.dynamo.compile(
             ep,
             inputs,
-            enabled_precisions={torch.float16},
             min_block_size=1,
-            use_explicit_typing=False,
             use_fp32_acc=False,
             disable_tf32=True,
         )
@@ -504,9 +501,7 @@ class TestIndexPutConverter(DispatchTestCase):
         trt_engine = torchtrt.dynamo.compile(
             ep,
             inputs=(source_tensor, indices_tensor, value_tensor),
-            enabled_precisions={torch.float32},
             min_block_size=1,
-            use_explicit_typing=False,
             use_fp32_acc=False,
             disable_tf32=True,
             use_python_runtime=True,
@@ -614,7 +609,6 @@ class TestIndexPutConverter(DispatchTestCase):
                     dtype=torch.long,
                 ),
             ],
-            use_explicit_typing=True,
             min_block_size=1,
         )
 
@@ -913,7 +907,6 @@ class TestIndexPutConverter(DispatchTestCase):
             inputs=[tokens, cache],
             use_dynamo_tracer=True,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
     @pytest.mark.skipif(
@@ -958,7 +951,6 @@ class TestIndexPutConverter(DispatchTestCase):
             inputs=[token_ids, accum],
             use_dynamo_tracer=True,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
     @pytest.mark.skipif(
@@ -1003,7 +995,6 @@ class TestIndexPutConverter(DispatchTestCase):
             inputs=[signal, hist],
             use_dynamo_tracer=True,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
 

@@ -22,8 +22,7 @@ trigger JIT kernel selection:
     import torch
     import torch_tensorrt
 
-    trt_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs,
-                                       use_explicit_typing=True)  # use model/input dtypes
+    trt_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
 
     # Warm up — these runs don't count
     for _ in range(5):
@@ -72,14 +71,7 @@ Using the Right Precision
 The single biggest speedup lever is precision. TRT can run in FP32, FP16, BF16,
 INT8, or FP8 — but only if you tell it to.
 
-.. deprecated::
-
-    ``enabled_precisions`` is deprecated as of TensorRT 10.12. Use
-    ``use_explicit_typing=True`` (the default) and specify precision by casting
-    your model and inputs to the desired dtype, or use ``enable_autocast=True``
-    for automatic mixed precision. See :ref:`mixed_precision` for details.
-
-**Explicit typing (recommended)** — cast your model and inputs to the target dtype:
+**Explicit typing (strong typing, always enabled)** — cast your model and inputs to the target dtype:
 
 .. code-block:: python
 
@@ -88,7 +80,6 @@ INT8, or FP8 — but only if you tell it to.
     inputs = [inp.half() for inp in inputs]
     trt_model = torch_tensorrt.compile(
         model, ir="dynamo", arg_inputs=inputs,
-        use_explicit_typing=True,  # default; TRT respects the dtypes in the model
     )
 
 **Autocast** — let Torch-TensorRT automatically lower eligible layers to a reduced precision:
@@ -97,7 +88,6 @@ INT8, or FP8 — but only if you tell it to.
 
     trt_model = torch_tensorrt.compile(
         model, ir="dynamo", arg_inputs=inputs,
-        use_explicit_typing=True,
         enable_autocast=True,
         autocast_low_precision_type=torch.float16,
     )
@@ -113,19 +103,19 @@ INT8, or FP8 — but only if you tell it to.
      - Default (model weights/inputs in FP32)
      - Accuracy-critical, no speedup vs PyTorch
    * - FP16
-     - ``model.half()`` + ``use_explicit_typing=True``
+     - ``model.half()`` + inputs in FP16
      - Standard choice; 2–3× speedup on Volta+
    * - BF16
-     - ``model.bfloat16()`` + ``use_explicit_typing=True``
+     - ``model.bfloat16()`` + inputs in BF16
      - Better numerical range than FP16; Ampere+
    * - FP16 mixed (autocast)
      - ``enable_autocast=True, autocast_low_precision_type=torch.float16``
      - Automatically keeps sensitive layers in FP32
    * - INT8 (with calibration)
-     - ModelOpt QDQ nodes + ``use_explicit_typing=True``
+     - ModelOpt QDQ nodes
      - Highest throughput; requires ModelOpt quantization
    * - FP8 (Hopper+)
-     - ModelOpt FP8 QDQ nodes + ``use_explicit_typing=True``
+     - ModelOpt FP8 QDQ nodes
      - Best accuracy–throughput tradeoff for LLMs on H100
 
 See :ref:`quantization` for the full INT8/FP8 workflow.
@@ -224,8 +214,7 @@ eliminate kernel launch overhead by recording the CUDA op sequence and replaying
 
     import torch_tensorrt
 
-    trt_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs,
-                                       use_explicit_typing=True)
+    trt_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
 
     with torch.no_grad():
         with torch_tensorrt.runtime.enable_cudagraphs(trt_model) as cg_model:
@@ -257,7 +246,6 @@ the compiled engine to disk so subsequent runs skip the compilation step:
         model,
         ir="dynamo",
         arg_inputs=inputs,
-        use_explicit_typing=True,
         cache_built_engines=True,
         reuse_cached_engines=True,
     )
@@ -278,7 +266,6 @@ weights on-demand from CPU. This reduces peak GPU memory at the cost of some thr
 
     trt_model = torch_tensorrt.compile(
         model, ir="dynamo", arg_inputs=inputs,
-        use_explicit_typing=True,
         # enable weight streaming at compile time
         enable_weight_streaming=True,
     )
@@ -343,7 +330,7 @@ Benchmarking Checklist
    * - ☐
      - Warm up the baseline model the same way
    * - ☐
-     - Use FP16 precision (``model.half()`` + ``use_explicit_typing=True``, or ``enable_autocast=True``) unless you need FP32
+     - Use FP16 precision (``model.half()`` with FP16 inputs, or ``enable_autocast=True``) unless you need FP32
    * - ☐
      - Run ``dryrun=True`` to confirm TRT coverage is high
    * - ☐

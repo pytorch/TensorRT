@@ -103,7 +103,7 @@ See :ref:`resource_management` for a complete guide. In brief:
     # Budget is restored to the original value on exit
 
 ``weight_streaming`` requires the model to be compiled with
-``enable_weight_streaming=True`` and ``use_explicit_typing=True``.
+``enable_weight_streaming=True``.
 
 ----
 

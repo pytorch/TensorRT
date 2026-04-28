@@ -53,7 +53,6 @@ def compile_torchtrt(model, args):
             backend="torch_tensorrt",
             dynamic=True,
             options={
-                "use_explicit_typing": True,
                 # "use_fp32_acc": True,
                 "device": DEVICE,
                 "disable_tf32": True,

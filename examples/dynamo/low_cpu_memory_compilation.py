@@ -54,12 +54,10 @@ model = net().eval()
 model.to("cuda")
 inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
 
-enabled_precisions = {torch.float}
 use_python_runtime = False
 
 compilation_options = {
     "use_python_runtime": use_python_runtime,
-    "enabled_precisions": enabled_precisions,
     "min_block_size": 1,
     "immutable_weights": True,
     "reuse_cached_engines": False,
