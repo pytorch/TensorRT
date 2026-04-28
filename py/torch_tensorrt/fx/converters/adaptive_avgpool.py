@@ -31,7 +31,4 @@ def adaptive_avgpool2d(network, submod, args, kwargs, name):
     layer.stride = stride
     layer.name = name
 
-    if input_val.dynamic_range:
-        mark_as_int8_layer(layer, input_val.dynamic_range)
-
     return layer.get_output(0)
