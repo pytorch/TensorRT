@@ -81,5 +81,14 @@ jobs:
         cmake --build "${EXECUTORCH_BUILD}" --target executorch_core -j"$(nproc)"
 
         export EXECUTORCH_ROOT="${EXECUTORCH_SRC}"
-        bazel build //:executorch_trt_backend --compilation_mode opt --config=linux
+        export EXECUTORCH_SOURCE_DIR="${EXECUTORCH_SRC}"
+        export PYTHONPATH="$(dirname "${EXECUTORCH_SRC}")${PYTHONPATH:+:${PYTHONPATH}}"
+        python - <<'PY'
+        import executorch.exir
+
+        print("ExecuTorch Python package is available:", executorch.exir.__file__)
+        PY
+        # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
+        # this is to verify the end user's workflow
+        .github/scripts/verify-executorch-reference-runner.sh
