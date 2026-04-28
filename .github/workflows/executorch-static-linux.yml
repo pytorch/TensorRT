@@ -78,6 +78,27 @@ jobs:
 
         print("ExecuTorch Python package is available:", executorch.exir.__file__)
         PY
+
+        BAZELISK_VERSION="1.26.0"
+        case "$(uname -m)" in
+          aarch64|arm64)
+            BAZEL_PLATFORM="arm64"
+            ;;
+          x86_64|amd64)
+            BAZEL_PLATFORM="amd64"
+            ;;
+          *)
+            echo "Unsupported Bazelisk platform: $(uname -m)"
+            exit 1
+            ;;
+        esac
+        mkdir -p "${RUNNER_TEMP}/bin"
+        curl -L "https://github.com/bazelbuild/bazelisk/releases/download/v${BAZELISK_VERSION}/bazelisk-linux-${BAZEL_PLATFORM}" \
+          -o "${RUNNER_TEMP}/bin/bazel"
+        chmod +x "${RUNNER_TEMP}/bin/bazel"
+        export PATH="${RUNNER_TEMP}/bin:${PATH}"
+        bazel --version
+
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
         # this is to verify the end user's workflow

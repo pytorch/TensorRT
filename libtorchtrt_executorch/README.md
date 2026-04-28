@@ -31,8 +31,7 @@ target_link_libraries(
 ```
 
 The backend archive is available as the `executorch_trt_backend` CMake target
-and is written to `lib/libexecutorch_trt_backend.a` under the build tree used
-for this package.
+and is written to `${CMAKE_BINARY_DIR}/lib/libexecutorch_trt_backend.a`.
 
 ## Standalone Backend Archive
 

@@ -56,7 +56,7 @@ The build also creates the executorch core and tensorrt backend archive as a dep
 
 ```text
 build-executorch-reference-runner/executorch/libexecutorch_core.a
-build-executorch-reference-runner/libtorchtrt_executorch/lib/libexecutorch_trt_backend.a
+build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 ```
 
 ## Load And Run A `.pte` Model
