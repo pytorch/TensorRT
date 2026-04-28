@@ -27,10 +27,6 @@ endif()
 add_subdirectory(core)
 add_subdirectory(cpp)
 
-if(BUILD_TORCHTRT_EXECUTORCH)
-  add_subdirectory(examples/torchtrt_executorch_example)
-endif()
-
 include(CMakePackageConfigHelpers)
 
 configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in

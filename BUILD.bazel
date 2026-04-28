@@ -139,6 +139,7 @@ filegroup(
         "LICENSE",
         "cmake/Modules/FindTensorRT.cmake",
         "examples/executorch_reference_runner/CMakeLists.txt",
+        "examples/executorch_reference_runner/README.md",
         "examples/executorch_reference_runner/main.cpp",
         "//core/runtime:DeviceList.cpp",
         "//core/runtime:Platform.cpp",
