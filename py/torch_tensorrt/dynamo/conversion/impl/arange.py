@@ -61,6 +61,23 @@ def arange(
     else:
         # All arguments are static, so use NumPy arange and create a TRT constant
         arr = np.arange(start, end, step, dtype=np.int32)
+        if arr.size == 0:
+            # TensorRT may reject zero-sized constants. Build an empty tensor by
+            # slicing a non-empty constant down to shape (0,) instead.
+            seed = np.zeros((1,), dtype=np.int32)
+            seed_weights = trt.Weights(seed)
+            seed_layer = ctx.net.add_constant(seed.shape, seed_weights)
+            set_layer_name(seed_layer, target, f"{name}_arange_seed", source_ir)
+            return impl.slice.slice(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_arange_empty",
+                seed_layer.get_output(0),
+                (0,),
+                (0,),
+                (1,),
+            )
         weights = trt.Weights(arr)
         const_layer = ctx.net.add_constant(arr.shape, weights)
         set_layer_name(const_layer, target, f"{name}_arange_const", source_ir)

@@ -97,6 +97,9 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     if input.shape[dim] != -1 and isinstance(start, int) and isinstance(stop, int):
         start = get_positive_dim(start, input.shape[dim])
         stop = get_positive_dim(stop, input.shape[dim])
+        # Narrow for mypy: both args were int, so the (int, int) -> int
+        # overload of get_positive_dim applies.
+        assert isinstance(start, int) and isinstance(stop, int)
         start_slice[dim] = start
     else:
         # the start and stop or None is dynamic along dim or or start or stop is an ITensor
@@ -209,6 +212,11 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             layer.set_input(3, stride_slice_tensor)
             return layer.get_output(0)
 
+    # By this point both start and stop must be int: the only path that
+    # reaches here without int-narrowing is the outer-else / inner-if branch
+    # which always returns at the add_slice above. The assert documents
+    # this for both readers and mypy.
+    assert isinstance(start, int) and isinstance(stop, int)
     output_shape[dim] = math.ceil((stop - start) / step)
     return slice(
         ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
@@ -224,7 +232,18 @@ def expand(
     shape: Shape,
 ) -> TRTTensor:
     shape_rank = len(shape)
-    initial_tensor_rank = len(input_t.shape)
+    # trt.Dims.__len__() can return -1 when the tensor rank is unknown at
+    # build time (e.g. from a shuffle layer with a dynamic shape-tensor
+    # input), which makes both len() and tuple() raise
+    # "ValueError: __len__() should return >= 0".
+    try:
+        input_t_shape = tuple(input_t.shape)
+    except ValueError:
+        input_t_shape = None
+
+    initial_tensor_rank = (
+        len(input_t_shape) if input_t_shape is not None else shape_rank
+    )
 
     # If the rank of the input tensor is less than the shape's rank, pad with ones
     if initial_tensor_rank < shape_rank:
@@ -234,53 +253,96 @@ def expand(
             name + "_expand_broadcast",
             shape_rank - initial_tensor_rank,
         )
+        try:
+            input_t_shape = tuple(input_t.shape)
+        except ValueError:
+            input_t_shape = None
     # If the rank of the input tensor is more than the shape's rank, raise error
     elif initial_tensor_rank > shape_rank:
         raise RuntimeError(
-            f"expand called with {shape_rank}-dimensional shape on Tensor with {len(shape)} dimensions. "
+            f"expand called with {shape_rank}-dimensional shape on Tensor with "
+            f"{initial_tensor_rank} dimensions. "
             "Cannot expand to shape with rank smaller than original tensor."
         )
 
     # After the above padding, the shape and tensor rank must be equal
-    assert len(input_t.shape) == shape_rank
+    if input_t_shape is not None:
+        assert len(input_t_shape) == shape_rank
 
     # Configure the start, strides and output shape tensors
     start = tuple([0] * shape_rank)
 
     # stride[dim]=0 implies that dimension is being broadcasted.
     # stride should be 1 for all non-broadcasted dims
-    stride = []
-    input_tensor_shape = tuple(input_t.shape)
-    for i, o in zip(input_tensor_shape, shape):
-        # If input dim and target shape dim are static, broadcast if they are not equal
-        # If input dim is known and target shape dim is dynamic we treat it as a broadcasted dim
-        if (
-            isinstance(i, int)
-            and i != DYNAMIC_DIM
-            and isinstance(o, int)
-            and o != DYNAMIC_DIM
-        ):
-            stride.append(int(i == o))
-        elif isinstance(i, int) and i != DYNAMIC_DIM and isinstance(o, TRTTensor):
-            stride.append(0)
-        else:
-            # No broadcasting is happening. The output should have the same size as input at this dimension.
-            stride.append(1)
+    stride_is_tensor = False
+    if input_t_shape is not None:
+        stride = []
+        input_tensor_shape = input_t_shape
+        for i, o in zip(input_tensor_shape, shape):
+            # If input dim and target shape dim are static, broadcast if they are not equal
+            # If input dim is known and target shape dim is dynamic we treat it as a broadcasted dim
+            if (
+                isinstance(i, int)
+                and i != DYNAMIC_DIM
+                and isinstance(o, int)
+                and o != DYNAMIC_DIM
+            ):
+                stride.append(int(i == o))
+            elif isinstance(i, int) and i != DYNAMIC_DIM and isinstance(o, TRTTensor):
+                stride.append(0)
+            else:
+                # No broadcasting is happening. The output should have the same size as input at this dimension.
+                stride.append(1)
+    else:
+        # Input shape is unknown at build time. Determine broadcast dims at
+        # runtime: stride[d] = 0 when input dim == 1 (broadcast), 1 otherwise.
+        # This is equivalent to: stride[d] = int(input_dim > 1).
+        dyn_shape_layer = ctx.net.add_shape(input_t)
+        set_layer_name(dyn_shape_layer, target, name + "_dyn_shape", source_ir)
+        dyn_shape_i32 = ctx.net.add_identity(dyn_shape_layer.get_output(0))
+        dyn_shape_i32.set_output_type(0, trt.int32)
+        set_layer_name(dyn_shape_i32, target, name + "_dyn_shape_i32", source_ir)
+        ones_t = get_trt_tensor(
+            ctx, np.ones(shape_rank, dtype=np.int32), name + "_expand_ones"
+        )
+        gt_layer = ctx.net.add_elementwise(
+            dyn_shape_i32.get_output(0), ones_t, trt.ElementWiseOperation.GREATER
+        )
+        set_layer_name(gt_layer, target, name + "_stride_gt", source_ir)
+        # GREATER returns bool; cast to int32 for use as stride values.
+        stride_i32 = ctx.net.add_identity(gt_layer.get_output(0))
+        stride_i32.set_output_type(0, trt.int32)
+        set_layer_name(stride_i32, target, name + "_stride_i32", source_ir)
+        stride = stride_i32.get_output(0)
+        stride_is_tensor = True
 
     # Resolve dynamic dimensions in the target shape. These are not broadcasted dims.
     # The value at this dimension should be same as input.
     target_shape = []
     for i in range(shape_rank):
         if shape[i] == DYNAMIC_DIM:
-            target_shape.append(
-                get_shape(ctx, target, source_ir, name + f"_shape_dim{i}", input_t, i)
-            )
+            if input_t_shape is not None:
+                target_shape.append(
+                    get_shape(
+                        ctx, target, source_ir, name + f"_shape_dim{i}", input_t, i
+                    )
+                )
+            else:
+                # get_shape() also calls len(input.shape) internally, so
+                # extract the dimension via add_shape + gather directly.
+                sl = ctx.net.add_shape(input_t)
+                set_layer_name(sl, target, name + f"_shape_l_{i}", source_ir)
+                idx_t = get_trt_tensor(ctx, i, name + f"_dim_idx_{i}")
+                gl = ctx.net.add_gather(sl.get_output(0), idx_t, axis=0)
+                set_layer_name(gl, target, name + f"_gather_dim{i}", source_ir)
+                target_shape.append(gl.get_output(0))
         else:
             target_shape.append(shape[i])
 
     target_shape_t = target_shape
-    # Handle dynamic shapes case where shape has dynamic dimension
-    if any(isinstance(ele, TRTTensor) for ele in target_shape_t):
+    # Handle dynamic shapes case where shape has dynamic dimension or
+    # stride was computed as a runtime tensor.
+    if any(isinstance(ele, TRTTensor) for ele in target_shape_t) or stride_is_tensor:
         target_shape_t = cat(
             ctx,
             target,
@@ -299,15 +361,18 @@ def expand(
             0,
             cast_dtype=trt.int32,
         )
-        stride_tensor = cat(
-            ctx,
-            target,
-            source_ir,
-            name + "_stride_concat",
-            stride,
-            0,
-            cast_dtype=trt.int32,
-        )
+        if stride_is_tensor:
+            stride_tensor = stride
+        else:
+            stride_tensor = cat(
+                ctx,
+                target,
+                source_ir,
+                name + "_stride_concat",
+                stride,
+                0,
+                cast_dtype=trt.int32,
+            )
         layer = ctx.net.add_slice(
             input_t, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
         )
