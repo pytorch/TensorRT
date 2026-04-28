@@ -91,8 +91,11 @@ with open("model.pte", "wb") as f:
 
 ## C++ Runner
 
-This repo includes a minimal C++ loader example in
-`examples/torchtrt_executorch_example/executor_runner.cpp`.
+This repo includes a C++ reference runner in
+`examples/executorch_reference_runner/main.cpp`. It follows the ExecuTorch
+CMake integration pattern: clone ExecuTorch next to the unpacked
+`libtorchtrt_executorch` source package, add both directories with CMake, and
+link the runner against `torchtrt::executorch_backend`.
 
 The corresponding Bazel target statically links the TensorRT backend into the
 application binary:
@@ -101,10 +104,15 @@ application binary:
 bazel build //examples/torchtrt_executorch_example:trt_executor_runner
 ```
 
-There is also a matching CMake path for local source builds:
+For the CMake source package flow:
 
 ```bash
-export EXECUTORCH_ROOT=/home/lanl/git/executorch
+mkdir user_runner_project
+cd user_runner_project
+git clone https://github.com/pytorch/executorch.git
+tar -xzf /path/to/libtorchtrt_executorch.tar.gz
+
+export EXECUTORCH_ROOT="${PWD}/executorch"
 export CMAKE_PREFIX_PATH=/home/lanl/miniconda3/envs/torch_tensorrt_py310/lib/python3.10/site-packages/torch/share/cmake
 
 # 1. Build the ExecuTorch runtime static library.
@@ -114,30 +122,31 @@ cmake -S "${EXECUTORCH_ROOT}" -B "${EXECUTORCH_ROOT}/cmake-out" \
   -DEXECUTORCH_BUILD_PYBIND=OFF \
   -DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON \
   -DEXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR=ON \
-  -DEXECUTORCH_BUILD_EXTENSION_MODULE=ON
+  -DEXECUTORCH_BUILD_EXTENSION_MODULE=ON \
+  -DEXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP=ON
 cmake --build "${EXECUTORCH_ROOT}/cmake-out" --target executorch_core -j
 
-# 2. Configure Torch-TensorRT with ExecuTorch support.
-cmake -S . -B build-executorch \
-  -DBUILD_TORCHTRT_EXECUTORCH=ON \
+# 2. Build the standalone TensorRT backend archive.
+cmake -S libtorchtrt_executorch -B build-libtorchtrt-executorch \
   -DEXECUTORCH_ROOT="${EXECUTORCH_ROOT}" \
-  -DEXECUTORCH_CORE_LIBRARY="${EXECUTORCH_ROOT}/cmake-out/libexecutorch_core.a" \
   -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+cmake --build build-libtorchtrt-executorch --target executorch_trt_backend -j
 
-# 3. Build the standalone ExecuTorch TensorRT backend archive.
-cmake --build build-executorch --target executorch_trt_backend -j
-
-# 4. Build the runtime-only runner binary.
-cmake --build build-executorch --target trt_executor_runner -j
+# 3. Configure and build the reference runner.
+cmake -S libtorchtrt_executorch/examples/executorch_reference_runner \
+  -B build-executorch-reference-runner \
+  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+cmake --build build-executorch-reference-runner --target my_runner -j
 ```
 
 This produces:
 
 - `EXECUTORCH_ROOT/cmake-out/libexecutorch_core.a`
-- `build-executorch/lib/libexecutorch_trt_backend.a`
-- `build-executorch/bin/trt_executor_runner`
+- `build-libtorchtrt-executorch/lib/libexecutorch_trt_backend.a`
+- `build-executorch-reference-runner/lib/libexecutorch_trt_backend.a`
+- `build-executorch-reference-runner/my_runner`
 
-The `trt_executor_runner` binary statically links the application code,
+The `my_runner` binary statically links the application code,
 ExecuTorch runtime integration, and the TensorRT ExecuTorch backend. It still
 depends on the TensorRT, CUDA, and LibTorch shared libraries present on the
 system, but it does not require the `torch_tensorrt` Python wheel at runtime.
@@ -147,7 +156,7 @@ Use it with a generated `.pte` file:
 ```bash
 ./bazel-bin/examples/torchtrt_executorch_example/trt_executor_runner --model_path=/path/to/model.pte
 # or
-./build-executorch/bin/trt_executor_runner --model_path=/path/to/model.pte
+./build-executorch-reference-runner/my_runner --model_path=/path/to/model.pte
 ```
 
 ## Export vs Runtime
