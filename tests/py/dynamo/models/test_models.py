@@ -40,7 +40,6 @@ def test_resnet18(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
@@ -70,7 +69,6 @@ def compile_one(idx: int, ir: str):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
@@ -121,7 +119,6 @@ def test_resnet18_cpu_offload(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
@@ -170,8 +167,6 @@ def test_resnet18_torch_exec_ops(ir):
             )
         ],
         "ir": ir,
-        "use_explicit_typing": False,
-        "enabled_precisions": {torch.float32, torch.float16},
         "min_block_size": 1,
         "output_format": "exported_program",
         "cache_built_engines": True,
@@ -211,7 +206,6 @@ def test_mobilenet_v2(ir, dtype):
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
-        "use_explicit_typing": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -255,7 +249,6 @@ def test_efficientnet_b0(ir, dtype):
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
-        "use_explicit_typing": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -313,7 +306,6 @@ def test_bert_base_uncased(ir, dtype):
         "min_block_size": 15,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
-        "use_explicit_typing": True,
         "attn_bias_is_causal": False,  # BERT uses bidirectional self-attention instead of causal
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -359,7 +351,6 @@ def test_bert_base_uncased_cpu_offload(ir):
             ),
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "truncate_double": True,
         "ir": ir,
         "pass_through_build_failures": True,
@@ -408,8 +399,6 @@ def test_resnet18_half(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "use_explicit_typing": False,
-        "enabled_precisions": {torch.half},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
@@ -506,8 +495,6 @@ def test_cosmos_true_div(ir):
         trt_model = torchtrt.dynamo.compile(
             ep,
             inputs=(hidden_states,),
-            enabled_precisions={torch.bfloat16},
-            use_explicit_typing=False,
             use_fp32_acc=False,
             device="cuda:0",
             disable_tf32=True,
@@ -550,13 +537,11 @@ def test_bf16_model(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float32},
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
-        "use_explicit_typing": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -597,13 +582,11 @@ def test_bf16_fallback_model(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float32},
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
-        "use_explicit_typing": True,
         "torch_executed_ops": {"torch.ops.aten.relu.default"},
     }
 

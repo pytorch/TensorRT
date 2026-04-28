@@ -141,7 +141,6 @@ class TestScaledDotProductAttention(DispatchTestCase):
             atol=1e-2,
             precision=dtype,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
     @parameterized.expand(
@@ -277,7 +276,6 @@ class TestScaledDotProductAttention(DispatchTestCase):
             atol=1e-2,
             precision=dtype,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
     @parameterized.expand(
@@ -506,7 +504,6 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             atol=1e-2,
             precision=dtype,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
     @parameterized.expand(
@@ -613,7 +610,6 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             atol=1e-2,
             precision=dtype,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
 

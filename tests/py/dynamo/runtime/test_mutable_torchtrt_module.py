@@ -222,7 +222,6 @@ def test_resnet18():
 
     compile_spec = {
         "use_python_runtime": False,
-        "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }
 
@@ -269,7 +268,6 @@ def test_save():
     # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     compile_spec = {
         "use_python_runtime": False,
-        "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }
 
@@ -309,7 +307,6 @@ def test_resnet18_modify_attribute():
 
     compile_spec = {
         "use_python_runtime": False,
-        "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }
 
@@ -354,7 +351,6 @@ def test_resnet18_modify_attribute_no_refit():
 
     compile_spec = {
         "use_python_runtime": False,
-        "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }
 
@@ -433,7 +429,6 @@ def test_custom_model_with_kwarg():
     }
 
     compile_spec = {
-        "enabled_precisions": {torch.float},
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 1,
@@ -498,7 +493,6 @@ def test_custom_model_with_inplace_init():
     args = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
     compile_spec = {
-        "enabled_precisions": {torch.float},
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 1,
@@ -565,7 +559,6 @@ def test_custom_model_with_init_recompile():
     args = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
     compile_spec = {
-        "enabled_precisions": {torch.float},
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 1,
@@ -638,7 +631,6 @@ def test_custom_model_with_kwarg_different_input():
     }
 
     compile_spec = {
-        "enabled_precisions": {torch.float},
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 1,

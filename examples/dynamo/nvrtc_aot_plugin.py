@@ -20,7 +20,6 @@ The example performs a simple pointwise Sigmoid operation: f(x) = 1 / (1 + exp(-
 from typing import List, Tuple, Union
 
 import torch
-
 import torch_tensorrt
 
 # ============================================================================
@@ -232,7 +231,6 @@ if __name__ == "__main__":
         model_trt = torch_tensorrt.compile(
             model,
             inputs=trt_inputs,
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         print("Model compiled successfully!")

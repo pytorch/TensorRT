@@ -235,14 +235,9 @@ with torch.no_grad():
         input_tensor = images.cuda()
 
         exp_program = torch.export.export(model, (input_tensor,), strict=False)
-        if args.quantize_type == "int8":
-            enabled_precisions = {torch.int8}
-        elif args.quantize_type == "fp8":
-            enabled_precisions = {torch.float8_e4m3fn}
         trt_model = torchtrt.dynamo.compile(
             exp_program,
             inputs=[input_tensor],
-            enabled_precisions=enabled_precisions,
             min_block_size=1,
         )
         # You can also use torch compile path to compile the model with Torch-TensorRT:

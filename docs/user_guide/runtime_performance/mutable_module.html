@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../_static/documentation_options.js?v=166e5273"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -549,7 +549,6 @@ stays identical:</p>
 <span class="c1"># The only extra line you need</span>
 <span class="n">pipe</span><span class="o">.</span><span class="n">unet</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span>
     <span class="n">pipe</span><span class="o">.</span><span class="n">unet</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># pipeline already loaded in float16 via torch_dtype</span>
     <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
@@ -606,10 +605,7 @@ automatically on the next forward call:</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">mutable_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># enabled_precisions deprecated</span>
-<span class="p">)</span>
+<span class="n">mutable_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 
@@ -649,7 +645,6 @@ triggers a fresh compilation on the next forward pass.</p>
 recompiling on subsequent process starts:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mutable_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># enabled_precisions deprecated</span>
     <span class="n">cache_built_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">engine_cache_size</span><span class="o">=</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">,</span>  <span class="c1"># 1 GiB</span>

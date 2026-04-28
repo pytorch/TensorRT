@@ -119,24 +119,14 @@ def compile_torchtrt(model, input_ids, args):
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
     # Set precision specific flags
     use_fp32_acc = False
-    use_explicit_typing = False
     if args.model_precision == "FP16":
-        enabled_precisions = {torch.float32}
         use_fp32_acc = True
-        use_explicit_typing = True
-    elif args.model_precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
-        use_fp32_acc = False
-    else:
-        enabled_precisions = {torch.float32}
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[input_ids, position_ids],
-            enabled_precisions=enabled_precisions,
             # truncate_double=True,
-            use_explicit_typing=use_explicit_typing,
             use_fp32_acc=use_fp32_acc,
             device=DEVICE,
             disable_tf32=True,

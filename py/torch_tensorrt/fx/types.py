@@ -8,7 +8,7 @@ if hasattr(trt, "__version__"):
     TRTTensor = trt.tensorrt.ITensor
     TRTLayer = trt.ILayer
     TRTPluginFieldCollection = trt.PluginFieldCollection
-    TRTPlugin = trt.IPluginV2
+    TRTPlugin = trt.IPluginV3
     TRTDataType = trt.DataType
     TRTElementWiseOp = trt.ElementWiseOperation
 else:
@@ -16,7 +16,7 @@ else:
     TRTTensor = "trt.tensorrt.ITensor"
     TRTLayer = "trt.ILayer"
     TRTPluginFieldCollection = "trt.PluginFieldCollection"
-    TRTPlugin = "trt.IPluginV2"
+    TRTPlugin = "trt.IPluginV3"
     TRTDataType = "trt.DataType"
     TRTElementWiseOp = "trt.ElementWiseOperation"
 

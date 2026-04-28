@@ -105,15 +105,28 @@ std::vector<int64_t> InterpolatePlugin::getOutputSize() {
   return size_;
 }
 
-int InterpolatePlugin::getNbOutputs() const noexcept {
-  if (mode_ == "adaptive_max_pool2d") {
-    return 2;
-  } else {
-    return 1;
+// IPluginV3
+
+nvinfer1::IPluginCapability* InterpolatePlugin::getCapabilityInterface(nvinfer1::PluginCapabilityType type) noexcept {
+  switch (type) {
+    case nvinfer1::PluginCapabilityType::kBUILD:
+      return static_cast<nvinfer1::IPluginV3OneBuild*>(this);
+    case nvinfer1::PluginCapabilityType::kRUNTIME:
+      return static_cast<nvinfer1::IPluginV3OneRuntime*>(this);
+    case nvinfer1::PluginCapabilityType::kCORE:
+      return static_cast<nvinfer1::IPluginV3OneCore*>(this);
+    default:
+      return nullptr;
   }
 }
 
-const char* InterpolatePlugin::getPluginType() const noexcept {
+nvinfer1::IPluginV3* InterpolatePlugin::clone() noexcept {
+  return new InterpolatePlugin(in_shape_, out_shape_, size_, scales_, mode_, align_corners_, use_scales_);
+}
+
+// IPluginV3OneCore
+
+const char* InterpolatePlugin::getPluginName() const noexcept {
   return "Interpolate";
 }
 
@@ -125,87 +138,56 @@ const char* InterpolatePlugin::getPluginNamespace() const noexcept {
   return "torch_tensorrt";
 }
 
-nvinfer1::IPluginV2DynamicExt* InterpolatePlugin::clone() const noexcept {
-  return new InterpolatePlugin(in_shape_, out_shape_, size_, scales_, mode_, align_corners_, use_scales_);
+// IPluginV3OneBuild
+
+int32_t InterpolatePlugin::getNbOutputs() const noexcept {
+  if (mode_ == "adaptive_max_pool2d") {
+    return 2;
+  } else {
+    return 1;
+  }
 }
 
-nvinfer1::DimsExprs InterpolatePlugin::getOutputDimensions(
-    int outputIndex,
+int32_t InterpolatePlugin::getOutputShapes(
     const nvinfer1::DimsExprs* inputs,
-    int nbInputs,
+    int32_t nbInputs,
+    const nvinfer1::DimsExprs* shapeInputs,
+    int32_t nbShapeInputs,
+    nvinfer1::DimsExprs* outputs,
+    int32_t nbOutputs,
     nvinfer1::IExprBuilder& exprBuilder) noexcept {
-  nvinfer1::DimsExprs output(inputs[0]);
+  outputs[0] = inputs[0];
 
   // TODO: This should enable the case of using this plugin with dynamic shape, scale factor and align corners == true
   // to cover the different implementations between PyTorch and TRT. However TRT currently does not support doubles for
   // ExprBuilder constants. Once that is possible enable this code and remove the code in the constructor if
   // (use_scales_) {
-  //   auto input_dimsexprs = inputs[0];
-  //   output.d[0] = exprBuilder.operation(DimensionOperation::kMAX, *input_dimsexprs.d[0], *exprBuilder.constant(0));
-  //   if (mode_ == "linear") {
-  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1],
-  //     *exprBuilder.constant(scales_[1]));
-  //   } else if (mode_ == "bilinear") {
-  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1],
-  //     *exprBuilder.constant(scales_[1])); output.d[2] = exprBuilder.operation(DimensionOperation::kPROD,
-  //     *input_dimsexprs.d[2], *exprBuilder.constant(scales_[2]));
-  //   } else if (mode_ == "trilinear") {
-  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1],
-  //     *exprBuilder.constant(scales_[1])); output.d[2] = exprBuilder.operation(DimensionOperation::kPROD,
-  //     *input_dimsexprs.d[2], *exprBuilder.constant(scales_[2])); output.d[3] =
-  //     exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[3], *exprBuilder.constant(scales_[3]));
-  //   }
+  //   ...
   // } else {
   for (unsigned int i = 0; i < out_shape_.size(); i++) {
-    output.d[i] = exprBuilder.constant(out_shape_[i]);
+    outputs[0].d[i] = exprBuilder.constant(out_shape_[i]);
   }
   //}
 
-  return output;
-}
-
-nvinfer1::DataType InterpolatePlugin::getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
-    const noexcept {
-  return nvinfer1::DataType::kFLOAT;
-}
-
-int InterpolatePlugin::initialize() noexcept {
   return 0;
 }
 
-void InterpolatePlugin::serialize(void* buffer) const noexcept {
-  std::string data = serializeToString();
-  size_t size = getSerializationSize();
-
-  data.copy((char*)buffer, size);
-}
-
-std::string InterpolatePlugin::serializeToString() const {
-  torch::serialize::OutputArchive output_archive;
-
-  output_archive.write("in_shape", torch::IValue(in_shape_));
-  output_archive.write("out_shape", torch::IValue(out_shape_));
-  output_archive.write("size", torch::IValue(size_));
-  output_archive.write("scales", torch::IValue(scales_));
-  output_archive.write("mode", torch::IValue(mode_));
-  output_archive.write("align_corners", torch::IValue(align_corners_));
-  output_archive.write("use_scales", torch::IValue(use_scales_));
-
-  std::ostringstream data_str;
-  output_archive.save_to(data_str);
-
-  return data_str.str();
-}
-
-size_t InterpolatePlugin::getSerializationSize() const noexcept {
-  return serializeToString().size();
+int32_t InterpolatePlugin::getOutputDataTypes(
+    nvinfer1::DataType* outputTypes,
+    int32_t nbOutputs,
+    const nvinfer1::DataType* inputTypes,
+    int32_t nbInputs) const noexcept {
+  for (int32_t i = 0; i < nbOutputs; i++) {
+    outputTypes[i] = nvinfer1::DataType::kFLOAT;
+  }
+  return 0;
 }
 
 bool InterpolatePlugin::supportsFormatCombination(
-    int pos,
-    const nvinfer1::PluginTensorDesc* inOut,
-    int nbInputs,
-    int nbOutputs) noexcept {
+    int32_t pos,
+    const nvinfer1::DynamicPluginTensorDesc* inOut,
+    int32_t nbInputs,
+    int32_t nbOutputs) noexcept {
   if (nbInputs != 1) {
     LOG_ERROR("Expected a single tensor as input to interpolate plugin");
   }
@@ -225,35 +207,71 @@ bool InterpolatePlugin::supportsFormatCombination(
     }
   }
 
-  const nvinfer1::PluginTensorDesc& in = inOut[0];
+  const nvinfer1::PluginTensorDesc& in = inOut[0].desc;
 
   if (pos == 0) {
     return (in.type == nvinfer1::DataType::kFLOAT) && (in.format == nvinfer1::TensorFormat::kLINEAR);
   }
 
   // pos == 1, accessing information about output tensor
-  const nvinfer1::PluginTensorDesc& out = inOut[1];
-
+  const nvinfer1::PluginTensorDesc& out = inOut[1].desc;
   return (in.type == out.type) && (in.format == out.format);
 }
 
-void InterpolatePlugin::configurePlugin(
+int32_t InterpolatePlugin::configurePlugin(
     const nvinfer1::DynamicPluginTensorDesc* in,
-    int nbInputs,
+    int32_t nbInputs,
     const nvinfer1::DynamicPluginTensorDesc* out,
-    int nbOutputs) noexcept {
+    int32_t nbOutputs) noexcept {
   dtype_ = nvinfer1::DataType::kFLOAT;
-}
-
-size_t InterpolatePlugin::getWorkspaceSize(
-    const nvinfer1::PluginTensorDesc* inputs,
-    int nbInputs,
-    const nvinfer1::PluginTensorDesc* outputs,
-    int nbOutputs) const noexcept {
   return 0;
 }
 
-int InterpolatePlugin::enqueue(
+size_t InterpolatePlugin::getWorkspaceSize(
+    const nvinfer1::DynamicPluginTensorDesc* inputs,
+    int32_t nbInputs,
+    const nvinfer1::DynamicPluginTensorDesc* outputs,
+    int32_t nbOutputs) const noexcept {
+  return 0;
+}
+
+std::string InterpolatePlugin::serializeToString() const {
+  torch::serialize::OutputArchive output_archive;
+
+  output_archive.write("in_shape", torch::IValue(in_shape_));
+  output_archive.write("out_shape", torch::IValue(out_shape_));
+  output_archive.write("size", torch::IValue(size_));
+  output_archive.write("scales", torch::IValue(scales_));
+  output_archive.write("mode", torch::IValue(mode_));
+  output_archive.write("align_corners", torch::IValue(align_corners_));
+  output_archive.write("use_scales", torch::IValue(use_scales_));
+
+  std::ostringstream data_str;
+  output_archive.save_to(data_str);
+  return data_str.str();
+}
+
+nvinfer1::PluginFieldCollection const* InterpolatePlugin::getFieldsToSerialize() noexcept {
+  mSerializedData = serializeToString();
+  mSerializationFields.clear();
+  mSerializationFields.emplace_back(
+      "data", mSerializedData.data(), nvinfer1::PluginFieldType::kCHAR, mSerializedData.size());
+  mSerializationFC.nbFields = static_cast<int32_t>(mSerializationFields.size());
+  mSerializationFC.fields = mSerializationFields.data();
+  return &mSerializationFC;
+}
+
+// IPluginV3OneRuntime
+
+int32_t InterpolatePlugin::onShapeChange(
+    const nvinfer1::PluginTensorDesc* in,
+    int32_t nbInputs,
+    const nvinfer1::PluginTensorDesc* out,
+    int32_t nbOutputs) noexcept {
+  return 0;
+}
+
+int32_t InterpolatePlugin::enqueue(
     const nvinfer1::PluginTensorDesc* inputDesc,
     const nvinfer1::PluginTensorDesc* outputDesc,
     const void* const* inputs,
@@ -317,6 +335,10 @@ int InterpolatePlugin::enqueue(
   return 0;
 }
 
+nvinfer1::IPluginV3* InterpolatePlugin::attachToContext(nvinfer1::IPluginResourceContext* context) noexcept {
+  return new InterpolatePlugin(in_shape_, out_shape_, size_, scales_, mode_, align_corners_, use_scales_);
+}
+
 /*
  * InterpolatePluginCreator class implementations
  */
@@ -346,57 +368,54 @@ const char* InterpolatePluginCreator::getPluginVersion() const noexcept {
   return "1";
 }
 
-nvinfer1::IPluginV2* InterpolatePluginCreator::createPlugin(
+nvinfer1::IPluginV3* InterpolatePluginCreator::createPlugin(
     const char* name,
-    const nvinfer1::PluginFieldCollection* fc) noexcept {
-  std::vector<int64_t> in_shape;
-  std::vector<int64_t> out_shape;
-  std::vector<int64_t> out_size;
-  std::vector<double> scales;
-  std::string mode;
-  int32_t align_corners = 0;
-  int32_t use_scales = 0;
+    const nvinfer1::PluginFieldCollection* fc,
+    nvinfer1::TensorRTPhase phase) noexcept {
+  if (phase == nvinfer1::TensorRTPhase::kBUILD) {
+    std::vector<int64_t> in_shape;
+    std::vector<int64_t> out_shape;
+    std::vector<int64_t> out_size;
+    std::vector<double> scales;
+    std::string mode;
+    int32_t align_corners = 0;
+    int32_t use_scales = 0;
 
-  for (int i = 0; i < fc->nbFields; i++) {
-    std::string field_name(fc->fields[i].name);
-    if (field_name.compare("in_shape") == 0) {
-      auto in_shape_values = static_cast<const int32_t*>(fc->fields[i].data);
-      in_shape.assign(in_shape_values, in_shape_values + fc->fields[i].length);
-    } else if (field_name.compare("out_shape") == 0) {
-      auto out_shape_values = static_cast<const int32_t*>(fc->fields[i].data);
-      out_shape.assign(out_shape_values, out_shape_values + fc->fields[i].length);
-    } else if (field_name.compare("out_size") == 0) {
-      auto out_size_values = static_cast<const int32_t*>(fc->fields[i].data);
-      out_size.assign(out_size_values, out_size_values + fc->fields[i].length);
-    } else if (field_name.compare("scales") == 0) {
-      auto scales_values = static_cast<const double*>(fc->fields[i].data);
-      scales.assign(scales_values, scales_values + fc->fields[i].length);
-    } else if (field_name.compare("mode") == 0) {
-      mode = *static_cast<const std::string*>(fc->fields[i].data);
-    } else if (field_name.compare("align_corners") == 0) {
-      align_corners = *static_cast<const int32_t*>(fc->fields[i].data);
-    } else if (field_name.compare("use_scales") == 0) {
-      use_scales = *static_cast<const int32_t*>(fc->fields[i].data);
+    for (int i = 0; i < fc->nbFields; i++) {
+      std::string field_name(fc->fields[i].name);
+      if (field_name.compare("in_shape") == 0) {
+        auto in_shape_values = static_cast<const int32_t*>(fc->fields[i].data);
+        in_shape.assign(in_shape_values, in_shape_values + fc->fields[i].length);
+      } else if (field_name.compare("out_shape") == 0) {
+        auto out_shape_values = static_cast<const int32_t*>(fc->fields[i].data);
+        out_shape.assign(out_shape_values, out_shape_values + fc->fields[i].length);
+      } else if (field_name.compare("out_size") == 0) {
+        auto out_size_values = static_cast<const int32_t*>(fc->fields[i].data);
+        out_size.assign(out_size_values, out_size_values + fc->fields[i].length);
+      } else if (field_name.compare("scales") == 0) {
+        auto scales_values = static_cast<const double*>(fc->fields[i].data);
+        scales.assign(scales_values, scales_values + fc->fields[i].length);
+      } else if (field_name.compare("mode") == 0) {
+        mode = *static_cast<const std::string*>(fc->fields[i].data);
+      } else if (field_name.compare("align_corners") == 0) {
+        align_corners = *static_cast<const int32_t*>(fc->fields[i].data);
+      } else if (field_name.compare("use_scales") == 0) {
+        use_scales = *static_cast<const int32_t*>(fc->fields[i].data);
+      }
     }
+    return new InterpolatePlugin(in_shape, out_shape, out_size, scales, mode, (bool)align_corners, (bool)use_scales);
+  } else { // TensorRTPhase::kRUNTIME - deserialization
+    auto const* data = static_cast<const char*>(fc->fields[0].data);
+    size_t length = fc->fields[0].length;
+    return new InterpolatePlugin(data, length);
   }
-  InterpolatePlugin* plugin =
-      new InterpolatePlugin(in_shape, out_shape, out_size, scales, mode, (bool)align_corners, (bool)use_scales);
-  return plugin;
-}
-
-nvinfer1::IPluginV2* InterpolatePluginCreator::deserializePlugin(
-    const char* name,
-    const void* serialData,
-    size_t serialLength) noexcept {
-  name_ = name;
-  return new InterpolatePlugin((const char*)serialData, serialLength);
 }
 
 const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames() noexcept {
-  return nullptr;
+  return &mFC;
 }
 
-REGISTER_TORCHTRT_PLUGIN(InterpolatePluginCreator);
+REGISTER_TORCHTRT_PLUGIN_V3(InterpolatePluginCreator);
 
 } // namespace impl
 } // namespace plugins

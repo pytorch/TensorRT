@@ -48,12 +48,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-        if explicit_batch_dimension:
-            EXPLICIT_BATCH = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH
-            )
-            flag |= EXPLICIT_BATCH
-
         if explicit_precision:
             EXPLICIT_PRECISION = 1 << (int)(
                 trt.NetworkDefinitionCreationFlag.EXPLICIT_PRECISION

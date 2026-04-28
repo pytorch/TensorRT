@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../_static/documentation_options.js?v=166e5273"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -557,7 +557,6 @@ conversion will fail. Use <code class="docutils literal notranslate"><span class
 <span class="n">engine_bytes</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
     <span class="n">exported</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">},</span>
 <span class="p">)</span>
 
 <span class="c1"># Save to disk</span>
@@ -582,7 +581,6 @@ conversion will fail. Use <code class="docutils literal notranslate"><span class
             <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">],</span>
-    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">},</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -659,9 +657,6 @@ relevant for this API:</p>
 <dl class="simple">
 <dt><code class="docutils literal notranslate"><span class="pre">inputs</span></code> / <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code></dt><dd><p>Input shape specifications. Accepts <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code> (static shape inferred),
 <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input</span></code> (explicit static or dynamic ranges), or a mix.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code></dt><dd><p>Set of <code class="docutils literal notranslate"><span class="pre">torch.dtype</span></code> values TRT may use. Add <code class="docutils literal notranslate"><span class="pre">torch.float16</span></code> or
-<code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> for reduced-precision inference.</p>
 </dd>
 <dt><code class="docutils literal notranslate"><span class="pre">immutable_weights</span></code></dt><dd><p>Default <code class="docutils literal notranslate"><span class="pre">True</span></code>. Set to <code class="docutils literal notranslate"><span class="pre">False</span></code> to produce a refittable engine whose weights
 can be updated without recompilation.</p>

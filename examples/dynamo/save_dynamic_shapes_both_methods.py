@@ -63,7 +63,6 @@ trt_module_method1 = torch_tensorrt.dynamo.compile(
             dtype=torch.float32,
         )
     ],
-    enabled_precisions={torch.float32},
     min_block_size=1,
 )
 

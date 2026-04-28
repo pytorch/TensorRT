@@ -3,7 +3,6 @@ import copy
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch.fx
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 import torchvision.models as models
 from torch.ao.quantization.quantize_fx import (
@@ -67,7 +66,6 @@ def build_int8_trt(rn18):
                 has_batch_dim=True,
             )
         ],
-        explicit_batch_dimension=True,
         explicit_precision=True,
         logger_level=trt.Logger.VERBOSE,
     )

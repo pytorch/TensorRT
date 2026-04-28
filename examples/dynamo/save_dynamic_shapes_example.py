@@ -73,7 +73,6 @@ compile_spec = {
             dtype=torch.float32,
         )
     ],
-    "enabled_precisions": {torch.float32},
     "min_block_size": 1,
 }
 
@@ -160,7 +159,6 @@ compile_spec2 = {
             dtype=torch.float32,
         )
     ],
-    "enabled_precisions": {torch.float32},
 }
 
 trt_gm2 = torch_tensorrt.dynamo.compile(exp_program2, **compile_spec2)

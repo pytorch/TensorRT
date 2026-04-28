@@ -7,7 +7,6 @@ import torchvision
 from torch_tensorrt.fx import compile
 from torch_tensorrt.fx.utils import LowerPrecision
 
-
 """
 The purpose of this example is to demostrate the onverall flow of lowering a PyTorch model
 to TensorRT conveniently with lower.py.
@@ -179,7 +178,6 @@ def run_configuration_benchmark(
             input,
             max_batch_size=conf.batch_size,
             lower_precision=LowerPrecision.FP16 if conf.fp16 else LowerPrecision.FP32,
-            explicit_batch_dimension=True,
             is_aten=True,
         )
         time = benchmark_torch_function(conf.batch_iter, lambda: lowered_module(*input))

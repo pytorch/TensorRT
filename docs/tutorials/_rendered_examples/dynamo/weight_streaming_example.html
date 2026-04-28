@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../../_static/documentation_options.js?v=166e5273"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -698,7 +698,7 @@ llama2_ep = export_llm(model, input_tensors[0], max_seq_len=osl)
 </section>
 <section id="Compiler-option">
 <h2>Compiler option<a class="headerlink" href="#Compiler-option" title="Link to this heading">#</a></h2>
-<p>enable_weight_streaming=True option and use_explicit_typing=True are required to build the engine with weight streaming feature. use_explicit_typing=True option creates a <a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#strongly-typed-networks">strongly typed network</a> and only float32 precision is allowed in enabled_precisions option</p>
+<p>enable_weight_streaming=True option is required to build the engine with weight streaming feature.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -707,10 +707,8 @@ llama2_ep = export_llm(model, input_tensors[0], max_seq_len=osl)
 trt_model = torch_tensorrt.dynamo.compile(
     llama2_ep,
     inputs=input_tensors,
-    enabled_precisions={torch.float32},
     truncate_double=True,
     device=DEVICE,
-    use_explicit_typing=True,
     enable_weight_streaming=True,
 )
 

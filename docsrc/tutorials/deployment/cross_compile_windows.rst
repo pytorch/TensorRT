@@ -55,7 +55,6 @@ Workflow
     trt_gm = torch_tensorrt.dynamo.cross_compile_for_windows(
         exp_program,
         arg_inputs=inputs,
-        use_explicit_typing=True,  # enabled_precisions deprecated; cast model/inputs to target dtype
     )
 
 **Step 3 — Save the compiled module**

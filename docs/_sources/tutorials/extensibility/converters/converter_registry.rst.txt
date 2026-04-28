@@ -226,8 +226,7 @@ Every converter receives a ``ConversionContext`` as its first argument (``ctx``)
     ``ctx.net.add_elementwise()``, ``ctx.net.add_activation()``, etc. to add TRT layers.
 
 ``ctx.compilation_settings``
-    Full ``CompilationSettings`` object. Use this to read user preferences (e.g., check
-    ``ctx.compilation_settings.enabled_precisions``) inside a converter.
+    Full ``CompilationSettings`` object. Use this to read user preferences inside a converter.
 
 ``ctx.record_weight(name, weight)``
     Call this from a converter whenever you add a constant tensor to the TRT network.

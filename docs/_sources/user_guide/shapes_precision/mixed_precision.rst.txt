@@ -50,17 +50,17 @@ the kernels for layers which result in the best performance (i.e., weak typing i
     # Name: __myl_AddResMulSumAdd_myl0_2, LayerType: kgen, Inputs: [ { Name: __mye146_dconst, Dimensions: [30,40], Format/Datatype: Float }, { Name: linear3/addmm_2_constant_0 _ linear3/addmm_2_add_broadcast_to_same_shape_lhs_broadcast_constantFloat, Dimensions: [1,40], Format/Datatype: Float }, { Name: __myln_k_arg__bb1_3, Dimensions: [1,30], Format/Datatype: Float }, { Name: linear2/addmm_1_constant_0 _ linear2/addmm_1_add_broadcast_to_same_shape_lhs_broadcast_constantFloat, Dimensions: [1,30], Format/Datatype: Float }], Outputs: [ { Name: output0, Dimensions: [1,40], Format/Datatype: Float }], TacticName: __myl_AddResMulSumAdd_0xcdd0085ad25f5f45ac5fafb72acbffd6, StreamId: 0, Metadata: 
 
 
-However, since TensorRT 10.12, TensorRT has deprecated weak typing, we must set ``use_explicit_typing=True`` 
-to enable strong typing, which means users must specify the precision of the nodes in the model. For example,
-in the case above, we set ``linear2`` layer to run in FP16, so if we compile the model with the following settings,
-the ``linear2`` layer will run in FP16 and other layers will run in FP32 as shown in the following TensorRT logs:
+Since TensorRT 10.12, TensorRT uses strong typing (explicit typing) by default, which means users must specify
+the precision of the nodes in the model. For example, in the case above, we set ``linear2`` layer to run in FP16,
+so if we compile the model with the following settings, the ``linear2`` layer will run in FP16 and other layers
+will run in FP32 as shown in the following TensorRT logs:
 
 .. code-block:: python
 
     inputs = [torch.randn((1, 10), dtype=torch.float32).cuda()]
     mod = MyModule().eval().cuda()
     ep = torch.export.export(mod, tuple(inputs))
-    trt_gm = torch_tensorrt.dynamo.compile(ep, arg_inputs=inputs, use_explicit_typing=True)
+    trt_gm = torch_tensorrt.dynamo.compile(ep, arg_inputs=inputs)
 
     # Debug log info
     # Layers:
@@ -95,8 +95,8 @@ might be more sensitive to affecting accuracy. In addition, Torch-TensorRT Autoc
 allowing users to use both PyTorch Autocast and Torch-TensorRT Autocast in the same model. Torch-TensorRT Autocast 
 respects the precision of the nodes within PyTorch Autocast context.
 
-To enable Torch-TensorRT Autocast, we need to set both ``enable_autocast=True`` and ``use_explicit_typing=True``. 
-On top of them, we can also specify the precision of the nodes to reduce to by ``autocast_low_precision_type``, 
+To enable Torch-TensorRT Autocast, we need to set ``enable_autocast=True``.
+On top of that, we can also specify the precision of the nodes to reduce to by ``autocast_low_precision_type``, 
 and exclude certain nodes/ops from Torch-TensorRT Autocast by ``autocast_excluded_nodes`` or ``autocast_excluded_ops``.
 For example,
 
@@ -122,7 +122,6 @@ For example,
         ep,
         arg_inputs=inputs,
         enable_autocast=True,
-        use_explicit_typing=True,
         autocast_low_precision_type=torch.float16,
         autocast_excluded_nodes={"^linear2$"},
     )
@@ -130,8 +129,9 @@ For example,
 This model excludes ``linear2`` from Autocast, so it will run ``linear2`` in FP32 and other layers in FP16. 
 
 In summary, now there are two ways in Torch-TensorRT to choose the precision of the nodes:
-1. User specifies precision (strong typing):                ``use_explicit_typing=True + enable_autocast=False``
-2. Autocast chooses precision (autocast + strong typing):   ``use_explicit_typing=True + enable_autocast=True``
+
+1. User specifies precision (strong typing):                ``enable_autocast=False`` (default)
+2. Autocast chooses precision (autocast + strong typing):   ``enable_autocast=True``
 
 FP32 Accumulation
 -----------------
@@ -140,7 +140,7 @@ When ``use_fp32_acc=True`` is set, Torch-TensorRT will attempt to use FP32 accum
 
 .. important::
 
-    When enabling ``use_fp32_acc=True``, **explicit typing must be enabled** by setting ``use_explicit_typing=True``. Without ``use_explicit_typing=True``, the accumulation type may not be properly respected, and you may not see the intended numerical benefits.
+    When enabling ``use_fp32_acc=True``, strong typing (explicit typing) is required — this is always enabled in the Dynamo path.
 
 .. code-block:: python
 
@@ -151,7 +151,6 @@ When ``use_fp32_acc=True`` is set, Torch-TensorRT will attempt to use FP32 accum
         ep,
         arg_inputs=inputs,
         use_fp32_acc=True,
-        use_explicit_typing=True,  # Explicit typing must be enabled
     )
 
     # Debug log info

@@ -140,8 +140,8 @@ Runtime Errors
 **Wrong numerical results (large error vs PyTorch)**
 
     * Enable higher precision: cast model and inputs to ``float32``, or remove
-      ``model.half()`` / ``model.bfloat16()`` calls (``enabled_precisions`` is deprecated;
-      use ``use_explicit_typing=True`` and set dtypes in the model directly).
+      ``model.half()`` / ``model.bfloat16()`` calls. Strong typing is always enabled —
+      set dtypes directly in the model and inputs.
     * TF32 is enabled by default on Ampere and newer GPUs. Disable it with
       ``disable_tf32=True`` for bit-exact FP32 comparison.
     * If using cross-compiled Windows engines, floating-point results may differ
@@ -173,9 +173,8 @@ Accuracy / Performance Issues
       vs PyTorch (high PyTorch fallback = low coverage = slow).
     * Increase ``optimization_level`` (0–5, default 3) to allow TRT more time to
       find faster kernels.
-    * Use FP16 for throughput-critical workloads: ``model.half()`` +
-      ``use_explicit_typing=True``, or ``enable_autocast=True`` +
-      ``autocast_low_precision_type=torch.float16`` (``enabled_precisions`` is deprecated).
+    * Use FP16 for throughput-critical workloads: ``model.half()`` with FP16 inputs,
+      or ``enable_autocast=True`` + ``autocast_low_precision_type=torch.float16``.
     * Try ``use_fast_partitioner=False`` for global partitioning — it is slower to
       compile but may produce better-performing partitions.
     * See :ref:`performance_tuning` for a complete benchmarking guide.
@@ -213,7 +212,6 @@ Accuracy / Performance Issues
 
         trt_model = torch_tensorrt.compile(
             model, ir="dynamo", arg_inputs=inputs,
-            use_explicit_typing=True,  # enabled_precisions deprecated; use model dtypes
         )
 
     See `NVIDIA ModelOpt documentation <https://nvidia.github.io/TensorRT-Model-Optimizer/>`_

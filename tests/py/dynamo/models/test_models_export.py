@@ -35,7 +35,6 @@ def test_resnet18(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
@@ -70,7 +69,6 @@ def test_mobilenet_v2(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
@@ -106,7 +104,6 @@ def test_efficientnet_b0(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
@@ -154,7 +151,6 @@ def test_bert_base_uncased(ir):
             ),
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "truncate_double": True,
         "ir": ir,
         "min_block_size": 10,
@@ -197,8 +193,6 @@ def test_resnet18_half(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "use_explicit_typing": False,
-        "enabled_precisions": {torch.half},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
@@ -273,7 +267,6 @@ def test_base_fp4_dynamic_shapes(ir):
                 min_block_size=1,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
-                use_explicit_typing=True,
             )
             batch_size = 128
             input_tensor = torch.ones(batch_size, 64, dtype=dtype).cuda()
@@ -337,7 +330,6 @@ def test_base_fp4_static_shapes(ir):
                 min_block_size=1,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
-                use_explicit_typing=True,
             )
             outputs_trt = trt_model(input_tensor)
             abs_diff = torch.abs(expected_output - outputs_trt)
@@ -447,7 +439,6 @@ def test_base_int8(ir, dtype):
                     cache_built_engines=False,
                     reuse_cached_engines=False,
                     truncate_double=True,
-                    use_explicit_typing=True,
                 )
             outputs_trt = trt_model(input_tensor)
             assert output_pyt.dtype == outputs_trt.dtype
@@ -508,7 +499,6 @@ def test_base_int8_dynamic_shape(ir, dtype):
                 cache_built_engines=False,
                 reuse_cached_engines=False,
                 truncate_double=True,
-                use_explicit_typing=True,
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-2, atol=5e-2)

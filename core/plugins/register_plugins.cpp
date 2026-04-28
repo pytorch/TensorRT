@@ -30,17 +30,17 @@ class TorchTRTPluginRegistry {
     plugin_logger.set_reportable_log_level(util::logging::get_logger().get_reportable_log_level());
 
     int numCreators = 0;
-    auto pluginsList = getPluginRegistry()->getPluginCreatorList(&numCreators);
+    auto pluginsList = getPluginRegistry()->getAllCreators(&numCreators);
     for (int k = 0; k < numCreators; ++k) {
       if (!pluginsList[k]) {
         plugin_logger.log(util::logging::LogLevel::kDEBUG, "Plugin creator for plugin " + str(k) + " is a nullptr");
         continue;
       }
-      std::string pluginNamespace = pluginsList[k]->getPluginNamespace();
+      auto interface_info = pluginsList[k]->getInterfaceInfo();
       plugin_logger.log(
           util::logging::LogLevel::kDEBUG,
-          "Registered plugin creator - " + std::string(pluginsList[k]->getPluginName()) +
-              ", Namespace: " + pluginNamespace);
+          "Registered plugin creator interface - " + std::string(interface_info.kind) + " v" +
+              str(interface_info.major) + "." + str(interface_info.minor));
     }
     plugin_logger.log(util::logging::LogLevel::kDEBUG, "Total number of plugins registered: " + str(numCreators));
   }

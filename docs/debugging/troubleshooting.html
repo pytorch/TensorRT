@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../_static/documentation_options.js?v=166e5273"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -632,8 +632,8 @@ runtime. Recompile using <code class="xref cpp cpp-class docutils literal notran
 <blockquote>
 <div><ul class="simple">
 <li><p>Enable higher precision: cast model and inputs to <code class="docutils literal notranslate"><span class="pre">float32</span></code>, or remove
-<code class="docutils literal notranslate"><span class="pre">model.half()</span></code> / <code class="docutils literal notranslate"><span class="pre">model.bfloat16()</span></code> calls (<code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code> is deprecated;
-use <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code> and set dtypes in the model directly).</p></li>
+<code class="docutils literal notranslate"><span class="pre">model.half()</span></code> / <code class="docutils literal notranslate"><span class="pre">model.bfloat16()</span></code> calls. Strong typing is always enabled —
+set dtypes directly in the model and inputs.</p></li>
 <li><p>TF32 is enabled by default on Ampere and newer GPUs. Disable it with
 <code class="docutils literal notranslate"><span class="pre">disable_tf32=True</span></code> for bit-exact FP32 comparison.</p></li>
 <li><p>If using cross-compiled Windows engines, floating-point results may differ
@@ -667,9 +667,8 @@ CPU/GPU sync overhead).</p></li>
 vs PyTorch (high PyTorch fallback = low coverage = slow).</p></li>
 <li><p>Increase <code class="docutils literal notranslate"><span class="pre">optimization_level</span></code> (0–5, default 3) to allow TRT more time to
 find faster kernels.</p></li>
-<li><p>Use FP16 for throughput-critical workloads: <code class="docutils literal notranslate"><span class="pre">model.half()</span></code> +
-<code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>, or <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code> +
-<code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type=torch.float16</span></code> (<code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code> is deprecated).</p></li>
+<li><p>Use FP16 for throughput-critical workloads: <code class="docutils literal notranslate"><span class="pre">model.half()</span></code> with FP16 inputs,
+or <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code> + <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type=torch.float16</span></code>.</p></li>
 <li><p>Try <code class="docutils literal notranslate"><span class="pre">use_fast_partitioner=False</span></code> for global partitioning — it is slower to
 compile but may produce better-performing partitions.</p></li>
 <li><p>See <a class="reference internal" href="../user_guide/performance_tuning.html#performance-tuning"><span class="std std-ref">Performance Tuning Guide</span></a> for a complete benchmarking guide.</p></li>
@@ -707,7 +706,6 @@ enables <code class="docutils literal notranslate"><span class="pre">weight_quan
 
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># enabled_precisions deprecated; use model dtypes</span>
 <span class="p">)</span>
 </pre></div>
 </div>

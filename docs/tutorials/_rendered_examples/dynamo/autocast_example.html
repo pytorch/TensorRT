@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../../_static/documentation_options.js?v=166e5273"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -593,8 +593,7 @@ pytorch_outs = model(*inputs)
 </pre></div>
 </div>
 </div>
-<p>We compile the model with Torch-TensorRT Autocast by setting <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code>, <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>, and <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type=torch.bfloat16</span></code>. To illustrate, we exclude the <code class="docutils literal notranslate"><span class="pre">conv1</span></code> node, all nodes with name containing <code class="docutils literal notranslate"><span class="pre">relu</span></code>, and <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.flatten.using_ints</span></code> ATen op from Autocast. In addtion, we also set <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>, and <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>. Please refer to the documentation for more
-details.</p>
+<p>We compile the model with Torch-TensorRT Autocast by setting <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code> and <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type=torch.bfloat16</span></code>. To illustrate, we exclude the <code class="docutils literal notranslate"><span class="pre">conv1</span></code> node, all nodes with name containing <code class="docutils literal notranslate"><span class="pre">relu</span></code>, and <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.flatten.using_ints</span></code> ATen op from Autocast. In addtion, we also set <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>, and <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>. Please refer to the documentation for more details.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -604,7 +603,6 @@ details.</p>
     arg_inputs=inputs,
     min_block_size=1,
     use_python_runtime=True,
-    use_explicit_typing=True,
     enable_autocast=True,
     autocast_low_precision_type=torch.bfloat16,
     autocast_excluded_nodes={&quot;^conv1$&quot;, &quot;relu&quot;},

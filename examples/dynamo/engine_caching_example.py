@@ -38,7 +38,6 @@ np.random.seed(0)
 torch.manual_seed(0)
 
 model = models.resnet18(pretrained=True).to("cuda").eval()
-enabled_precisions = {torch.float}
 min_block_size = 1
 use_python_runtime = False
 
@@ -93,7 +92,6 @@ def torch_compile(iterations=3):
             backend="tensorrt",
             options={
                 "use_python_runtime": True,
-                "enabled_precisions": enabled_precisions,
                 "min_block_size": min_block_size,
                 "immutable_weights": False,
                 "cache_built_engines": cache_built_engines,
@@ -153,7 +151,6 @@ def dynamo_compile(iterations=3):
             exp_program,
             tuple(inputs),
             use_python_runtime=use_python_runtime,
-            enabled_precisions=enabled_precisions,
             min_block_size=min_block_size,
             immutable_weights=False,
             cache_built_engines=cache_built_engines,
@@ -263,7 +260,6 @@ def torch_compile_my_cache(iterations=3):
             backend="tensorrt",
             options={
                 "use_python_runtime": True,
-                "enabled_precisions": enabled_precisions,
                 "min_block_size": min_block_size,
                 "immutable_weights": False,
                 "cache_built_engines": cache_built_engines,

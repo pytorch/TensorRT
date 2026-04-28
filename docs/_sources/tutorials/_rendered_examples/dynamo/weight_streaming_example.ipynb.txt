@@ -29,7 +29,7 @@
       "cell_type": "markdown",
       "metadata": {},
       "source": [
-        "## Compiler option\n\nenable_weight_streaming=True option and use_explicit_typing=True are required to build\nthe engine with weight streaming feature. use_explicit_typing=True option creates a\n[strongly typed network](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#strongly-typed-networks) and only float32 precision is allowed in enabled_precisions option\n\n\n"
+        "## Compiler option\n\nenable_weight_streaming=True option is required to build the engine with weight streaming feature.\n\n\n"
       ]
     },
     {
@@ -40,7 +40,7 @@
       },
       "outputs": [],
       "source": [
-        "# Create a TensorRT-compiled model\ntrt_model = torch_tensorrt.dynamo.compile(\n    llama2_ep,\n    inputs=input_tensors,\n    enabled_precisions={torch.float32},\n    truncate_double=True,\n    device=DEVICE,\n    use_explicit_typing=True,\n    enable_weight_streaming=True,\n)\n\n# Warm up for 3 iterations\n_ = time_generate(trt_model, input_tensors, osl, 3)"
+        "# Create a TensorRT-compiled model\ntrt_model = torch_tensorrt.dynamo.compile(\n    llama2_ep,\n    inputs=input_tensors,\n    truncate_double=True,\n    device=DEVICE,\n    enable_weight_streaming=True,\n)\n\n# Warm up for 3 iterations\n_ = time_generate(trt_model, input_tensors, osl, 3)"
       ]
     },
     {

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../_static/documentation_options.js?v=166e5273"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -520,7 +520,6 @@ wrapper API that consists of the major steps needed to finish this converison. P
 <span class="w">    </span>input,
 <span class="w">    </span><span class="nv">max_batch_size</span><span class="o">=</span><span class="m">2048</span>,
 <span class="w">    </span><span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">33554432</span>,
-<span class="w">    </span><span class="nv">explicit_batch_dimension</span><span class="o">=</span>False,
 <span class="w">    </span><span class="nv">lower_precision</span><span class="o">=</span>LowerPrecision.FP16,
 <span class="w">    </span><span class="nv">verbose_log</span><span class="o">=</span>False,
 <span class="w">    </span><span class="nv">timing_cache_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span>,
@@ -538,7 +537,6 @@ wrapper API that consists of the major steps needed to finish this converison. P
 <span class="s2">        input: Input for module.</span>
 <span class="s2">        max_batch_size: Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
 <span class="s2">        max_workspace_size: Maximum size of workspace given to TensorRT.</span>
-<span class="s2">        explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.</span>
 <span class="s2">        lower_precision: lower_precision config given to TRTModule.</span>
 <span class="s2">        verbose_log: Enable verbose log for TensorRT if set True.</span>
 <span class="s2">        timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.</span>
@@ -574,11 +572,12 @@ This means the model contains dynamic control flow. Please refer to section “D
 <ul class="simple">
 <li><p><strong>Step 2: Build TensorRT engine</strong></p></li>
 </ul>
-<p>There are <a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#explicit-implicit-batch">two different modes</a> for how TensorRT handles batch dimension, explicit batch dimension and implicit batch dimension. This mode was used by early versions of TensorRT, and is now deprecated but continues to be supported for backwards compatibility. In explicit batch mode, all dimensions are explicit and can be dynamic, that is their length can change at execution time. Many new features, such as dynamic shapes and loops, are available only in this mode. User can still choose to use implicit batch mode when they set <code class="docutils literal notranslate"><span class="pre">explicit_batch_dimension=False</span></code> in <code class="docutils literal notranslate"><span class="pre">compile()</span></code>. We do not recommend to use it since it will lack of support in future TensorRT versions.</p>
-<p>Explicit batch is the default mode and it must be set for dynamic shape. For most of vision task, user can choose to enable <code class="docutils literal notranslate"><span class="pre">dynamic_batch</span></code> in <code class="docutils literal notranslate"><span class="pre">compile()</span></code> if they want to get the similar effects as implicit mode where only batch dimension changes. It has some requirements:
-1. Shapes of inputs, outputs and activations are fixed except batch dimension.
-2. Inputs, outputs and activations have batch dimension as the major dimension.
-3. All the operators in the model do not modify batch dimension (permute, transpose, split, etc.) or compute over batch dimension (sum, softmax, etc.).</p>
+<p>TensorRT 10+ uses explicit batch mode exclusively — all dimensions are explicit and can be dynamic (their length can change at execution time). Dynamic shapes and loops require explicit batch mode. For most vision tasks, enabling <code class="docutils literal notranslate"><span class="pre">dynamic_batch</span></code> in <code class="docutils literal notranslate"><span class="pre">compile()</span></code> allows only the batch dimension to vary. Requirements for <code class="docutils literal notranslate"><span class="pre">dynamic_batch</span></code>:</p>
+<ol class="arabic simple">
+<li><p>Shapes of inputs, outputs and activations are fixed except batch dimension.</p></li>
+<li><p>Inputs, outputs and activations have batch dimension as the major dimension.</p></li>
+<li><p>All the operators in the model do not modify batch dimension (permute, transpose, split, etc.) or compute over batch dimension (sum, softmax, etc.).</p></li>
+</ol>
 <p>For examples of the last path, if we have a 3D tensor t shaped as (batch, sequence, dimension), operations such as torch.transpose(0, 2). If any of these three are not satisfied, we’ll need to specify InputTensorSpec as inputs with dynamic range.</p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>import<span class="w"> </span>deeplearning.trt.fx2trt.converter.converters
 from<span class="w"> </span>torch.fx.experimental.fx2trt.fx2trt<span class="w"> </span>import<span class="w"> </span>InputTensorSpec,<span class="w"> </span>TRTInterpreter
@@ -612,10 +611,8 @@ torch.rand<span class="o">((</span><span class="m">1</span>,4,5<span class="o">)
 <span class="w">    </span>InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>,<span class="w"> </span><span class="m">4</span>,<span class="w"> </span><span class="m">5</span><span class="o">)</span>,<span class="w"> </span><span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
 <span class="o">]</span>
 
-<span class="c1"># Build a TRT interpreter. Set explicit_batch_dimension accordingly.</span>
-<span class="nv">interpreter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>TRTInterpreter<span class="o">(</span>
-<span class="w">    </span>acc_mod,<span class="w"> </span>input_specs,<span class="w"> </span><span class="nv">explicit_batch_dimension</span><span class="o">=</span>True/False
-<span class="o">)</span>
+<span class="c1"># Build a TRT interpreter.</span>
+<span class="nv">interpreter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>TRTInterpreter<span class="o">(</span>acc_mod,<span class="w"> </span>input_specs<span class="o">)</span>
 
 <span class="c1"># The output of TRTInterpreter run() is wrapped as TRTInterpreterResult.</span>
 <span class="c1"># The TRTInterpreterResult contains required parameter to build TRTModule,</span>

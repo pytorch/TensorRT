@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cbdb921"></script>
+    <script src="../../../_static/documentation_options.js?v=166e5273"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -506,7 +506,6 @@ document.write(`
     <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
     <span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
-    <span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
     <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
     <span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">IMMUTABLE_WEIGHTS</span><span class="p">,</span>
@@ -528,7 +527,6 @@ document.write(`
     <span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
     <span class="n">USE_DISTRIBUTED_MODE_TRACE</span><span class="p">,</span>
-    <span class="n">USE_EXPLICIT_TYPING</span><span class="p">,</span>
     <span class="n">USE_FAST_PARTITIONER</span><span class="p">,</span>
     <span class="n">USE_FP32_ACC</span><span class="p">,</span>
     <span class="n">USE_PYTHON_RUNTIME</span><span class="p">,</span>
@@ -545,8 +543,6 @@ document.write(`
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compilation settings for Torch-TensorRT Dynamo Paths</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        enabled_precisions (Set[dtype]): Available kernel dtype precisions</span>
-<span class="sd">        debug (bool): Whether to print out verbose debugging information</span>
 <span class="sd">        workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)</span>
 <span class="sd">        min_block_size (int): Minimum number of operators per TRT-Engine Block</span>
 <span class="sd">        torch_executed_ops (Collection[Target]): Collection of operations to run in Torch, regardless of converter coverage</span>
@@ -582,8 +578,7 @@ document.write(`
 <span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for compiling shape-specialized kernels at runtime for dynamic shapes (TensorRT-RTX only). Options: &quot;lazy&quot; (compile in background, use fallback until ready), &quot;eager&quot; (compile immediately, blocking), &quot;none&quot; (always use fallback kernels). Default: &quot;lazy&quot;.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
-<span class="sd">        use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.</span>
-<span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.</span>
+<span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.</span>
 <span class="sd">        refit_identical_engine_weights (bool): Whether to refit the engine with identical weights</span>
 <span class="sd">        strip_engine_weights (bool): Whether to strip the engine weights</span>
 <span class="sd">        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored</span>
@@ -593,7 +588,7 @@ document.write(`
 <span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [&quot;none&quot;, &quot;fast&quot;, &quot;moderate&quot;, &quot;full&quot;].</span>
 <span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model</span>
-<span class="sd">        enable_autocast (bool): Whether to enable autocast. If enabled, use_explicit_typing will be set to True.</span>
+<span class="sd">        enable_autocast (bool): Whether to enable autocast.</span>
 <span class="sd">        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.</span>
 <span class="sd">        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].</span>
 <span class="sd">        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].</span>
@@ -606,7 +601,6 @@ document.write(`
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ENABLED_PRECISIONS</span><span class="p">)</span>
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">WORKSPACE_SIZE</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">MIN_BLOCK_SIZE</span>
     <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">set</span><span class="p">)</span>
@@ -640,7 +634,6 @@ document.write(`
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">LAZY_ENGINE_INIT</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">CACHE_BUILT_ENGINES</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REUSE_CACHED_ENGINES</span>
-    <span class="n">use_explicit_typing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_EXPLICIT_TYPING</span>
     <span class="n">use_fp32_acc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_FP32_ACC</span>
     <span class="n">refit_identical_engine_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REFIT_IDENTICAL_ENGINE_WEIGHTS</span>
     <span class="n">strip_engine_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">STRIP_ENGINE_WEIGHTS</span>
@@ -689,7 +682,6 @@ document.write(`
 
 <span class="c1"># If any of the following setting is changed, the engine should be rebuilt.</span>
 <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">,</span>
     <span class="s2">&quot;max_aux_streams&quot;</span><span class="p">,</span>
     <span class="s2">&quot;version_compatible&quot;</span><span class="p">,</span>
     <span class="s2">&quot;optimization_level&quot;</span><span class="p">,</span>

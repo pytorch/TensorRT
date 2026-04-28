@@ -33,7 +33,6 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 settings = {
     "use_python_runtime": False,
-    "enabled_precisions": {torch.float32},
     "immutable_weights": False,
 }
 
@@ -79,7 +78,6 @@ reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
 with torch.no_grad():
     settings = {
         "use_python_runtime": True,
-        "enabled_precisions": {torch.float16},
         "immutable_weights": False,
     }
 
@@ -212,7 +210,6 @@ example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
 model = torch_trt.MutableTorchTensorRTModule(
     model,
     use_python_runtime=True,
-    enabled_precisions={torch.float},
     min_block_size=1,
     immutable_weights=False,
     cache_built_engines=True,
