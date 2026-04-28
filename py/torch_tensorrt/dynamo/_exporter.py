@@ -553,7 +553,7 @@ def replace_execute_engine_no_op_node(
             if ENABLED_FEATURES.torch_tensorrt_runtime:
                 trt_engine = torch.classes.tensorrt.Engine(tuple(packed_engine_info))
             else:
-                from torch_tensorrt.dynamo.runtime._PythonTRTEngine import TRTEngine
+                from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
                 trt_engine = TRTEngine(packed_engine_info)
             setattr(gm, engine_name, trt_engine)

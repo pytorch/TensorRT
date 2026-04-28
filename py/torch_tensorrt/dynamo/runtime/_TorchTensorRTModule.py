@@ -217,7 +217,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if ENABLED_FEATURES.torch_tensorrt_runtime:
             self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
         else:
-            from torch_tensorrt.dynamo.runtime._PythonTRTEngine import TRTEngine
+            from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
             self.engine = TRTEngine(
                 self._pack_engine_info(),
@@ -290,7 +290,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if ENABLED_FEATURES.torch_tensorrt_runtime:
                 self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
             else:
-                from torch_tensorrt.dynamo.runtime._PythonTRTEngine import TRTEngine
+                from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
                 self.engine = TRTEngine(serialized_engine_info)  # type: ignore[assignment]
 

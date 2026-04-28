@@ -808,24 +808,32 @@ if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
             for i, shape in enumerate(output_shapes)
         ]
 
-    @torch.library.custom_op(  # type: ignore[misc]
-        "tensorrt::no_op_placeholder_for_execute_engine", mutates_args=()
+
+# ``no_op_placeholder_for_execute_engine`` is a pure-Python custom op that
+# raises if hit eagerly. It exists so that cross-compiled exported programs can
+# round-trip through ``torch.export.save``/``load`` regardless of which runtime
+# is active; ``replace_execute_engine_no_op_node`` lowers it to a real
+# ``execute_engine`` call at load time. Registered unconditionally because it
+# has no C++ counterpart and load-time deserialisation must work in either
+# runtime configuration.
+@torch.library.custom_op(  # type: ignore[misc]
+    "tensorrt::no_op_placeholder_for_execute_engine", mutates_args=()
+)
+def no_op_placeholder_for_execute_engine(
+    inputs: List[torch.Tensor],
+    abi_version: str,
+    name: str,
+    serialized_device_info: str,
+    serialized_engine: str,
+    serialized_in_binding_names: str,
+    serialized_out_binding_names: str,
+    serialized_hardware_compatible: str,
+    serialized_metadata: str,
+    serialized_target_platform: str,
+    serialized_require_output_allocator: str,
+    serialized_resource_allocation_strategy: str,
+) -> List[torch.Tensor]:
+    raise RuntimeError(
+        "TensorRT engine placeholder reached eager execution; load this artifact with "
+        "torch_tensorrt.load() so placeholders are lowered to execute_engine."
     )
-    def no_op_placeholder_for_execute_engine(
-        inputs: List[torch.Tensor],
-        abi_version: str,
-        name: str,
-        serialized_device_info: str,
-        serialized_engine: str,
-        serialized_in_binding_names: str,
-        serialized_out_binding_names: str,
-        serialized_hardware_compatible: str,
-        serialized_metadata: str,
-        serialized_target_platform: str,
-        serialized_require_output_allocator: str,
-        serialized_resource_allocation_strategy: str,
-    ) -> List[torch.Tensor]:
-        raise RuntimeError(
-            "TensorRT engine placeholder reached eager execution; load this artifact with "
-            "torch_tensorrt.load() so placeholders are lowered to execute_engine."
-        )

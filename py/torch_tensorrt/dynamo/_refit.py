@@ -32,12 +32,12 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
-from torch_tensorrt.dynamo.runtime._PythonTRTEngine import TRTEngine
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
     SERIALIZED_METADATA_IDX,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 from torch_tensorrt.dynamo.utils import (
     CPU_DEVICE,
     check_module_output,

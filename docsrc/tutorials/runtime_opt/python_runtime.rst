@@ -10,7 +10,7 @@ TensorRT execution) is selected automatically:
 * **C++ path** — ``torch.classes.tensorrt.Engine`` and ``torch.ops.tensorrt.execute_engine``.
   Used when the Torch-TensorRT C++ extension (``libtorchtrt`` / runtime ``.so``) is loaded:
   TorchScript-friendly, and integrates with the full C++ runtime stack.
-* **Python path** — Internal ``TRTEngine`` (``torch_tensorrt.dynamo.runtime._PythonTRTEngine``)
+* **Python path** — Internal ``TRTEngine`` (``torch_tensorrt.dynamo.runtime._TRTEngine``)
   plus ``tensorrt::execute_engine`` registered from Python when the C++ runtime is not
   available (use ``PYTHON_ONLY=1`` when building Torch-TensorRT). Useful for minimal installs and for Python-level debugging.
 

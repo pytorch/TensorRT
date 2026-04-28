@@ -545,7 +545,7 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(  # type: ignore[no-any-return]
+        return dynamo_convert_exported_program_to_serialized_trt_engine(
             exp_program,
             arg_inputs=tuple(arg_inputs),
             kwarg_inputs=torchtrt_kwarg_inputs,
@@ -597,7 +597,7 @@ def load(
     # Ensure Python TRT engine ops are registered so torch.export.load can
     # resolve tensorrt::execute_engine when the C++ runtime is absent.
     if not ENABLED_FEATURES.torch_tensorrt_runtime:
-        import torch_tensorrt.dynamo.runtime._PythonTRTEngine  # noqa: F401
+        import torch_tensorrt.dynamo.runtime._TRTEngine  # noqa: F401
 
     try:
         logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
@@ -1078,11 +1078,11 @@ def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> Non
     """
     import base64
 
-    from torch_tensorrt.dynamo.runtime._PythonTRTEngine import (
+    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
+    from torch_tensorrt.dynamo.runtime._TRTEngine import (
         EngineSerializer,
         TRTEngine,
     )
-    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
 
     for fqn, constant in list(exp_program.constants.items()):
         if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):
