@@ -45,7 +45,4 @@ def torch_flatten(network, target, args, kwargs, name):
     layer.reshape_dims = tuple(new_shape)
     layer.name = name
 
-    if input_val.dynamic_range:
-        mark_as_int8_layer(layer, input_val.dynamic_range)
-
     return layer.get_output(0)

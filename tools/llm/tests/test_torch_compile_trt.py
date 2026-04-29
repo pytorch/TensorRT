@@ -58,7 +58,6 @@ compiled_model = torch.compile(
     backend="tensorrt",
     dynamic=True,
     options={
-        "enabled_precisions": {torch.float32},
         "debug": False,
         "min_block_size": 1,
         "use_fp32_acc": False,

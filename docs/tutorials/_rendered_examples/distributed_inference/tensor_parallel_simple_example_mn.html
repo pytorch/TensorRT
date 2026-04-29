@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=166e5273"></script>
+    <script src="../../../_static/documentation_options.js?v=e38e3d67"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -703,18 +703,7 @@ def get_model(device_mesh):
 def compile_torchtrt(model, args):
     model.eval()
 
-    use_fp32_acc = False
-    use_explicit_typing = False
-    if args.precision == &quot;FP16&quot;:
-        enabled_precisions = {torch.float16}
-        use_fp32_acc = True
-        use_explicit_typing = True
-    elif args.precision == &quot;BF16&quot;:
-        enabled_precisions = {torch.bfloat16}
-        use_explicit_typing = True
-    else:
-        enabled_precisions = {torch.float32}
-        use_explicit_typing = True
+    use_fp32_acc = args.precision == &quot;FP16&quot;
 
     use_python_runtime = args.mode == &quot;jit_python&quot;
 
@@ -724,8 +713,6 @@ def compile_torchtrt(model, args):
             backend=&quot;torch_tensorrt&quot;,
             dynamic=False,
             options={
-                &quot;enabled_precisions&quot;: enabled_precisions,
-                &quot;use_explicit_typing&quot;: use_explicit_typing,
                 &quot;use_fp32_acc&quot;: use_fp32_acc,
                 &quot;device&quot;: DEVICE,
                 &quot;disable_tf32&quot;: True,
@@ -796,7 +783,6 @@ if __name__ == &quot;__main__&quot;:
             trt_model = torch_tensorrt.dynamo.compile(
                 exported_program,
                 inputs=[inp],
-                use_explicit_typing=True,
                 use_fp32_acc=True,
                 device=DEVICE,
                 disable_tf32=True,

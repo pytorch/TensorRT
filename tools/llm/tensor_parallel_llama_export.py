@@ -260,7 +260,6 @@ def export_and_save(input_ids, args):
                     name="position_ids",
                 ),
             },
-            use_explicit_typing=True,
             use_fp32_acc=True,
             device=DEVICE,
             disable_tf32=True,

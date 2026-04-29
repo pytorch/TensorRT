@@ -1125,7 +1125,6 @@ class TestNcclOpsSingleRank(unittest.TestCase):
                 backend="torch_tensorrt",
                 dynamic=False,
                 options={
-                    "enabled_precisions": {torch.float32},
                     "use_python_runtime": True,
                     "min_block_size": 1,
                     "use_distributed_mode_trace": True,
@@ -1257,7 +1256,6 @@ class TestPythonRuntimePickle(unittest.TestCase):
                 backend="torch_tensorrt",
                 dynamic=False,
                 options={
-                    "enabled_precisions": {torch.float32},
                     "use_python_runtime": True,
                     "min_block_size": 1,
                 },
@@ -1499,7 +1497,6 @@ def _multirank_distributed_mode_tp_model(
             backend="torch_tensorrt",
             dynamic=False,
             options={
-                "enabled_precisions": {torch.float32},
                 "use_python_runtime": True,
                 "min_block_size": 1,
                 "use_distributed_mode_trace": True,
@@ -1555,7 +1552,6 @@ def _multirank_distributed_mode_subgroup(
             backend="torch_tensorrt",
             dynamic=False,
             options={
-                "enabled_precisions": {torch.float32},
                 "use_python_runtime": True,
                 "min_block_size": 1,
                 "use_distributed_mode_trace": True,
@@ -1597,7 +1593,6 @@ def _multirank_cpp_runtime_bind_nccl(
         backend="torch_tensorrt",
         dynamic=False,
         options={
-            "enabled_precisions": {torch.float32},
             "use_python_runtime": False,  # C++ runtime
             "min_block_size": 1,
             "use_distributed_mode_trace": True,
@@ -1659,7 +1654,6 @@ def _multirank_distributed_mode_context_switch(
                 backend="torch_tensorrt",
                 dynamic=False,
                 options={
-                    "enabled_precisions": {torch.float32},
                     "use_python_runtime": True,
                     "min_block_size": 1,
                     "use_distributed_mode_trace": True,
@@ -1724,7 +1718,6 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
                 backend="torch_tensorrt",
                 dynamic=False,
                 options={
-                    "enabled_precisions": {torch.float32},
                     "use_python_runtime": use_python_runtime,
                     "min_block_size": 1,
                     "use_distributed_mode_trace": True,
