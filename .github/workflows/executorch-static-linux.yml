@@ -70,20 +70,10 @@ jobs:
         set -euo pipefail
         EXECUTORCH_SRC="${RUNNER_TEMP}/executorch"
 
-        git clone --depth 1 https://github.com/pytorch/executorch.git "${EXECUTORCH_SRC}"
-        # # ExecuTorch's packaging step copies these tracked schema files into
-        # # exir/_serialize as Python resources. This workflow imports the raw
-        # # clone via PYTHONPATH, so create the same resources explicitly.
-        # cp "${EXECUTORCH_SRC}/schema/program.fbs" "${EXECUTORCH_SRC}/exir/_serialize/program.fbs"
-        # cp "${EXECUTORCH_SRC}/schema/scalar_type.fbs" "${EXECUTORCH_SRC}/exir/_serialize/scalar_type.fbs"
+        git clone --depth 1 --recurse-submodules --shallow-submodules \
+           https://github.com/pytorch/executorch.git "${EXECUTORCH_SRC}"
         export EXECUTORCH_SOURCE_DIR="${EXECUTORCH_SRC}"
-        # export PYTHONPATH="$(dirname "${EXECUTORCH_SRC}")${PYTHONPATH:+:${PYTHONPATH}}"
-        # python - <<'PY'
-        # import executorch.exir
-
-        # print("ExecuTorch Python package is available:", executorch.exir.__file__)
-        # PY
-
+       
         BAZELISK_VERSION="1.26.0"
         case "$(uname -m)" in
           aarch64|arm64)
