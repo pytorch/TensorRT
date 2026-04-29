@@ -11,6 +11,7 @@ import sympy
 import torch
 from torch.export import ExportedProgram
 from torch.fx.node import Target
+from torch.utils._sympy.numbers import int_oo
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
@@ -895,20 +896,21 @@ def _build_user_symbol_bounds(
     sample_kwarg_inputs: dict[Any, Any],
     graph_signature: torch.export.graph_signature.ExportGraphSignature,
 ) -> Dict[sympy.Symbol, Tuple[int, int]]:
-    """Collect ``{sympy.Symbol: (min, max)}`` from user-supplied ``Input``s.
+    """Build a read-only ``{sympy.Symbol: (min, max)}`` map from dynamic ``Input``s.
 
-    This is a *read-only* bridge between ``torch_tensorrt.Input`` (where the
-    user declares ``min_shape``/``max_shape``) and the partitioner's shape
-    reader (``extract_var_range_info``). Each sympy symbol that appears in a
-    top-level placeholder's ``meta["val"].shape`` is recorded once with the
-    corresponding ``(min_shape[d], max_shape[d])`` from the user-provided
-    dynamic ``Input``.
+    Symbols are taken from top-level placeholder ``meta["val"].shape``; the
+    map is threaded to ``extract_var_range_info`` to fill upper bounds left
+    unbounded by ``Dim.DYNAMIC`` (``int_oo``). ``ShapeEnv`` is never mutated.
 
-    The map is consulted only to *fill* missing upper bounds (``int_oo`` /
-    unbounded) left by ``Dim.DYNAMIC``; the parent ``ShapeEnv`` is never
-    mutated. As a result, downstream consumers such as
-    :func:`torch_tensorrt.save(..., output_format="exported_program")` see
-    the original ``range_constraints`` from the exporter.
+    Validation against the exporter's finite bounds (when present):
+
+    - **Outside** (``user_min < exp_min`` or ``user_max > exp_max``): raises
+      ``ValueError`` -- shapes the user listed in ``Input`` would be rejected
+      by TRT at runtime since the engine profile follows the exporter.
+    - **Subset** (user fully inside exporter's range): emits a warning that
+      the engine profile will be widened to the exporter's bounds.
+    - **``Dim.DYNAMIC``** (unbounded exporter upper): no check; user's
+      ``Input`` fills the gap.
     """
     name_to_node = {n.name: n for n in gm.graph.nodes if n.op == "placeholder"}
     placeholders = [name_to_node[name] for name in graph_signature.user_inputs]
@@ -963,12 +965,88 @@ def _build_user_symbol_bounds(
                 continue
             if expr in user_symbol_bounds:
                 continue
-            user_symbol_bounds[expr] = (int(min_shape[d]), int(max_shape[d]))
+            user_min = int(min_shape[d])
+            user_max = int(max_shape[d])
+            user_symbol_bounds[expr] = (user_min, user_max)
             logger.debug(
                 "Recorded user-supplied bounds for %s: [%d, %d]",
                 expr,
-                int(min_shape[d]),
-                int(max_shape[d]),
+                user_min,
+                user_max,
+            )
+
+            # If the exporter has already declared *finite* bounds for this
+            # symbol (e.g. ``Dim("batch", min=10, max=20)``) and the user's
+            # ``Input`` disagrees, ``extract_var_range_info`` will silently
+            # keep the exporter's bounds (the override path is gated on
+            # ``max_val is None``). Reject incompatible bounds at compile
+            # time so the user doesn't hit a confusing TRT runtime error
+            # ("shape outside profile") on shapes they explicitly declared.
+            shape_env = getattr(dim.node, "shape_env", None)
+            if shape_env is None:
+                continue
+            exp_range = shape_env.var_to_range.get(expr)
+            if exp_range is None:
+                continue
+            exp_lower = exp_range.lower
+            exp_upper = exp_range.upper
+            exp_max_unbounded = exp_upper is int_oo or exp_upper == sympy.oo
+            if exp_max_unbounded:
+                # Pure ``Dim.DYNAMIC`` case -- user is filling the gap, which
+                # is the intended use. No warning, no error.
+                continue
+            try:
+                exp_min = int(exp_lower)
+                exp_max = int(exp_upper)
+            except (TypeError, ValueError):
+                continue
+            if user_min == exp_min and user_max == exp_max:
+                continue
+
+            # User extends outside the exporter's range -> shapes the user
+            # declared (e.g. ``Input.min_shape[d] = user_min`` when
+            # ``user_min < exp_min``) are guaranteed to fail at runtime
+            # because the TRT engine profile follows the exporter. Hard
+            # error so the user finds out at compile time.
+            if user_min < exp_min or user_max > exp_max:
+                raise ValueError(
+                    f"torch_tensorrt.Input bounds for symbol {expr} "
+                    f"(min={user_min}, max={user_max}) extend outside the "
+                    f"exporter's declared range (min={exp_min}, max={exp_max}). "
+                    f"The TRT engine profile follows the exporter's bounds, "
+                    f"so runtime tensors with shapes outside [{exp_min}, "
+                    f"{exp_max}] would be rejected by TRT with a 'shape "
+                    f"outside profile' error -- including shapes you listed "
+                    f"in Input.min_shape / Input.max_shape. To resolve, "
+                    f"either (a) re-export with "
+                    f"torch.export.Dim('{expr}', min={user_min}, "
+                    f"max={user_max}) so the exporter agrees with the "
+                    f"desired profile, or (b) pass an Input whose "
+                    f"min_shape/max_shape stay within [{exp_min}, "
+                    f"{exp_max}]."
+                )
+
+            # User is a strict subset of the exporter's range. No shape
+            # the user declared will fail at runtime, but the engine
+            # profile is silently widened to [exp_min, exp_max] -- so the
+            # user's narrower intent is dropped. Warn but do not error.
+            logger.warning(
+                "torch_tensorrt.Input bounds for symbol %s "
+                "(min=%d, max=%d) are narrower than the exporter's "
+                "declared range (min=%d, max=%d). The TRT engine profile "
+                "will use the exporter's wider [%d, %d] -- the Input "
+                "bounds are dropped. To get the narrower profile, "
+                "re-export with torch.export.Dim('%s', min=%d, max=%d).",
+                expr,
+                user_min,
+                user_max,
+                exp_min,
+                exp_max,
+                exp_min,
+                exp_max,
+                expr,
+                user_min,
+                user_max,
             )
 
     return user_symbol_bounds

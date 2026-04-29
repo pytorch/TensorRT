@@ -130,6 +130,73 @@ def test_extract_var_range_info_does_not_override_finite_max():
 
 
 @pytest.mark.unit
+def test_extract_var_range_info_handles_sympy_oo_from_bound_sympy():
+    """Composite symbolic expressions (e.g. ``s0 + s1``) take the
+    ``shape_env.bound_sympy`` fallback inside ``extract_var_range_info``.
+    Sympy's arithmetic returns the *float-typed* ``sympy.oo`` for unbounded
+    operands, which is a different object from PyTorch's ``int_oo``. A naive
+    ``!= int_oo`` guard misses this case and crashes when ``int(sympy.oo)`` is
+    attempted (``AttributeError: 'Infinity' object has no attribute '_mpf_'``).
+
+    This test reproduces that path: a model that concatenates two tensors
+    along a dynamic batch dimension, so the result's batch dim is
+    ``s0 + s1`` -- a composite expression whose ``bound_sympy`` upper is
+    ``sympy.oo`` when both ``s0`` and ``s1`` come from ``Dim.DYNAMIC``.
+    """
+
+    class _ConcatBatch(torch.nn.Module):
+        def forward(self, a, b):
+            return torch.cat([a, b], dim=0)
+
+    model = _ConcatBatch().eval().cuda()
+    a = torch.randn(2, 8, device="cuda")
+    b = torch.randn(3, 8, device="cuda")
+    ep = torch.export.export(
+        model,
+        (a, b),
+        dynamic_shapes=(
+            {0: torch.export.Dim.DYNAMIC},
+            {0: torch.export.Dim.DYNAMIC},
+        ),
+        strict=False,
+    )
+
+    cat_node = next(
+        (
+            n
+            for n in ep.graph.nodes
+            if n.op == "call_function" and "cat" in str(n.target)
+        ),
+        None,
+    )
+    if cat_node is None or "val" not in cat_node.meta:
+        pytest.skip(
+            "PyTorch version did not preserve a cat node with a composite "
+            "symbolic batch dim; skipping regression."
+        )
+
+    composite_dim = cat_node.meta["val"].size()[0]
+    if not isinstance(composite_dim, torch.SymInt):
+        pytest.skip("composite batch dim was specialized to a concrete int")
+    composite_expr = composite_dim.node.expr
+    if isinstance(composite_expr, sympy.Symbol):
+        pytest.skip(
+            "expected a composite expression (e.g. s0 + s1); got a plain "
+            "symbol on this PyTorch version"
+        )
+
+    # Without the fix, this call raises ``AttributeError`` from sympy when it
+    # tries to coerce ``sympy.oo`` to int. With the fix, the unbounded upper
+    # is reported as ``None`` so callers can fall back gracefully.
+    info = extract_var_range_info(composite_dim)
+    assert info["max"] is None, (
+        f"composite expression with unbounded operand should report max=None, "
+        f"got {info['max']!r}"
+    )
+    assert info["min"] is not None, "min should still resolve to an int"
+
+
+@pytest.mark.unit
 def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
     """Static ``Input``s contribute nothing to the user-bounds map."""
 
@@ -157,6 +224,189 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
     # Static input -> empty map.
     static_input = Input(shape=(2, 8), dtype=torch.float32)
     assert _build_user_symbol_bounds(ep.module(), [static_input], {}) == {}
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_raises_when_input_extends_outside_export():
+    """When the exporter declared finite bounds (e.g. ``Dim("batch",
+    min=10, max=20)``) and the user passes an ``Input`` that extends
+    *outside* that range, shapes the user listed in
+    ``min_shape``/``max_shape`` are guaranteed to fail at runtime (the
+    TRT engine profile follows the exporter). We surface that as a hard
+    ``ValueError`` at compile time rather than letting the user discover
+    it via a confusing TRT runtime error.
+    """
+
+    model = _SmallLinear().eval().cuda()
+    sample = torch.randn(10, 8, device="cuda")
+    ep = torch.export.export(
+        model,
+        (sample,),
+        dynamic_shapes=({0: torch.export.Dim("batch", min=10, max=20)},),
+        strict=False,
+    )
+
+    # User declares a profile that extends below the exporter's lower
+    # bound (user_min=2 < exp_min=10). The exporter would refuse batch=2
+    # at runtime; raise at compile.
+    incompatible_input = Input(
+        min_shape=(2, 8),
+        opt_shape=(5, 8),
+        max_shape=(10, 8),
+        dtype=torch.float32,
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        _build_user_symbol_bounds(ep.module(), [incompatible_input], {})
+    msg = str(exc_info.value)
+    assert "extend outside" in msg
+    assert "shape outside profile" in msg
+    # The actionable guidance: either re-export, or stay inside the range.
+    assert "re-export" in msg
+    assert "Dim(" in msg
+    # Both numeric pairs should appear so the user can see the conflict.
+    assert "min=2" in msg and "max=10" in msg
+    assert "min=10" in msg and "max=20" in msg
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_raises_when_input_max_above_export():
+    """Symmetric to the lower-bound case: user_max > exp_max also
+    guarantees a runtime error (TRT will reject shapes above the
+    exporter's max). Compile must fail."""
+
+    model = _SmallLinear().eval().cuda()
+    sample = torch.randn(10, 8, device="cuda")
+    ep = torch.export.export(
+        model,
+        (sample,),
+        dynamic_shapes=({0: torch.export.Dim("batch", min=10, max=20)},),
+        strict=False,
+    )
+    too_wide_input = Input(
+        min_shape=(10, 8),
+        opt_shape=(15, 8),
+        max_shape=(25, 8),  # exceeds exp_max=20
+        dtype=torch.float32,
+    )
+    with pytest.raises(ValueError) as exc_info:
+        _build_user_symbol_bounds(ep.module(), [too_wide_input], {})
+    assert "extend outside" in str(exc_info.value)
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_no_warning_on_matching_bounds(caplog):
+    """If the user's ``Input`` bounds exactly match the exporter's
+    contract, no warning or error should fire -- the user got it right."""
+
+    model = _SmallLinear().eval().cuda()
+    sample = torch.randn(10, 8, device="cuda")
+    ep = torch.export.export(
+        model,
+        (sample,),
+        dynamic_shapes=({0: torch.export.Dim("batch", min=10, max=20)},),
+        strict=False,
+    )
+    matching_input = Input(
+        min_shape=(10, 8),
+        opt_shape=(15, 8),
+        max_shape=(20, 8),
+        dtype=torch.float32,
+    )
+
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        _build_user_symbol_bounds(ep.module(), [matching_input], {})
+
+    warning_messages = [
+        rec.message for rec in caplog.records if rec.levelno >= logging.WARNING
+    ]
+    assert (
+        not warning_messages
+    ), f"matching bounds should not produce any warning, got: {warning_messages}"
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_warns_on_subset_input(caplog):
+    """When the user's ``Input`` is a *strict subset* of the exporter's
+    range (e.g. user `[12, 18]` inside exporter `[10, 20]`), no shape
+    the user declared will fail at runtime -- the engine profile (which
+    follows the exporter) accepts everything in the user's range. So
+    this is *not* an error. But the user's narrower profile is silently
+    widened, which is surprising; emit a warning so they know to
+    re-export if they really want the narrower engine.
+    """
+
+    model = _SmallLinear().eval().cuda()
+    sample = torch.randn(10, 8, device="cuda")
+    ep = torch.export.export(
+        model,
+        (sample,),
+        dynamic_shapes=({0: torch.export.Dim("batch", min=10, max=20)},),
+        strict=False,
+    )
+    subset_input = Input(
+        min_shape=(12, 8),
+        opt_shape=(15, 8),
+        max_shape=(18, 8),
+        dtype=torch.float32,
+    )
+
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        # Must not raise.
+        _build_user_symbol_bounds(ep.module(), [subset_input], {})
+
+    warning_messages = [
+        rec.message for rec in caplog.records if rec.levelno >= logging.WARNING
+    ]
+    assert (
+        warning_messages
+    ), "subset Input bounds should produce a 'narrower than exporter' warning"
+    msg = "\n".join(warning_messages)
+    assert "narrower than the exporter" in msg
+    assert "engine profile will use the exporter's wider" in msg
+    assert "re-export" in msg
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_no_warning_on_dim_dynamic(caplog):
+    """``Dim.DYNAMIC`` leaves the exporter's upper unbounded; the user's
+    ``Input`` bounds *fill the gap* there (the intended use). No warning
+    should fire even if the user's lower differs from the exporter's
+    (post 0/1-specialization) lower."""
+
+    model = _SmallLinear().eval().cuda()
+    sample = torch.randn(2, 8, device="cuda")
+    ep = torch.export.export(
+        model,
+        (sample,),
+        dynamic_shapes=({0: torch.export.Dim.DYNAMIC},),
+        strict=False,
+    )
+    fill_input = Input(
+        min_shape=(1, 8),
+        opt_shape=(4, 8),
+        max_shape=(8, 8),
+        dtype=torch.float32,
+    )
+
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        _build_user_symbol_bounds(ep.module(), [fill_input], {})
+
+    mismatch_warnings = [
+        rec.message
+        for rec in caplog.records
+        if rec.levelno >= logging.WARNING and "differ from the exporter" in rec.message
+    ]
+    assert not mismatch_warnings, (
+        f"Dim.DYNAMIC + Input is the intended fill case, no mismatch warning expected, "
+        f"got: {mismatch_warnings}"
+    )
 
 
 @pytest.mark.unit
