@@ -450,10 +450,32 @@ def extract_var_range_info(
         or expr.xreplace(var_to_val_map)
     )
     assert var_range, var_val
-    min_val, max_val = (
-        int(var_range.lower),
-        int(var_range.upper) if var_range.upper != int_oo else None,
-    )
+
+    # ``var_range`` can come from two paths:
+    #   (1) ``shape_env.var_to_range[expr]`` -- stores PyTorch's integer-typed
+    #       ``int_oo`` sentinel for unbounded sides.
+    #   (2) ``shape_env.bound_sympy(expr)`` (composite exprs like ``s0 + s1``)
+    #       -- runs sympy arithmetic, which collapses unbounded operands to
+    #       ``sympy.oo`` (sympy's float-typed ``S.Infinity``).
+    # ``int_oo`` and ``sympy.oo`` are different objects, so a single-sentinel
+    # check (``!= int_oo``) misses path (2) and crashes downstream when sympy
+    # tries to coerce ``oo`` to int. Treat any non-finite bound as ``None``.
+    def _bound_to_int_or_none(value: Any) -> Optional[int]:
+        if value is int_oo or value is -int_oo:
+            return None
+        if value == sympy.oo or value == -sympy.oo:
+            return None
+        try:
+            return int(value)
+        except (TypeError, OverflowError, AttributeError):
+            return None
+
+    min_val_opt = _bound_to_int_or_none(var_range.lower)
+    max_val = _bound_to_int_or_none(var_range.upper)
+    # An unbounded lower should be impossible for tensor dims (>=0), but if it
+    # ever does happen we fall back to 1 (post 0/1-specialization default)
+    # rather than crashing.
+    min_val = min_val_opt if min_val_opt is not None else 1
 
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
