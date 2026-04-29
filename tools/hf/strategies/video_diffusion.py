@@ -1,21 +1,21 @@
 """
 Video diffusion strategy: CogVideoX, AnimateDiff, Stable Video Diffusion, etc.
 
-Compiles only the denoising backbone (3D UNet or 3D DiT transformer).  The
-rest of the pipeline (VAE, text encoder, scheduler) stays in PyTorch.
+Compiles the full compute-heavy pipeline with TRT:
+  - denoising backbone  (3D UNet or 3D DiT transformer)
+  - text encoder        (pipe.text_encoder if present)
+  - VAE decoder         (pipe.vae.decoder if present)
 
 Video backbones operate on 5D tensors (B, C, F, H, W) where F is frame count.
-The same forward-pre-hook capture pattern from DiffusionStrategy is used to
-capture the actual call signature, since architectures differ significantly:
+The same forward-pre-hook capture pattern captures all component inputs in one
+pipeline pass (output_type="pt" to trigger VAE decode).
 
   CogVideoX          : 3D DiT transformer, causal VAE with temporal compression
   AnimateDiff        : UNet2D + MotionAdapter (spatial + temporal attention)
   Stable Video Diff  : UNetSpatioTemporalConditionModel (SVD)
   I2VGen-XL          : dual-text-and-image conditioned 3D UNet
 
-Rather than hard-coding dummy inputs per architecture, we run one short
-inference pass and capture the actual backbone-call args via a forward
-pre-hook.  Those captured tensors are reused for export.
+Components that fail to compile fall back to PyTorch silently.
 """
 
 from __future__ import annotations
@@ -60,16 +60,10 @@ def _is_image_to_video(pipe) -> bool:
 
 
 def _build_pipeline_call_kwargs(
-    pipe,
-    num_frames: int,
-    image_size: int,
-    device: str,
-    dtype: torch.dtype,
+    pipe, num_frames: int, image_size: int, device: str, dtype: torch.dtype
 ) -> dict:
-    """Return the kwargs needed to drive one pipeline step for backbone capture."""
+    """Return the kwargs needed to drive one pipeline step for capture."""
     if _is_image_to_video(pipe):
-        # SVD and similar pipelines need a conditioning image tensor.
-        # Using a random uint8 PIL image is fine for shape capture only.
         try:
             import numpy as np
             from PIL import Image as PILImage
@@ -80,57 +74,93 @@ def _build_pipeline_call_kwargs(
             img = PILImage.fromarray(arr.astype("uint8"))
         except ImportError:
             img = None
-        kwargs: dict = {
-            "num_frames": num_frames,
-            "decode_chunk_size": num_frames,
-            "output_type": "latent",
-        }
+        kwargs: dict = {"num_frames": num_frames, "decode_chunk_size": num_frames}
         if img is not None:
             kwargs["image"] = img
         return kwargs
-    # Default: text-to-video
-    return {
-        "prompt": "a dog running in a park",
-        "num_frames": num_frames,
-        "output_type": "latent",
-    }
+    return {"prompt": "a dog running in a park", "num_frames": num_frames}
 
 
-def _capture_backbone_inputs(
-    pipe,
-    num_frames: int,
-    image_size: int,
-    device: str,
-    dtype: torch.dtype,
-) -> tuple[tuple, dict]:
+def _clone(x):
+    return x.detach().clone() if isinstance(x, torch.Tensor) else x
+
+
+def _capture_all_inputs(
+    pipe, num_frames: int, image_size: int, device: str, dtype: torch.dtype
+) -> dict[str, tuple]:
     """
-    Run one denoising step and capture the backbone's positional and keyword
-    args via a forward pre-hook.  Returns cloned (args, kwargs).
+    Run one full pipeline pass (output_type="pt" triggers VAE decode) and capture
+    the actual call args/kwargs for every compile target via forward pre-hooks.
+
+    Returns a dict keyed by component name:
+      "backbone", "text_encoder", "vae_decoder"
+    Each value is (args_tuple, kwargs_dict) of cloned tensors.
     """
     backbone, _ = _get_backbone(pipe)
-    captured: dict = {"args": None, "kwargs": None}
+    captured: dict[str, tuple] = {}
 
-    def _hook(module, args, kwargs):
-        captured["args"] = tuple(
-            a.detach().clone() if isinstance(a, torch.Tensor) else a for a in args
+    def make_hook(key: str):
+        def _hook(module, args, kwargs):
+            if key not in captured:
+                captured[key] = (
+                    tuple(_clone(a) for a in args),
+                    {k: _clone(v) for k, v in kwargs.items()},
+                )
+
+        return _hook
+
+    hooks = [
+        backbone.register_forward_pre_hook(make_hook("backbone"), with_kwargs=True)
+    ]
+    te = getattr(pipe, "text_encoder", None)
+    if te is not None:
+        hooks.append(
+            te.register_forward_pre_hook(make_hook("text_encoder"), with_kwargs=True)
         )
-        captured["kwargs"] = {
-            k: (v.detach().clone() if isinstance(v, torch.Tensor) else v)
-            for k, v in kwargs.items()
-        }
+    vae = getattr(pipe, "vae", None)
+    if vae is not None:
+        dec = getattr(vae, "decoder", None)
+        if dec is not None:
+            hooks.append(
+                dec.register_forward_pre_hook(
+                    make_hook("vae_decoder"), with_kwargs=True
+                )
+            )
 
-    handle = backbone.register_forward_pre_hook(_hook, with_kwargs=True)
     call_kwargs = _build_pipeline_call_kwargs(
         pipe, num_frames, image_size, device, dtype
     )
+    call_kwargs["output_type"] = "pt"  # trigger VAE decode
+
     try:
         pipe(num_inference_steps=1, **call_kwargs)
     finally:
-        handle.remove()
+        for h in hooks:
+            h.remove()
 
-    if captured["args"] is None:
+    if "backbone" not in captured:
         raise RuntimeError("Failed to capture video backbone forward inputs.")
-    return captured["args"], captured["kwargs"]
+    return captured
+
+
+def _trt_inputs_from(args, kwargs) -> tuple[list, dict]:
+    arg_inputs = [
+        torch_tensorrt.Input(shape=t.shape, dtype=t.dtype)
+        for t in args
+        if isinstance(t, torch.Tensor)
+    ]
+    kwarg_inputs = {
+        k: (
+            torch_tensorrt.Input(shape=v.shape, dtype=v.dtype)
+            if isinstance(v, torch.Tensor)
+            else v
+        )
+        for k, v in kwargs.items()
+    }
+    flat = arg_inputs + [
+        v for v in kwarg_inputs.values() if isinstance(v, torch_tensorrt.Input)
+    ]
+    return flat, kwarg_inputs
 
 
 # --------------------------------------------------------------------------- #
@@ -148,6 +178,9 @@ class VideoDiffusionStrategy(ModelStrategy):
         self._captured_args: tuple = ()
         self._captured_kwargs: dict = {}
         self._num_frames: int = cfg.num_frames
+        # Original module refs for raw engine serialization.
+        self._orig_text_encoder = None
+        self._orig_vae_decoder = None
 
     # ---------------------------------------------------------------------- #
 
@@ -167,33 +200,57 @@ class VideoDiffusionStrategy(ModelStrategy):
 
     def compile(self) -> None:
         assert self._pipe is not None, "Call load() before compile()"
-        backbone, attr = _get_backbone(self._pipe)
-        print(f"[video_diffusion] Compiling pipe.{attr} ...")
 
-        if self.cfg.mode == "compile":
-            compiled = self._compile_torch_compile(backbone)
-        else:
-            compiled = self._compile_export(backbone)
-
-        # Copy pipeline-required attributes that diffusers reads from the backbone.
-        for attr_name in ("config", "dtype", "add_embedding", "device"):
-            if hasattr(backbone, attr_name) and not hasattr(compiled, attr_name):
-                try:
-                    setattr(compiled, attr_name, getattr(backbone, attr_name))
-                except Exception:
-                    pass
-
-        setattr(self._pipe, attr, compiled)
-        print(f"[video_diffusion] Compiled backbone swapped into pipe.{attr}.")
-
-    def _compile_torch_compile(self, backbone: torch.nn.Module) -> torch.nn.Module:
-        options = compile_kwargs(self.cfg.precision, self.cfg.autocast)
-        options.update(
-            {"min_block_size": self.cfg.min_block_size, "debug": self.cfg.debug}
+        self._orig_text_encoder = getattr(self._pipe, "text_encoder", None)
+        vae = getattr(self._pipe, "vae", None)
+        self._orig_vae_decoder = (
+            getattr(vae, "decoder", None) if vae is not None else None
         )
 
-        compiled = torch.compile(backbone, backend="torch_tensorrt", options=options)
+        if self.cfg.mode == "compile":
+            self._compile_all_torch_compile()
+        else:
+            self._compile_all_export()
 
+    # ---------------------------------------------------------------------- #
+    # torch.compile path
+    # ---------------------------------------------------------------------- #
+
+    def _trt_opts(self) -> dict:
+        opts = compile_kwargs(self.cfg.precision, self.cfg.autocast)
+        opts.update(
+            {"min_block_size": self.cfg.min_block_size, "debug": self.cfg.debug}
+        )
+        if self.cfg.optimization_level is not None:
+            opts["optimization_level"] = self.cfg.optimization_level
+        return opts
+
+    def _compile_all_torch_compile(self) -> None:
+        opts = self._trt_opts()
+        backbone, attr = _get_backbone(self._pipe)
+
+        print(f"[video_diffusion] torch.compile pipe.{attr} ...")
+        compiled_bb = torch.compile(backbone, backend="torch_tensorrt", options=opts)
+        self._copy_backbone_attrs(backbone, compiled_bb)
+        setattr(self._pipe, attr, compiled_bb)
+
+        te = getattr(self._pipe, "text_encoder", None)
+        if te is not None:
+            print("[video_diffusion] torch.compile pipe.text_encoder ...")
+            self._pipe.text_encoder = torch.compile(
+                te, backend="torch_tensorrt", options=opts
+            )
+
+        vae = getattr(self._pipe, "vae", None)
+        if vae is not None and getattr(vae, "decoder", None) is not None:
+            print("[video_diffusion] torch.compile pipe.vae.decoder ...")
+            self._pipe.vae.decoder = torch.compile(
+                vae.decoder, backend="torch_tensorrt", options=opts
+            )
+
+        print(
+            "[video_diffusion] Warming up (triggers TRT compilation for all components) ..."
+        )
         call_kwargs = _build_pipeline_call_kwargs(
             self._pipe,
             self._num_frames,
@@ -201,98 +258,144 @@ class VideoDiffusionStrategy(ModelStrategy):
             self._device,
             self._model_dtype,
         )
+        call_kwargs["output_type"] = "pt"
         with torch.no_grad():
             self._pipe(num_inference_steps=1, **call_kwargs)
         torch.cuda.synchronize()
-        return compiled
+        print("[video_diffusion] All components compiled.")
 
-    def _compile_export(self, backbone: torch.nn.Module) -> torch.nn.Module:
+    # ---------------------------------------------------------------------- #
+    # export path
+    # ---------------------------------------------------------------------- #
+
+    def _compile_all_export(self) -> None:
+        backbone, attr = _get_backbone(self._pipe)
+
         print(
-            f"[video_diffusion] Capturing backbone inputs from a 1-step inference "
-            f"({self._num_frames} frames) ..."
+            f"[video_diffusion] Capturing inputs from 1-step inference "
+            f"({self._num_frames} frames, output_type='pt') ..."
         )
-        args, kwargs = _capture_backbone_inputs(
+        captured = _capture_all_inputs(
             self._pipe,
             num_frames=self._num_frames,
             image_size=self.cfg.image_size,
             device=self._device,
             dtype=self._model_dtype,
         )
-        _summarize_captured(args, kwargs)
+        print(f"[video_diffusion] Captured: {sorted(captured.keys())}")
+        _summarize_captured(captured.get("backbone", ([], {})))
 
+        # ---- backbone ----
+        bb_args, bb_kwargs = captured["backbone"]
         self._pt_backbone = backbone
-        self._captured_args = args
-        self._captured_kwargs = kwargs
+        self._captured_args = bb_args
+        self._captured_kwargs = bb_kwargs
 
-        print("[video_diffusion] torch.export.export ...")
-        ep = safe_export(backbone, args=args, kwargs=kwargs)
+        print(f"[video_diffusion] Exporting + compiling pipe.{attr} ...")
+        ep = safe_export(backbone, args=bb_args, kwargs=bb_kwargs)
         maybe_save_exported_program(
-            self.cfg, ep, log_prefix="[video_diffusion:backbone]"
+            self.cfg, ep, log_prefix=f"[video_diffusion:{attr}]"
         )
+        flat, kw_in = _trt_inputs_from(bb_args, bb_kwargs)
+        compiled_bb = self._do_compile_with_trt(
+            ep, flat, log_prefix=f"[video_diffusion:{attr}]"
+        )
+        self._copy_backbone_attrs(backbone, compiled_bb)
+        setattr(self._pipe, attr, compiled_bb)
 
-        # Build TRT inputs: tensor args → positional Input; tensor kwargs → kwarg Input.
-        trt_arg_inputs = [
-            torch_tensorrt.Input(shape=t.shape, dtype=t.dtype)
-            for t in args
-            if isinstance(t, torch.Tensor)
-        ]
-        trt_kwarg_inputs = {
-            k: (
-                torch_tensorrt.Input(shape=v.shape, dtype=v.dtype)
-                if isinstance(v, torch.Tensor)
-                else v
-            )
-            for k, v in kwargs.items()
-        }
-        flat_trt_inputs = trt_arg_inputs + [
-            v for v in trt_kwarg_inputs.values() if isinstance(v, torch_tensorrt.Input)
-        ]
+        if self.cfg.save_trt_engine:
+            try:
+                engine_bytes = serialize_trt_engine(
+                    ep,
+                    arg_inputs=[
+                        torch_tensorrt.Input(shape=t.shape, dtype=t.dtype)
+                        for t in bb_args
+                        if isinstance(t, torch.Tensor)
+                    ],
+                    kwarg_inputs=kw_in or None,
+                    precision=self.cfg.precision,
+                    autocast=self.cfg.autocast,
+                    min_block_size=self.cfg.min_block_size,
+                    debug=self.cfg.debug,
+                    offload_module_to_cpu=self.cfg.offload_module_to_cpu,
+                    optimization_level=self.cfg.optimization_level,
+                )
+                with open(self.cfg.save_trt_engine, "wb") as f:
+                    f.write(engine_bytes)
+                print(
+                    f"[video_diffusion:{attr}] Wrote {len(engine_bytes)} bytes → {self.cfg.save_trt_engine}"
+                )
+            except Exception as e:
+                print(f"[video_diffusion:{attr}] Engine serialization failed: {e}")
 
+        # ---- text encoder ----
+        te = getattr(self._pipe, "text_encoder", None)
+        if te is not None:
+            if "text_encoder" not in captured:
+                print(
+                    "[video_diffusion:text_encoder] Not called during capture — keeping PyTorch."
+                )
+            else:
+                te_args, te_kwargs = captured["text_encoder"]
+                print("[video_diffusion] Exporting + compiling pipe.text_encoder ...")
+                try:
+                    ep_te = safe_export(te, args=te_args, kwargs=te_kwargs)
+                    flat_te, _ = _trt_inputs_from(te_args, te_kwargs)
+                    compiled_te = self._do_compile_with_trt(
+                        ep_te, flat_te, log_prefix="[video_diffusion:text_encoder]"
+                    )
+                    self._pipe.text_encoder = compiled_te
+                except Exception as e:
+                    print(
+                        f"[video_diffusion:text_encoder] Compile failed ({e}) — keeping PyTorch."
+                    )
+
+        # ---- VAE decoder ----
+        vae = getattr(self._pipe, "vae", None)
+        if vae is not None and getattr(vae, "decoder", None) is not None:
+            if "vae_decoder" not in captured:
+                print(
+                    "[video_diffusion:vae_decoder] Not called during capture — keeping PyTorch."
+                )
+            else:
+                vae_args, vae_kwargs = captured["vae_decoder"]
+                print("[video_diffusion] Exporting + compiling pipe.vae.decoder ...")
+                try:
+                    ep_vae = safe_export(vae.decoder, args=vae_args, kwargs=vae_kwargs)
+                    flat_vae, _ = _trt_inputs_from(vae_args, vae_kwargs)
+                    compiled_vae = self._do_compile_with_trt(
+                        ep_vae, flat_vae, log_prefix="[video_diffusion:vae_decoder]"
+                    )
+                    self._pipe.vae.decoder = compiled_vae
+                except Exception as e:
+                    print(
+                        f"[video_diffusion:vae_decoder] Compile failed ({e}) — keeping PyTorch."
+                    )
+
+    def _do_compile_with_trt(self, ep, flat_inputs, *, log_prefix: str):
+        print(f"{log_prefix} torch_tensorrt.dynamo.compile ...")
         compiled = compile_with_trt(
             ep,
-            inputs=flat_trt_inputs,
+            inputs=flat_inputs,
             precision=self.cfg.precision,
             autocast=self.cfg.autocast,
             min_block_size=self.cfg.min_block_size,
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
             engine_cache_dir=self.cfg.engine_cache_dir,
+            optimization_level=self.cfg.optimization_level,
         )
         torch.cuda.synchronize()
-
-        if self.cfg.save_engine:
-            from common.compile import maybe_save_trt_module
-
-            maybe_save_trt_module(
-                self.cfg,
-                compiled,
-                arg_inputs=flat_trt_inputs,
-                log_prefix="[video_diffusion]",
-            )
-
-        if self.cfg.save_trt_engine:
-            _, backbone_attr = _get_backbone(self._pipe)
-            try:
-                engine_bytes = serialize_trt_engine(
-                    ep,
-                    arg_inputs=trt_arg_inputs,
-                    kwarg_inputs=trt_kwarg_inputs or None,
-                    precision=self.cfg.precision,
-                    autocast=self.cfg.autocast,
-                    min_block_size=self.cfg.min_block_size,
-                    debug=self.cfg.debug,
-                    offload_module_to_cpu=self.cfg.offload_module_to_cpu,
-                )
-                path = self.cfg.save_trt_engine
-                with open(path, "wb") as f:
-                    f.write(engine_bytes)
-                print(
-                    f"[video_diffusion:{backbone_attr}] Wrote {len(engine_bytes)} bytes → {path}"
-                )
-            except Exception as e:
-                print(f"[video_diffusion:{backbone_attr}] FAILED to serialize: {e}")
-
         return compiled
+
+    @staticmethod
+    def _copy_backbone_attrs(src, dst) -> None:
+        for name in ("config", "dtype", "add_embedding", "device"):
+            if hasattr(src, name) and not hasattr(dst, name):
+                try:
+                    setattr(dst, name, getattr(src, name))
+                except Exception:
+                    pass
 
     # ---------------------------------------------------------------------- #
 
@@ -364,7 +467,6 @@ class VideoDiffusionStrategy(ModelStrategy):
         with torch.no_grad():
             out = self._pipe(**call_kwargs)
 
-        # Video pipelines return .frames (list of PIL images) or .frames as tensors.
         frames = getattr(out, "frames", None)
         if frames is not None:
             n = len(frames) if hasattr(frames, "__len__") else "?"
@@ -380,13 +482,14 @@ class VideoDiffusionStrategy(ModelStrategy):
 # --------------------------------------------------------------------------- #
 
 
-def _summarize_captured(args: tuple, kwargs: dict) -> None:
+def _summarize_captured(backbone_capture: tuple) -> None:
+    args, kwargs = backbone_capture
     n_tensor_args = sum(1 for a in args if isinstance(a, torch.Tensor))
     n_tensor_kwargs = sum(1 for v in kwargs.values() if isinstance(v, torch.Tensor))
     tensor_shapes = [tuple(a.shape) for a in args if isinstance(a, torch.Tensor)] + [
         tuple(v.shape) for v in kwargs.values() if isinstance(v, torch.Tensor)
     ]
     print(
-        f"[video_diffusion] Captured {n_tensor_args} positional + "
+        f"[video_diffusion] Backbone: {n_tensor_args} positional + "
         f"{n_tensor_kwargs} keyword tensor args.  Shapes: {tensor_shapes}"
     )

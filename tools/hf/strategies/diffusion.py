@@ -1,8 +1,10 @@
 """
 Diffusion strategy: Stable Diffusion, SDXL, FLUX, etc.
 
-Compile only the denoising backbone (UNet or DiT transformer).  The rest
-of the pipeline (scheduler, VAE, CLIP) stays in PyTorch.
+Compiles the full compute-heavy pipeline with TRT:
+  - denoising backbone  (UNet or DiT transformer)
+  - text encoder(s)     (pipe.text_encoder, pipe.text_encoder_2 if present)
+  - VAE decoder         (pipe.vae.decoder)
 
 UNet/DiT signatures vary widely across architectures:
   SD 1.x/2.x : (sample, timestep, encoder_hidden_states)
@@ -11,8 +13,12 @@ UNet/DiT signatures vary widely across architectures:
                 encoder_hidden_states, txt_ids, img_ids)
 
 Rather than hard-code dummy inputs per architecture, we run one short
-inference pass and capture the actual backbone-call args via a forward
-pre-hook.  Those captured tensors are then used as the export args.
+inference pass (output_type="pil" to trigger VAE decode) and capture
+every component's actual call args via forward pre-hooks.  Those captured
+tensors are used as the export args.
+
+Components that fail to compile fall back to PyTorch silently so a partial
+TRT pipeline is still faster than a full PyTorch one.
 """
 
 from __future__ import annotations
@@ -36,11 +42,6 @@ from strategies.base import ModelStrategy, RunConfig
 
 
 def _suffix_engine_path(base_path: str, suffix: str) -> str:
-    """
-    Insert `.<suffix>` before the extension of base_path.
-      foo.trt → foo.<suffix>.trt
-      foo     → foo.<suffix>
-    """
     import os
 
     root, ext = os.path.splitext(base_path)
@@ -58,34 +59,82 @@ def _get_backbone(pipe) -> tuple[torch.nn.Module, str]:
     )
 
 
-def _capture_backbone_inputs(pipe, prompt: str, num_steps: int = 1):
+def _clone(x):
+    return x.detach().clone() if isinstance(x, torch.Tensor) else x
+
+
+def _capture_all_inputs(pipe, prompt: str, num_steps: int = 1) -> dict[str, tuple]:
     """
-    Run a single denoising step and capture the backbone's positional and
-    keyword args via a pre-forward hook.  Returns (args, kwargs) cloned so
-    they can be reused for export.
+    Run one full pipeline step (including VAE decode) and capture the actual
+    call args/kwargs for every compile target via forward pre-hooks.
+
+    Returns a dict keyed by component name:
+      "backbone", "text_encoder", "text_encoder_2", "vae_decoder"
+    Each value is (args_tuple, kwargs_dict) of cloned tensors.
     """
     backbone, _ = _get_backbone(pipe)
-    captured = {"args": None, "kwargs": None}
+    captured: dict[str, tuple] = {}
 
-    def _hook(module, args, kwargs):
-        captured["args"] = tuple(
-            a.detach().clone() if isinstance(a, torch.Tensor) else a for a in args
-        )
-        captured["kwargs"] = {
-            k: (v.detach().clone() if isinstance(v, torch.Tensor) else v)
-            for k, v in kwargs.items()
-        }
+    def make_hook(key: str):
+        def _hook(module, args, kwargs):
+            if key not in captured:  # only first call per component
+                captured[key] = (
+                    tuple(_clone(a) for a in args),
+                    {k: _clone(v) for k, v in kwargs.items()},
+                )
 
-    handle = backbone.register_forward_pre_hook(_hook, with_kwargs=True)
+        return _hook
+
+    hooks = [
+        backbone.register_forward_pre_hook(make_hook("backbone"), with_kwargs=True)
+    ]
+    for attr in ("text_encoder", "text_encoder_2"):
+        te = getattr(pipe, attr, None)
+        if te is not None:
+            hooks.append(
+                te.register_forward_pre_hook(make_hook(attr), with_kwargs=True)
+            )
+    vae = getattr(pipe, "vae", None)
+    if vae is not None:
+        dec = getattr(vae, "decoder", None)
+        if dec is not None:
+            hooks.append(
+                dec.register_forward_pre_hook(
+                    make_hook("vae_decoder"), with_kwargs=True
+                )
+            )
+
     try:
-        # 1 step is enough to capture the call signature.
-        pipe(prompt, num_inference_steps=num_steps, output_type="latent")
+        # output_type="pil" triggers the VAE decode path so vae.decoder is called.
+        pipe(prompt, num_inference_steps=num_steps, output_type="pil")
     finally:
-        handle.remove()
+        for h in hooks:
+            h.remove()
 
-    if captured["args"] is None:
+    if "backbone" not in captured:
         raise RuntimeError("Failed to capture backbone forward inputs.")
-    return captured["args"], captured["kwargs"]
+    return captured
+
+
+def _trt_inputs_from(args, kwargs) -> tuple[list, dict]:
+    """Split captured (args, kwargs) into (flat_trt_inputs, kwarg_inputs) for compile_with_trt."""
+    arg_inputs = [
+        torch_tensorrt.Input(shape=t.shape, dtype=t.dtype)
+        for t in args
+        if isinstance(t, torch.Tensor)
+    ]
+    kwarg_inputs = {
+        k: (
+            torch_tensorrt.Input(shape=v.shape, dtype=v.dtype)
+            if isinstance(v, torch.Tensor)
+            else v
+        )
+        for k, v in kwargs.items()
+    }
+    flat = arg_inputs + [
+        v for v in kwarg_inputs.values() if isinstance(v, torch_tensorrt.Input)
+    ]
+    return flat, kwarg_inputs
 
 
 class DiffusionStrategy(ModelStrategy):
@@ -98,6 +147,10 @@ class DiffusionStrategy(ModelStrategy):
         self._pt_backbone = None
         self._captured_args: tuple = ()
         self._captured_kwargs: dict = {}
+        # Original (pre-compilation) module refs needed for raw engine serialization.
+        self._orig_text_encoder = None
+        self._orig_text_encoder_2 = None
+        self._orig_vae_decoder = None
 
     # ---------------------------------------------------------------------- #
 
@@ -105,12 +158,9 @@ class DiffusionStrategy(ModelStrategy):
         from diffusers import AutoPipelineForText2Image
 
         print(f"[diffusion] Loading {self.cfg.model} ...")
-        # When autocast=True we keep FP32 weights for the backbone; otherwise
-        # use the target precision for both backbone and pipeline parts.
-        torch_dtype = self._model_dtype
         self._pipe = AutoPipelineForText2Image.from_pretrained(
             self.cfg.model,
-            torch_dtype=torch_dtype,
+            torch_dtype=self._model_dtype,
         ).to(self._device)
         self._pipe.set_progress_bar_config(disable=True)
         print("[diffusion] Pipeline loaded.")
@@ -119,160 +169,190 @@ class DiffusionStrategy(ModelStrategy):
 
     def compile(self) -> None:
         assert self._pipe is not None, "Call load() before compile()"
-        backbone, attr = _get_backbone(self._pipe)
-        print(f"[diffusion] Compiling pipe.{attr} ...")
+
+        # Save original module refs before any compilation so _save_companion_engines
+        # can still serialize the original PyTorch modules as raw TRT engine bytes.
+        self._orig_text_encoder = getattr(self._pipe, "text_encoder", None)
+        self._orig_text_encoder_2 = getattr(self._pipe, "text_encoder_2", None)
+        vae = getattr(self._pipe, "vae", None)
+        self._orig_vae_decoder = (
+            getattr(vae, "decoder", None) if vae is not None else None
+        )
 
         if self.cfg.mode == "compile":
-            compiled = self._compile_torch_compile(backbone)
+            self._compile_all_torch_compile()
         else:
-            compiled = self._compile_export(backbone)
+            self._compile_all_export()
 
-        # Preserve attributes the diffusers pipeline reads on the backbone
-        # (e.g. unet.config.sample_size, unet.dtype).
-        for attr_name in ("config", "dtype", "add_embedding", "device"):
-            if hasattr(backbone, attr_name) and not hasattr(compiled, attr_name):
-                try:
-                    setattr(compiled, attr_name, getattr(backbone, attr_name))
-                except Exception:
-                    pass
-
-        setattr(self._pipe, attr, compiled)
-        print(f"[diffusion] Compiled backbone swapped into pipe.{attr}")
-
-        # When --save-trt-engine is set, also serialize text_encoder and
-        # vae.decoder as separate engines so the full diffusion pipeline
-        # can be deployed under the standalone TRT runtime.
         if self.cfg.save_trt_engine and self.cfg.mode == "export":
             self._save_companion_engines()
 
-    def _compile_torch_compile(self, backbone: torch.nn.Module) -> torch.nn.Module:
-        options = compile_kwargs(self.cfg.precision, self.cfg.autocast)
-        options.update(
+    # ---------------------------------------------------------------------- #
+    # torch.compile path
+    # ---------------------------------------------------------------------- #
+
+    def _trt_opts(self) -> dict:
+        opts = compile_kwargs(self.cfg.precision, self.cfg.autocast)
+        opts.update(
             {"min_block_size": self.cfg.min_block_size, "debug": self.cfg.debug}
         )
+        if self.cfg.optimization_level is not None:
+            opts["optimization_level"] = self.cfg.optimization_level
+        return opts
 
-        compiled = torch.compile(backbone, backend="torch_tensorrt", options=options)
+    def _compile_all_torch_compile(self) -> None:
+        opts = self._trt_opts()
+        backbone, attr = _get_backbone(self._pipe)
 
-        # Trigger compilation by running a real pipeline step.
-        with torch.no_grad():
-            self._pipe("warmup", num_inference_steps=1, output_type="latent")
-        torch.cuda.synchronize()
-        return compiled
+        print(f"[diffusion] torch.compile pipe.{attr} ...")
+        compiled_bb = torch.compile(backbone, backend="torch_tensorrt", options=opts)
+        self._copy_backbone_attrs(backbone, compiled_bb)
+        setattr(self._pipe, attr, compiled_bb)
 
-    def _compile_export(self, backbone: torch.nn.Module) -> torch.nn.Module:
-        # Capture the actual backbone call signature from a one-step inference.
-        print("[diffusion] Capturing backbone inputs from a 1-step inference ...")
-        args, kwargs = _capture_backbone_inputs(
-            self._pipe,
-            prompt="a photo of an astronaut",
-            num_steps=1,
-        )
-        print(
-            f"[diffusion] Captured {len(args)} positional + {len(kwargs)} keyword args."
-        )
+        for te_attr in ("text_encoder", "text_encoder_2"):
+            te = getattr(self._pipe, te_attr, None)
+            if te is not None:
+                print(f"[diffusion] torch.compile pipe.{te_attr} ...")
+                setattr(
+                    self._pipe,
+                    te_attr,
+                    torch.compile(te, backend="torch_tensorrt", options=opts),
+                )
 
-        # Stash for accuracy comparison: keep the PT backbone reference and
-        # the captured call args/kwargs so we can run both pre- and post-swap.
-        self._pt_backbone = backbone
-        self._captured_args = args
-        self._captured_kwargs = kwargs
-
-        # Static-shape export for the backbone.  Dynamic-shape support is
-        # currently architecture-specific (FLUX has variable image-token count,
-        # SD has fixed latent shape) — leave to a future per-arch override.
-        print("[diffusion] torch.export.export ...")
-        ep = safe_export(backbone, args=args, kwargs=kwargs)
-        # Save the pre-TRT EP for the backbone if requested.  Companion EPs
-        # for text_encoder/vae are saved under suffixed paths in
-        # _save_companion_engines (only when --save-trt-engine is used).
-        maybe_save_exported_program(self.cfg, ep, log_prefix="[diffusion:backbone]")
-
-        # Split positional and keyword tensor inputs to match the EP's
-        # input spec.  Non-tensor kwargs (None, bool, dict) were baked
-        # into the EP as constants at export time and are not graph inputs.
-        trt_arg_inputs = [
-            torch_tensorrt.Input(shape=t.shape, dtype=t.dtype)
-            for t in args
-            if isinstance(t, torch.Tensor)
-        ]
-        # The EP's input spec includes ALL kwargs from the original call,
-        # not just tensor kwargs (non-tensor ones became constants but are
-        # still listed in the in_spec for tree flattening).  Provide an
-        # entry for each: torch_tensorrt.Input for tensors, the original
-        # value for everything else.
-        trt_kwarg_inputs = {
-            k: (
-                torch_tensorrt.Input(shape=v.shape, dtype=v.dtype)
-                if isinstance(v, torch.Tensor)
-                else v
+        vae = getattr(self._pipe, "vae", None)
+        if vae is not None and getattr(vae, "decoder", None) is not None:
+            print("[diffusion] torch.compile pipe.vae.decoder ...")
+            self._pipe.vae.decoder = torch.compile(
+                vae.decoder, backend="torch_tensorrt", options=opts
             )
-            for k, v in kwargs.items()
-        }
-        # For the compile() call we still need a flat list, but only
-        # tensor-typed entries; compile()'s `inputs=` arg is positional.
-        flat_trt_inputs = trt_arg_inputs + [
-            v for v in trt_kwarg_inputs.values() if isinstance(v, torch_tensorrt.Input)
-        ]
 
+        print(
+            "[diffusion] Warming up (triggers TRT compilation for all components) ..."
+        )
+        with torch.no_grad():
+            self._pipe("warmup", num_inference_steps=1, output_type="pil")
+        torch.cuda.synchronize()
+        print("[diffusion] All components compiled.")
+
+    # ---------------------------------------------------------------------- #
+    # export path
+    # ---------------------------------------------------------------------- #
+
+    def _compile_all_export(self) -> None:
+        backbone, attr = _get_backbone(self._pipe)
+
+        print("[diffusion] Capturing inputs from a 1-step inference ...")
+        captured = _capture_all_inputs(
+            self._pipe, prompt="a photo of an astronaut", num_steps=1
+        )
+        print(f"[diffusion] Captured: {sorted(captured.keys())}")
+
+        # ---- backbone ----
+        bb_args, bb_kwargs = captured["backbone"]
+        self._pt_backbone = backbone
+        self._captured_args = bb_args
+        self._captured_kwargs = bb_kwargs
+
+        print(f"[diffusion] Exporting + compiling pipe.{attr} ...")
+        ep = safe_export(backbone, args=bb_args, kwargs=bb_kwargs)
+        maybe_save_exported_program(self.cfg, ep, log_prefix=f"[diffusion:{attr}]")
+        flat, kw_in = _trt_inputs_from(bb_args, bb_kwargs)
+        compiled_bb = self._do_compile_with_trt(
+            ep, flat, log_prefix=f"[diffusion:{attr}]"
+        )
+        self._copy_backbone_attrs(backbone, compiled_bb)
+        setattr(self._pipe, attr, compiled_bb)
+
+        if self.cfg.save_trt_engine:
+            try:
+                self._serialize_to_path(
+                    ep,
+                    _suffix_engine_path(self.cfg.save_trt_engine, attr),
+                    arg_inputs=[
+                        torch_tensorrt.Input(shape=t.shape, dtype=t.dtype)
+                        for t in bb_args
+                        if isinstance(t, torch.Tensor)
+                    ],
+                    kwarg_inputs=kw_in or None,
+                    log_prefix=f"[diffusion:{attr}]",
+                )
+            except Exception as e:
+                print(f"[diffusion:{attr}] Engine serialization failed: {e}")
+
+        # ---- text encoders ----
+        for te_attr in ("text_encoder", "text_encoder_2"):
+            te = getattr(self._pipe, te_attr, None)
+            if te is None or te_attr not in captured:
+                if te is not None:
+                    print(
+                        f"[diffusion:{te_attr}] Not called during capture — keeping PyTorch."
+                    )
+                continue
+            te_args, te_kwargs = captured[te_attr]
+            print(f"[diffusion] Exporting + compiling pipe.{te_attr} ...")
+            try:
+                ep_te = safe_export(te, args=te_args, kwargs=te_kwargs)
+                flat_te, _ = _trt_inputs_from(te_args, te_kwargs)
+                compiled_te = self._do_compile_with_trt(
+                    ep_te, flat_te, log_prefix=f"[diffusion:{te_attr}]"
+                )
+                setattr(self._pipe, te_attr, compiled_te)
+            except Exception as e:
+                print(f"[diffusion:{te_attr}] Compile failed ({e}) — keeping PyTorch.")
+
+        # ---- VAE decoder ----
+        vae = getattr(self._pipe, "vae", None)
+        if vae is not None and getattr(vae, "decoder", None) is not None:
+            if "vae_decoder" not in captured:
+                print(
+                    "[diffusion:vae_decoder] Not called during capture — keeping PyTorch."
+                )
+            else:
+                vae_args, vae_kwargs = captured["vae_decoder"]
+                print("[diffusion] Exporting + compiling pipe.vae.decoder ...")
+                try:
+                    ep_vae = safe_export(vae.decoder, args=vae_args, kwargs=vae_kwargs)
+                    flat_vae, _ = _trt_inputs_from(vae_args, vae_kwargs)
+                    compiled_vae = self._do_compile_with_trt(
+                        ep_vae, flat_vae, log_prefix="[diffusion:vae_decoder]"
+                    )
+                    self._pipe.vae.decoder = compiled_vae
+                except Exception as e:
+                    print(
+                        f"[diffusion:vae_decoder] Compile failed ({e}) — keeping PyTorch."
+                    )
+
+    def _do_compile_with_trt(self, ep, flat_inputs, *, log_prefix: str):
+        print(f"{log_prefix} torch_tensorrt.dynamo.compile ...")
         compiled = compile_with_trt(
             ep,
-            inputs=flat_trt_inputs,
+            inputs=flat_inputs,
             precision=self.cfg.precision,
             autocast=self.cfg.autocast,
             min_block_size=self.cfg.min_block_size,
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
             engine_cache_dir=self.cfg.engine_cache_dir,
+            optimization_level=self.cfg.optimization_level,
         )
         torch.cuda.synchronize()
-
-        if self.cfg.save_engine:
-            from common.compile import maybe_save_trt_module
-
-            maybe_save_trt_module(
-                self.cfg,
-                compiled,
-                arg_inputs=flat_trt_inputs,
-                log_prefix="[diffusion]",
-            )
-
-        # Save the backbone engine to <base>.<attr>.trt; companion engines
-        # (text_encoder, vae_decoder) are written separately by
-        # _save_companion_engines() called from compile().
-        # The backbone often hits "Failed to extract symbolic shape
-        # expressions" because diffusion UNets/transformers have ops the
-        # converter can't trace symbolically.  Treat that as non-fatal:
-        # text_encoder + vae_decoder are useful even without the backbone.
-        if self.cfg.save_trt_engine:
-            _, backbone_attr = _get_backbone(self._pipe)
-            try:
-                self._serialize_to_path(
-                    ep,
-                    _suffix_engine_path(self.cfg.save_trt_engine, backbone_attr),
-                    arg_inputs=trt_arg_inputs,
-                    kwarg_inputs=trt_kwarg_inputs or None,
-                    log_prefix=f"[diffusion:{backbone_attr}]",
-                )
-            except Exception as e:
-                print(f"[diffusion:{backbone_attr}] FAILED: {e}")
-                print(
-                    f"[diffusion:{backbone_attr}] (continuing with companion engines)"
-                )
-
         return compiled
 
+    @staticmethod
+    def _copy_backbone_attrs(src, dst) -> None:
+        for name in ("config", "dtype", "add_embedding", "device"):
+            if hasattr(src, name) and not hasattr(dst, name):
+                try:
+                    setattr(dst, name, getattr(src, name))
+                except Exception:
+                    pass
+
     # ---------------------------------------------------------------------- #
-    # Multi-engine save: text_encoder + backbone + vae_decoder
+    # Multi-engine serialization (--save-trt-engine)
     # ---------------------------------------------------------------------- #
 
     def _serialize_to_path(
-        self,
-        ep,
-        path: str,
-        *,
-        arg_inputs,
-        kwarg_inputs=None,
-        log_prefix: str,
+        self, ep, path, *, arg_inputs, kwarg_inputs=None, log_prefix: str
     ) -> None:
         print(f"{log_prefix} Serializing to {path} ...")
         engine_bytes = serialize_trt_engine(
@@ -284,6 +364,7 @@ class DiffusionStrategy(ModelStrategy):
             min_block_size=self.cfg.min_block_size,
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
+            optimization_level=self.cfg.optimization_level,
         )
         with open(path, "wb") as f:
             f.write(engine_bytes)
@@ -291,85 +372,69 @@ class DiffusionStrategy(ModelStrategy):
 
     def _save_companion_engines(self) -> None:
         """
-        Export and serialize the text_encoder and VAE decoder as separate
-        TRT engines.  Together with the backbone engine they cover the
-        compute-heavy parts of a text-to-image pipeline; the scheduler and
-        tokenizer remain in Python.
+        Export and serialize the text_encoder and VAE decoder as separate TRT engines.
+        Uses the original PyTorch modules saved before compilation.
         """
         base = self.cfg.save_trt_engine
         assert base is not None
 
-        # Text encoder ----------------------------------------------------- #
-        if hasattr(self._pipe, "text_encoder") and self._pipe.text_encoder is not None:
+        if self._orig_text_encoder is not None:
             try:
-                self._serialize_text_encoder(_suffix_engine_path(base, "text_encoder"))
+                self._serialize_text_encoder(
+                    self._orig_text_encoder,
+                    _suffix_engine_path(base, "text_encoder"),
+                )
             except Exception as e:
-                print(f"[diffusion:text_encoder] FAILED: {e}")
+                print(f"[diffusion:text_encoder] Serialization failed: {e}")
 
-        # VAE decoder ------------------------------------------------------ #
-        if hasattr(self._pipe, "vae") and self._pipe.vae is not None:
+        if self._orig_text_encoder_2 is not None:
             try:
-                self._serialize_vae_decoder(_suffix_engine_path(base, "vae_decoder"))
+                self._serialize_text_encoder(
+                    self._orig_text_encoder_2,
+                    _suffix_engine_path(base, "text_encoder_2"),
+                )
             except Exception as e:
-                print(f"[diffusion:vae_decoder] FAILED: {e}")
+                print(f"[diffusion:text_encoder_2] Serialization failed: {e}")
 
-    def _serialize_text_encoder(self, path: str) -> None:
-        text_encoder = self._pipe.text_encoder
-        tcfg = getattr(text_encoder, "config", None)
+        if self._orig_vae_decoder is not None:
+            try:
+                self._serialize_vae_decoder(
+                    self._orig_vae_decoder,
+                    _suffix_engine_path(base, "vae_decoder"),
+                )
+            except Exception as e:
+                print(f"[diffusion:vae_decoder] Serialization failed: {e}")
+
+    def _serialize_text_encoder(self, te, path: str) -> None:
+        tcfg = getattr(te, "config", None)
         max_len = getattr(tcfg, "max_position_embeddings", 77)
         vocab = getattr(tcfg, "vocab_size", 49408)
         input_ids = torch.randint(
             0, vocab, (self.cfg.batch_size, max_len), dtype=torch.int64
         ).to(self._device)
-
-        print("[diffusion:text_encoder] torch.export.export ...")
-        ep = safe_export(text_encoder, args=(input_ids,))
+        ep = safe_export(te, args=(input_ids,))
         trt_inputs = [
             torch_tensorrt.Input(shape=input_ids.shape, dtype=input_ids.dtype)
         ]
         self._serialize_to_path(
-            ep,
-            path,
-            arg_inputs=trt_inputs,
-            log_prefix="[diffusion:text_encoder]",
+            ep, path, arg_inputs=trt_inputs, log_prefix="[diffusion:text_encoder]"
         )
 
-    def _serialize_vae_decoder(self, path: str) -> None:
+    def _serialize_vae_decoder(self, decoder, path: str) -> None:
         vae = self._pipe.vae
-        # `vae.decode(z)` is what the pipeline calls; its underlying module
-        # is `vae.decoder`.  We export `vae.decoder` directly to skip the
-        # diffusers-specific output wrapping and tiling logic.
-        decoder = getattr(vae, "decoder", None)
-        if decoder is None:
-            print("[diffusion:vae_decoder] No vae.decoder submodule; skipping.")
-            return
-
         vcfg = getattr(vae, "config", None)
         latent_channels = getattr(vcfg, "latent_channels", 4)
-        # Spatial downsampling factor = 2^(num_decoder_blocks - 1).
-        # `vae.config.scaling_factor` is the latent value rescaling (float
-        # like 0.18215), NOT the spatial factor — don't confuse them.
         block_out_channels = getattr(vcfg, "block_out_channels", [128, 256, 512, 512])
         spatial_factor = 2 ** (len(block_out_channels) - 1)
         h_lat = self.cfg.image_size // spatial_factor
         w_lat = self.cfg.image_size // spatial_factor
-
         latents = torch.randn(
-            self.cfg.batch_size,
-            latent_channels,
-            h_lat,
-            w_lat,
-            dtype=self._model_dtype,
+            self.cfg.batch_size, latent_channels, h_lat, w_lat, dtype=self._model_dtype
         ).to(self._device)
-
-        print("[diffusion:vae_decoder] torch.export.export ...")
         ep = safe_export(decoder, args=(latents,))
         trt_inputs = [torch_tensorrt.Input(shape=latents.shape, dtype=latents.dtype)]
         self._serialize_to_path(
-            ep,
-            path,
-            arg_inputs=trt_inputs,
-            log_prefix="[diffusion:vae_decoder]",
+            ep, path, arg_inputs=trt_inputs, log_prefix="[diffusion:vae_decoder]"
         )
 
     # ---------------------------------------------------------------------- #
@@ -424,8 +489,6 @@ class DiffusionStrategy(ModelStrategy):
             return self._pt_backbone(*self._captured_args, **self._captured_kwargs)
 
     def _run_trt(self):
-        # The TRT module was swapped into pipe.unet/transformer; call it
-        # the same way the captured forward was made.
         backbone, _ = _get_backbone(self._pipe)
         with torch.no_grad():
             return backbone(*self._captured_args, **self._captured_kwargs)

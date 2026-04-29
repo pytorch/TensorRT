@@ -24,13 +24,13 @@ Two valid precision paths (mutually exclusive):
 `enabled_precisions` is deprecated when `use_explicit_typing=True` and is
 NEVER set by these helpers.
 """
+
 from __future__ import annotations
 
 from typing import Iterable, Optional
 
 import torch
 import torch_tensorrt
-
 
 # --------------------------------------------------------------------------- #
 # Precision plumbing
@@ -90,6 +90,7 @@ def compile_kwargs(precision: str, autocast: bool) -> dict:
 # Export helper (with fallback for guard violations)
 # --------------------------------------------------------------------------- #
 
+
 def safe_export(
     module: torch.nn.Module,
     args: tuple = (),
@@ -97,9 +98,17 @@ def safe_export(
     dynamic_shapes=None,
 ):
     """
-    torch.export.export with the standard fallback used across torch-trt
-    examples: if a constraint guard is violated, retry with
-    `prefer_deferred_runtime_asserts_over_guards=True`.
+    torch.export.export with a two-stage fallback.
+
+    Stage 1: strict=False (standard).
+    Stage 2: If stage 1 raises a constraint / guard violation, retry with
+             prefer_deferred_runtime_asserts_over_guards=True.
+
+    WARNING: the deferred-assertions fallback converts guards to runtime
+    ops that TRT may miscompile or ignore, producing wrong output for
+    models with data-dependent control flow (e.g. LLaMA RoPE scaling).
+    Callers should use Dim.AUTO in dynamic_shapes rather than explicit
+    min/max to avoid triggering this fallback in the first place.
     """
     kwargs = kwargs or {}
     with torch.no_grad():
@@ -112,7 +121,13 @@ def safe_export(
                 strict=False,
             )
         except Exception as e:
-            print(f"[compile] torch.export.export failed ({e}); retrying with deferred guards.")
+            print(
+                f"[compile] torch.export.export failed ({type(e).__name__}: "
+                f"{str(e)[:120]}); retrying with deferred guards.\n"
+                "[compile] WARNING: deferred-assertions export may produce wrong "
+                "TRT output for RoPE / causal-SDPA models. Use Dim.AUTO in "
+                "dynamic_shapes to avoid this."
+            )
             return torch.export._trace._export(
                 module,
                 args=args,
@@ -127,6 +142,7 @@ def safe_export(
 # Compile wrapper
 # --------------------------------------------------------------------------- #
 
+
 def _build_trt_kwargs(
     precision: str,
     autocast: bool,
@@ -137,6 +153,7 @@ def _build_trt_kwargs(
     reuse_cached_engines: bool,
     engine_cache_dir: Optional[str],
     extra: Optional[dict],
+    optimization_level: Optional[int] = None,
 ) -> dict:
     kw = compile_kwargs(precision, autocast)
     kw.update(
@@ -150,6 +167,8 @@ def _build_trt_kwargs(
             "reuse_cached_engines": reuse_cached_engines,
         }
     )
+    if optimization_level is not None:
+        kw["optimization_level"] = optimization_level
     if engine_cache_dir is not None:
         kw["engine_cache_dir"] = engine_cache_dir
     if extra:
@@ -164,6 +183,7 @@ def compile_with_trt(
     precision: str,
     autocast: bool = False,
     min_block_size: int = 1,
+    optimization_level: Optional[int] = None,
     debug: bool = False,
     offload_module_to_cpu: bool = False,
     cache_built_engines: bool = True,
@@ -181,9 +201,16 @@ def compile_with_trt(
       - offload_module_to_cpu OFF (opt-in for memory-constrained models)
     """
     kw = _build_trt_kwargs(
-        precision, autocast, min_block_size, debug,
-        offload_module_to_cpu, cache_built_engines, reuse_cached_engines,
-        engine_cache_dir, extra,
+        precision,
+        autocast,
+        min_block_size,
+        debug,
+        offload_module_to_cpu,
+        cache_built_engines,
+        reuse_cached_engines,
+        engine_cache_dir,
+        extra,
+        optimization_level=optimization_level,
     )
     return torch_tensorrt.dynamo.compile(ep, inputs=list(inputs), **kw)
 
@@ -227,7 +254,9 @@ def maybe_save_trt_module(
     # torch_tensorrt.Input specs.
     if fmt == "torchscript":
         use_args = example_arg_inputs if example_arg_inputs is not None else arg_inputs
-        use_kwargs = example_kwarg_inputs if example_kwarg_inputs is not None else kwarg_inputs
+        use_kwargs = (
+            example_kwarg_inputs if example_kwarg_inputs is not None else kwarg_inputs
+        )
     else:
         use_args = arg_inputs
         use_kwargs = kwarg_inputs
@@ -283,6 +312,7 @@ def serialize_trt_engine(
     precision: str,
     autocast: bool = False,
     min_block_size: int = 1,
+    optimization_level: Optional[int] = None,
     debug: bool = False,
     offload_module_to_cpu: bool = False,
     engine_cache_dir: Optional[str] = None,
@@ -310,13 +340,17 @@ def serialize_trt_engine(
     `compile_with_trt` + `torch_tensorrt.save` path instead.
     """
     kw = _build_trt_kwargs(
-        precision, autocast, min_block_size, debug,
+        precision,
+        autocast,
+        min_block_size,
+        debug,
         offload_module_to_cpu,
         # Engine caching is irrelevant for serialization output.
         cache_built_engines=False,
         reuse_cached_engines=False,
         engine_cache_dir=engine_cache_dir,
         extra=extra,
+        optimization_level=optimization_level,
     )
     return torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
         ep,

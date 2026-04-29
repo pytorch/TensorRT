@@ -88,6 +88,13 @@ class AudioStrategy(ModelStrategy):
         self._model.model.encoder = self._trt_encoder
         print("[audio] Compiled encoder swapped into self._model.model.encoder")
 
+        # ---- Decoder ----
+        decoder = getattr(self._model.model, "decoder", None)
+        if decoder is not None:
+            self._compile_decoder(decoder)
+        else:
+            print("[audio] No decoder found — skipping decoder TRT.")
+
     def _compile_torch_compile(self, encoder: torch.nn.Module) -> torch.nn.Module:
         print("[audio] torch.compile encoder (backend='torch_tensorrt') ...")
         options = compile_kwargs(self.cfg.precision, self.cfg.autocast)
@@ -122,6 +129,7 @@ class AudioStrategy(ModelStrategy):
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
             engine_cache_dir=self.cfg.engine_cache_dir,
+            optimization_level=self.cfg.optimization_level,
         )
         torch.cuda.synchronize()
 
@@ -134,6 +142,22 @@ class AudioStrategy(ModelStrategy):
         maybe_save_trt_engine(self.cfg, ep, trt_inputs, log_prefix="[audio]")
 
         return compiled
+
+    def _compile_decoder(self, decoder: torch.nn.Module) -> None:
+        print(
+            "[audio] torch.compile decoder (dynamic=True, backend='torch_tensorrt') ..."
+        )
+        opts = compile_kwargs(self.cfg.precision, self.cfg.autocast)
+        opts.update(
+            {"min_block_size": self.cfg.min_block_size, "debug": self.cfg.debug}
+        )
+        if self.cfg.optimization_level is not None:
+            opts["optimization_level"] = self.cfg.optimization_level
+        compiled = torch.compile(
+            decoder, backend="torch_tensorrt", dynamic=True, options=opts
+        )
+        self._model.model.decoder = compiled
+        print("[audio] Compiled decoder swapped into self._model.model.decoder")
 
     # ---------------------------------------------------------------------- #
 
@@ -176,6 +200,37 @@ class AudioStrategy(ModelStrategy):
             report_latency(
                 stats,
                 backend=f"{backend} (encoder)",
+                batch_size=self.cfg.batch_size,
+                precision=self.cfg.precision,
+            )
+        )
+
+        # End-to-end generate: encoder + decoder together.
+        import numpy as np
+
+        sr = 16000
+        audio_np = np.zeros(int(sr * audio_duration_s), dtype=np.float32)
+        inputs = self._processor(audio_np, sampling_rate=sr, return_tensors="pt")
+        input_features = inputs.input_features.to(self._model_dtype).to(self._device)
+
+        def _run_generate():
+            with torch.no_grad():
+                return self._model.generate(input_features, max_new_tokens=128)
+
+        gen_timings = warmup_and_time(_run_generate, (), iterations=self.cfg.iterations)
+        gen_stats = compute_stats(gen_timings, self.cfg.batch_size)
+        rows.append(
+            report_rtf(
+                audio_duration_s=audio_duration_s,
+                inference_s=gen_stats["mean_latency_ms"] / 1000.0,
+                backend=f"{backend} (generate)",
+                precision=self.cfg.precision,
+            )
+        )
+        rows.append(
+            report_latency(
+                gen_stats,
+                backend=f"{backend} (generate)",
                 batch_size=self.cfg.batch_size,
                 precision=self.cfg.precision,
             )

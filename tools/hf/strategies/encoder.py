@@ -154,6 +154,7 @@ class EncoderStrategy(ModelStrategy):
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
             engine_cache_dir=self.cfg.engine_cache_dir,
+            optimization_level=self.cfg.optimization_level,
         )
         torch.cuda.synchronize()
         print("[encoder] TRT compile done.")
@@ -199,6 +200,24 @@ class EncoderStrategy(ModelStrategy):
                 report_latency(
                     compute_stats(trt_t, self.cfg.batch_size),
                     backend=f"torch_tensorrt[{self.cfg.mode}]",
+                    batch_size=self.cfg.batch_size,
+                    precision=self.cfg.precision,
+                )
+            )
+
+        if self.cfg.inductor:
+            print("[encoder] torch.compile(backend='inductor') ...")
+            ind_model = torch.compile(self._model, backend="inductor")
+            with torch.no_grad():
+                ind_t = warmup_and_time(
+                    lambda *a: ind_model(*a),
+                    self._dummy_inputs,
+                    iterations=self.cfg.iterations,
+                )
+            rows.append(
+                report_latency(
+                    compute_stats(ind_t, self.cfg.batch_size),
+                    backend="inductor",
                     batch_size=self.cfg.batch_size,
                     precision=self.cfg.precision,
                 )

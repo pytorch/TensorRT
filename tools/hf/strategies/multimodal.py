@@ -149,6 +149,7 @@ class MultimodalStrategy(ModelStrategy):
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
             engine_cache_dir=self.cfg.engine_cache_dir,
+            optimization_level=self.cfg.optimization_level,
         )
         torch.cuda.synchronize()
 

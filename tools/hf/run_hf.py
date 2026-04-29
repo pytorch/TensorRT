@@ -51,6 +51,18 @@ Standard usage (single process)
 # Override family detection:
   uv run python run_hf.py --model some/model --task text-generation --benchmark
 
+# VLM (LLaVA, PaliGemma, Qwen2-VL, SmolVLM, …):
+  uv run python run_hf.py --model HuggingFaceTB/SmolVLM-256M-Instruct --benchmark
+
+# VLA (OpenVLA, SpatialVLA — robotics; loads with trust_remote_code=True):
+  uv run python run_hf.py --model openvla/openvla-7b --benchmark
+
+# Object detection (DETR, RT-DETR):
+  uv run python run_hf.py --model facebook/detr-resnet-50 --benchmark
+
+# SAM (image encoder only):
+  uv run python run_hf.py --model facebook/sam-vit-base --benchmark
+
 # torch.compile fast path (no export, no serialization):
   uv run python run_hf.py --model bert-base-uncased --mode compile --benchmark
 
@@ -136,6 +148,18 @@ def _build_strategy(family: str, cfg: RunConfig):
         from strategies.video_diffusion import VideoDiffusionStrategy
 
         return VideoDiffusionStrategy(cfg)
+    if family == "vlm":
+        from strategies.vlm import VLMStrategy
+
+        return VLMStrategy(cfg)
+    if family == "vla":
+        from strategies.vla import VLAStrategy
+
+        return VLAStrategy(cfg)
+    if family == "detection":
+        from strategies.detection import DetectionStrategy
+
+        return DetectionStrategy(cfg)
     raise ValueError(f"No strategy implemented for family '{family}'")
 
 

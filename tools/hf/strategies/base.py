@@ -49,6 +49,10 @@ class RunConfig:
     min_block_size: int = 1
     """Minimum consecutive TRT-compatible ops to form a TRT segment."""
 
+    optimization_level: Optional[int] = None
+    """TensorRT builder optimization level (0–5). Higher = longer build, better runtime perf.
+    Default (None) lets TensorRT choose (typically 3). Levels 4–5 enable extra kernel search."""
+
     offload_module_to_cpu: bool = False
     """Offload original PyTorch module to CPU after compile (memory-constrained models)."""
 
@@ -103,6 +107,9 @@ class RunConfig:
     # ---- Audio-specific ----
     audio_duration_s: float = 30.0
     """Simulated audio duration in seconds for RTF calculation (audio)."""
+
+    inductor: bool = False
+    """Also benchmark torch.compile(backend='inductor') during benchmark() for comparison."""
 
     # ---- Accuracy comparison ----
     accuracy_atol: float = 1e-2

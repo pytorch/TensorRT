@@ -57,14 +57,28 @@ if str(_TOOLS_LLM) not in sys.path:
 
 
 def _export_llm(model: torch.nn.Module, input_ids: torch.Tensor, max_seq_len: int):
-    """Export an HF causal LM with dynamic seq_len (no KV cache in graph)."""
-    seq_len = torch.export.Dim("seq_len", min=1, max=max_seq_len)
+    """Export an HF causal LM with dynamic seq_len (no KV cache in graph).
+
+    Uses Dim.AUTO so the exporter infers the correct constraints from the
+    model itself.  Explicit min/max values cause constraint violations across
+    multiple model families:
+      - LLaMA / Mistral / Qwen: RoPE scaling emits min(64*N, 256*N) guards
+        that no user-specified range satisfies
+      - All SDPA causal models: is_causal = True if q_len > 1 else False
+        fails when min=1 is in range
+    Dim.AUTO derives the tightest correct constraints automatically, avoids
+    the fallback to prefer_deferred_runtime_asserts_over_guards (which silently
+    produces wrong TRT graphs for LLaMA), and works for all model families.
+    """
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(input_ids.device)
     return safe_export(
         model,
         args=(input_ids,),
         kwargs={"position_ids": position_ids},
-        dynamic_shapes=({1: seq_len}, {1: seq_len}),
+        dynamic_shapes={
+            "input_ids": {1: torch.export.Dim.AUTO},
+            "position_ids": {1: torch.export.Dim.AUTO},
+        },
     )
 
 
@@ -221,6 +235,7 @@ class LLMStrategy(ModelStrategy):
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
             engine_cache_dir=self.cfg.engine_cache_dir,
+            optimization_level=self.cfg.optimization_level,
         )
         torch.cuda.synchronize()
         print("[llm] TRT compile done.")
@@ -391,6 +406,7 @@ class LLMStrategy(ModelStrategy):
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
             engine_cache_dir=self.cfg.engine_cache_dir,
+            optimization_level=self.cfg.optimization_level,
         )
         torch.cuda.synchronize()
         print("[llm:hf_static] TRT compile done.")
@@ -438,6 +454,24 @@ class LLMStrategy(ModelStrategy):
                     total_tokens=tokens_per_iter * self.cfg.iterations,
                     elapsed_s=sum(trt_t),
                     backend=f"torch_tensorrt[{self.cfg.mode}] (prefill)",
+                    precision=self.cfg.precision,
+                )
+            )
+
+        if self.cfg.inductor:
+            print("[llm] torch.compile(backend='inductor', dynamic=True) ...")
+            ind_model = torch.compile(self._model, backend="inductor", dynamic=True)
+
+            def _run_ind():
+                with torch.no_grad():
+                    return ind_model(self._input_ids, position_ids=position_ids)
+
+            ind_t = warmup_and_time(_run_ind, (), iterations=self.cfg.iterations)
+            rows.append(
+                report_tokens_per_sec(
+                    total_tokens=tokens_per_iter * self.cfg.iterations,
+                    elapsed_s=sum(ind_t),
+                    backend="inductor (prefill)",
                     precision=self.cfg.precision,
                 )
             )

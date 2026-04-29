@@ -1,15 +1,20 @@
 """
 Seq2seq strategy: T5, BART, mT5, Pegasus, ...
 
-Mirrors the audio strategy: compile only the encoder, leave the decoder in
-PyTorch.  The decoder uses cross-attention + autoregressive KV cache, neither
-of which traces cleanly with torch.export today.
+Compiles both the encoder and the decoder with TRT:
 
-The compiled encoder is swapped into model.encoder so HF's
-.generate() automatically uses the TRT encoder + PyTorch decoder.
+  Encoder  — torch.export + dynamo.compile (export mode) or torch.compile.
+             Static shape; the main compute-heavy component.
 
-Benchmarking metric: encoder latency on a fixed-length input + qualitative
-.generate() output via the strategy's generate() method.
+  Decoder  — torch.compile with dynamic=True.
+             Handles cross-attention over encoder hidden states and
+             the autoregressive self-attention KV cache through dynamo's
+             symbolic shapes; no custom static-cache wrapper required.
+
+The compiled modules are swapped back into model.encoder / model.decoder so
+HF's .generate() uses both automatically.
+
+Benchmarking: encoder latency AND full end-to-end .generate() throughput.
 """
 
 from __future__ import annotations
@@ -42,6 +47,7 @@ class SeqToSeqStrategy(ModelStrategy):
         self._dummy_inputs: Optional[tuple] = None
         self._device = "cuda:0"
         self._model_dtype = model_dtype(cfg.precision, cfg.autocast)
+        self._encoder_owner = None  # set in compile()
 
     # ---------------------------------------------------------------------- #
 
@@ -111,6 +117,17 @@ class SeqToSeqStrategy(ModelStrategy):
             f"[seq2seq] Compiled encoder swapped into {type(self._encoder_owner).__name__}.encoder"
         )
 
+        # ---- Decoder ----
+        # torch.compile with dynamic=True handles the autoregressive KV cache
+        # and cross-attention over encoder hidden states through dynamo's
+        # symbolic shapes.  torch.export of the decoder is not used because
+        # the dynamic past_key_values structure cannot be exported cleanly.
+        decoder = getattr(self._encoder_owner, "decoder", None)
+        if decoder is not None:
+            self._compile_decoder(decoder)
+        else:
+            print("[seq2seq] No decoder found on encoder_owner — skipping decoder TRT.")
+
     def _compile_torch_compile(self, encoder: torch.nn.Module) -> torch.nn.Module:
         print("[seq2seq] torch.compile encoder (backend='torch_tensorrt') ...")
         options = compile_kwargs(self.cfg.precision, self.cfg.autocast)
@@ -151,6 +168,7 @@ class SeqToSeqStrategy(ModelStrategy):
             debug=self.cfg.debug,
             offload_module_to_cpu=self.cfg.offload_module_to_cpu,
             engine_cache_dir=self.cfg.engine_cache_dir,
+            optimization_level=self.cfg.optimization_level,
         )
         torch.cuda.synchronize()
 
@@ -164,10 +182,28 @@ class SeqToSeqStrategy(ModelStrategy):
 
         return compiled
 
+    def _compile_decoder(self, decoder: torch.nn.Module) -> None:
+        print(
+            "[seq2seq] torch.compile decoder (dynamic=True, backend='torch_tensorrt') ..."
+        )
+        opts = compile_kwargs(self.cfg.precision, self.cfg.autocast)
+        opts.update(
+            {"min_block_size": self.cfg.min_block_size, "debug": self.cfg.debug}
+        )
+        if self.cfg.optimization_level is not None:
+            opts["optimization_level"] = self.cfg.optimization_level
+        compiled = torch.compile(
+            decoder, backend="torch_tensorrt", dynamic=True, options=opts
+        )
+        self._encoder_owner.decoder = compiled
+        print("[seq2seq] Compiled decoder swapped into encoder_owner.decoder")
+
     # ---------------------------------------------------------------------- #
 
     def benchmark(self) -> list[dict]:
-        assert self._dummy_inputs is not None, "Call load() first"
+        assert (
+            self._dummy_inputs is not None and self._tokenizer is not None
+        ), "Call load() first"
         rows: list[dict] = []
         encoder = (
             self._trt_encoder
@@ -180,11 +216,11 @@ class SeqToSeqStrategy(ModelStrategy):
             else "pytorch"
         )
 
-        def _run():
+        def _run_encoder():
             with torch.no_grad():
                 return encoder(*self._dummy_inputs)
 
-        timings = warmup_and_time(_run, (), iterations=self.cfg.iterations)
+        timings = warmup_and_time(_run_encoder, (), iterations=self.cfg.iterations)
         rows.append(
             report_latency(
                 compute_stats(timings, self.cfg.batch_size),
@@ -193,7 +229,29 @@ class SeqToSeqStrategy(ModelStrategy):
                 precision=self.cfg.precision,
             )
         )
-        print_table(rows, title=f"Seq2seq encoder benchmark – {self.cfg.model}")
+
+        # End-to-end generate: encoder + decoder together.
+        inputs = self._tokenizer(self.cfg.prompt, return_tensors="pt", padding=True).to(
+            self._device
+        )
+        num_tokens = min(self.cfg.num_tokens, 128)
+
+        def _run_generate():
+            with torch.no_grad():
+                return self._model.generate(**inputs, max_new_tokens=num_tokens)
+
+        gen_timings = warmup_and_time(_run_generate, (), iterations=self.cfg.iterations)
+        gen_stats = compute_stats(gen_timings, self.cfg.batch_size)
+        rows.append(
+            report_latency(
+                gen_stats,
+                backend=f"{backend} (generate)",
+                batch_size=self.cfg.batch_size,
+                precision=self.cfg.precision,
+            )
+        )
+
+        print_table(rows, title=f"Seq2seq benchmark – {self.cfg.model}")
         return rows
 
     # ---------------------------------------------------------------------- #
