@@ -23,6 +23,24 @@ from torch_tensorrt.dynamo.utils import extract_var_range_info
 assertions = unittest.TestCase()
 
 
+def _first_sym_placeholder(ep: torch.export.ExportedProgram, sym_dim: int = 0):
+    """Return (fake_val, sym_int) for the first placeholder node that has a
+    ``torch.SymInt`` at ``sym_dim``.
+
+    ``ep.graph`` is the *lifted* graph: parameters and buffers are lifted to
+    placeholders ahead of the user's inputs (``p_<param>`` / ``b_<buf>``
+    targets). Hence the function"""
+    for node in ep.graph.nodes:
+        if node.op != "placeholder":
+            continue
+        val = node.meta.get("val")
+        if not isinstance(val, torch.Tensor):
+            continue
+        if sym_dim < len(val.size()) and isinstance(val.size()[sym_dim], torch.SymInt):
+            return val, val.size()[sym_dim]
+    return None, None
+
+
 class _SmallLinear(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -47,10 +65,12 @@ def test_extract_var_range_info_fills_unbounded_max_from_user():
     )
 
     # Pull the SymInt for the dynamic batch dim from the placeholder meta.
-    placeholders = [n for n in ep.graph.nodes if n.op == "placeholder"]
-    assert placeholders, "expected a placeholder for the model input"
-    fake_val = placeholders[0].meta["val"]
-    sym_dim = fake_val.size()[0]
+    # Use the helper to skip parameter/buffer placeholders that strict=False
+    # may prepend to the graph.
+    fake_val, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
+    assert (
+        sym_dim is not None
+    ), "expected at least one placeholder with a SymInt batch dim"
     assert isinstance(sym_dim, torch.SymInt)
     expr = sym_dim.node.expr
     assert isinstance(expr, sympy.Symbol)
@@ -95,8 +115,8 @@ def test_extract_var_range_info_does_not_widen_lower_bound():
         dynamic_shapes=({0: torch.export.Dim.DYNAMIC},),
         strict=False,
     )
-    placeholders = [n for n in ep.graph.nodes if n.op == "placeholder"]
-    sym_dim = placeholders[0].meta["val"].size()[0]
+    _, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
+    assert sym_dim is not None, "expected a placeholder with a SymInt batch dim"
     expr = sym_dim.node.expr
 
     info = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (0, 8)})
@@ -119,8 +139,8 @@ def test_extract_var_range_info_does_not_override_finite_max():
         dynamic_shapes=({0: torch.export.Dim("batch", min=1, max=4)},),
         strict=False,
     )
-    placeholders = [n for n in ep.graph.nodes if n.op == "placeholder"]
-    sym_dim = placeholders[0].meta["val"].size()[0]
+    _, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
+    assert sym_dim is not None, "expected a placeholder with a SymInt batch dim"
     expr = sym_dim.node.expr
 
     info = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (1, 16)})
@@ -282,8 +302,8 @@ def test_build_user_symbol_bounds_raises_when_input_min_genuinely_below_export()
     with pytest.raises(ValueError) as exc_info:
         _build_user_symbol_bounds(ep.module(), [input_too_low], {})
     msg = str(exc_info.value)
-    assert "TRT engine min" in msg
-    assert "re-export" in msg or "raise Input.min_shape" in msg
+    assert "min_shape is below" in msg or "TRT will reject" in msg
+    assert "Re-export" in msg or "adjust Input" in msg
 
 
 @pytest.mark.unit
@@ -472,24 +492,22 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
         max_shape=(8, 8),
         dtype=torch.float32,
     )
-    # The user is allowed to pass an ``Input`` for the SymInt argument
-    # (Torch-TRT treats it as a 1-D shape tensor downstream), but
-    # ``_build_user_symbol_bounds`` will not record it because
-    # ``meta["val"]`` is a ``torch.SymInt``, not a ``torch.Tensor``.
+    # ``_build_user_symbol_bounds`` skips SymInt placeholders entirely
+    # (tensor-only guard on ``meta["val"]``).  The Input for the scalar
+    # argument is therefore never inspected; the specific shape values
+    # below carry no meaning -- this is a structurally-valid placeholder
+    # to keep the index alignment with positional placeholders.
     scalar_input = Input(
         min_shape=(1,),
-        opt_shape=(4,),
-        max_shape=(8,),
+        opt_shape=(1,),
+        max_shape=(1,),
         dtype=torch.int64,
     )
 
     bounds = _build_user_symbol_bounds(ep.module(), [tensor_input, scalar_input], {})
 
     # Exactly one symbol recorded - from x's dynamic dim 0. The SymInt
-    # placeholder contributed nothing. (The fact that the recorded
-    # bounds equal the *tensor* input's (1, 8) - not the scalar input's
-    # (1, 8), which happens to be the same numerically - is verified by
-    # checking that exactly one entry exists, ruling out double-recording.)
+    # placeholder contributed nothing.
     assert (
         len(bounds) == 1
     ), f"expected only the tensor placeholder to contribute, got {bounds}"
