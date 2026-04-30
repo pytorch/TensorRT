@@ -17,6 +17,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -54,8 +55,6 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_device,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -822,6 +821,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         else:
             return converter(self.ctx, target, args, kwargs, self._cur_node_name)
 
+    def _cast_output_dtype(
+        self,
+        output: trt.ITensor,
+        output_dtype: trt.DataType,
+        output_name: str,
+    ) -> trt.ITensor:
+        if output.dtype == output_dtype:
+            return output
+
+        layer = self.ctx.net.add_cast(output, output_dtype)
+        layer.name = f"Cast output {output_name} from {output.dtype} to {output_dtype}"
+        return layer.get_output(0)
+
     def output(self, target: str, args: Any, kwargs: Any) -> List[Any]:
         assert len(args) == 1
         if isinstance(args[0], tuple):
@@ -877,18 +889,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             ):
                 output_dtype = dtype.b
             elif self.output_dtypes is not None:
-                if self.output_dtypes[i] == dtype.i64:
-                    output = self.ctx.net.add_cast(
-                        output, dtype.i64.to(trt.DataType)
-                    ).get_output(0)
-                    output_dtype = dtype.i64
-                else:
-                    output_dtype = self.output_dtypes[i]
+                output_dtype = self.output_dtypes[i]
 
-            self.ctx.net.mark_output(output)
             if output_dtype is not dtype.unknown:
-                output.dtype = output_dtype.to(trt.DataType, use_default=True)
+                output = self._cast_output_dtype(
+                    output,
+                    output_dtype.to(trt.DataType, use_default=True),
+                    name,
+                )
+
             output.name = name
+            outputs = outputs[:i] + (output,) + outputs[i + 1 :]
+            self.ctx.net.mark_output(output)
 
             self._output_names.append(name)
             _LOGGER.debug(

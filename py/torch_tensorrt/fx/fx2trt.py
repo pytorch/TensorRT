@@ -323,6 +323,21 @@ class TRTInterpreter(torch.fx.Interpreter):
         assert self._cur_node_name is not None
         return converter(self.network, target, args, kwargs, self._cur_node_name)
 
+    def _cast_output_dtype(
+        self,
+        output: trt.tensorrt.ITensor,
+        output_dtype: trt.DataType,
+        output_name: str,
+    ) -> trt.tensorrt.ITensor:
+        if output.dtype == output_dtype:
+            return output
+
+        layer = self.network.add_cast(output, output_dtype)
+        layer.name = (
+            f"Cast output {output_name} from {output.dtype} to {output_dtype}"
+        )
+        return layer.get_output(0)
+
     def output(self, target, args, kwargs):
         assert len(args) == 1
         if isinstance(args[0], tuple):
@@ -355,10 +370,16 @@ class TRTInterpreter(torch.fx.Interpreter):
             else:
                 output_bool = False
             name = f"output{i}"
+
+            output_dtype = None
+            if output_bool:
+                output_dtype = trt.bool
+            elif self.output_fp16 and output.dtype == trt.float32:
+                output_dtype = trt.float16
+
+            if output_dtype is not None:
+                output = self._cast_output_dtype(output, output_dtype, name)
+
             output.name = name
             self.network.mark_output(output)
-            if output_bool:
-                output.dtype = trt.bool
-            elif self.output_fp16 and output.dtype == trt.float32:
-                output.dtype = trt.float16
             self._output_names.append(name)
