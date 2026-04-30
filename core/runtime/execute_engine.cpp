@@ -92,7 +92,13 @@ bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngi
   return false;
 }
 
-void setup_input_tensors(
+// Returns the contiguified input tensors. The caller must keep the returned
+// list alive until enqueueV3 completes: the engine is bound to .data_ptr()s
+// inside it, and freshly-allocated contig copies (from .contiguous() on
+// non-contig inputs) would otherwise be freed and their CUDA addresses
+// recycled by the caching allocator for output tensors, aliasing inputs
+// onto outputs and corrupting reads after the first output write.
+std::list<at::Tensor> setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
     bool cudagraphs_enabled,
@@ -169,6 +175,7 @@ void setup_input_tensors(
           "Failed to bind tensor address for " << name);
     }
   }
+  return formatted_inputs;
 }
 
 std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> compiled_engine) {
@@ -255,6 +262,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // Shape tensor CPU buffers must outlive inferShapes() and enqueueV3()
     std::list<std::vector<int64_t>> inputShapeTensorValues;
 
+    // Contiguified input copies must outlive enqueueV3() to prevent input/output
+    // buffer aliasing via CUDA caching-allocator address reuse (see
+    // setup_input_tensors comment).
+    std::list<at::Tensor> formatted_inputs;
+
     // Intialize inputs and outputs to be available throughout the succeeding scopes
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
@@ -263,7 +275,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record, inputShapeTensorValues);
+      formatted_inputs = setup_input_tensors(
+          inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record, inputShapeTensorValues);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
@@ -389,6 +402,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // Shape tensor CPU buffers must outlive inferShapes() and enqueueV3()
     std::list<std::vector<int64_t>> inputShapeTensorValues;
 
+    // Contiguified input copies must outlive enqueueV3() to prevent input/output
+    // buffer aliasing via CUDA caching-allocator address reuse (see
+    // setup_input_tensors comment).
+    std::list<at::Tensor> formatted_inputs;
+
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
       if (compiled_engine->profile_execution) {
@@ -396,7 +414,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, false, false, inputShapeTensorValues);
+      formatted_inputs = setup_input_tensors(inputs, compiled_engine, false, false, inputShapeTensorValues);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
