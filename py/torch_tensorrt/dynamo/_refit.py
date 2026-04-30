@@ -41,7 +41,6 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     TorchTensorRTModule,
 )
 from torch_tensorrt.dynamo.utils import (
-    CPU_DEVICE,
     check_module_output,
     check_output_equal,
     get_model_device,
