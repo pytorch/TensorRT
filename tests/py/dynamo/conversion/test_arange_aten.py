@@ -22,13 +22,14 @@ class TestArangeConverter(DispatchTestCase):
             (-5, -2, 2),
             (-5, -3, 1),
             (-2, -5, -1),
-            # Empty-range cases: np.arange(...) returns a (0,)-shaped array.
-            # Exercises the empty-arange fallback that builds a (0,) tensor
-            # via slice instead of feeding zero-volume trt.Weights to add_constant.
+            # Empty-range cases: np.arange(start, start, step) returns a
+            # (0,)-shaped array. Exercises the empty-arange fallback that
+            # builds a (0,) tensor via slice instead of feeding zero-volume
+            # trt.Weights to add_constant. (PyTorch eager rejects "reversed
+            # bound" cases like arange(5, 3, 1) or arange(5, 3, -1), so only equal-bound cases
+            # are exercised here.)
             (5, 5, 1),
             (5, 5, -1),
-            (5, 3, 1),
-            (3, 5, -1),
         ]
     )
     def test_arange(self, start, end, step):

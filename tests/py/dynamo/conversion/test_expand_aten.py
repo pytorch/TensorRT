@@ -169,7 +169,7 @@ class TestExpandUnknownRankInput(unittest.TestCase):
         try:
             out = impl.slice.expand(
                 ctx,
-                target=None,
+                target="test_expand_unknown_rank",
                 source_ir=None,
                 name=f"test_expand_unknown_rank_{_name}",
                 input_t=unk,
@@ -224,7 +224,7 @@ class TestExpandUnknownRankInput(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             impl.slice.expand(
                 ctx,
-                target=None,
+                target="test_expand_rank_mismatch",
                 source_ir=None,
                 name="test_expand_rank_mismatch",
                 input_t=inp,
