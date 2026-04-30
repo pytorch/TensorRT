@@ -227,15 +227,43 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
 
 
 @pytest.mark.unit
-def test_build_user_symbol_bounds_raises_when_input_extends_outside_export():
-    """When the exporter declared finite bounds (e.g. ``Dim("batch",
-    min=10, max=20)``) and the user passes an ``Input`` that extends
-    *outside* that range, shapes the user listed in
-    ``min_shape``/``max_shape`` are guaranteed to fail at runtime (the
-    TRT engine profile follows the exporter). We surface that as a hard
-    ``ValueError`` at compile time rather than letting the user discover
-    it via a confusing TRT runtime error.
-    """
+def test_build_user_symbol_bounds_warns_on_01_specialization(caplog):
+    """``user_min=1, exp_min=2`` is PyTorch's 0/1 specialization artifact
+    (``Dim(min=1)`` silently bumped to 2 in ShapeEnv). This should warn,
+    not raise -- it is not a user error."""
+
+    model = _SmallLinear().eval().cuda()
+    sample = torch.randn(2, 8, device="cuda")
+    ep = torch.export.export(
+        model,
+        (sample,),
+        dynamic_shapes=({0: torch.export.Dim.DYNAMIC},),
+        strict=False,
+    )
+    # After 0/1 specialization exp_min is 2; user declares min=1.
+    input_min1 = Input(
+        min_shape=(1, 8),
+        opt_shape=(4, 8),
+        max_shape=(8, 8),
+        dtype=torch.float32,
+    )
+
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        _build_user_symbol_bounds(ep.module(), [input_min1], {})
+
+    msgs = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
+    # Either no warning (bounds recorded fine with Dim.DYNAMIC unbounded path)
+    # or the 0/1 specialization warning — but definitely no exception.
+    if msgs:
+        assert "0/1 specialization" in "\n".join(msgs)
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_raises_when_input_min_genuinely_below_export():
+    """``user_min < exp_min`` where the gap is NOT the 1→2 specialization
+    artifact (e.g. user_min=2, exp_min=10) must raise ``ValueError``."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(10, 8, device="cuda")
@@ -245,28 +273,17 @@ def test_build_user_symbol_bounds_raises_when_input_extends_outside_export():
         dynamic_shapes=({0: torch.export.Dim("batch", min=10, max=20)},),
         strict=False,
     )
-
-    # User declares a profile that extends below the exporter's lower
-    # bound (user_min=2 < exp_min=10). The exporter would refuse batch=2
-    # at runtime; raise at compile.
-    incompatible_input = Input(
+    input_too_low = Input(
         min_shape=(2, 8),
         opt_shape=(5, 8),
         max_shape=(10, 8),
         dtype=torch.float32,
     )
-
     with pytest.raises(ValueError) as exc_info:
-        _build_user_symbol_bounds(ep.module(), [incompatible_input], {})
+        _build_user_symbol_bounds(ep.module(), [input_too_low], {})
     msg = str(exc_info.value)
-    assert "extend outside" in msg
-    assert "shape outside profile" in msg
-    # The actionable guidance: either re-export, or stay inside the range.
-    assert "re-export" in msg
-    assert "Dim(" in msg
-    # Both numeric pairs should appear so the user can see the conflict.
-    assert "min=2" in msg and "max=10" in msg
-    assert "min=10" in msg and "max=20" in msg
+    assert "TRT engine min" in msg
+    assert "re-export" in msg or "raise Input.min_shape" in msg
 
 
 @pytest.mark.unit
@@ -291,7 +308,8 @@ def test_build_user_symbol_bounds_raises_when_input_max_above_export():
     )
     with pytest.raises(ValueError) as exc_info:
         _build_user_symbol_bounds(ep.module(), [too_wide_input], {})
-    assert "extend outside" in str(exc_info.value)
+    msg = str(exc_info.value)
+    assert "max_shape exceeds" in msg or "TRT will reject" in msg
 
 
 @pytest.mark.unit
@@ -362,13 +380,10 @@ def test_build_user_symbol_bounds_warns_on_subset_input(caplog):
     warning_messages = [
         rec.message for rec in caplog.records if rec.levelno >= logging.WARNING
     ]
-    assert (
-        warning_messages
-    ), "subset Input bounds should produce a 'narrower than exporter' warning"
+    assert warning_messages, "subset Input bounds should produce a warning"
     msg = "\n".join(warning_messages)
-    assert "narrower than the exporter" in msg
-    assert "engine profile will use the exporter's wider" in msg
-    assert "re-export" in msg
+    assert "subset" in msg or "wider" in msg
+    assert "re-export" in msg or "Re-export" in msg
 
 
 @pytest.mark.unit

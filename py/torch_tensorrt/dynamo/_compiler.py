@@ -904,11 +904,17 @@ def _build_user_symbol_bounds(
 
     Validation against the exporter's finite bounds (when present):
 
-    - **Outside** (``user_min < exp_min`` or ``user_max > exp_max``): raises
-      ``ValueError`` -- shapes the user listed in ``Input`` would be rejected
-      by TRT at runtime since the engine profile follows the exporter.
-    - **Subset** (user fully inside exporter's range): emits a warning that
-      the engine profile will be widened to the exporter's bounds.
+    - **Upper overflow** (``user_max > exp_max``): raises ``ValueError`` --
+      the TRT engine profile follows the exporter, so shapes above ``exp_max``
+      are guaranteed to be rejected at TRT runtime, including sizes the user
+      explicitly listed in ``Input.max_shape``.
+    - **Lower underflow** (``user_min < exp_min``): raises ``ValueError``
+      *except* for the ``user_min=1, exp_min=2`` case, which is PyTorch's
+      0/1 specialization artifact (``Dim(min=1)`` is silently bumped to 2
+      in ``ShapeEnv``). That specific case emits a warning only.
+    - **Subset** (``user_max <= exp_max`` and ``user_min >= exp_min``): emits
+      a warning that the engine profile will be widened to the exporter's
+      bounds.
     - **``Dim.DYNAMIC``** (unbounded exporter upper): no check; user's
       ``Input`` fills the gap.
     """
@@ -1003,45 +1009,53 @@ def _build_user_symbol_bounds(
             if user_min == exp_min and user_max == exp_max:
                 continue
 
-            # User extends outside the exporter's range -> shapes the user
-            # declared (e.g. ``Input.min_shape[d] = user_min`` when
-            # ``user_min < exp_min``) are guaranteed to fail at runtime
-            # because the TRT engine profile follows the exporter. Hard
-            # error so the user finds out at compile time.
-            if user_min < exp_min or user_max > exp_max:
+            # Shared header and re-export hint used by all three cases below.
+            _HDR = (
+                f"symbol {expr}: Input({user_min}, {user_max}) vs "
+                f"exporter({exp_min}, {exp_max})."
+            )
+            _HINT = (
+                f" Re-export with Dim('{expr}', min={user_min}, "
+                f"max={user_max}) or adjust Input to match."
+            )
+
+            # Upper overflow: user_max > exp_max.
+            # TRT engine profile has max=exp_max; shapes above it will be
+            # rejected at runtime. Hard error so the user finds out at compile.
+            if user_max > exp_max:
                 raise ValueError(
-                    f"torch_tensorrt.Input bounds for symbol {expr} "
-                    f"(min={user_min}, max={user_max}) extend outside the "
-                    f"exporter's declared range (min={exp_min}, max={exp_max}). "
-                    f"The TRT engine profile follows the exporter's bounds, "
-                    f"so runtime tensors with shapes outside [{exp_min}, "
-                    f"{exp_max}] would be rejected by TRT with a 'shape "
-                    f"outside profile' error -- including shapes you listed "
-                    f"in Input.min_shape / Input.max_shape. To resolve, "
-                    f"either (a) re-export with "
-                    f"torch.export.Dim('{expr}', min={user_min}, "
-                    f"max={user_max}) so the exporter agrees with the "
-                    f"desired profile, or (b) pass an Input whose "
-                    f"min_shape/max_shape stay within [{exp_min}, "
-                    f"{exp_max}]."
+                    f"{_HDR} Input.max_shape exceeds the exporter's max "
+                    f"({user_max} > {exp_max}); TRT will reject shapes above "
+                    f"{exp_max} at runtime.{_HINT}"
                 )
 
-            # User is a strict subset of the exporter's range. No shape
-            # the user declared will fail at runtime, but the engine
-            # profile is silently widened to [exp_min, exp_max] -- so the
-            # user's narrower intent is dropped. Warn but do not error.
+            # Lower underflow: user_min < exp_min.
+            # Tolerated only for the 0/1 specialization artifact (1→2);
+            # every other gap is a genuine user error.
+            if user_min < exp_min:
+                if user_min == 1 and exp_min == 2:
+                    logger.warning(
+                        "%s Input.min_shape=1 vs exporter min=2 is the "
+                        "PyTorch 0/1 specialization artifact; TRT engine "
+                        "min will be 2.",
+                        _HDR,
+                    )
+                    continue
+                raise ValueError(
+                    f"{_HDR} Input.min_shape is below the exporter's min "
+                    f"({user_min} < {exp_min}); TRT will reject shapes "
+                    f"below {exp_min} at runtime.{_HINT}"
+                )
+
+            # Subset: user range fits inside exporter range but is narrower.
+            # No runtime failure, but the engine profile is silently widened
+            # to [exp_min, exp_max]. Warn so the user knows.
             logger.warning(
-                "torch_tensorrt.Input bounds for symbol %s "
-                "(min=%d, max=%d) are narrower than the exporter's "
-                "declared range (min=%d, max=%d). The TRT engine profile "
-                "will use the exporter's wider [%d, %d] -- the Input "
-                "bounds are dropped. To get the narrower profile, "
-                "re-export with torch.export.Dim('%s', min=%d, max=%d).",
-                expr,
-                user_min,
-                user_max,
-                exp_min,
-                exp_max,
+                "%s Input bounds are a subset of the exporter's range; "
+                "TRT engine profile will use the wider [%d, %d]."
+                " Re-export with Dim('%s', min=%d, max=%d) for a "
+                "narrower profile.",
+                _HDR,
                 exp_min,
                 exp_max,
                 expr,
