@@ -351,7 +351,10 @@ class TRTInterpreter(torch.fx.Interpreter):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
         for i, output in enumerate(outputs):
-            if any(
+            output_tensor_meta = self._itensor_to_tensor_meta.get(output)
+            if output_tensor_meta is not None and output_tensor_meta.dtype is not None:
+                output_bool = output_tensor_meta.dtype == torch.bool
+            elif any(
                 op_name in output.name.split("_")
                 for op_name in (
                     "eq",

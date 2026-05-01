@@ -870,8 +870,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
             name = f"output{i}"
 
-            output_dtype = dtype.unknown
-            if any(
+            if self.output_dtypes is not None:
+                output_dtype = self.output_dtypes[i]
+            elif any(
                 op_name in output.name.split("_")
                 for op_name in (
                     "eq",
@@ -888,8 +889,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 )
             ):
                 output_dtype = dtype.b
-            elif self.output_dtypes is not None:
-                output_dtype = self.output_dtypes[i]
+            else:
+                output_dtype = dtype.unknown
 
             if output_dtype is not dtype.unknown:
                 output = self._cast_output_dtype(
