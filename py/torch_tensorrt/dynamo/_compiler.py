@@ -246,6 +246,19 @@ def cross_compile_for_windows(
         else:
             immutable_weights = not kwargs["make_refittable"]
 
+    if "engine_cache" in kwargs.keys():
+        warnings.warn(
+            "`engine_cache` is deprecated. Please use `custom_engine_cache` to provide a custom engine cache instance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if custom_engine_cache is not None:
+            raise ValueError(
+                "Use flag `custom_engine_cache` only. Flag `engine_cache` is deprecated."
+            )
+        else:
+            custom_engine_cache = kwargs["engine_cache"]
+
     if refit_identical_engine_weights:
         if immutable_weights:
             raise ValueError(
@@ -605,6 +618,19 @@ def compile(
             )
         else:
             immutable_weights = not kwargs["make_refittable"]
+
+    if "engine_cache" in kwargs.keys():
+        warnings.warn(
+            "`engine_cache` is deprecated. Please use `custom_engine_cache` to provide a custom engine cache instance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if custom_engine_cache is not None:
+            raise ValueError(
+                "Use flag `custom_engine_cache` only. Flag `engine_cache` is deprecated."
+            )
+        else:
+            custom_engine_cache = kwargs["engine_cache"]
 
     if refit_identical_engine_weights:
         if immutable_weights:
@@ -1370,6 +1396,19 @@ def convert_exported_program_to_serialized_trt_engine(
             )
         else:
             immutable_weights = not kwargs["make_refittable"]
+
+    if "engine_cache" in kwargs.keys():
+        warnings.warn(
+            "`engine_cache` is deprecated. Please use `custom_engine_cache` to provide a custom engine cache instance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if custom_engine_cache is not None:
+            raise ValueError(
+                "Use flag `custom_engine_cache` only. Flag `engine_cache` is deprecated."
+            )
+        else:
+            custom_engine_cache = kwargs["engine_cache"]
 
     if refit_identical_engine_weights:
         if immutable_weights:
