@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=e38e3d67"></script>
+    <script src="../../_static/documentation_options.js?v=7d95555c"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -623,7 +623,7 @@ persisting compiled engines to disk and reloading them on a cache hit.</p>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">engine_cache</span><span class="o">=</span><span class="n">my_cache</span><span class="p">,</span>
+    <span class="n">custom_engine_cache</span><span class="o">=</span><span class="n">my_cache</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -754,7 +754,7 @@ a database), implement the <code class="docutils literal notranslate"><span clas
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">engine_cache</span><span class="o">=</span><span class="n">S3EngineCache</span><span class="p">(</span><span class="s2">&quot;my-model-cache-bucket&quot;</span><span class="p">),</span>
+    <span class="n">custom_engine_cache</span><span class="o">=</span><span class="n">S3EngineCache</span><span class="p">(</span><span class="s2">&quot;my-model-cache-bucket&quot;</span><span class="p">),</span>
 <span class="p">)</span>
 </pre></div>
 </div>
