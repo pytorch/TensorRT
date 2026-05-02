@@ -47,7 +47,7 @@ Customize the cache location and size:
         arg_inputs=inputs,
         cache_built_engines=True,
         reuse_cached_engines=True,
-        engine_cache=my_cache,
+        custom_engine_cache=my_cache,
     )
 
 ----
@@ -197,7 +197,7 @@ a database), implement the ``BaseEngineCache`` interface:
         arg_inputs=inputs,
         cache_built_engines=True,
         reuse_cached_engines=True,
-        engine_cache=S3EngineCache("my-model-cache-bucket"),
+        custom_engine_cache=S3EngineCache("my-model-cache-bucket"),
     )
 
 The two methods you must implement:
