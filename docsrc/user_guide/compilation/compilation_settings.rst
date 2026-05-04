@@ -51,12 +51,6 @@ Core Parameters
    * - ``device``
      - current CUDA device
      - :class:`torch_tensorrt.Device` specifying the GPU to compile for.
-   * - ``use_python_runtime``
-     - ``False`` (auto)
-     - ``False`` uses the C++ runtime (recommended — serializable, CUDAGraphs,
-       multi-device safe). ``True`` forces the Python runtime (simpler to instrument
-       for debugging but not serializable to ``ExportedProgram``). ``None`` selects C++
-       if available.
    * - ``pass_through_build_failures``
      - ``False``
      - When ``True``, TRT engine build errors raise exceptions rather than fall back to PyTorch.

@@ -58,6 +58,7 @@ inline constexpr std::array<const char*, SERIALIZATION_LEN> kSerializedInfoIndex
     "RESOURCE_ALLOCATION_STRATEGY_IDX",
     "REQUIRES_NATIVE_MULTIDEVICE_IDX",
 }};
+// For adding new serialized info indices, update above and update /dynamo/runtime/_serialized_engine_layout.py
 
 std::string base64_encode(const std::string& in);
 std::string base64_decode(const std::string& in);

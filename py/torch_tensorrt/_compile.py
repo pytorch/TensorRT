@@ -585,35 +585,52 @@ def load(
     Raises:
         ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file
     """
+    # Ensure Python TRT engine ops are registered so torch.export.load can
+    # resolve tensorrt::execute_engine when the C++ runtime is absent.
+    if not ENABLED_FEATURES.torch_tensorrt_runtime:
+        import torch_tensorrt.dynamo.runtime._TRTEngine  # noqa: F401
 
     try:
-        logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
-        ts_module = function_overload_with_kwargs(
+        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
+        exp_program = function_overload_with_kwargs(
             torch.export.load,
             file_path,
             extra_files=extra_files,
             **kwargs,
         )
-        return ts_module
+        # Handle legacy cross-compiled archives that use no_op_placeholder nodes
+        gm = exp_program.graph_module
+        if any(
+            "no_op_placeholder_for_execute_engine" in n.name for n in gm.graph.nodes
+        ):
+            from torch_tensorrt.dynamo._exporter import (
+                replace_execute_engine_no_op_node,
+            )
+
+            return replace_execute_engine_no_op_node(exp_program)
+
+        return exp_program
     except Exception:
+        import traceback
+
+        traceback.print_exc()
         logger.info(
             f"Loading the provided file {file_path} via torch.export.load() failed with the following error",
             exc_info=True,
         )
-        pass
 
     try:
-        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
-        exp_program = function_overload_with_kwargs(
+        logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
+        ts_module = function_overload_with_kwargs(
             torch.jit.load,
             file_path,
             _extra_files=extra_files,
             **kwargs,
         )
-        return exp_program
-    except Exception:
+        return ts_module
+    except Exception as e:
         logger.info(
-            f"Loading the provided file {file_path} via torch.jit.load() (after failing to load with torch.export.load()) failed with the following error",
+            f"Loading the provided file {file_path} via torch.jit.load() (after failing to load with torch.export.load()) failed with the following error: {e}",
             exc_info=True,
         )
         raise ValueError(
@@ -893,6 +910,7 @@ def save(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
             if output_format == "exported_program":
+                _normalize_engine_constants_to_python(module)
                 function_overload_with_kwargs(
                     torch.export.save,
                     module,
@@ -956,6 +974,7 @@ def save(
                     use_legacy_exporter=_use_legacy,
                 )
                 if output_format == "exported_program":
+                    _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
                         exp_program,
@@ -1040,6 +1059,7 @@ def save(
                     )
 
                 if output_format == "exported_program":
+                    _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
                         exp_program,
@@ -1261,6 +1281,38 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         executorch_program.write_to_file(f)
 
 
+def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:
+    """Convert C++ ``torch.classes.tensorrt.Engine`` constants to Python ``TRTEngine``.
+
+    The C++ runtime stores engine constants as ``torch._C.ScriptObject``
+    (``torch.classes.tensorrt.Engine``).  Python ``TRTEngine`` is registered as
+    an opaque type so ``torch.export`` can serialise it with ``pickle``.  By
+    converting before save the artifact is portable across both runtimes.
+    """
+    import base64
+
+    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
+    from torch_tensorrt.dynamo.runtime._TRTEngine import (
+        EngineSerializer,
+        TRTEngine,
+    )
+
+    for fqn, constant in list(exp_program.constants.items()):
+        if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):
+
+            state = constant.__getstate__()
+            if len(state) == 2 and (
+                state[1] == "TRTEngine"
+                or state[1] == "__torch__.torch.classes.tensorrt.Engine"
+            ):
+                serialized_info = list(state[0])
+                serialized_info[ENGINE_IDX] = base64.b64decode(
+                    serialized_info[ENGINE_IDX]
+                )
+                exp_program.constants[fqn] = EngineSerializer(serialized_info)
+
+
+#
 def function_overload_with_kwargs(
     fn: Callable[..., Any], *args: Any, **kwargs: Any
 ) -> Any:

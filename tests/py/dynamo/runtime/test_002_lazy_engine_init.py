@@ -14,7 +14,7 @@ from torch_tensorrt.dynamo.utils import (
     cosine_similarity,
     get_model_device,
 )
-from torch_tensorrt.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.runtime import TorchTensorRTModule
 
 assertions = unittest.TestCase()
 
@@ -72,7 +72,7 @@ class TestLazyEngineInit(TestCase):
         )
 
         # Inference on TRT Engine
-        trt_module = PythonTorchTensorRTModule(
+        trt_module = TorchTensorRTModule(
             trt_engine_str,
             ["a", "b"],
             ["output0"],
@@ -88,7 +88,7 @@ class TestLazyEngineInit(TestCase):
             trt_output = trt_module(input_data_0, input_data_1).cpu()
 
         trt_module.setup_engine()
-        assertions.assertTrue(trt_module.engine, msg="Engine was not setup")
+        assertions.assertTrue(trt_module.engine is not None, msg="Engine was not setup")
 
         trt_output = trt_module(input_data_0, input_data_1).cpu()
 
@@ -128,7 +128,7 @@ class TestLazyEngineInit(TestCase):
         assert get_model_device(model).type == "cpu"
         model.cuda()
         # Inference on TRT Engine
-        trt_module = PythonTorchTensorRTModule(
+        trt_module = TorchTensorRTModule(
             trt_engine_str,
             ["x"],
             ["output0"],
@@ -144,7 +144,7 @@ class TestLazyEngineInit(TestCase):
             trt_output = trt_module(input_data).cpu()
 
         trt_module.setup_engine()
-        assertions.assertTrue(trt_module.engine, msg="Engine was not setup")
+        assertions.assertTrue(trt_module.engine is not None, msg="Engine was not setup")
 
         trt_output = trt_module(input_data).cpu()
 
@@ -225,7 +225,6 @@ class TestLazyEngineInit(TestCase):
             "min_block_size": 1,
             "ir": "dynamo",
             "lazy_engine_init": True,
-            "use_python_runtime": True,
             "cache_built_engines": False,
             "reuse_cached_engines": False,
         }
@@ -264,7 +263,6 @@ class TestLazyEngineInit(TestCase):
             "min_block_size": 1,
             "ir": "dynamo",
             "lazy_engine_init": True,
-            "use_python_runtime": False,
             "cache_built_engines": False,
             "reuse_cached_engines": False,
         }
@@ -303,7 +301,6 @@ class TestLazyEngineInit(TestCase):
             "min_block_size": 1,
             "ir": "dynamo",
             "lazy_engine_init": True,
-            "use_python_runtime": False,
             "cache_built_engines": False,
             "reuse_cached_engines": False,
         }
@@ -351,7 +348,6 @@ class TestLazyEngineInit(TestCase):
             "min_block_size": 1,
             "ir": "dynamo",
             "lazy_engine_init": True,
-            "use_python_runtime": True,
             "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
             "cache_built_engines": False,
             "reuse_cached_engines": False,
@@ -394,7 +390,6 @@ class TestLazyEngineInit(TestCase):
             "min_block_size": 1,
             "ir": "dynamo",
             "lazy_engine_init": True,
-            "use_python_runtime": False,
             "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
             "cache_built_engines": False,
             "reuse_cached_engines": False,

@@ -499,7 +499,6 @@ def test_cosmos_true_div(ir):
             use_fp32_acc=False,
             device="cuda:0",
             disable_tf32=True,
-            use_python_runtime=True,
             min_block_size=1,
         )
         trt_output = trt_model(hidden_states)

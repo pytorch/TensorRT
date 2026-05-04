@@ -32,14 +32,12 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
-from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
-    PythonTorchTensorRTModule,
-)
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
     SERIALIZED_METADATA_IDX,
-    TorchTensorRTModule,
 )
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 from torch_tensorrt.dynamo.utils import (
     check_module_output,
     check_output_equal,
@@ -308,11 +306,7 @@ def refit_module_weights(
             if (
                 not isinstance(
                     submodule,
-                    (
-                        PythonTorchTensorRTModule,
-                        TorchTensorRTModule,
-                        torch.nn.modules.module.Module,
-                    ),
+                    (TorchTensorRTModule, torch.nn.modules.module.Module),
                 )
                 or "_run_on_gpu" in name
             ):
@@ -509,9 +503,13 @@ def refit_module_weights(
                     except AttributeError:
                         if isinstance(compiled_submodule, torch.nn.Module):
                             # Torch retrace module
-                            assert (
-                                not settings.use_python_runtime
-                            ), "Refitting a torch retraced module is only supported with use_python_runtime=False"
+                            assert not isinstance(
+                                compiled_submodule.engine,
+                                TRTEngine,
+                            ), (
+                                "Refitting a torch retraced module is only supported when "
+                                "the engine uses the C++ Torch-TensorRT runtime"
+                            )
                             encoded_metadata = [
                                 engine
                                 for name, engine in compiled_submodules
@@ -533,10 +531,10 @@ def refit_module_weights(
                             "This engine does not have a weight map cache. Rebuilding the weight map"
                         )
 
-                # Rexporting the TRT compiled graph module and loading it back doesn't preserve the instance type and registers
-                # the compiled submodule as torch.nn.Module. So we use settings.use_python_runtime to determine the instance type.
-                if settings.use_python_runtime:
-                    engine = compiled_submodule.engine
+                # Rexporting the TRT compiled graph module and loading it back doesn't preserve
+                # the instance type; choose the engine handle based on the actual engine object.
+                if isinstance(compiled_submodule.engine, TRTEngine):
+                    engine = compiled_submodule.engine.cuda_engine
                 else:
                     engine_info = compiled_submodule.engine.__getstate__()[0]
                     engine = get_engine_from_encoded_engine(
@@ -592,12 +590,17 @@ def refit_module_weights(
             serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
         serialized_engine = engine.serialize_with_config(serialization_config)
 
-        if isinstance(compiled_submodule, PythonTorchTensorRTModule):
-            compiled_submodule.serialized_engine = bytes(serialized_engine)
-        elif isinstance(compiled_submodule, TorchTensorRTModule):
-            compiled_submodule.engine = None  # Clear the engine for TorchTensorRTModule, otherwise it won't be updated
-            compiled_submodule.serialized_engine = bytes(serialized_engine)
-            compiled_submodule.setup_engine()
+        if isinstance(compiled_submodule, TorchTensorRTModule):
+            new_serialized_engine = bytes(serialized_engine)
+            compiled_submodule.serialized_engine = new_serialized_engine
+            if isinstance(compiled_submodule.engine, TRTEngine):
+                # Refit already updated ``cuda_engine`` in place; avoid deserialize (slow).
+                py_eng = compiled_submodule.engine
+                py_eng.serialized_info[ENGINE_IDX] = new_serialized_engine
+                py_eng.serialized_engine = new_serialized_engine
+            else:
+                compiled_submodule.engine = None
+                compiled_submodule.setup_engine()
         elif inline_module:
             new_engine_info = list(engine_info)
             new_engine_info[ENGINE_IDX] = bytes(serialized_engine)

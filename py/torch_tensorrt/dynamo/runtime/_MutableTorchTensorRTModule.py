@@ -74,7 +74,6 @@ class MutableTorchTensorRTModule(object):
         pytorch_model: torch.nn.Module,
         *,
         device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
-        use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
         immutable_weights: bool = False,
         strict: bool = True,
         prefer_deferred_runtime_asserts_over_guards: bool = False,
@@ -110,7 +109,6 @@ class MutableTorchTensorRTModule(object):
             max_aux_stream (Optional[int]): Maximum streams in the engine
             version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
             optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-            use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
             use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
             enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
             dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -148,7 +146,6 @@ class MutableTorchTensorRTModule(object):
         self.prefer_deferred_runtime_asserts_over_guards = (
             prefer_deferred_runtime_asserts_over_guards
         )
-        self.use_python_runtime = use_python_runtime
         self.trt_device = to_torch_tensorrt_device(device)
         assert (
             not immutable_weights
@@ -368,7 +365,6 @@ class MutableTorchTensorRTModule(object):
             arg_inputs=self.arg_inputs,
             kwarg_inputs=self.kwarg_inputs,
             immutable_weights=False,
-            use_python_runtime=self.use_python_runtime,
             **self.additional_settings,
         )
         if self.additional_settings.get("offload_module_to_cpu", False):
@@ -702,9 +698,6 @@ class MutableTorchTensorRTModule(object):
     @staticmethod
     def save(module: Any, path: str) -> None:
         # Cast the object back to MutableTorchTensorRTModule to save
-        assert (
-            not module.use_python_runtime
-        ), "Python runtime does not support serialization. Save failed."
         module.init_finished = False
         module.__class__ = MutableTorchTensorRTModule
         exp_program = module.exp_program
