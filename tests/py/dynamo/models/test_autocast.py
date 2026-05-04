@@ -52,7 +52,6 @@ def test_no_pytorch_autocast():
             ep.module(),
             arg_inputs=inputs,
             min_block_size=1,
-            use_python_runtime=True,
             enable_autocast=True,
             autocast_low_precision_type=torch.float16,
             autocast_excluded_nodes={"^conv1$", "relu"},
@@ -142,7 +141,6 @@ def test_whole_pytorch_autocast():
             ep,
             arg_inputs=inputs,
             min_block_size=1,
-            use_python_runtime=True,
             # Torch-TensorRT's autocast doesn't affect layers inside Pytorch autocast
             enable_autocast=True,
             autocast_low_precision_type=torch.bfloat16,
@@ -221,7 +219,6 @@ def test_mixed_pytorch_autocast():
             ep.module(),
             arg_inputs=inputs,
             min_block_size=1,
-            use_python_runtime=False,
             # Torch-TensorRT's autocast doesn't affect layers inside Pytorch autocast
             enable_autocast=True,
             autocast_low_precision_type=torch.bfloat16,
@@ -328,7 +325,6 @@ def test_nested_pytorch_autocast():
             ep,
             arg_inputs=inputs,
             min_block_size=1,
-            use_python_runtime=False,
             # Torch-TensorRT's autocast doesn't affect layers inside Pytorch autocast
             enable_autocast=True,
             autocast_low_precision_type=torch.bfloat16,

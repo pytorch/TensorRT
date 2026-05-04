@@ -73,7 +73,6 @@ trt_autocast_mod = torch_tensorrt.compile(
     ep.module(),
     arg_inputs=inputs,
     min_block_size=1,
-    use_python_runtime=True,
     enable_autocast=True,
     autocast_low_precision_type=torch.bfloat16,
     autocast_excluded_nodes={"^conv1$", "relu"},

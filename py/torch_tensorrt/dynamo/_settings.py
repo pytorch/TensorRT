@@ -53,7 +53,6 @@ from torch_tensorrt.dynamo._defaults import (
     USE_DISTRIBUTED_MODE_TRACE,
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
-    USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
     default_device,
@@ -73,9 +72,6 @@ class CompilationSettings:
         version_compatible (bool): Provide version forward-compatibility for engine plan files
         optimization_level (Optional[int]): Builder optimization 0-5, higher levels imply longer build time,
             searching for more optimization options. TRT defaults to 3
-        use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
-            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
-            argument as None
         truncate_double (bool): Whether to truncate float64 TRT engine inputs or weights to float32
         use_fast_partitioner (bool): Whether to use the fast or global graph partitioning system
         enable_experimental_decompositions (bool): Whether to enable all core aten decompositions
@@ -130,7 +126,6 @@ class CompilationSettings:
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS
     version_compatible: bool = VERSION_COMPATIBLE
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL
-    use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME
     truncate_double: bool = TRUNCATE_DOUBLE
     use_fast_partitioner: bool = USE_FAST_PARTITIONER
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS
@@ -198,6 +193,7 @@ class CompilationSettings:
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
+        state.pop("use_python_runtime", None)
         self.__dict__.update(state)
 
 

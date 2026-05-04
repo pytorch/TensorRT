@@ -1,5 +1,4 @@
 from torch_tensorrt.dynamo.runtime import (  # noqa: F401
-    PythonTorchTensorRTModule,
     TorchTensorRTModule,
 )
 from torch_tensorrt.runtime._cudagraphs import (

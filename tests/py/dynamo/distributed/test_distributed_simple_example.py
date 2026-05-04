@@ -67,7 +67,6 @@ tp_model = torch.compile(
     backend=backend,
     options={
         "truncate_long_and_double": True,
-        "use_python_runtime": True,
         "min_block_size": 1,
         "use_distributed_mode_trace": True,
     },

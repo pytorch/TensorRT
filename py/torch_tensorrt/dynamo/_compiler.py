@@ -12,7 +12,7 @@ from torch.export import ExportedProgram
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
-from torch_tensorrt._features import needs_cross_compile
+from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults, partitioning
 from torch_tensorrt.dynamo._DryRunTracker import (
@@ -83,7 +83,7 @@ def cross_compile_for_windows(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
+    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -163,7 +163,7 @@ def cross_compile_for_windows(
         max_aux_stream (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -219,6 +219,16 @@ def cross_compile_for_windows(
                 DeprecationWarning,
                 stacklevel=2,
             )
+
+    if use_python_runtime:
+        warnings.warn(
+            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
+            "runtimes have been merged; the runtime is now selected automatically based "
+            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
+            "be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     if "refit" in kwargs.keys():
         warnings.warn(
@@ -302,7 +312,6 @@ def cross_compile_for_windows(
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
-        "use_python_runtime": False,
         "truncate_double": truncate_double,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
@@ -339,7 +348,6 @@ def cross_compile_for_windows(
 
     # disable the following settings is not supported for cross compilation for windows feature
     unsupported_settings = (
-        "use_python_runtime",
         "lazy_engine_init",
         "cache_built_engines",
         "reuse_cached_engines",
@@ -425,7 +433,7 @@ def compile(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
+    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -520,7 +528,7 @@ def compile(
         max_aux_streams (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -579,6 +587,16 @@ def compile(
                 DeprecationWarning,
                 stacklevel=2,
             )
+
+    if use_python_runtime:
+        warnings.warn(
+            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
+            "runtimes have been merged; the runtime is now selected automatically based "
+            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
+            "be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     if "refit" in kwargs.keys():
         warnings.warn(
@@ -691,7 +709,6 @@ def compile(
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
-        "use_python_runtime": use_python_runtime,
         "truncate_double": truncate_double,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
@@ -1127,7 +1144,7 @@ def compile_module(
 
             if _debugger_config:
                 if _debugger_config.save_engine_profile:
-                    if settings.use_python_runtime:
+                    if not ENABLED_FEATURES.torch_tensorrt_runtime:
                         if _debugger_config.profile_format != "cudagraph":
                             raise ValueError(
                                 "Profiling with TREX can only be enabled when using the C++ runtime. Python runtime profiling only support cudagraph visualization."
@@ -1219,7 +1236,7 @@ def convert_exported_program_to_serialized_trt_engine(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
+    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -1295,7 +1312,7 @@ def convert_exported_program_to_serialized_trt_engine(
         max_aux_streams (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -1344,6 +1361,16 @@ def convert_exported_program_to_serialized_trt_engine(
                 DeprecationWarning,
                 stacklevel=2,
             )
+
+    if use_python_runtime:
+        warnings.warn(
+            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
+            "runtimes have been merged; the runtime is now selected automatically based "
+            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
+            "be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     if "refit" in kwargs.keys():
         warnings.warn(
@@ -1443,7 +1470,6 @@ def convert_exported_program_to_serialized_trt_engine(
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
-        "use_python_runtime": use_python_runtime,
         "truncate_double": truncate_double,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
