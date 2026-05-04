@@ -220,7 +220,6 @@ class TestLazyEngineInit(TestCase):
                 )
             ],
             "device": torchtrt.Device("cuda:0"),
-            "enabled_precisions": {torch.float},
             "pass_through_build_failures": True,
             "optimization_level": 1,
             "min_block_size": 1,
@@ -260,7 +259,6 @@ class TestLazyEngineInit(TestCase):
                 )
             ],
             "device": torchtrt.Device("cuda:0"),
-            "enabled_precisions": {torch.float},
             "pass_through_build_failures": True,
             "optimization_level": 1,
             "min_block_size": 1,
@@ -300,7 +298,6 @@ class TestLazyEngineInit(TestCase):
                 )
             ],
             "device": torchtrt.Device("cuda:0"),
-            "enabled_precisions": {torch.float},
             "pass_through_build_failures": True,
             "optimization_level": 1,
             "min_block_size": 1,
@@ -349,7 +346,6 @@ class TestLazyEngineInit(TestCase):
         compile_spec = {
             "inputs": (input_data_0, input_data_1),
             "device": torchtrt.Device("cuda:0"),
-            "enabled_precisions": {torch.float},
             "pass_through_build_failures": True,
             "optimization_level": 1,
             "min_block_size": 1,
@@ -393,7 +389,6 @@ class TestLazyEngineInit(TestCase):
         compile_spec = {
             "inputs": (input_data_0, input_data_1),
             "device": torchtrt.Device("cuda:0"),
-            "enabled_precisions": {torch.float},
             "pass_through_build_failures": True,
             "optimization_level": 1,
             "min_block_size": 1,

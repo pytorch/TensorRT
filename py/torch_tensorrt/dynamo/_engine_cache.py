@@ -160,7 +160,7 @@ class BaseEngineCache(ABC):
             unpacked["compilation_settings"],
             unpacked["weight_name_map"],
             unpacked["requires_output_allocator"],
-            unpacked["requires_native_multidevice"],
+            unpacked.get("requires_native_multidevice", False),
         )
 
     def insert(

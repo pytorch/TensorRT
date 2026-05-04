@@ -91,7 +91,6 @@ large models (LLMs, diffusion models) that exceed available VRAM.
         model,
         ir="dynamo",
         arg_inputs=inputs,
-        enabled_precisions={torch.float16},
         enable_weight_streaming=True,
     )
 

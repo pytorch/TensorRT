@@ -3961,6 +3961,46 @@ def aten_ops_linear(
     )
 
 
+def _attention_qkv_shapes_supported(node: Node) -> bool:
+    query_shape, key_shape, value_shape = None, None, None
+    if "val" in node.args[0].meta:
+        query_shape = node.args[0].meta["val"].size()
+    if "val" in node.args[1].meta:
+        key_shape = node.args[1].meta["val"].size()
+    if "val" in node.args[2].meta:
+        value_shape = node.args[2].meta["val"].size()
+
+    # If shape metadata is unavailable, defer to runtime/converter checks.
+    if query_shape is None or key_shape is None or value_shape is None:
+        return True
+
+    if len(query_shape) != len(key_shape) or len(query_shape) != len(value_shape):
+        _LOGGER.debug(
+            "query, key, and value must have the same rank. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+
+    # TensorRT IAttention layer supports different sequence lengths for query and key/value
+    # ([B, Nq, Sq, H] vs [B, Nkv, Skv, H]), but K and V must still agree on all dims.
+    seq_dim = len(query_shape) - 2
+    for dim, (query_dim, key_dim, value_dim) in enumerate(
+        zip(query_shape, key_shape, value_shape)
+    ):
+        if dim == seq_dim:
+            if key_dim != value_dim:
+                _LOGGER.debug(
+                    "key and value must have the same sequence length. Please try setting decompose_attention=True in the compilation settings."
+                )
+                return False
+        else:
+            if query_dim != key_dim or query_dim != value_dim or key_dim != value_dim:
+                _LOGGER.debug(
+                    "query, key, and value differ on a non-sequence dimension. Please try setting decompose_attention=True in the compilation settings."
+                )
+                return False
+    return True
+
+
 def scaled_dot_product_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
@@ -3969,24 +4009,7 @@ def scaled_dot_product_attention_validator(
             "enable_gqa is not yet supported by the converter. Please try setting decompose_attention=True in the compilation settings."
         )
         return False
-
-    query_shape, key_shape, value_shape = None, None, None
-    if "val" in node.args[0].meta:
-        query_shape = node.args[0].meta["val"].size()
-    if "val" in node.args[1].meta:
-        key_shape = node.args[1].meta["val"].size()
-    if "val" in node.args[2].meta:
-        value_shape = node.args[2].meta["val"].size()
-    if (
-        query_shape != key_shape
-        or query_shape != value_shape
-        or key_shape != value_shape
-    ):
-        _LOGGER.debug(
-            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
-        )
-        return False
-    return True
+    return _attention_qkv_shapes_supported(node)
 
 
 @dynamo_tensorrt_converter(
@@ -4024,24 +4047,7 @@ def scaled_dot_product_flash_attention_validator(
     if args_bounds_check(node.args, 5, False):
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
-
-    query_shape, key_shape, value_shape = None, None, None
-    if "val" in node.args[0].meta:
-        query_shape = node.args[0].meta["val"].size()
-    if "val" in node.args[1].meta:
-        key_shape = node.args[1].meta["val"].size()
-    if "val" in node.args[2].meta:
-        value_shape = node.args[2].meta["val"].size()
-    if (
-        query_shape != key_shape
-        or query_shape != value_shape
-        or key_shape != value_shape
-    ):
-        _LOGGER.debug(
-            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
-        )
-        return False
-    return True
+    return _attention_qkv_shapes_supported(node)
 
 
 @dynamo_tensorrt_converter(
@@ -4078,24 +4084,7 @@ def scaled_dot_product_efficient_attention_validator(
     if args_bounds_check(node.args, 4, False):
         _LOGGER.debug("compute_log_sumexp is not yet supported.")
         return False
-
-    query_shape, key_shape, value_shape = None, None, None
-    if "val" in node.args[0].meta:
-        query_shape = node.args[0].meta["val"].size()
-    if "val" in node.args[1].meta:
-        key_shape = node.args[1].meta["val"].size()
-    if "val" in node.args[2].meta:
-        value_shape = node.args[2].meta["val"].size()
-    if (
-        query_shape != key_shape
-        or query_shape != value_shape
-        or key_shape != value_shape
-    ):
-        _LOGGER.debug(
-            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
-        )
-        return False
-    return True
+    return _attention_qkv_shapes_supported(node)
 
 
 @dynamo_tensorrt_converter(

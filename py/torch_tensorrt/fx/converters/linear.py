@@ -24,7 +24,7 @@ def common_linear(network, mod, input_val, layer_name, is_quantized):
     layer.name = f"{layer_name}_pre_shuffle"
 
     if is_quantized:
-        mark_as_int8_layer(layer, input_val.dynamic_range)
+        mark_as_int8_layer(layer)
 
     kernel = to_numpy(mod.weight if not is_quantized else mod.weight())
     bias = to_numpy(mod.bias if not is_quantized else mod.bias())

@@ -39,7 +39,6 @@ Custom Setting Usage
     ...
     optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False,
                                     options={"truncate_long_and_double": True,
-                                             "enabled_precisions": {torch.float, torch.half},
                                              "debug": True,
                                              "min_block_size": 2,
                                              "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
@@ -87,7 +86,7 @@ If key operators for your model are unsupported, see :ref:`dynamo_conversion` to
 
 Feasibility of Serialization
 ^^^^^^^^^^^^^^^^^
-Compilation can also be helpful in demonstrating graph breaks and the feasibility of serialization of a particular model. For instance, if a model has no graph breaks and compiles successfully with the Torch-TensorRT backend, then that model should be compilable and serializeable via the `torch_tensorrt` Dynamo IR, as discussed in :ref:`dynamic_shapes`. To determine the number of graph breaks in a model, the `torch._dynamo.explain` function is very useful:
+Compilation can also be helpful in demonstrating graph breaks and the feasibility of serialization of a particular model. For instance, if a model has no graph breaks and compiles successfully with the Torch-TensorRT backend, then that model should be compilable and serializable via the `torch_tensorrt` Dynamo IR, as discussed in :ref:`dynamic_shapes`. To determine the number of graph breaks in a model, the `torch._dynamo.explain` function is very useful:
 
 .. code-block:: python
 

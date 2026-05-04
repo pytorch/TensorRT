@@ -17,6 +17,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -28,7 +29,6 @@ from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
 from torch_tensorrt._utils import is_tensorrt_version_supported
-from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -55,8 +55,6 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_device,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -96,19 +94,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.builder = trt.Builder(self.logger)
         self._debugger_config = _debugger_config
         flag = 0
-        # rtx build, strongly typed is enabled by default, can not set it by builder config
-        if ENABLED_FEATURES.tensorrt_rtx:
-            if not compilation_settings.use_explicit_typing:
-                warnings.warn(
-                    "Strongly typed is enabled by default in torch-tensorrt-rtx build,  setting use_explicit_typing to True"
-                )
-                compilation_settings.use_explicit_typing = True
-        else:
-            if compilation_settings.use_explicit_typing:
-                STRONGLY_TYPED = 1 << (int)(
-                    trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
-                )
-                flag |= STRONGLY_TYPED
+        # rtx build has strongly typed enabled by default at the network level
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            STRONGLY_TYPED = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+            )
+            flag |= STRONGLY_TYPED
 
         self.ctx = ConversionContext(
             self.builder.create_network(flag), compilation_settings
@@ -122,9 +113,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # an xdist worker), making those ops incorrectly appear as disallowed.
         CONVERTERS.set_compilation_settings(compilation_settings)
         self.validate_compile_settings()
-        assert TRTInterpreter._all_precisions_supported(
-            compilation_settings.enabled_precisions
-        ), f"Attempted to enable kernel precisions that are not supported (got: {compilation_settings.enabled_precisions}, support: {_defaults.SUPPORTED_KERNEL_PRECISIONS})"
         missing_ops = self.validate_conversion()
         if missing_ops:
             warnings.warn(
@@ -201,27 +189,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         str_args = [clean_repr(a) for a in args]
         return repr(tuple(str_args))
 
-    @staticmethod
-    def _all_precisions_supported(enabled_precisions: Set[dtype]) -> bool:
-        return enabled_precisions.issubset(_defaults.SUPPORTED_KERNEL_PRECISIONS)
-
     def validate_compile_settings(self) -> None:
-        if ENABLED_FEATURES.tensorrt_rtx:
-            # NOTE: bfloat16 check disabled — depthwise conv BF16 limitation
-            # is now handled per-layer via capability_validator
-            return
-
-        if (
-            dtype.i8 in self.compilation_settings.enabled_precisions
-            and not self.builder.platform_has_fast_int8
-        ):
-            raise RuntimeError("Current platform doesn't support fast native int8!")
-
-        if (
-            dtype.f16 in self.compilation_settings.enabled_precisions
-            and not self.builder.platform_has_fast_fp16
-        ):
-            warnings.warn("Current platform doesn't support fast native fp16!")
+        pass
 
     def _populate_trt_builder_config(
         self,
@@ -229,12 +198,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         tactic_sources: Optional[int] = None,
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
-
-        if ENABLED_FEATURES.native_trt_collectives:
-            _LOGGER.info("Using native TRT collectives")
-            builder_config.set_preview_feature(
-                trt.PreviewFeature.MULTIDEVICE_RUNTIME_10_16, True
-            )
 
         if self._debugger_config and self._debugger_config.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
@@ -304,19 +267,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 trt.MemoryPoolType.DLA_GLOBAL_DRAM,
                 self.compilation_settings.dla_global_dram_size,
             )
-
-        if not self.compilation_settings.use_explicit_typing:
-            if dtype.float16 in self.compilation_settings.enabled_precisions:
-                builder_config.set_flag(trt.BuilderFlag.FP16)
-
-            if dtype.int8 in self.compilation_settings.enabled_precisions:
-                builder_config.set_flag(trt.BuilderFlag.INT8)
-
-            if dtype.fp8 in self.compilation_settings.enabled_precisions:
-                builder_config.set_flag(trt.BuilderFlag.FP8)
-
-            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
-                builder_config.set_flag(trt.BuilderFlag.BF16)
 
         if self.compilation_settings.sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
@@ -871,6 +821,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         else:
             return converter(self.ctx, target, args, kwargs, self._cur_node_name)
 
+    def _cast_output_dtype(
+        self,
+        output: trt.ITensor,
+        output_dtype: trt.DataType,
+        output_name: str,
+    ) -> trt.ITensor:
+        if output.dtype == output_dtype:
+            return output
+
+        layer = self.ctx.net.add_cast(output, output_dtype)
+        layer.name = f"Cast output {output_name} from {output.dtype} to {output_dtype}"
+        return layer.get_output(0)
+
     def output(self, target: str, args: Any, kwargs: Any) -> List[Any]:
         assert len(args) == 1
         if isinstance(args[0], tuple):
@@ -907,8 +870,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
             name = f"output{i}"
 
-            output_dtype = dtype.unknown
-            if any(
+            if self.output_dtypes is not None:
+                output_dtype = self.output_dtypes[i]
+            elif any(
                 op_name in output.name.split("_")
                 for op_name in (
                     "eq",
@@ -925,19 +889,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 )
             ):
                 output_dtype = dtype.b
-            elif self.output_dtypes is not None:
-                if self.output_dtypes[i] == dtype.i64:
-                    output = self.ctx.net.add_cast(
-                        output, dtype.i64.to(trt.DataType)
-                    ).get_output(0)
-                    output_dtype = dtype.i64
-                else:
-                    output_dtype = self.output_dtypes[i]
+            else:
+                output_dtype = dtype.unknown
 
-            self.ctx.net.mark_output(output)
             if output_dtype is not dtype.unknown:
-                output.dtype = output_dtype.to(trt.DataType, use_default=True)
+                output = self._cast_output_dtype(
+                    output,
+                    output_dtype.to(trt.DataType, use_default=True),
+                    name,
+                )
+
             output.name = name
+            outputs = outputs[:i] + (output,) + outputs[i + 1 :]
+            self.ctx.net.mark_output(output)
 
             self._output_names.append(name)
             _LOGGER.debug(

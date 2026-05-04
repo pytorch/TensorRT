@@ -49,7 +49,6 @@ def quantize(network, submod, args, kwargs, layer_name):
             f"Only support torch.quint8 quantized type for activation, get {dtype}."
         )
 
-    input_val.dynamic_range = get_dyn_range(scale, zero_point, dtype)
     return input_val
 
 

@@ -34,7 +34,7 @@ There are lot of options for users to customize their settings for optimizing wi
 Some of the frequently used options are as follows:
 
 * ``inputs`` - For static shapes, this can be a list of torch tensors or `torch_tensorrt.Input` objects. For dynamic shapes, this should be a list of ``torch_tensorrt.Input`` objects.
-* ``use_explicit_typing`` - Respect dtypes set in the model/inputs (recommended, default ``True``). For mixed precision use ``enable_autocast=True``. ``enabled_precisions`` is **deprecated**.
+* ``enable_autocast`` - For mixed precision, use ``enable_autocast=True`` with ``autocast_low_precision_type``. Strong typing (respecting model/input dtypes) is always enabled.
 * ``truncate_long_and_double`` - Truncates long and double values to int and floats respectively.
 * ``torch_executed_ops`` - Operators which are forced to be executed by Torch.
 * ``min_block_size`` - Minimum number of consecutive operators required to be executed as a TensorRT segment.

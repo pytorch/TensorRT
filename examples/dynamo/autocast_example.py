@@ -63,7 +63,7 @@ pytorch_outs = model(*inputs)
 
 # %% Compile the model with Torch-TensorRT Autocast
 #
-# We compile the model with Torch-TensorRT Autocast by setting ``enable_autocast=True``, ``use_explicit_typing=True``, and
+# We compile the model with Torch-TensorRT Autocast by setting ``enable_autocast=True`` and
 # ``autocast_low_precision_type=torch.bfloat16``. To illustrate, we exclude the ``conv1`` node, all nodes with name
 # containing ``relu``, and ``torch.ops.aten.flatten.using_ints`` ATen op from Autocast. In addtion, we also set
 # ``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``, and ``autocast_calibration_dataloader``. Please refer to
@@ -74,7 +74,6 @@ trt_autocast_mod = torch_tensorrt.compile(
     arg_inputs=inputs,
     min_block_size=1,
     use_python_runtime=True,
-    use_explicit_typing=True,
     enable_autocast=True,
     autocast_low_precision_type=torch.bfloat16,
     autocast_excluded_nodes={"^conv1$", "relu"},

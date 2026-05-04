@@ -28,6 +28,7 @@ Model Zoo
 * :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
 * :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
+* :ref:`torch_export_3d_rope`: Compiling a 3D RoPE video-transformer block with complex numerics support
 
 
 .. raw:: html
@@ -105,23 +106,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="Compilation is an expensive operation as it involves many graph transformations, translations a...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_refit_engine_example_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_refit_engine_example.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Refitting Torch-TensorRT Programs with New Weights</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
 
 .. only:: html
@@ -134,6 +118,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Compiling BERT using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Compilation is an expensive operation as it involves many graph transformations, translations a...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_refit_engine_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_refit_engine_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Refitting Torch-TensorRT Programs with New Weights</div>
     </div>
 
 
@@ -547,6 +548,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="3D RoPE is the positional encoding used in video generation transformers such as CogVideoX, Wan...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_3d_rope_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_3d_rope.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how a developer could include a custom kernel in a TensorRT engine ...">
 
 .. only:: html
@@ -574,8 +592,8 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/dynamic_memory_allocation
    /tutorials/_rendered_examples/dynamo/debugger_example
    /tutorials/_rendered_examples/dynamo/cross_runtime_compilation_for_windows
-   /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
+   /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/torch_compile_gpt2
    /tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
@@ -600,6 +618,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/engine_caching_example
    /tutorials/_rendered_examples/dynamo/nvrtc_aot_plugin
    /tutorials/_rendered_examples/dynamo/llama2_flashinfer_rmsnorm
+   /tutorials/_rendered_examples/dynamo/torch_export_3d_rope
    /tutorials/_rendered_examples/dynamo/custom_kernel_plugins
 
 

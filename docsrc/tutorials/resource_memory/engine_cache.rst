@@ -47,7 +47,7 @@ Customize the cache location and size:
         arg_inputs=inputs,
         cache_built_engines=True,
         reuse_cached_engines=True,
-        engine_cache=my_cache,
+        custom_engine_cache=my_cache,
     )
 
 ----
@@ -84,7 +84,6 @@ Cache Invalidation
 The cache is **automatically invalidated** when any engine-invariant setting changes.
 The following changes always require a cache miss (engine rebuild):
 
-* ``enabled_precisions``
 * ``max_aux_streams``
 * ``version_compatible`` / ``hardware_compatible``
 * ``optimization_level``
@@ -198,7 +197,7 @@ a database), implement the ``BaseEngineCache`` interface:
         arg_inputs=inputs,
         cache_built_engines=True,
         reuse_cached_engines=True,
-        engine_cache=S3EngineCache("my-model-cache-bucket"),
+        custom_engine_cache=S3EngineCache("my-model-cache-bucket"),
     )
 
 The two methods you must implement:

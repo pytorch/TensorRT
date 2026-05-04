@@ -207,7 +207,7 @@ in ``tools/llm/run_llm.py``:
         return gm
 
     # 4. Compile as normal
-    trt_model = torch_tensorrt.compile(model, arg_inputs=inputs, use_explicit_typing=True)
+    trt_model = torch_tensorrt.compile(model, arg_inputs=inputs)
 
 For a complete, production-ready implementation of this pattern across LLaMA, Qwen,
 and Gemma3 models (including sliding-window attention), see

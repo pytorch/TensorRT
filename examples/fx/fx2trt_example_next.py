@@ -1,17 +1,18 @@
 # type: ignore[]
 
 import io
+
 import torch
 import torch.fx
 import torch.nn as nn
-from torch_tensorrt.fx.utils import LowerPrecision
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
-from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter
-from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from torch_tensorrt.dynamo._TorchTensorRTModule import (
-    TorchTensorRTModule as TRTModule,
     Device,
 )
+from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule as TRTModule
+from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter
+from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
+from torch_tensorrt.fx.utils import LowerPrecision
 
 # The purpose of this example is to demonstrate the overall flow of lowering a PyTorch
 # model to TensorRT via FX with existing FX based tooling. The general lowering flow
@@ -137,7 +138,6 @@ for name, _ in split_mod.named_children():
         interp = TRTInterpreter(
             submod,
             InputTensorSpec.from_tensors(acc_inputs),
-            explicit_batch_dimension=True,
         )
         r = interp.run(lower_precision=LowerPrecision.FP32)
         with io.BytesIO() as engine_bytes:

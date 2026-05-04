@@ -12,7 +12,7 @@ import torch
 from torch.export import ExportedProgram
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._enums import dtype
-from torch_tensorrt._features import needs_refit
+from torch_tensorrt._features import ENABLED_FEATURES, needs_refit
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._exporter import inline_torch_modules
@@ -41,7 +41,6 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     TorchTensorRTModule,
 )
 from torch_tensorrt.dynamo.utils import (
-    CPU_DEVICE,
     check_module_output,
     check_output_equal,
     get_model_device,
@@ -199,9 +198,24 @@ def _refit_single_trt_engine_with_gm(
                     weight_dtype, weight.data_ptr(), torch.numel(weight)
                 )
                 refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-            assert (
-                len(refitter.get_missing_weights()) == 0
-            ), "Fast refitting failed due to incomplete mapping"
+            # get_missing_weights(): reports weights in connected engines
+            # that were not set.
+            missing_weights = refitter.get_missing_weights()
+            assert len(missing_weights) == 0, (
+                f"Fast refit failed: refitter.get_missing_weights() reports "
+                f"{len(missing_weights)} of {len(weight_list)} engine weight(s) "
+                f"were never set."
+            )
+            if ENABLED_FEATURES.tensorrt_rtx:
+                # Compare weights actually set vs all engine weights: catches
+                # weights in independent engines that get_missing_weights() may not report.
+                unset_weights = {w for w in weight_list if w not in mapping}
+                assert len(unset_weights) == 0, (
+                    f"Fast refit failed on TensorRT-RTX: {len(unset_weights)} of "
+                    f"{len(weight_list)} engine weight(s) had no entry in "
+                    f"weight_name_map. "
+                    f"Unset (showing up to 5): {sorted(unset_weights)[:5]}"
+                )
 
         else:
             mapping = construct_refit_mapping(new_gm, input_list, settings)

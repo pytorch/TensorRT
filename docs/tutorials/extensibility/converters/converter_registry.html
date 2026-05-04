@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../_static/documentation_options.js?v=7fc5b972"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -450,6 +450,7 @@ document.write(`
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l3"><a class="reference internal" href="../lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowering/subgraph_builder.html">SubgraphBuilder — Cursor-Based FX Node Insertion</a></li>
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -501,13 +502,27 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../deployment/distributed_inference.html">Distributed Inference</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../deployment/complex_tensors.html">Complex Tensor Support</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../complex_numerics/index.html">Complex Numerics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../complex_numerics/complex_tensors.html">Complex Tensor Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/torch_export_3d_rope.html">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</a></li>
+
+
+
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../_rendered_examples/distributed_inference/index.html">Example: Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/test_multinode_nccl.html">Usage</a></li>
+
+
 <li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/tensor_parallel_simple_example_mn.html">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/test_multinode_export_save_load.html">Usage</a></li>
+
+
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
@@ -773,8 +788,7 @@ order (HIGH-priority entries first).</p></li>
 <dt><code class="docutils literal notranslate"><span class="pre">ctx.net</span></code></dt><dd><p>The <code class="docutils literal notranslate"><span class="pre">trt.INetworkDefinition</span></code>. Converters call methods like
 <code class="docutils literal notranslate"><span class="pre">ctx.net.add_elementwise()</span></code>, <code class="docutils literal notranslate"><span class="pre">ctx.net.add_activation()</span></code>, etc. to add TRT layers.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">ctx.compilation_settings</span></code></dt><dd><p>Full <code class="docutils literal notranslate"><span class="pre">CompilationSettings</span></code> object. Use this to read user preferences (e.g., check
-<code class="docutils literal notranslate"><span class="pre">ctx.compilation_settings.enabled_precisions</span></code>) inside a converter.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">ctx.compilation_settings</span></code></dt><dd><p>Full <code class="docutils literal notranslate"><span class="pre">CompilationSettings</span></code> object. Use this to read user preferences inside a converter.</p>
 </dd>
 <dt><code class="docutils literal notranslate"><span class="pre">ctx.record_weight(name,</span> <span class="pre">weight)</span></code></dt><dd><p>Call this from a converter whenever you add a constant tensor to the TRT network.
 It populates <code class="docutils literal notranslate"><span class="pre">weight_refit_map</span></code> (used by <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.refit_module_weights()</span></code>)

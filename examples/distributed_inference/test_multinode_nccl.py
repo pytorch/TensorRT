@@ -100,7 +100,6 @@ for runtime, use_python in [("cpp", False), ("python", True)]:
             backend="torch_tensorrt",
             options={
                 "truncate_long_and_double": True,
-                "enabled_precisions": {torch.float32},
                 "use_python_runtime": use_python,
                 "min_block_size": 1,
             },

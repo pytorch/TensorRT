@@ -48,12 +48,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-        if explicit_batch_dimension:
-            EXPLICIT_BATCH = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH
-            )
-            flag |= EXPLICIT_BATCH
-
         if explicit_precision:
             EXPLICIT_PRECISION = 1 << (int)(
                 trt.NetworkDefinitionCreationFlag.EXPLICIT_PRECISION
@@ -185,18 +179,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.output_fp16 = (
             not force_fp32_output and lower_precision == LowerPrecision.FP16
         )
-
-        if (
-            lower_precision == LowerPrecision.INT8
-            and not self.builder.platform_has_fast_int8
-        ):
-            raise RuntimeError("Current platform doesn't support fast native int8!")
-
-        if (
-            lower_precision == LowerPrecision.FP16
-            and not self.builder.platform_has_fast_fp16
-        ):
-            warnings.warn("Current platform doesn't support fast native fp16!")
 
         self.input_specs_iter = 0
         run_module_start_time = datetime.now()
@@ -341,6 +323,21 @@ class TRTInterpreter(torch.fx.Interpreter):
         assert self._cur_node_name is not None
         return converter(self.network, target, args, kwargs, self._cur_node_name)
 
+    def _cast_output_dtype(
+        self,
+        output: trt.tensorrt.ITensor,
+        output_dtype: trt.DataType,
+        output_name: str,
+    ) -> trt.tensorrt.ITensor:
+        if output.dtype == output_dtype:
+            return output
+
+        layer = self.network.add_cast(output, output_dtype)
+        layer.name = (
+            f"Cast output {output_name} from {output.dtype} to {output_dtype}"
+        )
+        return layer.get_output(0)
+
     def output(self, target, args, kwargs):
         assert len(args) == 1
         if isinstance(args[0], tuple):
@@ -354,7 +351,10 @@ class TRTInterpreter(torch.fx.Interpreter):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
         for i, output in enumerate(outputs):
-            if any(
+            output_tensor_meta = self._itensor_to_tensor_meta.get(output)
+            if output_tensor_meta is not None and output_tensor_meta.dtype is not None:
+                output_bool = output_tensor_meta.dtype == torch.bool
+            elif any(
                 op_name in output.name.split("_")
                 for op_name in (
                     "eq",
@@ -373,10 +373,16 @@ class TRTInterpreter(torch.fx.Interpreter):
             else:
                 output_bool = False
             name = f"output{i}"
+
+            output_dtype = None
+            if output_bool:
+                output_dtype = trt.bool
+            elif self.output_fp16 and output.dtype == trt.float32:
+                output_dtype = trt.float16
+
+            if output_dtype is not None:
+                output = self._cast_output_dtype(output, output_dtype, name)
+
             output.name = name
             self.network.mark_output(output)
-            if output_bool:
-                output.dtype = trt.bool
-            elif self.output_fp16 and output.dtype == trt.float32:
-                output.dtype = trt.float16
             self._output_names.append(name)

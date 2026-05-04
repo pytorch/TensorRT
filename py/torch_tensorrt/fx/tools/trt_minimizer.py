@@ -5,7 +5,9 @@ import torch
 import torch.fx.passes.net_min_base as net_min_base
 from torch.fx.passes.tools_common import Tensors
 
-from .. import InputTensorSpec, TRTInterpreter, TRTModule
+from ..fx2trt import TRTInterpreter
+from ..input_tensor_spec import InputTensorSpec
+from ..trt_module import TRTModule
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

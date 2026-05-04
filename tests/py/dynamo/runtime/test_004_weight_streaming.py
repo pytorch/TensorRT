@@ -56,7 +56,6 @@ class TestWeightStreamingPython(TestCase):
             cache_built_engines=False,
             reuse_cached_engines=False,
             use_python_runtime=use_python_runtime,
-            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
         # Checking if default weight streaming budget(automatic) is applied when compiler option was provided
@@ -107,7 +106,6 @@ class TestWeightStreamingPython(TestCase):
             cache_built_engines=False,
             reuse_cached_engines=False,
             use_python_runtime=use_python_runtime,
-            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
         # Weight streaming budget is applied manually.
@@ -170,7 +168,6 @@ class TestWeightStreamingPython(TestCase):
                 {"torch.ops.aten.convolution.default"} if multi_rt else {}
             ),
             use_python_runtime=use_python_runtime,
-            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
 
@@ -216,7 +213,6 @@ class TestWeightStreamingPython(TestCase):
             reuse_cached_engines=False,
             torch_executed_ops={"torch.ops.aten.convolution.default"},
             use_python_runtime=use_python_runtime,
-            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
 
@@ -261,7 +257,6 @@ class TestWeightStreamingPython(TestCase):
             reuse_cached_engines=False,
             torch_executed_ops={"torch.ops.aten.convolution.default"},
             use_python_runtime=use_python_runtime,
-            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
 
@@ -350,13 +345,11 @@ class TestWeightStreamingPython(TestCase):
             ],
             "kwarg_inputs": kwarg_torchtrt_input,
             "device": torchtrt.Device("cuda:0"),
-            "enabled_precisions": {torch.float},
             "pass_through_build_failures": True,
             "min_block_size": 1,
             "ir": "dynamo",
             "cache_built_engines": False,
             "reuse_cached_engines": False,
-            "use_explicit_typing": True,
             "enable_weight_streaming": True,
             "torch_executed_ops": {"torch.ops.aten.mul.Tensor"},
             "use_python_runtime": use_python_runtime,

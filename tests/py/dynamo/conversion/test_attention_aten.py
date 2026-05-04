@@ -20,7 +20,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float16,
                 0.0,
                 False,
-            ),  # flash attention
+            ),
             (
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
@@ -31,7 +31,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float16,
                 0.0,
                 False,
-            ),  # flash attention
+            ),
             (
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
@@ -42,7 +42,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float32,
                 0.0,
                 False,
-            ),  # flash attention
+            ),
             (
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
@@ -53,7 +53,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float32,
                 0.0,
                 False,
-            ),  # flash attention
+            ),
             (
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
@@ -64,7 +64,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float16,
                 0.0,
                 False,
-            ),  # efficient attention
+            ),
             (
                 (2, 8, 128, 64),
                 (2, 8, 128, 64),
@@ -75,7 +75,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float16,
                 0.0,
                 False,
-            ),  # efficient attention
+            ),
             (
                 (2, 8, 128, 64),
                 (2, 8, 128, 64),
@@ -86,7 +86,18 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float32,
                 0.0,
                 False,
-            ),  # efficient attention
+            ),
+            (
+                (4, 8, 1, 64),
+                (4, 8, 4, 64),
+                (4, 8, 4, 64),
+                (1, 1, 4),
+                False,
+                None,
+                torch.float16,
+                0.0,
+                False,
+            ),  # decoder-style single-token attention
         ]
     )
     def test_sdpa_bool_mask(
@@ -130,7 +141,6 @@ class TestScaledDotProductAttention(DispatchTestCase):
             atol=1e-2,
             precision=dtype,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
     @parameterized.expand(
@@ -145,7 +155,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float16,
                 0.0,
                 False,
-            ),  # flash attention
+            ),
             (
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
@@ -156,7 +166,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float16,
                 0.0,
                 False,
-            ),  # flash attention
+            ),
             (
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
@@ -167,7 +177,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float32,
                 0.0,
                 False,
-            ),  # flash attention
+            ),
             (
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
@@ -178,7 +188,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float32,
                 0.0,
                 False,
-            ),  # flash attention
+            ),
             (
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
@@ -189,7 +199,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float16,
                 0.0,
                 False,
-            ),  # efficient attention
+            ),
             (
                 (2, 8, 128, 64),
                 (2, 8, 128, 64),
@@ -200,7 +210,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float16,
                 0.0,
                 False,
-            ),  # efficient attention
+            ),
             (
                 (2, 8, 128, 64),
                 (2, 8, 128, 64),
@@ -211,7 +221,18 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 torch.float32,
                 0.0,
                 False,
-            ),  # efficient attention
+            ),
+            (
+                (4, 8, 1, 64),
+                (4, 8, 4, 64),
+                (4, 8, 4, 64),
+                (1, 1, 4),
+                False,
+                None,
+                torch.float16,
+                0.0,
+                False,
+            ),  # decoder-style single-token attention
         ]
     )
     def test_sdpa_fp_mask(
@@ -255,7 +276,6 @@ class TestScaledDotProductAttention(DispatchTestCase):
             atol=1e-2,
             precision=dtype,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
     @parameterized.expand(
@@ -304,6 +324,17 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 0.0,
                 False,
             ),
+            (
+                [(2, 8, 1, 64), (4, 8, 1, 64), (8, 8, 1, 64)],
+                [(2, 8, 4, 64), (4, 8, 4, 64), (8, 8, 4, 64)],
+                [(2, 8, 4, 64), (4, 8, 4, 64), (8, 8, 4, 64)],
+                [(1, 1, 4), (1, 1, 4), (1, 1, 4)],
+                False,
+                None,
+                torch.float16,
+                0.0,
+                False,
+            ),  # decoder-style single-token attention
         ]
     )
     def test_dynamic_sdpa_fp_mask(
@@ -416,6 +447,16 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
                 torch.float32,
                 0.0,
             ),
+            (
+                (4, 8, 1, 64),
+                (4, 8, 4, 64),
+                (4, 8, 4, 64),
+                (1, 1, 4),
+                False,
+                None,
+                torch.float16,
+                0.0,
+            ),  # decoder-style single-token attention
         ]
     )
     def test_efficient_sdpa(
@@ -463,7 +504,6 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             atol=1e-2,
             precision=dtype,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
     @parameterized.expand(
@@ -518,6 +558,16 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
                 torch.float32,
                 0.0,
             ),
+            (
+                (4, 8, 1, 64),
+                (4, 8, 4, 64),
+                (4, 8, 4, 64),
+                (1, 1, 4),
+                False,
+                None,
+                torch.float16,
+                0.0,
+            ),  # decoder-style single-token attention
         ]
     )
     def test_efficient_sdpa_random_attn_bias(
@@ -560,7 +610,6 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             atol=1e-2,
             precision=dtype,
             enable_passes=True,
-            use_explicit_typing=True,
         )
 
 

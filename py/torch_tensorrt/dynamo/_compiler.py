@@ -5,7 +5,7 @@ import logging
 import os
 import platform
 import warnings
-from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Collection, List, Optional, Sequence, Union
 
 import torch
 from torch.export import ExportedProgram
@@ -68,9 +68,6 @@ def cross_compile_for_windows(
     disable_tf32: bool = _defaults.DISABLE_TF32,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    enabled_precisions: Union[
-        Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
-    ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -100,7 +97,6 @@ def cross_compile_for_windows(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
-    use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
@@ -152,7 +148,6 @@ def cross_compile_for_windows(
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
-        enabled_precisions (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
@@ -182,8 +177,7 @@ def cross_compile_for_windows(
         engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
         engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -266,25 +260,12 @@ def cross_compile_for_windows(
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
 
-    if use_explicit_typing:
-        if len(enabled_precisions) != 1 or not any(
-            x in enabled_precisions
-            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
-        ):
-            raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
-            )
-
     if use_fp32_acc:
         logger.debug(
             "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
                      This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
         )
 
-    if enable_weight_streaming and not use_explicit_typing:
-        raise AssertionError(
-            "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
-        )
     # Aliasing inputs to arg_inputs for better understanding
     if arg_inputs is None and kwarg_inputs is None and inputs is None:
         raise AssertionError(
@@ -308,12 +289,8 @@ def cross_compile_for_windows(
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
     trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
-    enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
     compilation_options = {
-        "enabled_precisions": (
-            enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
-        ),
         "device": device,
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "workspace_size": workspace_size,
@@ -433,9 +410,6 @@ def compile(
     disable_tf32: bool = _defaults.DISABLE_TF32,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    enabled_precisions: Union[
-        Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
-    ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -465,7 +439,6 @@ def compile(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
-    use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
@@ -532,7 +505,6 @@ def compile(
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
-        enabled_precisions (Union[Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]]): The set of datatypes that TensorRT can use when selecting kernels
         engine_capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
@@ -562,8 +534,7 @@ def compile(
         engine_cache_dir (str): Directory to store the cached TRT engines
         engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -572,7 +543,7 @@ def compile(
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
-        enable_autocast (bool): Whether to enable autocast. If enabled, use_explicit_typing will be set to True.
+        enable_autocast (bool): Whether to enable autocast.
         autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
         autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
         autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
@@ -592,13 +563,6 @@ def compile(
     if kwargs.get("debug", False):
         warnings.warn(
             "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    if not kwargs.get("use_explicit_typing", False):
-        warnings.warn(
-            "`use_explicit_typing` is deprecated. use_explicit_types is now on by default, this setting will be removed and you should enable autocast to recover weak typing behavior.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -664,19 +628,6 @@ def compile(
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
 
-    if enable_autocast:
-        use_explicit_typing = True
-        logger.debug("Autocast is enabled, setting use_explicit_typing to True.")
-
-    if use_explicit_typing:
-        if len(enabled_precisions) != 1 or not any(
-            x in enabled_precisions
-            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
-        ):
-            raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
-            )
-
     if autocast_low_precision_type is not None:
         if not isinstance(autocast_low_precision_type, (torch.dtype, dtype)):
             raise ValueError(
@@ -696,10 +647,6 @@ def compile(
                      This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
         )
 
-    if enable_weight_streaming and not use_explicit_typing:
-        raise AssertionError(
-            "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
-        )
     # Aliasing inputs to arg_inputs for better understanding
     if arg_inputs is None and kwarg_inputs is None and inputs is None:
         raise AssertionError(
@@ -723,7 +670,6 @@ def compile(
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
     trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
-    enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
     engine_cache = None
     if cache_built_engines or reuse_cached_engines:
@@ -734,9 +680,6 @@ def compile(
         )
 
     compilation_options = {
-        "enabled_precisions": (
-            enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
-        ),
         "device": device,
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "workspace_size": workspace_size,
@@ -768,7 +711,6 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
-        "use_explicit_typing": use_explicit_typing,
         "use_fp32_acc": use_fp32_acc,
         "refit_identical_engine_weights": refit_identical_engine_weights,
         "strip_engine_weights": strip_engine_weights,
@@ -1262,9 +1204,6 @@ def convert_exported_program_to_serialized_trt_engine(
     disable_tf32: bool = _defaults.DISABLE_TF32,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    enabled_precisions: Union[
-        Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
-    ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -1294,7 +1233,6 @@ def convert_exported_program_to_serialized_trt_engine(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
-    use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
@@ -1342,7 +1280,6 @@ def convert_exported_program_to_serialized_trt_engine(
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
-        enabled_precisions (Union[Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]]): The set of datatypes that TensorRT can use when selecting kernels
         engine_capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
@@ -1372,8 +1309,7 @@ def convert_exported_program_to_serialized_trt_engine(
         engine_cache_dir (str): Directory to store the cached TRT engines
         engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -1457,25 +1393,12 @@ def convert_exported_program_to_serialized_trt_engine(
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
 
-    if use_explicit_typing:
-        if len(enabled_precisions) != 1 or not any(
-            x in enabled_precisions
-            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
-        ):
-            raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
-            )
-
     if use_fp32_acc:
         logger.debug(
             "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
                      This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
         )
 
-    if enable_weight_streaming and not use_explicit_typing:
-        raise AssertionError(
-            "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
-        )
     # Aliasing inputs to arg_inputs for better understanding
     if arg_inputs is None and kwarg_inputs is None and inputs is None:
         raise AssertionError(
@@ -1499,7 +1422,6 @@ def convert_exported_program_to_serialized_trt_engine(
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
     trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
-    enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
     engine_cache = None
     if cache_built_engines or reuse_cached_engines:
@@ -1510,9 +1432,6 @@ def convert_exported_program_to_serialized_trt_engine(
         )
 
     compilation_options = {
-        "enabled_precisions": (
-            enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
-        ),
         "device": device,
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "workspace_size": workspace_size,
@@ -1544,7 +1463,6 @@ def convert_exported_program_to_serialized_trt_engine(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
-        "use_explicit_typing": use_explicit_typing,
         "use_fp32_acc": use_fp32_acc,
         "refit_identical_engine_weights": refit_identical_engine_weights,
         "strip_engine_weights": strip_engine_weights,

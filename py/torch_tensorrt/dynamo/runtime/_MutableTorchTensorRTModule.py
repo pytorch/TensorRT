@@ -3,14 +3,13 @@ import logging
 import warnings
 from copy import deepcopy
 from enum import Enum, auto
-from typing import Any, Dict, Iterator, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterator, Optional, Union
 
 import numpy as np
 import torch
 import torch_tensorrt
 from torch.export._trace import _export
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
@@ -22,6 +21,16 @@ from torch_tensorrt.dynamo.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_modelopt_quantized(model: torch.nn.Module) -> bool:
+    """Return True if the model has been quantized with the modelopt library."""
+    try:
+        from modelopt.torch.quantization.nn import TensorQuantizer
+
+        return any(isinstance(m, TensorQuantizer) for m in model.modules())
+    except ImportError:
+        return False
 
 
 class RefitFlag(Enum):
@@ -70,9 +79,6 @@ class MutableTorchTensorRTModule(object):
         strict: bool = True,
         prefer_deferred_runtime_asserts_over_guards: bool = False,
         weight_streaming_budget: Optional[int] = None,
-        enabled_precisions: Union[
-            Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
-        ] = _defaults.ENABLED_PRECISIONS,
         **kwargs: Any,
     ) -> None:
         """
@@ -88,7 +94,6 @@ class MutableTorchTensorRTModule(object):
             disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
             assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
             sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
-            enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
             immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable.
             capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
             num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
@@ -113,7 +118,6 @@ class MutableTorchTensorRTModule(object):
             timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
             runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.
             lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
-            enabled_precisions (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
             **kwargs: Any,
         Returns:
             MutableTorchTensorRTModule
@@ -168,7 +172,6 @@ class MutableTorchTensorRTModule(object):
                 logger.warning(
                     "Weight stremaing budget is not set. Using auto weight streaming budget"
                 )
-        self.enabled_precisions = enabled_precisions
 
         cls = self.__class__
         self.__class__ = type(
@@ -335,11 +338,8 @@ class MutableTorchTensorRTModule(object):
                     strict=self.strict,
                 )
 
-        # Check if any quantization precision is enabled
-        if self.enabled_precisions and any(
-            precision in self.enabled_precisions
-            for precision in (torch.float8_e4m3fn, torch.int8, torch.float4_e2m1fn_x2)
-        ):
+        # Check if the model has been quantized with modelopt
+        if _is_modelopt_quantized(self.original_model):
             try:
                 from modelopt.torch.quantization.utils import export_torch_mode
 
@@ -369,7 +369,6 @@ class MutableTorchTensorRTModule(object):
             kwarg_inputs=self.kwarg_inputs,
             immutable_weights=False,
             use_python_runtime=self.use_python_runtime,
-            enabled_precisions=self.enabled_precisions,
             **self.additional_settings,
         )
         if self.additional_settings.get("offload_module_to_cpu", False):

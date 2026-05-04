@@ -12,7 +12,6 @@ import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
@@ -226,10 +225,9 @@ def compile(
     """
 
     input_list = inputs if inputs is not None else []
+    # Default for legacy FX/TS frontends; not used for the Dynamo path
     enabled_precisions_set: Set[Union[torch.dtype, dtype]] = (
-        enabled_precisions
-        if enabled_precisions is not None
-        else _defaults.ENABLED_PRECISIONS
+        enabled_precisions if enabled_precisions is not None else {torch.float32}
     )
 
     module_type = _parse_module_type(module)
@@ -323,14 +321,11 @@ def compile(
         trt_graph_module = dynamo_compile(
             exp_program,
             arg_inputs=torchtrt_arg_inputs,
-            enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
         return trt_graph_module
     elif target_ir == _IRType.torch_compile:
-        return torch_compile(
-            module, enabled_precisions=enabled_precisions_set, **kwargs
-        )
+        return torch_compile(module, **kwargs)
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
@@ -389,12 +384,6 @@ def cross_compile_for_windows(
     if not file_path:
         raise ValueError("File path cannot be empty. Please provide a valid file path")
 
-    enabled_precisions_set: Set[dtype | torch.dtype] = (
-        enabled_precisions
-        if enabled_precisions is not None
-        else _defaults.ENABLED_PRECISIONS
-    )
-
     # Prepare torch and torchtrt inputs
     if arg_inputs is None and inputs is None:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
@@ -427,7 +416,6 @@ def cross_compile_for_windows(
     trt_gm = dynamo_cross_compile_for_windows(
         exp_program,
         arg_inputs=torchtrt_arg_inputs,
-        enabled_precisions=enabled_precisions_set,
         **kwargs,
     )
 
@@ -493,6 +481,7 @@ def convert_method_to_trt_engine(
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
+    # Default for legacy TS frontend; not used for the Dynamo path
     enabled_precisions_set = (
         enabled_precisions if enabled_precisions is not None else {torch.float}
     )
@@ -549,7 +538,6 @@ def convert_method_to_trt_engine(
             exp_program,
             arg_inputs=tuple(arg_inputs),
             kwarg_inputs=torchtrt_kwarg_inputs,
-            enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
     elif target_ir == _IRType.torch_compile:

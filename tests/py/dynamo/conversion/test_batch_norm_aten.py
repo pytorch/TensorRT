@@ -307,7 +307,6 @@ class TestBatchNormConvFusion(DispatchTestCase):
             exp_program,
             inputs=[torch_tensorrt.Input(shape=(1, 1, 1, 1), dtype=torch.float32)],
             device=torch_tensorrt.Device("cuda:0"),
-            enabled_precisions={torch.float32},
             min_block_size=1,
             pass_through_build_failures=True,
             cache_built_engines=False,

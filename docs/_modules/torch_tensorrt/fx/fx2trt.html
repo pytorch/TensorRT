@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8cb60082"></script>
+    <script src="../../../_static/documentation_options.js?v=7fc5b972"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -529,12 +529,6 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">builder</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Builder</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="p">)</span>
 
         <span class="n">flag</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">if</span> <span class="n">explicit_batch_dimension</span><span class="p">:</span>
-            <span class="n">EXPLICIT_BATCH</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="nb">int</span><span class="p">)(</span>
-                <span class="n">trt</span><span class="o">.</span><span class="n">NetworkDefinitionCreationFlag</span><span class="o">.</span><span class="n">EXPLICIT_BATCH</span>
-            <span class="p">)</span>
-            <span class="n">flag</span> <span class="o">|=</span> <span class="n">EXPLICIT_BATCH</span>
-
         <span class="k">if</span> <span class="n">explicit_precision</span><span class="p">:</span>
             <span class="n">EXPLICIT_PRECISION</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="nb">int</span><span class="p">)(</span>
                 <span class="n">trt</span><span class="o">.</span><span class="n">NetworkDefinitionCreationFlag</span><span class="o">.</span><span class="n">EXPLICIT_PRECISION</span>
@@ -666,18 +660,6 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">output_fp16</span> <span class="o">=</span> <span class="p">(</span>
             <span class="ow">not</span> <span class="n">force_fp32_output</span> <span class="ow">and</span> <span class="n">lower_precision</span> <span class="o">==</span> <span class="n">LowerPrecision</span><span class="o">.</span><span class="n">FP16</span>
         <span class="p">)</span>
-
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="n">lower_precision</span> <span class="o">==</span> <span class="n">LowerPrecision</span><span class="o">.</span><span class="n">INT8</span>
-            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">builder</span><span class="o">.</span><span class="n">platform_has_fast_int8</span>
-        <span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Current platform doesn&#39;t support fast native int8!&quot;</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="n">lower_precision</span> <span class="o">==</span> <span class="n">LowerPrecision</span><span class="o">.</span><span class="n">FP16</span>
-            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">builder</span><span class="o">.</span><span class="n">platform_has_fast_fp16</span>
-        <span class="p">):</span>
-            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Current platform doesn&#39;t support fast native fp16!&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">input_specs_iter</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">run_module_start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
@@ -822,6 +804,21 @@ document.write(`
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cur_node_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">converter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cur_node_name</span><span class="p">)</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_cast_output_dtype</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">output</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">,</span>
+        <span class="n">output_dtype</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span>
+        <span class="n">output_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">trt</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">output</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">output_dtype</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">output</span>
+
+        <span class="n">layer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">add_cast</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">output_dtype</span><span class="p">)</span>
+        <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Cast output </span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2"> from </span><span class="si">{</span><span class="n">output</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">layer</span><span class="o">.</span><span class="n">get_output</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">):</span>
@@ -835,7 +832,10 @@ document.write(`
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;TensorRT requires all outputs to be Tensor!&quot;</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">output</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
-            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">output_tensor_meta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_itensor_to_tensor_meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">output_tensor_meta</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">output_tensor_meta</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">output_bool</span> <span class="o">=</span> <span class="n">output_tensor_meta</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span>
+            <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span>
                 <span class="n">op_name</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span>
                 <span class="k">for</span> <span class="n">op_name</span> <span class="ow">in</span> <span class="p">(</span>
                     <span class="s2">&quot;eq&quot;</span><span class="p">,</span>
@@ -854,12 +854,18 @@ document.write(`
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">output_bool</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="n">name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;output</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
+
+            <span class="n">output_dtype</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">output_bool</span><span class="p">:</span>
+                <span class="n">output_dtype</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">bool</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_fp16</span> <span class="ow">and</span> <span class="n">output</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span>
+                <span class="n">output_dtype</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">float16</span>
+
+            <span class="k">if</span> <span class="n">output_dtype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cast_output_dtype</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">output_dtype</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
             <span class="n">output</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">mark_output</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">output_bool</span><span class="p">:</span>
-                <span class="n">output</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">bool</span>
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_fp16</span> <span class="ow">and</span> <span class="n">output</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span>
-                <span class="n">output</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">float16</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_output_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
 
 </pre></div>

@@ -87,7 +87,7 @@
       },
       "outputs": [],
       "source": [
-        "trt_gm = torch_tensorrt.dynamo.compile(\n    ep,\n    inputs=dummy_inputs,\n    enabled_precisions={torch.float32},\n    truncate_double=True,\n    min_block_size=1,\n    use_fp32_acc=True,\n    use_explicit_typing=True,\n    immutable_weights=False,\n    offload_module_to_cpu=True,\n)"
+        "trt_gm = torch_tensorrt.dynamo.compile(\n    ep,\n    inputs=dummy_inputs,\n    truncate_double=True,\n    min_block_size=1,\n    use_fp32_acc=True,\n    immutable_weights=False,\n    offload_module_to_cpu=True,\n)"
       ]
     },
     {

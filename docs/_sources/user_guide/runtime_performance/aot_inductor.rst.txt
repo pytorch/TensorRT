@@ -60,7 +60,6 @@ to ``torch_tensorrt.save``:
                 dtype=torch.float32,
             )
         ],
-        use_explicit_typing=True,
         min_block_size=1,
     )
 
