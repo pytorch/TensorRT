@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=7fc5b972"></script>
+    <script src="../../../../_static/documentation_options.js?v=cc29f205"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -500,7 +500,8 @@ document.write(`
     <span class="n">multi_gpu_device_check</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+<span class="c1"># must import after torch_tensorrt to resolve tensorrt_rtx alias</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>  <span class="c1"># isort: skip</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -1016,6 +1017,12 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;output_names&quot;</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;platform&quot;</span><span class="p">]</span>
 
+        <span class="c1"># Same rationale as __setstate__: ensure these exist before</span>
+        <span class="c1"># setup_engine() so __del__ -&gt; _save_runtime_cache() is safe even</span>
+        <span class="c1"># if a future caller invokes this without __init__ having run.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span> <span class="o">=</span> <span class="kc">None</span>
+
         <span class="c1"># Run multi-gpu device check to validate engine instantiation</span>
         <span class="n">multi_gpu_device_check</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
@@ -1034,6 +1041,12 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
         <span class="c1"># reset after unpickling, apbose: is this required though?</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># __getstate__ pops these; re-initialize before setup_engine() so</span>
+        <span class="c1"># __del__ -&gt; _save_runtime_cache() can always read them, including</span>
+        <span class="c1"># on standard (non-RTX) TRT where setup_engine() does not call</span>
+        <span class="c1"># _setup_runtime_config().</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">:</span>
