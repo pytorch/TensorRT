@@ -24,7 +24,8 @@ from torch_tensorrt.runtime._utils import (
     multi_gpu_device_check,
 )
 
-import tensorrt as trt
+# must import after torch_tensorrt to resolve tensorrt_rtx alias
+import tensorrt as trt  # isort: skip
 
 logger = logging.getLogger(__name__)
 
@@ -529,6 +530,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_names = state_dict[prefix + "output_names"]
         self.target_platform = state_dict[prefix + "platform"]
 
+        # Same rationale as __setstate__: ensure these exist before
+        # setup_engine() so __del__ -> _save_runtime_cache() is safe even
+        # if a future caller invokes this without __init__ having run.
+        self.runtime_config = None
+        self.runtime_cache = None
+
         # Run multi-gpu device check to validate engine instantiation
         multi_gpu_device_check()
         self.setup_engine()
@@ -547,6 +554,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.__dict__.update(state)
         # reset after unpickling, apbose: is this required though?
         self._nccl_comm = None
+        # __getstate__ pops these; re-initialize before setup_engine() so
+        # __del__ -> _save_runtime_cache() can always read them, including
+        # on standard (non-RTX) TRT where setup_engine() does not call
+        # _setup_runtime_config().
+        self.runtime_config = None
+        self.runtime_cache = None
         self.setup_engine()
 
     def __deepcopy__(self, memo: Any) -> PythonTorchTensorRTModule:
