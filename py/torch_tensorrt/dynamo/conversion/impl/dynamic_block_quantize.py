@@ -1,9 +1,7 @@
 from typing import Optional, Union
 
 import numpy as np
-import tensorrt as trt
 import torch
-from tensorrt import ITensor as TRTTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
 from torch_tensorrt._utils import is_tensorrt_version_supported
@@ -13,6 +11,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
+
+import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 
 if is_tensorrt_version_supported("10.8.0"):
 
@@ -33,11 +34,28 @@ if is_tensorrt_version_supported("10.8.0"):
         Adds quantize and dequantize ops (QDQ) which quantize to FP4 based
         on the output_type set and dequantizes them back.
         """
-        if len(input_tensor.shape) not in (2, 3):
-            raise ValueError(
-                f"dynamic_block_quantize converter received an input of {input_tensor.shape} shape. Supported shapes: 2D or 3D"
-            )
+        # Save original shape before any reshape so we can restore it.
+        original_shape = tuple(input_tensor.shape)
+        # FP4 block quantization requires 2D or 3D inputs.  For higher-rank
+        # tensors (e.g. a patch-embed reshape to (B, C, pH, pW, kH, kW)) we
+        # flatten all leading dimensions into one, quantize in 2D, then
+        # restore the original shape on the output.
+        needs_reshape = len(original_shape) > 3
+
         with unset_fake_temporarily():
+            if needs_reshape:
+                last_dim = original_shape[-1]
+                is_weight = ".weight_quantizer" in name
+                if is_weight:
+                    # torch.Tensor path: plain reshape
+                    input_tensor = input_tensor.reshape(-1, last_dim)
+                else:
+                    # TRTTensor path: insert a shuffle (reshape) layer
+                    reshape_layer = ctx.net.add_shuffle(input_tensor)
+                    reshape_layer.reshape_dims = (-1, last_dim)
+                    reshape_layer.name = f"{name}_reshape_to_2d"
+                    input_tensor = reshape_layer.get_output(0)
+
             axis = -1
             global_scale = _calculate_global_scale(ctx, name, amax)
             if ".weight_quantizer" in name:
@@ -64,6 +82,24 @@ if is_tensorrt_version_supported("10.8.0"):
                 raise ValueError(
                     f"quantizer received an input of {name}. Supported values: weight_quantizer | input_quantizer"
                 )
+
+            if needs_reshape:
+                restore_dims = list(original_shape)
+                # TRT reshape_dims allows at most one -1 (inferred dimension).
+                # More than one dynamic dim requires shape-tensor API which is
+                # not yet implemented here.
+                dynamic_count = sum(1 for d in restore_dims if d == -1)
+                if dynamic_count > 1:
+                    raise ValueError(
+                        f"dynamic_block_quantize: cannot restore tensor to shape "
+                        f"{original_shape} — found {dynamic_count} dynamic dimensions "
+                        f"(TRT reshape supports at most one inferred dimension)"
+                    )
+                restore_layer = ctx.net.add_shuffle(output)
+                restore_layer.reshape_dims = tuple(restore_dims)
+                restore_layer.name = f"{name}_reshape_from_2d"
+                output = restore_layer.get_output(0)
+
             return output
 
     def _dynamic_double_quantize(
