@@ -97,4 +97,5 @@ jobs:
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
         # this is to verify the end user's workflow
+        python -m pip install pyyaml
         .github/scripts/verify-executorch-reference-runner.sh

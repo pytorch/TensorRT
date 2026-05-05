@@ -27,6 +27,16 @@ set +x
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
 
+python_executable="${PYTHON_EXECUTABLE:-}"
+if [[ -z "${python_executable}" ]]; then
+  python_executable="$(command -v python || true)"
+fi
+if [[ -z "${python_executable}" ]]; then
+  echo "Could not find python on PATH" >&2
+  exit 1
+fi
+export PYTHON_EXECUTABLE="${python_executable}"
+
 : "${EXECUTORCH_SOURCE_DIR:?Set EXECUTORCH_SOURCE_DIR to an ExecuTorch source checkout}"
 
 if [[ ! -f "${EXECUTORCH_SOURCE_DIR}/CMakeLists.txt" ]]; then
@@ -93,7 +103,7 @@ select_tensorrt_archive_repo() {
 read_tensorrt_archive_metadata() {
   local repo_name="$1"
 
-  python - "${repo_name}" <<'PY'
+  "${python_executable}" - "${repo_name}" <<'PY'
 import re
 import sys
 from pathlib import Path
@@ -176,7 +186,7 @@ fi
 # torch_tensorrt and the native runner both need TensorRT/PyTorch shared
 # libraries on the runtime path. Set this before importing torch_tensorrt or
 # exporting the .pte model.
-torch_lib_dir="$(python - <<'PY'
+torch_lib_dir="$("${python_executable}" - <<'PY'
 import os
 import torch
 
@@ -191,28 +201,31 @@ else
 fi
 
 # Fail early if the Python environment cannot export a Torch-TensorRT
-# ExecuTorch model.
-python - <<'PY'
+# ExecuTorch model or run ExecuTorch's CMake codegen.
+if ! "${python_executable}" - <<'PY'
 import importlib
 import importlib.util
 
 missing = [
     name
-    for name in ("torch", "torch_tensorrt", "executorch.exir")
+    for name in ("yaml", "torch", "torch_tensorrt", "executorch.exir")
     if importlib.util.find_spec(name) is None
 ]
 if missing:
     raise SystemExit(
-        "Missing Python package(s) required to export the .pte: "
+        "Missing Python package(s) required to export the .pte and build the runner: "
         + ", ".join(missing)
     )
 
-for name in ("torch", "torch_tensorrt", "executorch.exir"):
+for name in ("yaml", "torch", "torch_tensorrt", "executorch.exir"):
     importlib.import_module(name)
 PY
+then
+  exit 1
+fi
 
 model_path="${verify_root}/model.pte"
-python examples/torchtrt_executorch_example/export_static_shape.py --model_path="${model_path}"
+"${python_executable}" examples/torchtrt_executorch_example/export_static_shape.py --model_path="${model_path}"
 test -f "${model_path}"
 
 tar -xzf "${tarball}" -C "${verify_root}"
@@ -233,7 +246,7 @@ fi
 export TORCHTRT_EXECUTORCH_SOURCE_DIR="${verify_root}/libtorchtrt_executorch"
 
 if [[ -z "${CMAKE_PREFIX_PATH:-}" ]]; then
-  CMAKE_PREFIX_PATH="$(python -c "import torch; print(torch.utils.cmake_prefix_path)")"
+  CMAKE_PREFIX_PATH="$("${python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)")"
   export CMAKE_PREFIX_PATH
 fi
 
@@ -245,6 +258,7 @@ cmake_args=(
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}"
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}"
   -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+  -DPYTHON_EXECUTABLE="${python_executable}"
 )
 
 if [[ -n "${TensorRT_ROOT:-}" ]]; then
