@@ -472,6 +472,8 @@ def inline_trt_modules(
             continue
         # Get the TRT submodule
         trt_module = getattr(gm, name)
+        if trt_module._use_python_runtime:
+            raise ValueError("Python runtime is not supported for serialization")
 
         # Ensure the trt module node in the main graph (gm) has inputs
         trt_module_node = [node for node in gm.graph.nodes if node.name == name]
