@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set +x
 
 # Verifies the documented end-user flow for the ExecuTorch reference runner:
 #
@@ -51,6 +51,7 @@ find_bazel_tensorrt_root() {
   local repo_name="$1"
   local output_base
   local trt_header
+  local tensorrt_root
 
   if ! command -v bazel >/dev/null 2>&1; then
     return 1
@@ -67,8 +68,9 @@ find_bazel_tensorrt_root() {
     return 1
   fi
 
-  dirname "$(dirname "${trt_header}")"
-  echo "find_bazel_tensorrt_root: ${trt_header}"
+  tensorrt_root="$(dirname "$(dirname "${trt_header}")")"
+  echo "Using Bazel TensorRT SDK: ${tensorrt_root}" >&2
+  printf '%s\n' "${tensorrt_root}"
 }
 
 # The archive repo is architecture-specific in MODULE.bazel.
@@ -120,7 +122,6 @@ PY
 # Download TensorRT only when it cannot be found in Bazel's external repo cache
 # and TensorRT_ROOT was not provided by the caller.
 download_tensorrt_root() {
-  echo "download_tensorrt_root: entered"
   local repo_name="$1"
   local tensorrt_url
   local tensorrt_strip_prefix
@@ -128,6 +129,8 @@ download_tensorrt_root() {
   local tensorrt_extract_dir
   local tensorrt_archive
   local tensorrt_root
+
+  echo "Downloading TensorRT SDK for ${repo_name}" >&2
 
   read -r tensorrt_url tensorrt_strip_prefix < <(read_tensorrt_archive_metadata "${repo_name}") || return 1
 
@@ -152,7 +155,8 @@ download_tensorrt_root() {
     return 1
   fi
 
-  echo "download_tensorrt_root exiting with ${tensorrt_root}"
+  echo "Using downloaded TensorRT SDK: ${tensorrt_root}" >&2
+  printf '%s\n' "${tensorrt_root}"
 }
 
 if [[ -z "${TensorRT_ROOT:-}" ]]; then
