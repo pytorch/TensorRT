@@ -126,8 +126,6 @@ Runtime Errors
       the engine. Upgrade TRT or rebuild with ``version_compatible=True``.
     * The GPU compute capability is lower than on the build machine. Rebuild with
       ``hardware_compatible=True`` (requires Ampere or newer).
-    * The ``.ep`` file was generated with ``use_python_runtime=True`` which is not
-      serializable. Rebuild with the default C++ runtime.
 
 **Shape mismatch at runtime / "Invalid input shape"**
 
@@ -153,9 +151,9 @@ Runtime Errors
     The model contains data-dependent-shape ops (``nonzero``, ``unique``,
     ``masked_select``, etc.) which require TRT's output allocator.
 
-    * Use ``PythonTorchTensorRTModule`` (``use_python_runtime=True``) — it
-      activates the dynamic output allocator automatically via
-      ``requires_output_allocator=True``.
+    * Use :class:`~torch_tensorrt.runtime.TorchTensorRTModule` (or a compiled graph that wraps it)
+      with ``requires_output_allocator=True`` so the runtime can use TRT's output allocator
+      when the engine needs dynamic output allocation.
     * See :ref:`cuda_graphs` for ``DynamicOutputAllocator`` details.
 
 ----

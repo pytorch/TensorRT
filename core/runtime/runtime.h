@@ -43,6 +43,8 @@ typedef enum {
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
+// For adding new serialized info indices, above and update /dynamo/runtime/_serialized_engine_layout.py
+
 std::string base64_encode(const std::string& in);
 std::string base64_decode(const std::string& in);
 std::string serialize_bindings(const std::vector<std::string>& bindings);

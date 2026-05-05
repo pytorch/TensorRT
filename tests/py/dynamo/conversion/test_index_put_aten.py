@@ -504,7 +504,6 @@ class TestIndexPutConverter(DispatchTestCase):
             min_block_size=1,
             use_fp32_acc=False,
             disable_tf32=True,
-            use_python_runtime=True,
         )
         result = trt_engine(source_tensor, indices_tensor, value_tensor)
 

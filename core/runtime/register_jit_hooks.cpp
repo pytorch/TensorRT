@@ -101,6 +101,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
                           : TRTEngine::ResourceAllocationStrategy::kStatic);
             })
         .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
+        .def_readwrite("pre_allocated_outputs", &TRTEngine::pre_allocated_outputs)
         .def_readwrite("use_output_allocator_outputs", &TRTEngine::use_output_allocator_outputs)
         .def_property(
             "device_memory_budget",
