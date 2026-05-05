@@ -19,6 +19,7 @@ def trace(
     *,
     arg_inputs: Optional[Tuple[Any, ...]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
+    dynamic_shapes: Optional[Any] = None,
     **kwargs: Any,
 ) -> torch.export.ExportedProgram:
     """Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT
@@ -73,12 +74,14 @@ def trace(
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)
     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
-    # Build dynamic shapes from the Input objects. Inputs carrying shared_dims
-    # share a Dim across inputs via the registry; the rest get an independent
-    # per-input Dim.
-    dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
-    dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs, dim_registry)
-    dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry))
+    if dynamic_shapes is None:
+        # Build dynamic shapes from the Input objects. Inputs carrying shared_dims
+        # share a Dim across inputs via the registry; the rest get an independent
+        # per-input Dim. Explicit dynamic_shapes, when provided, pass through
+        # unchanged and take precedence.
+        dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
+        dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs, dim_registry)
+        dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry))
     exp_program = export(
         mod,
         tuple(torch_arg_inputs),
