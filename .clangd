@@ -1,0 +1,9 @@
+# clangd configuration for the Bazel-driven C++ build.
+#
+# Requires a compile_commands.json at the workspace root. Generate it with:
+#     bazel run //:refresh_compile_commands
+#
+# See CONTRIBUTING.md ("Editor / clangd setup") for the full workflow.
+
+CompileFlags:
+  CompilationDatabase: .
