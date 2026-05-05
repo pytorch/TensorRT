@@ -65,7 +65,6 @@ print("Refit successfully!")
 # Saving Mutable Torch TensorRT Module
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-# Saving requires a C++-runtime compiled graph (see MutableTorchTensorRTModule.save).
 torch_trt.MutableTorchTensorRTModule.save(mutable_module, "mutable_module.pkl")
 reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
 

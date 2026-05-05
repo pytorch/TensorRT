@@ -537,7 +537,7 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(
+        return dynamo_convert_exported_program_to_serialized_trt_engine(  # type: ignore[no-any-return]
             exp_program,
             arg_inputs=tuple(normalized_arg_inputs),
             kwarg_inputs=torchtrt_kwarg_inputs,
@@ -598,18 +598,8 @@ def load(
             extra_files=extra_files,
             **kwargs,
         )
-        # Handle legacy cross-compiled archives that use no_op_placeholder nodes
-        gm = exp_program.graph_module
-        if any(
-            "no_op_placeholder_for_execute_engine" in n.name for n in gm.graph.nodes
-        ):
-            from torch_tensorrt.dynamo._exporter import (
-                replace_execute_engine_no_op_node,
-            )
-
-            return replace_execute_engine_no_op_node(exp_program)
-
         return exp_program
+
     except Exception:
         import traceback
 
@@ -818,8 +808,8 @@ def save(
                     f"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: {dynamic_shapes}"
                 )
 
-        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))
-        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())
+        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))  # type: ignore[arg-type]
+        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())  # type: ignore[assignment]
 
     else:
         # Mixed case: some inputs are Tensors, some are Input objects
@@ -1282,34 +1272,38 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:
-    """Convert C++ ``torch.classes.tensorrt.Engine`` constants to Python ``TRTEngine``.
+    pass
 
-    The C++ runtime stores engine constants as ``torch._C.ScriptObject``
-    (``torch.classes.tensorrt.Engine``).  Python ``TRTEngine`` is registered as
-    an opaque type so ``torch.export`` can serialise it with ``pickle``.  By
-    converting before save the artifact is portable across both runtimes.
-    """
-    import base64
 
-    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
-    from torch_tensorrt.dynamo.runtime._TRTEngine import (
-        EngineSerializer,
-        TRTEngine,
-    )
+# TODO: Uncomment this when cross serialization is enabled
+#     """Convert C++ ``torch.classes.tensorrt.Engine`` constants to Python ``TRTEngine``.
 
-    for fqn, constant in list(exp_program.constants.items()):
-        if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):
+#     The C++ runtime stores engine constants as ``torch._C.ScriptObject``
+#     (``torch.classes.tensorrt.Engine``).  Python ``TRTEngine`` is registered as
+#     an opaque type so ``torch.export`` can serialise it with ``pickle``.  By
+#     converting before save the artifact is portable across both runtimes.
+#     """
+#     import base64
 
-            state = constant.__getstate__()
-            if len(state) == 2 and (
-                state[1] == "TRTEngine"
-                or state[1] == "__torch__.torch.classes.tensorrt.Engine"
-            ):
-                serialized_info = list(state[0])
-                serialized_info[ENGINE_IDX] = base64.b64decode(
-                    serialized_info[ENGINE_IDX]
-                )
-                exp_program.constants[fqn] = EngineSerializer(serialized_info)
+#     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
+#     from torch_tensorrt.dynamo.runtime._TRTEngine import (
+#         EngineSerializer,
+#         TRTEngine,
+#     )
+
+#     for fqn, constant in list(exp_program.constants.items()):
+#         if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):
+
+#             state = constant.__getstate__()
+#             if len(state) == 2 and (
+#                 state[1] == "TRTEngine"
+#                 or state[1] == "__torch__.torch.classes.tensorrt.Engine"
+#             ):
+#                 serialized_info = list(state[0])
+#                 serialized_info[ENGINE_IDX] = base64.b64decode(
+#                     serialized_info[ENGINE_IDX]
+#                 )
+#                 exp_program.constants[fqn] = EngineSerializer(serialized_info)
 
 
 #
