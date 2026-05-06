@@ -648,14 +648,7 @@ void TRTEngine::release_nccl_comm() {
   LOG_INFO("Releasing NCCL communicator from engine '" << this->name << "'");
   torch::cuda::synchronize(device_info.id);
   this->exec_ctx.reset();
-  if (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic) {
-    this->exec_ctx =
-        make_trt(cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED));
-  } else {
-    this->exec_ctx = make_trt(cuda_engine->createExecutionContext());
-  }
-  TORCHTRT_CHECK(
-      (exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context after releasing NCCL comm");
+  recreate_execution_context();
   this->nccl_initialized = false;
   LOG_INFO("NCCL communicator released from engine '" << this->name << "'");
 }
