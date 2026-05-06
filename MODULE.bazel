@@ -27,6 +27,14 @@ new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.
 
 local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 
+local_executorch = use_repo_rule("//toolchains:local_executorch.bzl", "local_executorch")
+
+# Detect ExecuTorch from the active Python environment (VIRTUAL_ENV / CONDA_PREFIX / PATH).
+# Supports both pip-installed wheel layout and source-tree layout.
+# Optional overrides:
+#   EXECUTORCH_ROOT=/path/to/executorch
+local_executorch(name = "executorch")
+
 torch_nccl_detect = use_repo_rule("//toolchains/torch_nccl:defs.bzl", "torch_nccl_detect")
 
 torch_nccl_detect(name = "torch_nccl")
