@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../_static/documentation_options.js?v=77cef958"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -534,8 +534,7 @@ trigger JIT kernel selection:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
-<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-                                   <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># use model/input dtypes</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Warm up — these runs don&#39;t count</span>
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
@@ -579,20 +578,18 @@ Use <a class="reference internal" href="../tutorials/compilation_analysis/dryrun
 <h2>Using the Right Precision<a class="headerlink" href="#using-the-right-precision" title="Link to this heading">#</a></h2>
 <p>The single biggest speedup lever is precision. TRT can run in FP32, FP16, BF16,
 INT8, or FP8 — but only if you tell it to.</p>
-<p><strong>Explicit typing (recommended)</strong> — cast your model and inputs to the target dtype:</p>
+<p><strong>Explicit typing (strong typing, always enabled)</strong> — cast your model and inputs to the target dtype:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># FP16: cast model weights and inputs</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">inp</span><span class="o">.</span><span class="n">half</span><span class="p">()</span> <span class="k">for</span> <span class="n">inp</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">]</span>
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># default; TRT respects the dtypes in the model</span>
 <span class="p">)</span>
 </pre></div>
 </div>
 <p><strong>Autocast</strong> — let Torch-TensorRT automatically lower eligible layers to a reduced precision:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">enable_autocast</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">autocast_low_precision_type</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
 <span class="p">)</span>
@@ -616,11 +613,11 @@ INT8, or FP8 — but only if you tell it to.</p>
 <td><p>Accuracy-critical, no speedup vs PyTorch</p></td>
 </tr>
 <tr class="row-odd"><td><p>FP16</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">model.half()</span></code> + <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.half()</span></code> + inputs in FP16</p></td>
 <td><p>Standard choice; 2–3× speedup on Volta+</p></td>
 </tr>
 <tr class="row-even"><td><p>BF16</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">model.bfloat16()</span></code> + <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.bfloat16()</span></code> + inputs in BF16</p></td>
 <td><p>Better numerical range than FP16; Ampere+</p></td>
 </tr>
 <tr class="row-odd"><td><p>FP16 mixed (autocast)</p></td>
@@ -628,11 +625,11 @@ INT8, or FP8 — but only if you tell it to.</p>
 <td><p>Automatically keeps sensitive layers in FP32</p></td>
 </tr>
 <tr class="row-even"><td><p>INT8 (with calibration)</p></td>
-<td><p>ModelOpt QDQ nodes + <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code></p></td>
+<td><p>ModelOpt QDQ nodes</p></td>
 <td><p>Highest throughput; requires ModelOpt quantization</p></td>
 </tr>
 <tr class="row-odd"><td><p>FP8 (Hopper+)</p></td>
-<td><p>ModelOpt FP8 QDQ nodes + <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code></p></td>
+<td><p>ModelOpt FP8 QDQ nodes</p></td>
 <td><p>Best accuracy–throughput tradeoff for LLMs on H100</p></td>
 </tr>
 </tbody>
@@ -715,8 +712,7 @@ produces fewer, larger TRT blocks (slower to compile).</p></li>
 eliminate kernel launch overhead by recording the CUDA op sequence and replaying it:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
-<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-                                   <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
     <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">cg_model</span><span class="p">:</span>
@@ -744,7 +740,6 @@ the compiled engine to disk so subsequent runs skip the compilation step:</p>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
@@ -760,7 +755,6 @@ the compiled engine to disk so subsequent runs skip the compilation step:</p>
 weights on-demand from CPU. This reduces peak GPU memory at the cost of some throughput:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="c1"># enable weight streaming at compile time</span>
     <span class="n">enable_weight_streaming</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
@@ -823,7 +817,7 @@ compare the kernel timelines for the TRT model vs the baseline.</p>
 <td><p>Warm up the baseline model the same way</p></td>
 </tr>
 <tr class="row-even"><td><p>☐</p></td>
-<td><p>Use FP16 precision (<code class="docutils literal notranslate"><span class="pre">model.half()</span></code> + <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>, or <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code>) unless you need FP32</p></td>
+<td><p>Use FP16 precision (<code class="docutils literal notranslate"><span class="pre">model.half()</span></code> with FP16 inputs, or <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code>) unless you need FP32</p></td>
 </tr>
 <tr class="row-odd"><td><p>☐</p></td>
 <td><p>Run <code class="docutils literal notranslate"><span class="pre">dryrun=True</span></code> to confirm TRT coverage is high</p></td>

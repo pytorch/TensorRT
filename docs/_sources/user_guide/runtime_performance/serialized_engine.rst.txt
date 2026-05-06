@@ -40,7 +40,6 @@ Basic Usage
     engine_bytes: bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
         exported,
         arg_inputs=inputs,
-        enabled_precisions={torch.float16},
     )
 
     # Save to disk
@@ -68,7 +67,6 @@ Pass ``torch_tensorrt.Input`` objects to specify min/opt/max shape ranges:
                 dtype=torch.float32,
             )
         ],
-        enabled_precisions={torch.float16},
     )
 
 ----
@@ -138,10 +136,6 @@ relevant for this API:
 ``inputs`` / ``arg_inputs``
     Input shape specifications. Accepts ``torch.Tensor`` (static shape inferred),
     ``torch_tensorrt.Input`` (explicit static or dynamic ranges), or a mix.
-
-``enabled_precisions``
-    Set of ``torch.dtype`` values TRT may use. Add ``torch.float16`` or
-    ``torch.bfloat16`` for reduced-precision inference.
 
 ``immutable_weights``
     Default ``True``. Set to ``False`` to produce a refittable engine whose weights

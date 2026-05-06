@@ -112,7 +112,7 @@
       },
       "outputs": [],
       "source": [
-        "torch._dynamo.mark_dynamic(input_ids, 1, min=2, max=1023)\nmodel.forward = torch.compile(\n    model.forward,\n    backend=\"tensorrt\",\n    dynamic=None,\n    options={\n        \"enabled_precisions\": {torch.float32},\n        \"disable_tf32\": True,\n        \"min_block_size\": 1,\n    },\n)"
+        "torch._dynamo.mark_dynamic(input_ids, 1, min=2, max=1023)\nmodel.forward = torch.compile(\n    model.forward,\n    backend=\"tensorrt\",\n    dynamic=None,\n    options={\n        \"disable_tf32\": True,\n        \"min_block_size\": 1,\n    },\n)"
       ]
     },
     {

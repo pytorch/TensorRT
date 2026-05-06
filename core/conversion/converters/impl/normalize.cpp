@@ -42,9 +42,11 @@ void create_plugin(
     }
   }
 
-  auto creator = getPluginRegistry()->getPluginCreator("NormalizePlugin", "1", "torch_tensorrt");
-  auto plugin = creator->createPlugin(name, &fc);
-  auto normalize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+  auto creator = static_cast<nvinfer1::IPluginCreatorV3One*>(
+      getPluginRegistry()->getCreator("NormalizePlugin", "1", "torch_tensorrt"));
+  auto plugin = creator->createPlugin(name, &fc, nvinfer1::TensorRTPhase::kBUILD);
+  auto normalize_layer =
+      ctx->net->addPluginV3(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, nullptr, 0, *plugin);
   TORCHTRT_CHECK(normalize_layer, "Unable to create normalization plugin from node" << *n);
 
   normalize_layer->setName(util::node_info(n).c_str());

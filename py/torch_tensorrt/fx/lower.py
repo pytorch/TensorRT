@@ -158,7 +158,6 @@ def default_split_function(
     model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting
 ) -> SplitResult:
     splitter_setting = TRTSplitterSetting()
-    splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
     splitter_setting.min_acc_module_size = lower_setting.min_acc_module_size
     splitter_setting.use_experimental_rt = lower_setting.use_experimental_rt
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)

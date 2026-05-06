@@ -258,7 +258,6 @@ trt_model = torch_tensorrt.dynamo.compile(
     exp_program,
     inputs=torchtrt_inputs,
     min_block_size=1,
-    enabled_precisions={torch.float16},
     use_fp32_acc=True,
 )
 

@@ -44,7 +44,6 @@ class Test64BitSupport(TestCase):
             use_python_runtime=False,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
@@ -85,7 +84,6 @@ class Test64BitSupport(TestCase):
             use_python_runtime=True,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
@@ -132,7 +130,6 @@ class Test64BitSupport(TestCase):
             use_python_runtime=False,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
@@ -174,7 +171,6 @@ class Test64BitSupport(TestCase):
             use_python_runtime=True,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
@@ -229,7 +225,6 @@ class TestBF16Support(TestCase):
             use_python_runtime=False,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
@@ -269,7 +264,6 @@ class TestBF16Support(TestCase):
             use_python_runtime=True,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
@@ -307,7 +301,6 @@ class TestBF16Support(TestCase):
                 device=device,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
-                use_explicit_typing=True,
             )
 
             torch_model_results = mod(*inputs)

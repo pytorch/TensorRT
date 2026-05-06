@@ -4,7 +4,7 @@ import torch
 import torch.fx
 import torch.nn as nn
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops  # noqa: F401
-from torch.testing._internal.common_utils import run_tests, TestCase
+from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.fx.tools.trt_splitter import create_trt_operator_support
 from torch_tensorrt.fx.tracer.acc_tracer import acc_ops, acc_tracer
 
@@ -35,7 +35,7 @@ class TestTRTOperatorSupport(TestCase):
 
         mod = TestModule()
         traced_mod = acc_tracer.trace(mod, [torch.randn(5, 2)])
-        op_support = create_trt_operator_support(use_implicit_batch_dim=False)
+        op_support = create_trt_operator_support()
 
         for node in traced_mod.graph.nodes:
             if node.target == acc_ops.add:
@@ -51,13 +51,11 @@ class TestTRTOperatorSupport(TestCase):
 
         mod = TestModule()
         traced_mod = acc_tracer.trace(mod, [torch.randn(5, 2)])
-        op_support = create_trt_operator_support(use_implicit_batch_dim=True)
+        op_support = create_trt_operator_support()
 
         for node in traced_mod.graph.nodes:
             if node.target == acc_ops.add:
                 self.assertTrue(op_support.is_node_supported(mod, node))
-            elif node.target == acc_ops.gelu:
-                self.assertFalse(op_support.is_node_supported(mod, node))
 
     def test_support_node_with_int_attr(self):
         class TestModule(nn.Module):
@@ -69,7 +67,7 @@ class TestTRTOperatorSupport(TestCase):
 
         mod = TestModule()
         traced_mod = acc_tracer.trace(mod, [torch.randn(5, 2)])
-        op_support = create_trt_operator_support(use_implicit_batch_dim=True)
+        op_support = create_trt_operator_support()
 
         for node in traced_mod.graph.nodes:
             if node.target == acc_ops.quantize_per_tensor:

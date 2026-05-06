@@ -40,7 +40,7 @@
       },
       "outputs": [],
       "source": [
-        "settings = {\n    \"ir\": \"dynamo\",\n    \"use_python_runtime\": False,\n    \"enabled_precisions\": {torch.float32},\n    \"immutable_weights\": False,\n    \"lazy_engine_init\": True,\n    \"dynamically_allocate_resources\": True,\n}\n\nmodel = models.resnet152(pretrained=True).eval().to(\"cuda\")\ncompiled_module = torch_trt.compile(model, inputs=inputs, **settings)\nprint((torch.cuda.mem_get_info()[1] - torch.cuda.mem_get_info()[0]) / 1024**3)\ncompiled_module(*inputs)"
+        "settings = {\n    \"ir\": \"dynamo\",\n    \"use_python_runtime\": False,\n    \"immutable_weights\": False,\n    \"lazy_engine_init\": True,\n    \"dynamically_allocate_resources\": True,\n}\n\nmodel = models.resnet152(pretrained=True).eval().to(\"cuda\")\ncompiled_module = torch_trt.compile(model, inputs=inputs, **settings)\nprint((torch.cuda.mem_get_info()[1] - torch.cuda.mem_get_info()[0]) / 1024**3)\ncompiled_module(*inputs)"
       ]
     },
     {

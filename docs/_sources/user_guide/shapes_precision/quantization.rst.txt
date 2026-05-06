@@ -56,8 +56,7 @@ the quantization scales using a small calibration dataset:
 
 **Step 2 — Compile with Torch-TensorRT**
 
-Pass the quantized model (with QDQ nodes) to the Torch-TensorRT compiler together with
-the matching precision in ``enabled_precisions``:
+Pass the quantized model (with QDQ nodes) to the Torch-TensorRT compiler:
 
 .. code-block:: python
 
@@ -70,7 +69,6 @@ the matching precision in ``enabled_precisions``:
         model,
         ir="dynamo",
         arg_inputs=inputs,
-        enabled_precisions={torch.int8},
         min_block_size=1,
     )
 
@@ -79,7 +77,6 @@ the matching precision in ``enabled_precisions``:
         model,
         ir="dynamo",
         arg_inputs=inputs,
-        enabled_precisions={torch.float8_e4m3fn},
         min_block_size=1,
     )
 
@@ -107,7 +104,6 @@ TensorRT ≥ 10.8 and a Blackwell GPU.
         model,
         ir="dynamo",
         arg_inputs=inputs,
-        enabled_precisions={torch.float4_e2m1fn_x2},
         min_block_size=1,
     )
 
@@ -129,7 +125,6 @@ When using the ``torch.export`` → ``dynamo.compile`` path, wrap the export ste
     trt_gm = torch_tensorrt.dynamo.compile(
         exp_program,
         arg_inputs=inputs,
-        enabled_precisions={torch.int8},
     )
 
 ``MutableTorchTensorRTModule`` handles the ``export_torch_mode`` context automatically
@@ -149,7 +144,6 @@ Quantization also works with ``torch.compile``:
         model,  # already quantized with ModelOpt
         backend="torch_tensorrt",
         options={
-            "enabled_precisions": {torch.int8},
             "min_block_size": 1,
         },
     )
@@ -187,7 +181,6 @@ quantized layers were included:
     trt_gm = torch_tensorrt.dynamo.compile(
         exp_program,
         arg_inputs=inputs,
-        enabled_precisions={torch.int8},
         dryrun=True,
     )
 
@@ -197,23 +190,19 @@ Supported Precision / Hardware Matrix
 ---------------------------------------
 
 .. list-table::
-   :widths: 15 30 30 25
+   :widths: 20 40 40
    :header-rows: 1
 
    * - Precision
-     - ``enabled_precisions`` value
      - Minimum GPU
      - TRT requirement
    * - INT8
-     - ``torch.int8`` or ``torch_tensorrt.dtype.int8``
      - Any TRT-capable GPU
      - Any supported TRT version
    * - FP8
-     - ``torch.float8_e4m3fn`` or ``torch_tensorrt.dtype.fp8``
      - NVIDIA Hopper (H100+)
      - TRT ≥ 8.6
    * - FP4 (NVFP4)
-     - ``torch.float4_e2m1fn_x2`` or ``torch_tensorrt.dtype.fp4``
      - NVIDIA Blackwell (B100+)
      - TRT ≥ 10.8
 
@@ -228,8 +217,7 @@ Troubleshooting
     before calling ``mtq.quantize``.
 
 **QDQ nodes fall back to PyTorch (not TRT)**
-    Check that ``enabled_precisions`` includes the matching dtype. Also verify
-    ``min_block_size`` is not too large — use ``dryrun=True`` to inspect coverage.
+    Verify ``min_block_size`` is not too large — use ``dryrun=True`` to inspect coverage.
 
 **"TensorRT-RTX does not support int8 activation quantization"**
     INT8 activation quantization (``input_quantizer`` nodes) is not supported by

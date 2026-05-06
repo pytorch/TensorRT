@@ -48,12 +48,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-        if explicit_batch_dimension:
-            EXPLICIT_BATCH = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH
-            )
-            flag |= EXPLICIT_BATCH
-
         if explicit_precision:
             EXPLICIT_PRECISION = 1 << (int)(
                 trt.NetworkDefinitionCreationFlag.EXPLICIT_PRECISION
@@ -185,18 +179,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.output_fp16 = (
             not force_fp32_output and lower_precision == LowerPrecision.FP16
         )
-
-        if (
-            lower_precision == LowerPrecision.INT8
-            and not self.builder.platform_has_fast_int8
-        ):
-            raise RuntimeError("Current platform doesn't support fast native int8!")
-
-        if (
-            lower_precision == LowerPrecision.FP16
-            and not self.builder.platform_has_fast_fp16
-        ):
-            warnings.warn("Current platform doesn't support fast native fp16!")
 
         self.input_specs_iter = 0
         run_module_start_time = datetime.now()

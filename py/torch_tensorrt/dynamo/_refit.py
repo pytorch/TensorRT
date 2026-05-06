@@ -199,9 +199,18 @@ def _refit_single_trt_engine_with_gm(
                     weight_dtype, weight.data_ptr(), torch.numel(weight)
                 )
                 refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-            assert (
-                len(refitter.get_missing_weights()) == 0
-            ), "Fast refitting failed due to incomplete mapping"
+            # Check completeness via two methods:
+            # 1. get_missing_weights(): reports weights in connected engines
+            #    that were not set.
+            # 2. Compare weights actually set vs all engine weights: catches
+            #    weights in independent engines that get_missing_weights() may not report.
+            missing_weights = refitter.get_missing_weights()
+            unset_weights = {w for w in weight_list if w not in mapping}
+            assert len(missing_weights) == 0 and len(unset_weights) == 0, (
+                f"Fast refitting failed due to incomplete mapping"
+                f" ({len(missing_weights)} missing,"
+                f" {len(unset_weights)} unset)"
+            )
 
         else:
             mapping = construct_refit_mapping(new_gm, input_list, settings)

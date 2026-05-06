@@ -78,7 +78,6 @@ model.forward = torch.compile(
     backend="tensorrt",
     dynamic=None,
     options={
-        "enabled_precisions": {torch.float32},
         "disable_tf32": True,
         "min_block_size": 1,
     },

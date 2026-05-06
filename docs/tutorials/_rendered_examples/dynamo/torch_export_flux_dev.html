@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -709,11 +709,9 @@ ep = _export(
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>trt_gm = torch_tensorrt.dynamo.compile(
     ep,
     inputs=dummy_inputs,
-    enabled_precisions={torch.float32},
     truncate_double=True,
     min_block_size=1,
     use_fp32_acc=True,
-    use_explicit_typing=True,
     immutable_weights=False,
     offload_module_to_cpu=True,
 )
@@ -765,7 +763,7 @@ generate_image(pipe, [&quot;A golden retriever holding a sign to code&quot;], &q
 </div>
 </div>
 <p>The generated image is as shown below</p>
-<p><img alt="a6fc6a60d34243b887cfe27d969feae9" src="file://dog_code.png" /></p>
+<p><img alt="99645f001dbd4048bb84c55bfac34024" src="file://dog_code.png" /></p>
 </section>
 </section>
 

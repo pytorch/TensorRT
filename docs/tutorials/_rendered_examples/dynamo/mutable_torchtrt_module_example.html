@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -619,7 +619,6 @@ inputs = [torch.rand((1, 3, 224, 224)).to(&quot;cuda&quot;)]
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>settings = {
     &quot;use_python_runtime&quot;: False,
-    &quot;enabled_precisions&quot;: {torch.float32},
     &quot;immutable_weights&quot;: False,
 }
 
@@ -679,7 +678,6 @@ reload = torch_trt.MutableTorchTensorRTModule.load(&quot;mutable_module.pkl&quot
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>with torch.no_grad():
     settings = {
         &quot;use_python_runtime&quot;: True,
-        &quot;enabled_precisions&quot;: {torch.float16},
         &quot;immutable_weights&quot;: False,
     }
 
@@ -819,7 +817,6 @@ example_inputs = (torch.randn((100, 3, 224, 224)).to(&quot;cuda&quot;),)
 model = torch_trt.MutableTorchTensorRTModule(
     model,
     use_python_runtime=True,
-    enabled_precisions={torch.float},
     min_block_size=1,
     immutable_weights=False,
     cache_built_engines=True,

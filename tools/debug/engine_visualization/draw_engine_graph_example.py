@@ -22,7 +22,6 @@ with torch_tensorrt.dynamo.Debugger(
     trt_gm = torch_tensorrt.dynamo.compile(
         exp_program,
         inputs=inputs,
-        enabled_precisions={torch.float},
         truncate_double=True,
         use_python_runtime=False,
         min_block_size=1,

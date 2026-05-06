@@ -9,6 +9,7 @@ set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/execute_engine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/register_jit_hooks.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Platform.cpp"
 )
 

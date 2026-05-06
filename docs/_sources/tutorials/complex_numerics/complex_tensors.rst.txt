@@ -94,7 +94,6 @@ contains complex-valued nodes:
     trt_gm = torch_tensorrt.dynamo.compile(
         exp_program,
         arg_inputs=[x, freqs],
-        use_explicit_typing=True,  # enabled_precisions deprecated
         min_block_size=1,
     )
 

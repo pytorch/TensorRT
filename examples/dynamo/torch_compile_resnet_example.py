@@ -25,10 +25,6 @@ inputs = [torch.randn((1, 3, 224, 224)).to("cuda").half()]
 # Optional Input Arguments to `torch_tensorrt.compile`
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-# Enabled precision for TensorRT optimization
-enabled_precisions = {torch.half}
-
-
 # Workspace size for TensorRT
 workspace_size = 20 << 30
 
@@ -48,8 +44,6 @@ optimized_model = torch_tensorrt.compile(
     model,
     ir="torch_compile",
     inputs=inputs,
-    use_explicit_typing=False,
-    enabled_precisions=enabled_precisions,
     workspace_size=workspace_size,
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,
@@ -57,7 +51,7 @@ optimized_model = torch_tensorrt.compile(
 
 # %%
 # Equivalently, we could have run the above via the torch.compile frontend, as so:
-# `optimized_model = torch.compile(model, backend="torch_tensorrt", options={"enabled_precisions": enabled_precisions, ...}); optimized_model(*inputs)`
+# `optimized_model = torch.compile(model, backend="torch_tensorrt", options={...}); optimized_model(*inputs)`
 
 # %%
 # Inference
@@ -87,8 +81,6 @@ optimized_model = torch_tensorrt.compile(
     model,
     ir="torch_compile",
     inputs=inputs_bs8,
-    use_explicit_typing=False,
-    enabled_precisions=enabled_precisions,
     workspace_size=workspace_size,
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,
@@ -113,8 +105,6 @@ compile_spec = {
             dtype=torch.half,
         )
     ],
-    "use_explicit_typing": False,
-    "enabled_precisions": enabled_precisions,
     "ir": "dynamo",
 }
 trt_model = torch_tensorrt.compile(model, **compile_spec)

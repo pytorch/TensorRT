@@ -26,7 +26,6 @@ def _compile_simple(**extra_kwargs):
     kwargs = {
         "ir": "dynamo",
         "inputs": inputs,
-        "enabled_precisions": {torch.float32},
         "use_python_runtime": True,
         "min_block_size": 1,
     }

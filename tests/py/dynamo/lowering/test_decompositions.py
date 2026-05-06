@@ -1855,7 +1855,6 @@ class TestLowering(TestCase):
             exported_program,
             inputs,
             min_block_size=1,
-            use_explicit_typing=True,
             decompose_attention=True,
         )
         torch.testing.assert_close(
@@ -1955,7 +1954,6 @@ class TestLowering(TestCase):
             exported_program,
             inputs,
             min_block_size=1,
-            use_explicit_typing=True,
             decompose_attention=True,
         )
 
@@ -2029,7 +2027,6 @@ class TestLowering(TestCase):
             exported_program,
             inputs,
             min_block_size=1,
-            use_explicit_typing=True,
             decompose_attention=True,
         )
         torch.testing.assert_close(
@@ -2098,7 +2095,6 @@ class TestLowering(TestCase):
             exported_program,
             inputs,
             min_block_size=1,
-            use_explicit_typing=True,
             decompose_attention=True,
         )
         torch.testing.assert_close(
@@ -2167,7 +2163,6 @@ class TestLowering(TestCase):
             exported_program,
             inputs,
             min_block_size=1,
-            use_explicit_typing=True,
             decompose_attention=True,
         )
         torch.testing.assert_close(

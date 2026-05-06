@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -783,14 +783,9 @@ with torch.no_grad():
         input_tensor = images.cuda()
 
         exp_program = torch.export.export(model, (input_tensor,), strict=False)
-        if args.quantize_type == &quot;int8&quot;:
-            enabled_precisions = {torch.int8}
-        elif args.quantize_type == &quot;fp8&quot;:
-            enabled_precisions = {torch.float8_e4m3fn}
         trt_model = torchtrt.dynamo.compile(
             exp_program,
             inputs=[input_tensor],
-            enabled_precisions=enabled_precisions,
             min_block_size=1,
         )
         # You can also use torch compile path to compile the model with Torch-TensorRT:

@@ -25,19 +25,13 @@ Three Precision Modes
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 20 20
+   :widths: 40 60
 
    * - Mode
-     - ``use_explicit_typing``
      - ``enable_autocast``
-   * - User-defined per-layer precision
-     - ``True``
-     - ``False``
-   * - TRT weak typing (deprecated)
-     - ``False``
-     - ``False``
-   * - Autocast (rule-based)
-     - ``True``
+   * - User-defined per-layer precision (strong typing, always on)
+     - ``False`` (default)
+   * - Autocast (rule-based mixed precision)
      - ``True``
 
 The autocast mode is the focus of this page.
@@ -53,7 +47,6 @@ User API
         exported_program.module(),
         arg_inputs=inputs,
         min_block_size=1,
-        use_explicit_typing=True,
         enable_autocast=True,
         low_precision_type=torch.float16,   # target low-precision dtype
         nodes_to_exclude={"^conv2d$"},       # regex patterns → keep fp32

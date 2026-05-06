@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -488,7 +488,6 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span><span class="p">,</span> <span class="n">needs_cross_compile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">_defaults</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">,</span>
 <span class="p">)</span>
@@ -704,10 +703,9 @@ document.write(`
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">input_list</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="c1"># Default for legacy FX/TS frontends; not used for the Dynamo path</span>
     <span class="n">enabled_precisions_set</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="n">enabled_precisions</span>
-        <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="k">else</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span>
+        <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">}</span>
     <span class="p">)</span>
 
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
@@ -798,17 +796,20 @@ document.write(`
                 <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span>
                 <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
             <span class="p">)</span>
+        <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;`enabled_precisions` is deprecated for the Dynamo path. Strong typing is always enabled; precision is controlled by the model&#39;s graph dtypes.&quot;</span><span class="p">,</span>
+                <span class="ne">DeprecationWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
         <span class="n">trt_graph_module</span> <span class="o">=</span> <span class="n">dynamo_compile</span><span class="p">(</span>
             <span class="n">exp_program</span><span class="p">,</span>
             <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torchtrt_arg_inputs</span><span class="p">,</span>
-            <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">trt_graph_module</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">torch_compile</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">torch_compile</span><span class="p">(</span>
-            <span class="n">module</span><span class="p">,</span> <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">torch_compile</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Module is an unknown format or the ir requested is unknown&quot;</span><span class="p">)</span></div>
 
@@ -868,11 +869,12 @@ document.write(`
     <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;File path cannot be empty. Please provide a valid file path&quot;</span><span class="p">)</span>
 
-    <span class="n">enabled_precisions_set</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="n">enabled_precisions</span>
-        <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="k">else</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span>
-    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;`enabled_precisions` is deprecated for the Dynamo path. Strong typing is always enabled; precision is controlled by the model&#39;s graph dtypes.&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="c1"># Prepare torch and torchtrt inputs</span>
     <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -906,7 +908,6 @@ document.write(`
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">dynamo_cross_compile_for_windows</span><span class="p">(</span>
         <span class="n">exp_program</span><span class="p">,</span>
         <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torchtrt_arg_inputs</span><span class="p">,</span>
-        <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 
@@ -974,6 +975,7 @@ document.write(`
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Default for legacy TS frontend; not used for the Dynamo path</span>
     <span class="n">enabled_precisions_set</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">}</span>
     <span class="p">)</span>
@@ -1026,11 +1028,16 @@ document.write(`
             <span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
         <span class="p">)</span>
 
+        <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;`enabled_precisions` is deprecated for the Dynamo path. Strong typing is always enabled; precision is controlled by the model&#39;s graph dtypes.&quot;</span><span class="p">,</span>
+                <span class="ne">DeprecationWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
         <span class="k">return</span> <span class="n">dynamo_convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
             <span class="n">exp_program</span><span class="p">,</span>
             <span class="n">arg_inputs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">),</span>
             <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span>
-            <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">torch_compile</span><span class="p">:</span>

@@ -189,12 +189,14 @@ bool InstanceNormConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& 
   fc.nbFields = f.size();
   fc.fields = f.data();
 
-  auto creator = getPluginRegistry()->getPluginCreator("InstanceNormalization_TRT", "1", "");
-  auto instance_norm_plugin = creator->createPlugin("instance_norm", &fc);
+  auto creator = static_cast<nvinfer1::IPluginCreatorV3One*>(
+      getPluginRegistry()->getCreator("InstanceNormalization_TRT", "1", ""));
+  auto instance_norm_plugin = creator->createPlugin("instance_norm", &fc, nvinfer1::TensorRTPhase::kBUILD);
 
   TORCHTRT_CHECK(instance_norm_plugin, "Unable to create instance_norm plugin from TensorRT plugin registry" << *n);
 
-  auto new_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&input), 1, *instance_norm_plugin);
+  auto new_layer =
+      ctx->net->addPluginV3(reinterpret_cast<nvinfer1::ITensor* const*>(&input), 1, nullptr, 0, *instance_norm_plugin);
 
   new_layer->setName(util::node_info(n).c_str());
   auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));

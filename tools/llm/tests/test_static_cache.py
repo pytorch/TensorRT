@@ -170,7 +170,6 @@ def test_no_cache_model_with_torch_tensorrt(args):
             trt_model = torch_tensorrt.dynamo.compile(
                 exported_program,
                 inputs=[q, k, v],
-                enabled_precisions={torch.float32},
                 disable_tf32=True,
                 debug=args.debug,
                 min_block_size=1,
@@ -245,7 +244,6 @@ def transform_gm_with_kv_cache(exported_program: torch.export.ExportedProgram, a
     gm = exported_program.module()
     # Post lower the model
     settings = torch_tensorrt.dynamo.conversion.CompilationSettings(
-        enabled_precisions={torch.float32},
         disable_tf32=True,
         use_python_runtime=True,
         debug=args.debug,
@@ -390,7 +388,6 @@ def test_static_cache_with_torch_tensorrt(args):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs=[q, k, v],
-            enabled_precisions={torch.float32},
             disable_tf32=True,
             use_python_runtime=True,
             debug=args.debug,

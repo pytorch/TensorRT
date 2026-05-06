@@ -247,7 +247,6 @@ serializable ``torch.fx.GraphModule``:
         model,
         ir="dynamo",
         arg_inputs=inputs,
-        use_explicit_typing=True,
     )
 
     # Save to disk

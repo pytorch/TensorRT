@@ -16,7 +16,6 @@ model = (
 trt_model = torch_tensorrt.compile(
     model,
     inputs=[torch_tensorrt.Input((1, 3, 224, 224))],
-    enabled_precisions={torch_tensorrt.dtype.f16},
 )
 
 ts_trt_model = torch.jit.trace(trt_model, torch.rand(1, 3, 224, 224).to("cuda"))

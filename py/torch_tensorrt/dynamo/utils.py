@@ -649,18 +649,6 @@ def parse_dynamo_kwargs(
         valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
         settings = replace(settings, **valid_kwargs)
 
-    # TODO: Remove once Dynamo precisions refactoring is complete
-    if "enabled_precisions" in kwargs:
-        enabled_precisions = {dtype._from(e) for e in kwargs["enabled_precisions"]}
-
-        if len(enabled_precisions) == 0:
-            logger.info(
-                f"No precision specified, defaulting to {_defaults.ENABLED_PRECISION}"
-            )
-            enabled_precisions = _defaults.ENABLED_PRECISIONS
-
-        settings.enabled_precisions = enabled_precisions
-
     # Parse input runtime specification
     settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
 

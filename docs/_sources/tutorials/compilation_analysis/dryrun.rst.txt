@@ -67,7 +67,7 @@ A typical dryrun report looks like this::
      torch.ops.aten.embedding.default: 1
      torch.ops.aten.index.Tensor: 3
 
-    Compiled with: CompilationSettings(enabled_precisions={dtype.f32}, min_block_size=5, ...)
+    Compiled with: CompilationSettings(min_block_size=5, ...)
 
       Graph Structure:
 

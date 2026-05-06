@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../../_static/documentation_options.js?v=77cef958"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -479,14 +479,13 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span><span class="p">,</span> <span class="n">auto</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export._trace</span><span class="w"> </span><span class="kn">import</span> <span class="n">_export</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">_defaults</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">dynamo_compile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._refit</span><span class="w"> </span><span class="kn">import</span> <span class="n">refit_module_weights</span>
@@ -498,6 +497,16 @@ document.write(`
 <span class="p">)</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_modelopt_quantized</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if the model has been quantized with the modelopt library.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">modelopt.torch.quantization.nn</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorQuantizer</span>
+
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">TensorQuantizer</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">modules</span><span class="p">())</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">RefitFlag</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
@@ -550,9 +559,6 @@ document.write(`
         <span class="n">strict</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">prefer_deferred_runtime_asserts_over_guards</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">weight_streaming_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-            <span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]</span>
-        <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -568,7 +574,6 @@ document.write(`
 <span class="sd">            disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
 <span class="sd">            assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False</span>
 <span class="sd">            sparse_weights (bool): Enable sparsity for convolution and fully connected layers.</span>
-<span class="sd">            enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
 <span class="sd">            immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable.</span>
 <span class="sd">            capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
 <span class="sd">            num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels</span>
@@ -593,7 +598,6 @@ document.write(`
 <span class="sd">            timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
 <span class="sd">            runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
 <span class="sd">            lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
-<span class="sd">            enabled_precisions (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
 <span class="sd">            **kwargs: Any,</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            MutableTorchTensorRTModule</span>
@@ -648,7 +652,6 @@ document.write(`
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="s2">&quot;Weight stremaing budget is not set. Using auto weight streaming budget&quot;</span>
                 <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">enabled_precisions</span> <span class="o">=</span> <span class="n">enabled_precisions</span>
 
         <span class="bp">cls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span>
@@ -822,11 +825,8 @@ document.write(`
                     <span class="n">strict</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">strict</span><span class="p">,</span>
                 <span class="p">)</span>
 
-        <span class="c1"># Check if any quantization precision is enabled</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enabled_precisions</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
-            <span class="n">precision</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">enabled_precisions</span>
-            <span class="k">for</span> <span class="n">precision</span> <span class="ow">in</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float8_e4m3fn</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span><span class="p">)</span>
-        <span class="p">):</span>
+        <span class="c1"># Check if the model has been quantized with modelopt</span>
+        <span class="k">if</span> <span class="n">_is_modelopt_quantized</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">modelopt.torch.quantization.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_torch_mode</span>
 
@@ -858,7 +858,6 @@ document.write(`
             <span class="n">kwarg_inputs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="p">,</span>
             <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">use_python_runtime</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">use_python_runtime</span><span class="p">,</span>
-            <span class="n">enabled_precisions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">enabled_precisions</span><span class="p">,</span>
             <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;offload_module_to_cpu&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
