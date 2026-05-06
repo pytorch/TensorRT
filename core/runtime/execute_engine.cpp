@@ -183,7 +183,12 @@ std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> comp
 
     auto dims = core::util::toVec(out_shape);
     auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
-    outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
+    auto options = torch::TensorOptions()
+                       .dtype(type)
+                       .layout(at::kStrided)
+                       .device(at::kCUDA, compiled_engine->device_info.id)
+                       .requires_grad(false);
+    outputs[pyt_idx] = std::move(at::empty(dims, options).contiguous());
   }
 
   return outputs;
