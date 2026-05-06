@@ -1,13 +1,6 @@
 # type: ignore
-"""Regression tests for user-supplied dynamic-shape bounds threading.
-
-These tests exercise the read-only ``user_symbol_bounds`` map plumbed from
-``compile_module`` through the partitioner into
-``extract_var_range_info``. The map fills in upper bounds left unbounded by
-``Dim.DYNAMIC`` *without* mutating the exporter's ``ShapeEnv``, so the
-original ``range_constraints`` are preserved across
-``torch_tensorrt.save(..., output_format="exported_program")``.
-"""
+"""Tests for ``user_symbol_bounds`` plumbed from ``compile_module`` through
+the partitioner into ``extract_var_range_info``."""
 
 import os
 import unittest
@@ -24,12 +17,8 @@ assertions = unittest.TestCase()
 
 
 def _first_sym_placeholder(ep: torch.export.ExportedProgram, sym_dim: int = 0):
-    """Return (fake_val, sym_int) for the first placeholder node that has a
-    ``torch.SymInt`` at ``sym_dim``.
-
-    ``ep.graph`` is the *lifted* graph: parameters and buffers are lifted to
-    placeholders ahead of the user's inputs (``p_<param>`` / ``b_<buf>``
-    targets). Hence the function"""
+    """First placeholder with a ``SymInt`` at ``sym_dim``; skips lifted
+    param/buffer placeholders that ``strict=False`` may prepend."""
     for node in ep.graph.nodes:
         if node.op != "placeholder":
             continue
@@ -52,60 +41,42 @@ class _SmallLinear(torch.nn.Module):
 
 @pytest.mark.unit
 def test_extract_var_range_info_fills_unbounded_max_from_user():
-    """``extract_var_range_info`` must use ``user_symbol_bounds`` only when
-    the exporter leaves ``var_to_range.upper`` as ``int_oo``."""
+    """User bounds must fill the gap when the exporter's upper is ``int_oo``,
+    and successive calls must not leak state across invocations."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(2, 8, device="cuda")
 
-    # ``Dim.DYNAMIC`` (sentinel) leaves the upper bound unbounded.
     dyn_batch = torch.export.Dim.DYNAMIC
     ep = torch.export.export(
         model, (sample,), dynamic_shapes=({0: dyn_batch},), strict=False
     )
 
-    # Pull the SymInt for the dynamic batch dim from the placeholder meta.
-    # Use the helper to skip parameter/buffer placeholders that strict=False
-    # may prepend to the graph.
     fake_val, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
-    assert (
-        sym_dim is not None
-    ), "expected at least one placeholder with a SymInt batch dim"
+    assert sym_dim is not None
     assert isinstance(sym_dim, torch.SymInt)
     expr = sym_dim.node.expr
     assert isinstance(expr, sympy.Symbol)
 
-    # Without the user map the upper bound is unbounded -> ``max`` is None.
-    info_no_user = extract_var_range_info(sym_dim)
-    assert info_no_user["max"] is None
+    assert extract_var_range_info(sym_dim)["max"] is None
 
-    # With the user map providing max=8, the exporter's gap is filled.
-    # The lower stays at 1 (Dynamo's 0/1 specialization rewrite in
-    # ``extract_var_range_info``); user_min=1 intersects to the same value.
     info_with_user = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (1, 8)})
     assert info_with_user["max"] == 8
     assert info_with_user["min"] == 1
 
-    # A second call with a *different* user map must return the new bounds:
-    # ``extract_var_range_info`` is read-only w.r.t. ``ShapeEnv`` and must
-    # therefore track whatever map the caller hands it on each invocation.
-    info_with_user_wider = extract_var_range_info(
-        sym_dim, user_symbol_bounds={expr: (1, 16)}
-    )
-    assert info_with_user_wider["max"] == 16
-    assert info_with_user_wider["min"] == 1
+    # Different map on the same SymInt must return the new bounds (no caching).
+    info_wider = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (1, 16)})
+    assert info_wider["max"] == 16
+    assert info_wider["min"] == 1
 
-    # And dropping the user map again must revert to the unbounded result -
-    # i.e. the previous calls did not mutate any cached state.
-    info_revert = extract_var_range_info(sym_dim)
-    assert info_revert["max"] is None
+    # Dropping the map must revert (no ShapeEnv mutation).
+    assert extract_var_range_info(sym_dim)["max"] is None
 
 
 @pytest.mark.unit
 def test_extract_var_range_info_does_not_widen_lower_bound():
-    """The user's lower bound must be intersected (``max(exporter, user)``)
-    so the exporter's 0/1 specialization (lower == 1) survives even when
-    the user passes ``min_shape=0``."""
+    """Lower bound is intersected so the 0/1 specialization survives even
+    when the user passes ``min_shape=0``."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(2, 8, device="cuda")
@@ -116,20 +87,17 @@ def test_extract_var_range_info_does_not_widen_lower_bound():
         strict=False,
     )
     _, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
-    assert sym_dim is not None, "expected a placeholder with a SymInt batch dim"
+    assert sym_dim is not None
     expr = sym_dim.node.expr
 
     info = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (0, 8)})
-    assert (
-        info["min"] == 1
-    ), "exporter's lower bound (1) must not be widened to user's 0"
+    assert info["min"] == 1, "exporter lower must not be widened to user's 0"
     assert info["max"] == 8
 
 
 @pytest.mark.unit
 def test_extract_var_range_info_does_not_override_finite_max():
-    """When the exporter already provides a finite upper bound (e.g. via
-    ``Dim(max=...)``), the user's value must be ignored."""
+    """A finite exporter max must win over ``user_symbol_bounds``."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(2, 8, device="cuda")
@@ -140,29 +108,18 @@ def test_extract_var_range_info_does_not_override_finite_max():
         strict=False,
     )
     _, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
-    assert sym_dim is not None, "expected a placeholder with a SymInt batch dim"
+    assert sym_dim is not None
     expr = sym_dim.node.expr
 
     info = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (1, 16)})
-    assert (
-        info["max"] == 4
-    ), "finite exporter upper bound must win over user_symbol_bounds"
+    assert info["max"] == 4
 
 
 @pytest.mark.unit
 def test_extract_var_range_info_handles_sympy_oo_from_bound_sympy():
-    """Composite symbolic expressions (e.g. ``s0 + s1``) take the
-    ``shape_env.bound_sympy`` fallback inside ``extract_var_range_info``.
-    Sympy's arithmetic returns the *float-typed* ``sympy.oo`` for unbounded
-    operands, which is a different object from PyTorch's ``int_oo``. A naive
-    ``!= int_oo`` guard misses this case and crashes when ``int(sympy.oo)`` is
-    attempted (``AttributeError: 'Infinity' object has no attribute '_mpf_'``).
-
-    This test reproduces that path: a model that concatenates two tensors
-    along a dynamic batch dimension, so the result's batch dim is
-    ``s0 + s1`` -- a composite expression whose ``bound_sympy`` upper is
-    ``sympy.oo`` when both ``s0`` and ``s1`` come from ``Dim.DYNAMIC``.
-    """
+    """Composite exprs (e.g. ``s0 + s1``) hit ``bound_sympy``, which returns
+    ``sympy.oo`` (not ``int_oo``) for unbounded operands. A naive
+    ``!= int_oo`` guard misses it and crashes on ``int(sympy.oo)``."""
 
     class _ConcatBatch(torch.nn.Module):
         def forward(self, a, b):
@@ -190,30 +147,18 @@ def test_extract_var_range_info_handles_sympy_oo_from_bound_sympy():
         None,
     )
     if cat_node is None or "val" not in cat_node.meta:
-        pytest.skip(
-            "PyTorch version did not preserve a cat node with a composite "
-            "symbolic batch dim; skipping regression."
-        )
+        pytest.skip("no cat node with composite SymInt on this PyTorch")
 
     composite_dim = cat_node.meta["val"].size()[0]
     if not isinstance(composite_dim, torch.SymInt):
-        pytest.skip("composite batch dim was specialized to a concrete int")
-    composite_expr = composite_dim.node.expr
-    if isinstance(composite_expr, sympy.Symbol):
-        pytest.skip(
-            "expected a composite expression (e.g. s0 + s1); got a plain "
-            "symbol on this PyTorch version"
-        )
+        pytest.skip("composite dim specialized to a concrete int")
+    if isinstance(composite_dim.node.expr, sympy.Symbol):
+        pytest.skip("expr collapsed to a plain symbol on this PyTorch")
 
-    # Without the fix, this call raises ``AttributeError`` from sympy when it
-    # tries to coerce ``sympy.oo`` to int. With the fix, the unbounded upper
-    # is reported as ``None`` so callers can fall back gracefully.
+    # Pre-fix this raised ``AttributeError`` from ``int(sympy.oo)``.
     info = extract_var_range_info(composite_dim)
-    assert info["max"] is None, (
-        f"composite expression with unbounded operand should report max=None, "
-        f"got {info['max']!r}"
-    )
-    assert info["min"] is not None, "min should still resolve to an int"
+    assert info["max"] is None
+    assert info["min"] is not None
 
 
 @pytest.mark.unit
@@ -248,9 +193,8 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
 
 @pytest.mark.unit
 def test_build_user_symbol_bounds_warns_on_01_specialization(caplog):
-    """``user_min=1, exp_min=2`` is PyTorch's 0/1 specialization artifact
-    (``Dim(min=1)`` silently bumped to 2 in ShapeEnv). This should warn,
-    not raise -- it is not a user error."""
+    """``user_min=1, exp_min=2`` is the 0/1 specialization artifact -- warn,
+    don't raise."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(2, 8, device="cuda")
@@ -260,7 +204,6 @@ def test_build_user_symbol_bounds_warns_on_01_specialization(caplog):
         dynamic_shapes=({0: torch.export.Dim.DYNAMIC},),
         strict=False,
     )
-    # After 0/1 specialization exp_min is 2; user declares min=1.
     input_min1 = Input(
         min_shape=(1, 8),
         opt_shape=(4, 8),
@@ -274,16 +217,13 @@ def test_build_user_symbol_bounds_warns_on_01_specialization(caplog):
         _build_user_symbol_bounds(ep.module(), [input_min1], {})
 
     msgs = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
-    # Either no warning (bounds recorded fine with Dim.DYNAMIC unbounded path)
-    # or the 0/1 specialization warning — but definitely no exception.
     if msgs:
         assert "0/1 specialization" in "\n".join(msgs)
 
 
 @pytest.mark.unit
 def test_build_user_symbol_bounds_raises_when_input_min_genuinely_below_export():
-    """``user_min < exp_min`` where the gap is NOT the 1→2 specialization
-    artifact (e.g. user_min=2, exp_min=10) must raise ``ValueError``."""
+    """``user_min < exp_min`` (not the 1->2 case) must raise."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(10, 8, device="cuda")
@@ -308,9 +248,7 @@ def test_build_user_symbol_bounds_raises_when_input_min_genuinely_below_export()
 
 @pytest.mark.unit
 def test_build_user_symbol_bounds_raises_when_input_max_above_export():
-    """Symmetric to the lower-bound case: user_max > exp_max also
-    guarantees a runtime error (TRT will reject shapes above the
-    exporter's max). Compile must fail."""
+    """``user_max > exp_max`` must raise (TRT would reject at runtime)."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(10, 8, device="cuda")
@@ -323,7 +261,7 @@ def test_build_user_symbol_bounds_raises_when_input_max_above_export():
     too_wide_input = Input(
         min_shape=(10, 8),
         opt_shape=(15, 8),
-        max_shape=(25, 8),  # exceeds exp_max=20
+        max_shape=(25, 8),
         dtype=torch.float32,
     )
     with pytest.raises(ValueError) as exc_info:
@@ -334,8 +272,7 @@ def test_build_user_symbol_bounds_raises_when_input_max_above_export():
 
 @pytest.mark.unit
 def test_build_user_symbol_bounds_no_warning_on_matching_bounds(caplog):
-    """If the user's ``Input`` bounds exactly match the exporter's
-    contract, no warning or error should fire -- the user got it right."""
+    """Matching bounds must not warn or raise."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(10, 8, device="cuda")
@@ -360,21 +297,13 @@ def test_build_user_symbol_bounds_no_warning_on_matching_bounds(caplog):
     warning_messages = [
         rec.message for rec in caplog.records if rec.levelno >= logging.WARNING
     ]
-    assert (
-        not warning_messages
-    ), f"matching bounds should not produce any warning, got: {warning_messages}"
+    assert not warning_messages, f"unexpected warnings: {warning_messages}"
 
 
 @pytest.mark.unit
 def test_build_user_symbol_bounds_warns_on_subset_input(caplog):
-    """When the user's ``Input`` is a *strict subset* of the exporter's
-    range (e.g. user `[12, 18]` inside exporter `[10, 20]`), no shape
-    the user declared will fail at runtime -- the engine profile (which
-    follows the exporter) accepts everything in the user's range. So
-    this is *not* an error. But the user's narrower profile is silently
-    widened, which is surprising; emit a warning so they know to
-    re-export if they really want the narrower engine.
-    """
+    """Strict-subset Input warns: engine profile is silently widened to the
+    exporter's range, which the user should know about."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(10, 8, device="cuda")
@@ -394,13 +323,12 @@ def test_build_user_symbol_bounds_warns_on_subset_input(caplog):
     import logging
 
     with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
-        # Must not raise.
         _build_user_symbol_bounds(ep.module(), [subset_input], {})
 
     warning_messages = [
         rec.message for rec in caplog.records if rec.levelno >= logging.WARNING
     ]
-    assert warning_messages, "subset Input bounds should produce a warning"
+    assert warning_messages
     msg = "\n".join(warning_messages)
     assert "subset" in msg or "wider" in msg
     assert "re-export" in msg or "Re-export" in msg
@@ -408,10 +336,7 @@ def test_build_user_symbol_bounds_warns_on_subset_input(caplog):
 
 @pytest.mark.unit
 def test_build_user_symbol_bounds_no_warning_on_dim_dynamic(caplog):
-    """``Dim.DYNAMIC`` leaves the exporter's upper unbounded; the user's
-    ``Input`` bounds *fill the gap* there (the intended use). No warning
-    should fire even if the user's lower differs from the exporter's
-    (post 0/1-specialization) lower."""
+    """Dim.DYNAMIC + Input is the intended fill case -- no mismatch warning."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(2, 8, device="cuda")
@@ -438,22 +363,13 @@ def test_build_user_symbol_bounds_no_warning_on_dim_dynamic(caplog):
         for rec in caplog.records
         if rec.levelno >= logging.WARNING and "differ from the exporter" in rec.message
     ]
-    assert not mismatch_warnings, (
-        f"Dim.DYNAMIC + Input is the intended fill case, no mismatch warning expected, "
-        f"got: {mismatch_warnings}"
-    )
+    assert not mismatch_warnings, f"unexpected mismatch warnings: {mismatch_warnings}"
 
 
 @pytest.mark.unit
 def test_build_user_symbol_bounds_mixed_tensor_and_symint():
-    """Mix of tensor + SymInt placeholders: only the tensor placeholder
-    contributes symbols to the user-bounds map. The SymInt placeholder
-    is silently skipped by the ``isinstance(fake_val, torch.Tensor)``
-    guard in ``_build_user_symbol_bounds``; downstream
-    ``construct_submodule_inputs`` still handles the SymInt via its
-    dedicated branch (falling back to the ``min*2^12`` heuristic since
-    no entry for that symbol lands in ``user_symbol_bounds``).
-    """
+    """Tensor + SymInt placeholders: only the tensor contributes to the map
+    (SymInt is filtered by the ``isinstance(fake_val, torch.Tensor)`` guard)."""
 
     class _TensorAndScalar(torch.nn.Module):
         def forward(self, x, k):
@@ -461,7 +377,7 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
 
     model = _TensorAndScalar().eval().cuda()
     x_sample = torch.randn(2, 8, device="cuda")
-    k_sample = 4  # avoid 0/1 specialization on the scalar input
+    k_sample = 4  # >1 to avoid 0/1 specialization
 
     dyn = torch.export.Dim.DYNAMIC
     ep = torch.export.export(
@@ -471,20 +387,11 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
         strict=False,
     )
 
-    # Sanity: the export should produce both a tensor and a SymInt
-    # placeholder. Some PyTorch versions may collapse the scalar input
-    # if the dynamism can't be propagated through the graph - in that
-    # case we just exercise the tensor-only path.
     placeholders = [n for n in ep.graph.nodes if n.op == "placeholder"]
     metas = [p.meta.get("val") for p in placeholders]
     if not any(isinstance(m, torch.SymInt) for m in metas):
-        pytest.skip(
-            "Export collapsed the scalar SymInt placeholder on this "
-            "PyTorch version; nothing left to exercise for the mix case."
-        )
-    assert any(
-        isinstance(m, torch.Tensor) for m in metas
-    ), "expected at least one tensor placeholder"
+        pytest.skip("export collapsed the scalar SymInt on this PyTorch")
+    assert any(isinstance(m, torch.Tensor) for m in metas)
 
     tensor_input = Input(
         min_shape=(1, 8),
@@ -492,11 +399,7 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
         max_shape=(8, 8),
         dtype=torch.float32,
     )
-    # ``_build_user_symbol_bounds`` skips SymInt placeholders entirely
-    # (tensor-only guard on ``meta["val"]``).  The Input for the scalar
-    # argument is therefore never inspected; the specific shape values
-    # below carry no meaning -- this is a structurally-valid placeholder
-    # to keep the index alignment with positional placeholders.
+    # Index-aligned placeholder; never inspected (SymInt path skips it).
     scalar_input = Input(
         min_shape=(1,),
         opt_shape=(1,),
@@ -505,12 +408,7 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
     )
 
     bounds = _build_user_symbol_bounds(ep.module(), [tensor_input, scalar_input], {})
-
-    # Exactly one symbol recorded - from x's dynamic dim 0. The SymInt
-    # placeholder contributed nothing.
-    assert (
-        len(bounds) == 1
-    ), f"expected only the tensor placeholder to contribute, got {bounds}"
+    assert len(bounds) == 1, bounds
     ((sym, (lo, hi)),) = bounds.items()
     assert isinstance(sym, sympy.Symbol)
     assert (lo, hi) == (1, 8)
@@ -518,19 +416,16 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
 
 @pytest.mark.unit
 def test_build_user_symbol_bounds_mixed_arg_and_kwarg():
-    """Both positional and keyword inputs must contribute to the
-    user-bounds map. Positional args are matched to placeholders by
-    index; kwargs are matched by parameter name (``node.target``).
-    """
+    """Positional args (matched by index) and kwargs (matched by name) both
+    contribute to the map."""
 
     class _TwoTensors(torch.nn.Module):
         def forward(self, x, y):
-            # Two independent paths so x's dim 0 and y's dim 0 are not
-            # unified by the exporter into a single sympy symbol.
+            # Independent paths so the exporter doesn't unify x[0] and y[0].
             return x.relu(), y.relu()
 
     model = _TwoTensors().eval().cuda()
-    # Distinct sample sizes for dim 0 to discourage symbol unification.
+    # Distinct sizes discourage symbol unification.
     x_sample = torch.randn(2, 8, device="cuda")
     y_sample = torch.randn(3, 8, device="cuda")
 
@@ -544,16 +439,10 @@ def test_build_user_symbol_bounds_mixed_arg_and_kwarg():
     )
 
     placeholder_names = [n.target for n in ep.graph.nodes if n.op == "placeholder"]
-    assert (
-        "x" in placeholder_names
-    ), f"expected positional arg 'x' as placeholder, got {placeholder_names}"
-    assert (
-        "y" in placeholder_names
-    ), f"expected kwarg 'y' as placeholder, got {placeholder_names}"
+    assert "x" in placeholder_names, placeholder_names
+    assert "y" in placeholder_names, placeholder_names
 
-    # Use *distinct* numerical bounds for x and y so we can verify by
-    # value that the kwarg path actually contributed (rather than just
-    # silently double-counting x's bounds).
+    # Distinct bounds for x and y so we can verify the kwarg path by value.
     x_input = Input(
         min_shape=(1, 8),
         opt_shape=(2, 8),
@@ -573,28 +462,17 @@ def test_build_user_symbol_bounds_mixed_arg_and_kwarg():
         sample_kwarg_inputs={"y": y_input},
     )
 
-    # Two placeholders, each with a single dynamic dim, no unification:
-    # we expect exactly two entries with their respective bounds.
     bounds_values = set(bounds.values())
-    assert (1, 8) in bounds_values, (
-        f"positional x's bounds (1, 8) not recorded - "
-        f"the positional-arg branch may be broken. got: {bounds}"
-    )
-    assert (2, 6) in bounds_values, (
-        f"kwarg y's bounds (2, 6) not recorded - "
-        f"the kwarg branch may be broken. got: {bounds}"
-    )
-    assert len(bounds) == 2, f"expected exactly 2 entries, got {bounds}"
+    assert (1, 8) in bounds_values, bounds  # positional-arg branch
+    assert (2, 6) in bounds_values, bounds  # kwarg branch
+    assert len(bounds) == 2, bounds
 
 
 @pytest.mark.unit
 @pytest.mark.critical
 def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
-    """End-to-end regression: exporting with ``Dim.DYNAMIC``, compiling
-    with ``Input(max_shape=8)``, and round-tripping through
-    ``torch_tensorrt.save(..., output_format="exported_program")`` must
-    leave the exporter's ``range_constraints`` untouched.
-    """
+    """End-to-end: Dim.DYNAMIC + Input(max_shape) round-trips through
+    ``torchtrt.save`` without mutating the exporter's range_constraints."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(2, 8, device="cuda")
@@ -604,7 +482,7 @@ def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
         model, (sample,), dynamic_shapes=({0: dyn_batch},), strict=False
     )
 
-    # Snapshot range_constraints **before** Torch-TRT touches anything.
+    # Snapshot before Torch-TRT touches anything.
     expected_constraints = {
         str(k): (v.lower, v.upper) for k, v in exp_program.range_constraints.items()
     }
@@ -625,13 +503,11 @@ def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
     }
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
-    # The exporter's range_constraints must NOT have been mutated by compile.
     after_constraints = {
         str(k): (v.lower, v.upper) for k, v in exp_program.range_constraints.items()
     }
     assertions.assertEqual(expected_constraints, after_constraints)
 
-    # Save + reload as ExportedProgram and verify constraints survive.
     trt_ep_path = os.path.join(tmpdir, "trt_dim_dynamic.ep")
     torchtrt.save(
         trt_module,
@@ -648,21 +524,14 @@ def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
     }
     assertions.assertEqual(expected_constraints, reloaded_constraints)
 
-    # Sanity: the compiled engine must accept inputs across the user's
-    # declared profile - both at the lower edge (min_shape=1) and at the
-    # upper edge (max_shape=8).
+    # Engine accepts shapes across [min_shape, max_shape].
     trt_module(torch.randn(1, 8, device="cuda"))
     trt_module(torch.randn(4, 8, device="cuda"))
     trt_module(torch.randn(8, 8, device="cuda"))
 
-    # And it must REJECT inputs beyond max_shape, even though the model
-    # graph (exported with ``Dim.DYNAMIC``) is itself unbounded and could
-    # theoretically handle batch=16 in eager. The TRT engine's profile is
-    # the binding runtime envelope: ``Input(max_shape=8)`` is the user
-    # opting into a strict cap. If a user wants batch=16 they must either
-    # re-compile with ``max_shape>=16`` or omit ``max_shape`` (heuristic
-    # fallback). This pins down the contract to prevent regressions where
-    # ``Input.max_shape`` would silently widen back to the heuristic.
+    # And rejects shapes beyond ``Input.max_shape`` even though the eager
+    # graph is unbounded -- ``Input(max_shape=8)`` is a strict cap. Pins
+    # the contract against regressions that re-widen to the heuristic.
     too_big = torch.randn(16, 8, device="cuda")
     with assertions.assertRaises(Exception):
         trt_module(too_big)

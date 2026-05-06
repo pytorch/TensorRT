@@ -410,20 +410,12 @@ def extract_var_range_info(
     symbolic_integer: torch.SymInt,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
 ) -> Dict[str, Optional[int]]:
-    """
-    This function returns the min, max, opt values of a symbolic integer.
+    """Return ``{min, max, opt}`` for a symbolic integer.
 
-    Args:
-        symbolic_integer: The ``torch.SymInt`` whose range is being queried.
-        user_symbol_bounds: Optional read-only map from a top-level sympy symbol
-            to ``(min, max)`` bounds supplied by the user via
-            ``torch_tensorrt.Input``. These are used **only** to fill the gap
-            when the exporter's ``ShapeEnv`` reports an unbounded upper range
-            (``int_oo``). The exporter's bounds always win when they are
-            finite; the lower bound is intersected (``max(exporter_lower,
-            user_lower)``) so we never widen the exporter's 0/1 specialization
-            (e.g. ``lower == 2 -> 1``) to ``0`` when the user passes
-            ``min_shape=0``. ``ShapeEnv`` itself is never mutated.
+    ``user_symbol_bounds`` (read-only ``{sym: (min, max)}``) is consulted only
+    when the exporter's upper is unbounded; finite exporter bounds always win.
+    The lower is intersected with the exporter's so the 0/1 specialization
+    survives even if the user passes ``min_shape=0``.
     """
     node = symbolic_integer.node
     expr = node.expr
@@ -451,15 +443,9 @@ def extract_var_range_info(
     )
     assert var_range, var_val
 
-    # ``var_range`` can come from two paths:
-    #   (1) ``shape_env.var_to_range[expr]`` -- stores PyTorch's integer-typed
-    #       ``int_oo`` sentinel for unbounded sides.
-    #   (2) ``shape_env.bound_sympy(expr)`` (composite exprs like ``s0 + s1``)
-    #       -- runs sympy arithmetic, which collapses unbounded operands to
-    #       ``sympy.oo`` (sympy's float-typed ``S.Infinity``).
-    # ``int_oo`` and ``sympy.oo`` are different objects, so a single-sentinel
-    # check (``!= int_oo``) misses path (2) and crashes downstream when sympy
-    # tries to coerce ``oo`` to int. Treat any non-finite bound as ``None``.
+    # ``var_to_range`` returns ``int_oo`` for unbounded; ``bound_sympy`` (used
+    # for composite exprs like ``s0+s1``) returns ``sympy.oo`` instead. They
+    # are distinct objects -- check both, else ``int(sympy.oo)`` raises.
     def _bound_to_int_or_none(value: Any) -> Optional[int]:
         if value is int_oo or value is -int_oo:
             return None
@@ -472,20 +458,14 @@ def extract_var_range_info(
 
     min_val_opt = _bound_to_int_or_none(var_range.lower)
     max_val = _bound_to_int_or_none(var_range.upper)
-    # An unbounded lower should be impossible for tensor dims (>=0), but if it
-    # ever does happen we fall back to 1 (post 0/1-specialization default)
-    # rather than crashing.
+    # Unbounded lower shouldn't happen for tensor dims; fall back to 1.
     min_val = min_val_opt if min_val_opt is not None else 1
 
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
 
-    # If the exporter left this symbol with an unbounded upper range (i.e.
-    # the user used ``Dim.DYNAMIC`` without an explicit upper), fall back to
-    # the bounds the user supplied via ``torch_tensorrt.Input(min_shape=...,
-    # max_shape=...)``. Only fills the gap; never overrides a finite exporter
-    # max. The lower bound is intersected so the exporter's specialization
-    # (e.g. lower == 1) is preserved.
+    # Fill missing exporter upper from user bounds; intersect lower so
+    # ShapeEnv's 0/1 specialization is preserved.
     if (
         max_val is None
         and user_symbol_bounds
