@@ -14,9 +14,22 @@ Discovery order:
 
 def _find_python(ctx):
     """Return a path-like object for a Python that has torch importable, or None."""
+
+    # Use a Label anchor to get the real workspace root reliably under Bzlmod.
+    ws = ctx.path(Label("//:MODULE.bazel")).dirname
+
     candidates = []
 
-    # virtualenv / uv venv
+    # Workspace-relative venv first — the project's own .venv always wins.
+    for rel in [
+        ".venv/bin/python3",
+        ".venv/bin/python",
+        "venv/bin/python3",
+        "venv/bin/python",
+    ]:
+        candidates.append(ctx.path(str(ws) + "/" + rel))
+
+    # Active virtualenv / uv venv (only if it's not a different project's venv)
     virtual_env = ctx.os.environ.get("VIRTUAL_ENV", "")
     if virtual_env:
         candidates.append(ctx.path(virtual_env + "/bin/python3"))
@@ -27,17 +40,6 @@ def _find_python(ctx):
     if conda_prefix:
         candidates.append(ctx.path(conda_prefix + "/bin/python3"))
         candidates.append(ctx.path(conda_prefix + "/bin/python"))
-
-    # Common relative-to-workspace venv locations
-    # ctx.workspace_root is the real workspace root (not the synthetic repo root)
-    ws = ctx.workspace_root
-    for rel in [
-        ".venv/bin/python3",
-        ".venv/bin/python",
-        "venv/bin/python3",
-        "venv/bin/python",
-    ]:
-        candidates.append(ws.get_child(rel.replace("/", ws.sep if hasattr(ws, "sep") else "/")))
 
     # System Python last
     for name in ["python3", "python"]:
@@ -95,5 +97,5 @@ def _local_torch_impl(ctx):
 
 local_torch = repository_rule(
     implementation = _local_torch_impl,
-    environ = ["TORCH_PATH", "VIRTUAL_ENV", "CONDA_PREFIX"],
+    environ = ["TORCH_PATH", "VIRTUAL_ENV", "CONDA_PREFIX", "PATH", "HOME"],
 )
