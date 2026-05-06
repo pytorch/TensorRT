@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
     CACHE_BUILT_ENGINES,
     CPU_MEMORY_BUDGET,
+    CUDA_GRAPH_STRATEGY,
     DECOMPOSE_ATTENTION,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -119,6 +120,7 @@ class CompilationSettings:
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
+        cuda_graph_strategy (str): TensorRT-RTX CUDA graph strategy: "disabled" (default) or "whole_graph_capture" (let TensorRT-RTX manage CUDA graph capture/replay internally). When set and combined with `torch_tensorrt.runtime.set_cudagraphs_mode(True)` on RTX, overrides manual capture. Not used for standard TensorRT.
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
     """
@@ -182,6 +184,7 @@ class CompilationSettings:
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
+    cuda_graph_strategy: str = CUDA_GRAPH_STRATEGY
     decompose_attention: bool = DECOMPOSE_ATTENTION
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
 

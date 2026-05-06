@@ -109,6 +109,7 @@ def cross_compile_for_windows(
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    cuda_graph_strategy: str = _defaults.CUDA_GRAPH_STRATEGY,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     **kwargs: Any,
@@ -333,6 +334,7 @@ def cross_compile_for_windows(
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
+        "cuda_graph_strategy": cuda_graph_strategy,
         "decompose_attention": decompose_attention,
         "attn_bias_is_causal": attn_bias_is_causal,
     }
@@ -464,6 +466,7 @@ def compile(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    cuda_graph_strategy: str = _defaults.CUDA_GRAPH_STRATEGY,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     **kwargs: Any,
@@ -731,6 +734,7 @@ def compile(
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
+        "cuda_graph_strategy": cuda_graph_strategy,
         "decompose_attention": decompose_attention,
         "attn_bias_is_causal": attn_bias_is_causal,
     }
@@ -791,7 +795,7 @@ def _insert_complex_io_adapters(
       Outputs: insert view_as_complex before the output node for each originally-complex
                output that comes from a TRT block.
 
-    Leverages metadata that was captued when the complex rewriter pass was run
+    Leverages metadata that was captured when the complex rewriter pass was run
     """
     complex_input_names = gm.meta.get("complex_input_names", [])
     complex_input_dtypes = gm.meta.get("complex_input_dtypes", {})
@@ -1242,6 +1246,7 @@ def convert_exported_program_to_serialized_trt_engine(
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    cuda_graph_strategy: str = _defaults.CUDA_GRAPH_STRATEGY,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     **kwargs: Any,
@@ -1473,6 +1478,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
         "use_distributed_mode_trace": use_distributed_mode_trace,
+        "cuda_graph_strategy": cuda_graph_strategy,
         "decompose_attention": decompose_attention,
         "attn_bias_is_causal": attn_bias_is_causal,
     }
