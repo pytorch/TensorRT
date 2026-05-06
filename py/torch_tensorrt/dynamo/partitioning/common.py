@@ -26,10 +26,8 @@ def construct_dynamic_input(
     Constructs a torch_tensorrt.Input based on a symbolic input
     Args:
         input_shape: A symbolic shape / regular shape of a tensor (which can have a  mix of SymInt nodes and static values)
-        user_symbol_bounds: Optional read-only ``{sym: (min, max)}`` map, used
-            only to fill missing upper bounds when the exporter's ``ShapeEnv``
-            reports them as unbounded. See
-            :func:`torch_tensorrt.dynamo.utils.extract_var_range_info`.
+        user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
+            :func:`extract_var_range_info` to fill unbounded exporter uppers.
     Returns:
         A dynamic shaped torch_tensorrt.Input which has the properties of the symbolic shaped input.
     """
@@ -95,11 +93,9 @@ def get_input(
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
 ) -> Input:
     """
-    Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs
+    Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs.
 
-    ``user_symbol_bounds`` is forwarded to :func:`construct_dynamic_input` and
-    is only consulted when an exporter-supplied symbolic dimension has no
-    upper bound (e.g. ``Dim.DYNAMIC`` without an explicit ``max``).
+    ``user_symbol_bounds`` is forwarded to :func:`construct_dynamic_input`.
     """
     if dtype in COMPLEX_TO_REAL_DTYPE:
         real_dtype = COMPLEX_TO_REAL_DTYPE[dtype]
@@ -135,10 +131,8 @@ def construct_submodule_inputs(
     The module inputs will have meta data which has the shape and dtype info
     Args:
         module: Input FX GraphModule
-        user_symbol_bounds: Optional read-only ``{sym: (min, max)}`` map built
-            from user-supplied ``torch_tensorrt.Input`` objects. Used only to
-            fill missing upper bounds left by ``Dim.DYNAMIC`` in the exporter;
-            never mutates the parent ``ShapeEnv``.
+        user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
+            :func:`get_input` to fill unbounded exporter uppers.
     Returns:
         Sequence of torch_tensorrt.Input's representing inputs to given module
     """
