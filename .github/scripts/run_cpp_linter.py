@@ -1,11 +1,12 @@
-import os
 import json
-
-from github import Github
+import os
 import subprocess
 
+from github import Auth, Github
+
 token = os.environ["GITHUB_TOKEN"]
-gh = Github(token)
+auth = Auth.Token(token)
+gh = Github(auth=auth)
 
 event_file_path = "/GITHUB_EVENT.json"
 with open(event_file_path, "r") as f:
