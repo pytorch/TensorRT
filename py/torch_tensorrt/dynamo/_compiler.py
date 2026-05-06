@@ -896,27 +896,14 @@ def _build_user_symbol_bounds(
     sample_kwarg_inputs: dict[Any, Any],
     graph_signature: torch.export.graph_signature.ExportGraphSignature,
 ) -> Dict[sympy.Symbol, Tuple[int, int]]:
-    """Build a read-only ``{sympy.Symbol: (min, max)}`` map from dynamic ``Input``s.
+    """Map ``sympy.Symbol -> (min, max)`` from dynamic ``Input``s, used to
+    fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
 
-    Symbols are taken from top-level placeholder ``meta["val"].shape``; the
-    map is threaded to ``extract_var_range_info`` to fill upper bounds left
-    unbounded by ``Dim.DYNAMIC`` (``int_oo``). ``ShapeEnv`` is never mutated.
-
-    Validation against the exporter's finite bounds (when present):
-
-    - **Upper overflow** (``user_max > exp_max``): raises ``ValueError`` --
-      the TRT engine profile follows the exporter, so shapes above ``exp_max``
-      are guaranteed to be rejected at TRT runtime, including sizes the user
-      explicitly listed in ``Input.max_shape``.
-    - **Lower underflow** (``user_min < exp_min``): raises ``ValueError``
-      *except* for the ``user_min=1, exp_min=2`` case, which is PyTorch's
-      0/1 specialization artifact (``Dim(min=1)`` is silently bumped to 2
-      in ``ShapeEnv``). That specific case emits a warning only.
-    - **Subset** (``user_max <= exp_max`` and ``user_min >= exp_min``): emits
-      a warning that the engine profile will be widened to the exporter's
-      bounds.
-    - **``Dim.DYNAMIC``** (unbounded exporter upper): no check; user's
-      ``Input`` fills the gap.
+    Validates against finite exporter bounds: ``user_max > exp_max`` and
+    ``user_min < exp_min`` raise (TRT will reject those shapes at runtime);
+    a strict subset warns (engine profile widens to the exporter); the
+    ``user_min=1, exp_min=2`` case warns only -- it's PyTorch's 0/1
+    specialization artifact, not a user error.
     """
     name_to_node = {n.name: n for n in gm.graph.nodes if n.op == "placeholder"}
     placeholders = [name_to_node[name] for name in graph_signature.user_inputs]
@@ -981,13 +968,10 @@ def _build_user_symbol_bounds(
                 user_max,
             )
 
-            # If the exporter has already declared *finite* bounds for this
-            # symbol (e.g. ``Dim("batch", min=10, max=20)``) and the user's
-            # ``Input`` disagrees, ``extract_var_range_info`` will silently
-            # keep the exporter's bounds (the override path is gated on
-            # ``max_val is None``). Reject incompatible bounds at compile
-            # time so the user doesn't hit a confusing TRT runtime error
-            # ("shape outside profile") on shapes they explicitly declared.
+            # If exporter bounds are finite, ``extract_var_range_info`` keeps
+            # them (override is gated on ``max_val is None``). Catch the
+            # mismatch here so the user doesn't hit a runtime "shape outside
+            # profile" error on shapes they explicitly declared.
             shape_env = getattr(dim.node, "shape_env", None)
             if shape_env is None:
                 continue
@@ -998,8 +982,7 @@ def _build_user_symbol_bounds(
             exp_upper = exp_range.upper
             exp_max_unbounded = exp_upper is int_oo or exp_upper == sympy.oo
             if exp_max_unbounded:
-                # Pure ``Dim.DYNAMIC`` case -- user is filling the gap, which
-                # is the intended use. No warning, no error.
+                # Dim.DYNAMIC: user fills the gap (intended use).
                 continue
             try:
                 exp_min = int(exp_lower)
@@ -1009,53 +992,45 @@ def _build_user_symbol_bounds(
             if user_min == exp_min and user_max == exp_max:
                 continue
 
-            # Shared header and re-export hint used by all three cases below.
-            _HDR = (
+            mismatch = (
                 f"symbol {expr}: Input({user_min}, {user_max}) vs "
                 f"exporter({exp_min}, {exp_max})."
             )
-            _HINT = (
+            hint = (
                 f" Re-export with Dim('{expr}', min={user_min}, "
                 f"max={user_max}) or adjust Input to match."
             )
 
-            # Upper overflow: user_max > exp_max.
-            # TRT engine profile has max=exp_max; shapes above it will be
-            # rejected at runtime. Hard error so the user finds out at compile.
             if user_max > exp_max:
                 raise ValueError(
-                    f"{_HDR} Input.max_shape exceeds the exporter's max "
+                    f"{mismatch} Input.max_shape exceeds the exporter's max "
                     f"({user_max} > {exp_max}); TRT will reject shapes above "
-                    f"{exp_max} at runtime.{_HINT}"
+                    f"{exp_max} at runtime.{hint}"
                 )
 
-            # Lower underflow: user_min < exp_min.
-            # Tolerated only for the 0/1 specialization artifact (1→2);
-            # every other gap is a genuine user error.
             if user_min < exp_min:
+                # 1->2 is the 0/1 specialization artifact, not a user error.
                 if user_min == 1 and exp_min == 2:
                     logger.warning(
                         "%s Input.min_shape=1 vs exporter min=2 is the "
                         "PyTorch 0/1 specialization artifact; TRT engine "
                         "min will be 2.",
-                        _HDR,
+                        mismatch,
                     )
                     continue
                 raise ValueError(
-                    f"{_HDR} Input.min_shape is below the exporter's min "
+                    f"{mismatch} Input.min_shape is below the exporter's min "
                     f"({user_min} < {exp_min}); TRT will reject shapes "
-                    f"below {exp_min} at runtime.{_HINT}"
+                    f"below {exp_min} at runtime.{hint}"
                 )
 
-            # Subset: user range fits inside exporter range but is narrower.
-            # No runtime failure, but the engine profile is silently widened
-            # to [exp_min, exp_max]. Warn so the user knows.
+            # Strict subset: engine profile widens to the exporter.
             logger.warning(
                 "%s Input bounds are a subset of the exporter's range; "
                 "TRT engine profile will use the wider [%d, %d]."
                 " Re-export with Dim('%s', min=%d, max=%d) for a "
                 "narrower profile.",
-                _HDR,
+                mismatch,
                 exp_min,
                 exp_max,
                 expr,
@@ -1106,12 +1081,8 @@ def compile_module(
             "is incompatible with require_full_compilation=True; enable only one."
         )
 
-    # Build a read-only ``{sympy.Symbol: (min, max)}`` map from the user's
-    # sample ``Input`` objects. This is forwarded to the partitioner so that
-    # symbols whose upper bound is left unbounded by ``Dim.DYNAMIC`` get
-    # filled in with the user's declared bounds, *without* mutating the
-    # exporter's ``ShapeEnv.var_to_range`` (which preserves the original
-    # ``range_constraints`` on save / re-export).
+    # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
+    # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
     if graph_signature is not None:
         user_symbol_bounds = _build_user_symbol_bounds(
             gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
