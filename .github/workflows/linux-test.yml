@@ -63,6 +63,11 @@ on:
         default: ""
         type: string
         required: false
+      fail-on-empty:
+        description: "Whether the Surface failing tests step should fail when no test results are found."
+        default: true
+        type: boolean
+        required: false
 
 jobs:
   test:
@@ -167,7 +172,7 @@ jobs:
           path: ${{ env.RUNNER_TEST_RESULTS_DIR }}/**/*.xml
           summary: true
           display-options: fEs
-          fail-on-empty: true
+          fail-on-empty: ${{ inputs.fail-on-empty }}
 
       - name: Prepare artifacts for upload
         working-directory: ${{ inputs.repository }}

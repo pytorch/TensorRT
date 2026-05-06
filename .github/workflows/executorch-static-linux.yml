@@ -66,6 +66,7 @@ jobs:
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.select-matrix.outputs.matrix }}
+      fail-on-empty: false
       script: |
         set -euo pipefail
         EXECUTORCH_SRC="${RUNNER_TEMP}/executorch"
