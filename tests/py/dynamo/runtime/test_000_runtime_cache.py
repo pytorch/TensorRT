@@ -2,6 +2,7 @@ import gc
 import os
 import shutil
 import tempfile
+import textwrap
 import unittest
 
 import torch
@@ -240,7 +241,8 @@ class TestRuntimeCachePersistence(TestCase):
     "Runtime cache is only available with TensorRT-RTX",
 )
 class TestRuntimeCacheConcurrency(TestCase):
-    """Tests that file locking works for concurrent access (Python runtime only)."""
+    """File-lock contract on the runtime cache, exercised on both runtime paths and
+    across the Python <-> C++ runtime boundary."""
 
     def setUp(self):
         self.cache_dir = tempfile.mkdtemp()
@@ -249,9 +251,21 @@ class TestRuntimeCacheConcurrency(TestCase):
     def tearDown(self):
         shutil.rmtree(self.cache_dir, ignore_errors=True)
 
-    def test_filelock_works(self):
-        """Verify that filelock can be acquired on the cache path after save."""
-        compiled, inputs = _compile_simple(runtime_cache_path=self.cache_path)
+    def _skip_if_cpp_unavailable(self, use_python_runtime):
+        if not use_python_runtime and not ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.skipTest("C++ runtime is not available")
+
+    @parameterized.expand(_RUNTIMES)
+    def test_filelock_works(self, _name, use_python_runtime):
+        """An external filelock acquire on <cache>.lock must succeed after save."""
+        self._skip_if_cpp_unavailable(use_python_runtime)
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(
+            model,
+            inputs,
+            use_python_runtime=use_python_runtime,
+            runtime_cache_path=self.cache_path,
+        )
         _ = compiled(*[inp.clone() for inp in inputs])
         del compiled
         gc.collect()
@@ -263,22 +277,179 @@ class TestRuntimeCacheConcurrency(TestCase):
             data = open(self.cache_path, "rb").read()
         self.assertGreater(len(data), 0)
 
-    def test_sequential_save_load(self):
-        """Two modules saving and loading from the same path should not corrupt data."""
-        compiled1, inputs = _compile_simple(runtime_cache_path=self.cache_path)
+    @parameterized.expand(_RUNTIMES)
+    def test_sequential_save_load(self, _name, use_python_runtime):
+        """Two compiles against the same cache path should not corrupt data."""
+        self._skip_if_cpp_unavailable(use_python_runtime)
+        model1, inputs = _fresh_conv_model_and_inputs(seed=0)
+        compiled1 = _compile(
+            model1,
+            inputs,
+            use_python_runtime=use_python_runtime,
+            runtime_cache_path=self.cache_path,
+        )
         _ = compiled1(*[inp.clone() for inp in inputs])
         del compiled1
         gc.collect()
         size1 = os.path.getsize(self.cache_path)
 
-        compiled2, inputs = _compile_simple(runtime_cache_path=self.cache_path)
-        _ = compiled2(*[inp.clone() for inp in inputs])
+        model2, inputs2 = _fresh_conv_model_and_inputs(seed=1)
+        compiled2 = _compile(
+            model2,
+            inputs2,
+            use_python_runtime=use_python_runtime,
+            runtime_cache_path=self.cache_path,
+        )
+        _ = compiled2(*[inp.clone() for inp in inputs2])
         del compiled2
         gc.collect()
         size2 = os.path.getsize(self.cache_path)
 
         self.assertGreater(size1, 0)
         self.assertGreater(size2, 0)
+
+    def test_filelock_cross_runtime_parallel(self):
+        """Python and C++ runtimes pointed at the same cache path must not deadlock or
+        corrupt the cache when running concurrently in separate processes. Cross-process
+        locking is the real-world scenario file locking is designed for. Subprocesses
+        also avoid torch.export's thread-unsafe TLS state. Requires the C++ runtime."""
+        if not ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.skipTest("C++ runtime is not available")
+
+        import subprocess
+        import sys as _sys
+
+        worker_script = textwrap.dedent(
+            """
+            import sys
+            import gc
+            import torch
+            import torch_tensorrt as torchtrt
+
+            use_python_runtime = sys.argv[1] == \"python\"
+            seed = int(sys.argv[2])
+            cache_path = sys.argv[3]
+            iterations = int(sys.argv[4])
+
+            class ConvModel(torch.nn.Module):
+                def __init__(self):
+                    super().__init__()
+                    self.conv = torch.nn.Conv2d(3, 8, 3, padding=1)
+                def forward(self, x):
+                    return torch.relu(self.conv(x))
+
+            for i in range(iterations):
+                torch.manual_seed(seed + i)
+                model = ConvModel().eval().cuda()
+                inputs = [torch.randn(2, 3, 16, 16).cuda()]
+                compiled = torchtrt.compile(
+                    model,
+                    ir=\"dynamo\",
+                    inputs=inputs,
+                    enabled_precisions={torch.float32},
+                    use_python_runtime=use_python_runtime,
+                    min_block_size=1,
+                    runtime_cache_path=cache_path,
+                )
+                _ = compiled(*[inp.clone() for inp in inputs])
+                del compiled
+                gc.collect()
+            """
+        )
+
+        procs = []
+        for runtime_name, _seed in (("python", 0), ("cpp", 100)):
+            p = subprocess.Popen(
+                [
+                    _sys.executable,
+                    "-c",
+                    worker_script,
+                    runtime_name,
+                    str(_seed),
+                    self.cache_path,
+                    "2",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            procs.append((runtime_name, p))
+
+        for name, p in procs:
+            try:
+                stdout, stderr = p.communicate(timeout=300)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.wait()
+                self.fail(f"{name}-runtime subprocess deadlocked (300s timeout)")
+            self.assertEqual(
+                p.returncode,
+                0,
+                f"{name}-runtime subprocess failed (exit {p.returncode})\n"
+                f"stdout: {stdout.decode(errors='replace')[-2000:]}\n"
+                f"stderr: {stderr.decode(errors='replace')[-2000:]}",
+            )
+
+        self.assertTrue(os.path.isfile(self.cache_path))
+        self.assertGreater(os.path.getsize(self.cache_path), 0)
+
+    def test_python_lock_blocks_cpp_save(self):
+        """An externally-held filelock on <cache>.lock must cause the C++ runtime
+        save to time out silently (save_runtime_cache is noexcept). The cache file must
+        not be modified while the external lock is held."""
+        if not ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.skipTest("C++ runtime is not available")
+
+        from filelock import FileLock as PyFileLock
+
+        # Pre-warm: compile once with the Python runtime so the cache file exists.
+        model, inputs = _fresh_conv_model_and_inputs(seed=0)
+        warmup = _compile(
+            model,
+            inputs,
+            use_python_runtime=True,
+            runtime_cache_path=self.cache_path,
+        )
+        _ = warmup(*[inp.clone() for inp in inputs])
+        del warmup
+        gc.collect()
+        self.assertTrue(os.path.isfile(self.cache_path))
+        initial_mtime = os.path.getmtime(self.cache_path)
+        initial_size = os.path.getsize(self.cache_path)
+
+        # Hold the Python lock across the C++ runtime's dispose-time save.
+        # The C++ save uses a 10s timeout matching filelock's default; it should
+        # time out silently while we hold the lock.
+        external = PyFileLock(self.cache_path + ".lock")
+        with external.acquire(timeout=5):
+            cpp_model, cpp_inputs = _fresh_conv_model_and_inputs(seed=1)
+            cpp_compiled = _compile(
+                cpp_model,
+                cpp_inputs,
+                use_python_runtime=False,
+                runtime_cache_path=self.cache_path,
+            )
+            _ = cpp_compiled(*[inp.clone() for inp in cpp_inputs])
+            del cpp_compiled
+            gc.collect()
+            self.assertEqual(
+                initial_mtime,
+                os.path.getmtime(self.cache_path),
+                "Cache file was modified while external lock was held",
+            )
+            self.assertEqual(initial_size, os.path.getsize(self.cache_path))
+
+        # After releasing, a fresh C++ save should now succeed normally.
+        cpp_model2, cpp_inputs2 = _fresh_conv_model_and_inputs(seed=2)
+        cpp_compiled2 = _compile(
+            cpp_model2,
+            cpp_inputs2,
+            use_python_runtime=False,
+            runtime_cache_path=self.cache_path,
+        )
+        _ = cpp_compiled2(*[inp.clone() for inp in cpp_inputs2])
+        del cpp_compiled2
+        gc.collect()
+        self.assertTrue(os.path.isfile(self.cache_path))
 
 
 @unittest.skipIf(

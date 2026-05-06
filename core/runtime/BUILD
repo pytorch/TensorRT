@@ -94,6 +94,7 @@ cc_library(
     }),
     deps = [
         "//core/plugins:torch_tensorrt_plugins",
+        "//core/util:file_lock",
         "//core/util:prelude",
     ] + if_torch_nccl(["@torch_nccl//:nccl_headers"]) + select({
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],

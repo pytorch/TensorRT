@@ -1,5 +1,6 @@
 #include "core/runtime/TRTRuntimeConfig.h"
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -7,6 +8,7 @@
 #include <vector>
 
 #include "core/runtime/runtime.h"
+#include "core/util/file_lock.h"
 #include "core/util/prelude.h"
 
 namespace torch_tensorrt {
@@ -64,14 +66,35 @@ namespace {
 // Raw cache I/O helpers. Exception-propagating; the caller wraps in try/catch at the
 // TRTRuntimeConfig member level. Kept file-local because the IRuntimeCache type is
 // itself TensorRT-RTX-only and tests reach this path through the member wrappers.
+//
+// Concurrent access is serialized with a FileLock on <cache_path>.lock matching
+// filelock's lock-file convention so a Python and C++ runtime sharing one cache path do not
+// race the rename. Load takes a shared lock (multiple readers allowed); save takes an
+// exclusive lock.
+using torch_tensorrt::core::util::FileLock;
+
+constexpr auto kRuntimeCacheLockTimeout = std::chrono::seconds(10);
+
+[[nodiscard]] std::filesystem::path lock_path_for(const std::string& cache_path) {
+  return std::filesystem::path(cache_path + ".lock");
+}
+
 void load_runtime_cache(const std::string& path, nvinfer1::IRuntimeCache* cache) {
   TORCHTRT_CHECK(cache != nullptr, "load_runtime_cache requires a non-null IRuntimeCache");
   if (!std::filesystem::exists(path)) {
     LOG_DEBUG("No existing runtime cache at " << path);
     return;
   }
-  std::ifstream f(path, std::ios::binary);
-  std::vector<char> buf((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+  std::vector<char> buf;
+  {
+    FileLock lock(lock_path_for(path));
+    TORCHTRT_CHECK(
+        lock.try_lock_for(FileLock::Mode::Shared, kRuntimeCacheLockTimeout),
+        "Timed out acquiring shared lock for runtime cache " << path);
+    std::ifstream f(path, std::ios::binary);
+    buf.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+  }
+  // Lock released; deserialize can be slow and does not need to hold readers off.
   if (buf.empty()) {
     return;
   }
@@ -89,13 +112,17 @@ void save_runtime_cache_impl(const std::string& path, nvinfer1::IRuntimeCache* c
   if (fs_path.has_parent_path()) {
     std::filesystem::create_directories(fs_path.parent_path());
   }
-  std::filesystem::path tmp_path = fs_path;
-  tmp_path += ".tmp";
+  // Exclusive lock keeps concurrent readers off while we overwrite the file in place,
+  // so the tmp + rename dance is unnecessary here. The ofstream goes out of scope (and
+  // flushes) before the lock is released.
   {
-    std::ofstream out(tmp_path, std::ios::binary);
+    FileLock lock(lock_path_for(path));
+    TORCHTRT_CHECK(
+        lock.try_lock_for(FileLock::Mode::Exclusive, kRuntimeCacheLockTimeout),
+        "Timed out acquiring exclusive lock for runtime cache " << path);
+    std::ofstream out(fs_path, std::ios::binary);
     out.write(reinterpret_cast<const char*>(host_mem->data()), host_mem->size());
   }
-  std::filesystem::rename(tmp_path, fs_path);
   LOG_INFO("Saved runtime cache to " << path << " (" << host_mem->size() << " bytes)");
 }
 #endif // TRT_MAJOR_RTX
