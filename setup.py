@@ -258,7 +258,7 @@ def build_libtorchtrt_cxx11_abi(
             cmd.append("--platforms=//toolchains:aarch64_linux")
         else:
             cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
-    
+
     env = os.environ.copy()
     if "TORCH_PATH" not in env:
         stable_torch_path = resolve_torch_path()
@@ -266,12 +266,12 @@ def build_libtorchtrt_cxx11_abi(
             env["TORCH_PATH"] = stable_torch_path
             print(f"Using TORCH_PATH={stable_torch_path}")
 
-
     print(f"building libtorchtrt {cmd=}")
     status_code = subprocess.run(cmd, env=env).returncode
 
     if status_code != 0:
         sys.exit(status_code)
+
 
 def resolve_torch_path():
     explicit_torch_path = os.environ.get("TORCH_PATH")
@@ -827,7 +827,10 @@ def get_x86_64_requirements(base_requirements):
     if IS_DLFW_CI:
         return requirements
     else:
-        requirements = requirements + ["torch>=2.12.0,<2.13.0", "executorch>=1.2.0"]
+        requirements = requirements + [
+            "torch>=2.12.0,<2.13.0",
+            "executorch>=1.2.0",
+        ]
         if USE_TRT_RTX:
             return requirements + [
                 "tensorrt_rtx>=1.4.0.76",
