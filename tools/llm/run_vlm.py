@@ -50,6 +50,22 @@ from utils import (
     record_stats,
 )
 
+# Import ViT plugin utilities (optional)
+try:
+    from plugin_utils_vit import (
+        ViTPluginWrapper,
+        compile_vit_plugin_model,
+        get_vit_plugin_config,
+        load_plugin as load_vit_plugin,
+        register_vit_plugin_op,
+        replace_vit_attention_with_plugin,
+        set_vit_plugin_config,
+    )
+
+    VIT_PLUGIN_AVAILABLE = True
+except ImportError:
+    VIT_PLUGIN_AVAILABLE = False
+
 # --- WORKAROUND FOR EAGLE2 SDPA COMPILATION ---
 # Eagle2's language model (Qwen2) implicitly defaults to "flash_attention_2"
 # due to settings in its remote code and config.json. This prevents direct
@@ -254,8 +270,13 @@ def _compile_lm(
     position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(device)
 
     use_fp32_acc = False
+    use_explicit_typing = False
     if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
         use_fp32_acc = True
+        use_explicit_typing = True
+    else:  # FP32
+        enabled_precisions = {torch.float32}
 
     exported_program = export_llm(
         lm_wrap, input_embeds, min_seq_len=1, max_seq_len=2560
@@ -265,6 +286,8 @@ def _compile_lm(
         trt_mod = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs=[input_embeds, position_ids],
+            enabled_precisions=enabled_precisions,
+            use_explicit_typing=use_explicit_typing,
             use_fp32_acc=use_fp32_acc,
             device=device,
             disable_tf32=args.disable_tf32,
@@ -324,8 +347,15 @@ def _compile_eagle2_vision(
     """
     # Set precision-specific flags
     use_fp32_acc = False
+    use_explicit_typing = False
     if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
         use_fp32_acc = True
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+    else:  # FP32
+        enabled_precisions = {torch.float32}
 
     with torch.inference_mode():
         exported_program = torch.export.export(
@@ -338,6 +368,8 @@ def _compile_eagle2_vision(
         trt_mod = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs=[example_pixel_values],
+            enabled_precisions=enabled_precisions,
+            use_explicit_typing=use_explicit_typing,
             use_fp32_acc=use_fp32_acc,
             device=device,
             disable_tf32=args.disable_tf32,
@@ -348,15 +380,161 @@ def _compile_eagle2_vision(
     return trt_mod
 
 
+def _get_qwen_vision_config(config):
+    if hasattr(config, "vision_config"):
+        return config.vision_config
+    if hasattr(config, "visual"):
+        return config.visual
+    raise ValueError("Cannot find Qwen-VL vision config")
+
+
+def _set_qwen_vit_plugin_config(vision_config, pixel_values):
+    head_dim = vision_config.hidden_size // vision_config.num_heads
+    set_vit_plugin_config(
+        num_attention_heads=vision_config.num_heads,
+        head_dim=head_dim,
+        num_patches=pixel_values.shape[0],
+    )
+
+
+def _create_qwen_vit_plugin_core_inputs(
+    visual_model: torch.nn.Module,
+    pixel_values: torch.Tensor,
+    image_grid_thw: torch.Tensor,
+    device: torch.device,
+    dtype: torch.dtype,
+):
+    with torch.no_grad():
+        rotary_pos_emb = visual_model.rot_pos_emb(image_grid_thw)
+        window_index, cu_window_seqlens = visual_model.get_window_index(image_grid_thw)
+
+    window_index = window_index.to(device=device, dtype=torch.long)
+    reverse_window_index = torch.argsort(window_index)
+
+    seq_len = pixel_values.shape[0]
+    attention_mask = torch.zeros(1, seq_len, seq_len, dtype=dtype, device=device)
+    window_attention_mask = torch.full(
+        (1, seq_len, seq_len),
+        torch.finfo(dtype).min,
+        dtype=dtype,
+        device=device,
+    )
+
+    if isinstance(cu_window_seqlens, torch.Tensor):
+        cu_window_seqlens = cu_window_seqlens.to(device="cpu", dtype=torch.long).tolist()
+
+    for start, end in zip(cu_window_seqlens[:-1], cu_window_seqlens[1:]):
+        window_attention_mask[:, start:end, start:end] = 0
+
+    return {
+        "rotary_pos_emb": rotary_pos_emb.to(device=device),
+        "attention_mask": attention_mask,
+        "window_attention_mask": window_attention_mask,
+        "window_index": window_index,
+        "reverse_window_index": reverse_window_index,
+    }
+
+
+class _QwenVITPluginVisualAdapter(torch.nn.Module):
+    """
+    Preserve Qwen's native visual tower call signature while using the compiled
+    ViT plugin wrapper internally.
+    """
+
+    def __init__(self, compiled_visual, core_inputs):
+        super().__init__()
+        self.compiled_visual = compiled_visual
+        self.core_inputs = core_inputs
+
+    def forward(self, pixel_values, image_grid_thw):
+        try:
+            return self.compiled_visual(
+                pixel_values=pixel_values,
+                rotary_pos_emb=self.core_inputs["rotary_pos_emb"],
+                attention_mask=self.core_inputs["attention_mask"],
+                window_attention_mask=self.core_inputs["window_attention_mask"],
+                window_index=self.core_inputs["window_index"],
+                reverse_window_index=self.core_inputs["reverse_window_index"],
+            )
+        except TypeError:
+            return self.compiled_visual(
+                pixel_values,
+                self.core_inputs["rotary_pos_emb"],
+                self.core_inputs["attention_mask"],
+                self.core_inputs["window_attention_mask"],
+                self.core_inputs["window_index"],
+                self.core_inputs["reverse_window_index"],
+            )
+
+
+def _compile_qwen_vision_with_vit_plugin(
+    model: torch.nn.Module,
+    inputs,
+    args: argparse.Namespace,
+    device: torch.device,
+) -> torch.nn.Module:
+    if "image_grid_thw" not in inputs:
+        raise ValueError("Qwen-VL ViT plugin path expects image_grid_thw in inputs.")
+
+    torch_dtype = {
+        "FP16": torch.float16,
+        "BF16": torch.bfloat16,
+    }.get(args.precision, torch.float32)
+
+    vision_config = _get_qwen_vision_config(model.config)
+    pixel_values = inputs["pixel_values"]
+    image_grid_thw = inputs["image_grid_thw"]
+
+    load_vit_plugin()
+    register_vit_plugin_op()
+    _set_qwen_vit_plugin_config(vision_config, pixel_values)
+    print(f"ViT plugin config: {get_vit_plugin_config()}")
+
+    visual_model = replace_vit_attention_with_plugin(model.visual, vision_config)
+    wrapper = ViTPluginWrapper(visual_model, model_type="qwen_vl").eval()
+    core_inputs = _create_qwen_vit_plugin_core_inputs(
+        visual_model,
+        pixel_values,
+        image_grid_thw,
+        device,
+        torch_dtype,
+    )
+
+    compile_kwargs = {
+        "pixel_values": pixel_values,
+        **core_inputs,
+    }
+    compiled_visual = compile_vit_plugin_model(
+        wrapper,
+        (),
+        device,
+        example_kwargs=compile_kwargs,
+        dynamic_shapes={name: {} for name in compile_kwargs},
+        debug=args.debug,
+    )
+
+    return _QwenVITPluginVisualAdapter(compiled_visual, core_inputs).eval()
+
+
 def compile_vision_torchtrt(
     model: torch.nn.Module,
     args: argparse.Namespace,
-    example_pixel_values: torch.Tensor,
+    inputs,
     device: torch.device,
 ) -> torch.nn.Module:
     """
     Dispatcher function for vision model compilation.
     """
+    example_pixel_values = inputs["pixel_values"]
+    if getattr(args, "vision_backend", "torchtrt") == "plugin":
+        if not VIT_PLUGIN_AVAILABLE:
+            raise RuntimeError(
+                "ViT plugin vision backend requested but plugin utilities are not available."
+            )
+        if args.model != "Qwen/Qwen2.5-VL-3B-Instruct":
+            raise ValueError("The ViT plugin vision backend currently supports Qwen2.5-VL.")
+        return _compile_qwen_vision_with_vit_plugin(model, inputs, args, device)
+
     if args.model == "nvidia/Eagle2-2B":
         return _compile_eagle2_vision(
             model.vision_model, example_pixel_values, args, device
@@ -430,6 +608,15 @@ if __name__ == "__main__":
         "--benchmark", action="store_true", help="Enable benchmarking mode"
     )
     parser.add_argument(
+        "--vision_backend",
+        default="torchtrt",
+        choices=["torchtrt", "plugin"],
+        help=(
+            "Vision backend. 'torchtrt' keeps the existing component compiler; "
+            "'plugin' uses the TensorRT-Edge-LLM ViT attention plugin where supported."
+        ),
+    )
+    parser.add_argument(
         "--image_path",
         type=str,
         default=None,
@@ -461,6 +648,11 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    if args.vision_backend == "plugin" and not VIT_PLUGIN_AVAILABLE:
+        raise RuntimeError(
+            "ViT plugin vision backend requested but plugin utilities are not available."
+        )
 
     device = torch.device(args.device)
     if device.type == "cuda":
@@ -558,8 +750,7 @@ if __name__ == "__main__":
     trt_model = copy.deepcopy(model)
     # 4.1. Vision model compilation
     # --- Add vision model compilation --- #
-    example_pixel_values = inputs["pixel_values"]
-    trt_vision = compile_vision_torchtrt(model, args, example_pixel_values, device)
+    trt_vision = compile_vision_torchtrt(trt_model, args, inputs, device)
     if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
         trt_model.visual = trt_vision
     else:
