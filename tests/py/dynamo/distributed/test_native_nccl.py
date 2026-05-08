@@ -1443,6 +1443,99 @@ def _multirank_reduce_scatter_correctness(
     _check_close(out, expected, f"reduce_scatter rank={rank}")
 
 
+def _multirank_reduce_scatter_all_reduce_ops(
+    rank: int, world_size: int, device: torch.device
+) -> None:
+    """reduce_scatter compiled via Torch-TensorRT must produce correct output
+    for every supported reduce_op (sum / prod / min / max / avg).
+
+    For each reduce_op:
+      1. Build a model that calls reduce_scatter_tensor with that op.
+      2. Run it eagerly on PyTorch as the reference.
+      3. Compile the same model with torch_tensorrt and run on TRT.
+      4. Assert TRT output matches eager output.
+
+    Regression guard for the bug where ``fused_nccl_reduce_scatter`` dropped
+    ``args[1]`` (reduce_op), causing all non-sum reductions to silently
+    compile as SUM on the native TRT collective path. The input is
+    constructed so that sum/prod/min/max/avg all give distinct row-wise
+    values, so a SUM-fallback bug fails every iteration except 'sum'.
+    """
+    if world_size < 2:
+        # world_size == 1 takes the `if world_size == 1: return plug_inputs[0]`
+        # early return inside nccl_reduce_scatter_native, so the reduce_op
+        # path is never exercised. This test is meaningful only with >= 2 ranks.
+        print(
+            f"[SKIP] _multirank_reduce_scatter_all_reduce_ops requires world_size >= 2"
+        )
+        return
+
+    import torch_tensorrt
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+
+    group = dist.group.WORLD
+    group_name = group.group_name if hasattr(group, "group_name") else ""
+
+    class ReduceScatter(nn.Module):
+        def __init__(self, reduce_op: str, world_size: int, group_name: str) -> None:
+            super().__init__()
+            self.reduce_op = reduce_op
+            self.world_size = world_size
+            self.group_name = group_name
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            out = torch.ops._c10d_functional.reduce_scatter_tensor.default(
+                x, self.reduce_op, self.world_size, self.group_name
+            )
+            return torch.ops._c10d_functional.wait_tensor.default(out)
+
+    # Input shape: (world_size, 4); rank r contributes row i = (r+1) * (i+1).
+    # Concrete row-wise reductions across ranks for world_size=2:
+    #   row 0: ranks contribute [1, 2]   sum=3   prod=2   min=1   max=2   avg=1.5
+    #   row 1: ranks contribute [2, 4]   sum=6   prod=8   min=2   max=4   avg=3.0
+    # Every reduce_op produces a distinct value per row, so any wrong
+    # reduction (e.g. SUM-fallback bug) is caught unambiguously.
+    inp = torch.stack(
+        [
+            torch.full(
+                (4,),
+                float((rank + 1) * (i + 1)),
+                device=device,
+                dtype=torch.float32,
+            )
+            for i in range(world_size)
+        ]
+    )
+
+    for reduce_op in ("sum", "prod", "min", "max", "avg"):
+        model = ReduceScatter(reduce_op, world_size, group_name).to(device).eval()
+
+        with torch.no_grad():
+            ref = model(inp)
+
+        trt_model = torch.compile(
+            model,
+            backend="torch_tensorrt",
+            dynamic=False,
+            options={
+                "use_python_runtime": True,
+                "min_block_size": 1,
+                "use_distributed_mode_trace": True,
+            },
+        )
+
+        with torch.no_grad():
+            out = trt_model(inp)
+
+        _check_close(
+            out,
+            ref,
+            f"reduce_scatter reduce_op={reduce_op!r} (TRT vs eager) rank={rank}",
+        )
+
+
 def _multirank_distributed_mode_tp_model(
     rank: int, world_size: int, device: torch.device
 ) -> None:
@@ -1829,6 +1922,18 @@ class TestMultirankNccl(MultiProcessTestCase):
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
+    def test_reduce_scatter_all_reduce_ops(self) -> None:
+        """reduce_scatter compiled via TRT matches eager for every reduce_op.
+
+        Regression guard for the fused_nccl_reduce_scatter args[1] (reduce_op)
+        forwarding bug — covers sum/prod/min/max/avg.
+        """
+        device = self._init_dist()
+        _multirank_reduce_scatter_all_reduce_ops(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
     def test_distributed_mode_tp_model(self) -> None:
         """Tensor-parallel MLP with distributed_context() produces correct output."""
         device = self._init_dist()
@@ -1881,6 +1986,7 @@ def run_multirank_tests() -> None:
         _multirank_all_reduce_correctness,
         _multirank_all_gather_correctness,
         _multirank_reduce_scatter_correctness,
+        _multirank_reduce_scatter_all_reduce_ops,
         _multirank_distributed_mode_tp_model,
         _multirank_distributed_mode_subgroup,
         _multirank_cpp_runtime_bind_nccl,
