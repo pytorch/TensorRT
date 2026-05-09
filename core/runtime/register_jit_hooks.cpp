@@ -4,66 +4,13 @@
 #include "core/runtime/runtime.h"
 #include "core/util/macros.h"
 
+// serialize_bindings / base64_encode / base64_decode are defined in
+// runtime_utils.cpp so the ExecuTorch backend can link them without
+// pulling in the torch::class_ registration below.
+
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
-
-std::string serialize_bindings(const std::vector<std::string>& bindings) {
-  std::stringstream ss;
-  for (size_t i = 0; i < bindings.size() - 1; i++) {
-    ss << bindings[i] << TRTEngine::BINDING_DELIM;
-  }
-  ss << bindings[bindings.size() - 1];
-
-  std::string serialized_binding_info = ss.str();
-
-  LOG_DEBUG("Serialized Binding Info: " << serialized_binding_info);
-
-  return serialized_binding_info;
-}
-
-static const std::string sym_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; //=
-std::string base64_encode(const std::string& in) {
-  std::string out;
-  int64_t val = 0, valb = -6;
-  for (unsigned char c : in) {
-    val = (val << 8) + c;
-    valb += 8;
-    while (valb >= 0) {
-      out.push_back(sym_table[(val >> valb) & 0x3F]);
-      valb -= 6;
-    }
-  }
-  if (valb > -6) {
-    out.push_back(sym_table[((val << 8) >> (valb + 8)) & 0x3F]);
-  };
-  while (out.size() % 4) {
-    out.push_back('=');
-  }
-  return out;
-}
-
-std::string base64_decode(const std::string& in) {
-  std::string out;
-  std::vector<int> T(256, -1);
-  for (int i = 0; i < 64; i++) {
-    T[sym_table[i]] = i;
-  }
-
-  int64_t val = 0, valb = -8;
-  for (unsigned char c : in) {
-    if (T[c] == -1) {
-      break;
-    }
-    val = (val << 6) + T[c];
-    valb += 6;
-    if (valb >= 0) {
-      out.push_back(char((val >> valb) & 0xFF));
-      valb -= 8;
-    }
-  }
-  return out;
-}
 
 namespace {
 // TODO: Implement a call method

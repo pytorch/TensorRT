@@ -27,6 +27,14 @@ new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.
 
 local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 
+local_executorch = use_repo_rule("//toolchains:local_executorch.bzl", "local_executorch")
+
+# Detect ExecuTorch from the active Python environment (VIRTUAL_ENV / CONDA_PREFIX / PATH).
+# Supports both pip-installed wheel layout and source-tree layout.
+# Optional overrides:
+#   EXECUTORCH_ROOT=/path/to/executorch
+local_executorch(name = "executorch")
+
 torch_nccl_detect = use_repo_rule("//toolchains/torch_nccl:defs.bzl", "torch_nccl_detect")
 
 torch_nccl_detect(name = "torch_nccl")
@@ -80,6 +88,15 @@ local_torch(name = "libtorch")
 # please modify this path according to your local python wheel path
 #    path = "/usr/local/lib/python3.11/dist-packages/torch",
 #    build_file = "third_party/libtorch/BUILD"
+#)
+
+# Explicit ExecuTorch override. The repository rule above is preferred.
+# If you use this manually, point the path either at the installed
+# ExecuTorch package root or a compatible source-tree root.
+#new_local_repository(
+#    name = "executorch",
+#    build_file = "@//third_party/executorch:BUILD",
+#    path = "/path/to/executorch",
 #)
 
 #new_local_repository(
