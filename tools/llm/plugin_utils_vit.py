@@ -703,7 +703,12 @@ class ViTPluginWrapper(nn.Module):
                 attention_mask,
             )
 
-        return self.model(pixel_values)
+        output = self.model(pixel_values)
+        if hasattr(output, "last_hidden_state"):
+            return output.last_hidden_state
+        if isinstance(output, (tuple, list)):
+            return output[0]
+        return output
 
 
 # -----------------------------------------------------------------------------
@@ -765,6 +770,23 @@ def replace_vit_attention_with_plugin(
                 replacement_count += 1
 
     if layer_idx:
+        return model
+
+    # HF SigLIP/SigLIP2-style tower: model.vision_model.encoder.layers or
+    # model.encoder.layers. These attention modules return
+    # (hidden_state, attn_weights), so the replacement returns a tuple.
+    if hasattr(vision_model, "encoder") and hasattr(vision_model.encoder, "layers"):
+        for i, layer in enumerate(vision_model.encoder.layers):
+            if hasattr(layer, "self_attn"):
+                layer.self_attn = ViTPluginAttention(
+                    layer.self_attn,
+                    config,
+                    i,
+                    return_tuple=True,
+                )
+                replacement_count += 1
+
+    if replacement_count:
         return model
 
     # HF ViT-style tower: model.vision_model.encoder.layer or model.encoder.layer.

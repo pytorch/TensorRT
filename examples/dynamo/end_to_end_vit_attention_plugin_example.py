@@ -14,16 +14,24 @@ visual towers used by production multimodal models:
 Supported end-to-end paths:
 - Qwen2.5-VL visual tower
 - Meta Llama 3.2 Vision / HuggingFace Mllama vision tower
+- NVIDIA GR00T N1.5 configured Eagle/SigLIP2 vision tower
 
-By default this script runs both benchmarks. Use ``--model-type qwen_vl`` or
-``--model-type mllama`` to run only one path.
+By default this script runs all benchmarks.
 """
 
 import os
 import sys
+import json
 
 import torch
-from transformers import AutoConfig, MllamaVisionModel, Qwen2_5_VLForConditionalGeneration
+from huggingface_hub import hf_hub_download
+from huggingface_hub.errors import RepositoryNotFoundError
+from transformers import (
+    AutoConfig,
+    AutoModel,
+    MllamaVisionModel,
+    Qwen2_5_VLForConditionalGeneration,
+)
 
 # Add tools/llm to path for shared plugin utilities, matching the LLM example style.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../tools/llm"))
@@ -42,8 +50,20 @@ from plugin_utils_vit import (
 # Configuration
 QWEN_MODEL_NAME = "Qwen/Qwen2.5-VL-3B-Instruct"
 MLLAMA_MODEL_NAME = "meta-llama/Llama-3.2-11B-Vision"
+GROOT_MODEL_NAME = "nvidia/GR00T-N1-2B"
+
 DTYPE = torch.float16
 DEVICE = torch.device("cuda:0")
+
+# Optional model-agnostic remaps for policy configs that reference placeholder
+# or internal backbone paths. Add entries as:
+#   "<path from config.json>": "<local checkpoint dir or public HF repo id>"
+BACKBONE_OVERRIDES = {
+    # Example for nvidia/GR00T-N1-2B.
+    TODO: This public SigLIP checkpoint is only a smoke-test stand-in for exercising
+    # policy -> backbone resolution. It is not the real GR00T Eagle backbone as it is not publicly accessible.
+    "$GR00T_BACKBONE_PATH/eagle2_hg_model": "google/siglip-base-patch16-224",
+}
 
 # One image grid used for the compile example: t, h, w.
 # Qwen2.5-VL visual input is already a patch-vector tensor: [t*h*w, patch_dim].
@@ -62,6 +82,13 @@ TARGET_CONFIG = None
 
 def get_vision_config(config):
     """Return the vision config from a top-level or vision-only config."""
+    if isinstance(config, dict):
+        if "vision_config" in config:
+            return config["vision_config"]
+        if "visual" in config:
+            return config["visual"]
+        if "attention_heads" in config and "max_num_tiles" in config:
+            return config
     if hasattr(config, "vision_config"):
         return config.vision_config
     if hasattr(config, "visual"):
@@ -70,7 +97,125 @@ def get_vision_config(config):
         return config
     raise ValueError("Cannot find vision config")
 
-def get_visual_num_patches(vision_config, image_grid_thw=None):
+
+def expand_backbone_model_name(backbone_name):
+    """
+    Resolve nested backbone names from policy configs.
+
+    A policy config can point to a public HF repo, a local absolute path, an
+    env-var based path, or a placeholder path that this example remaps through
+    BACKBONE_OVERRIDES. GR00T-N1-2B, for example, uses
+    "$GR00T_BACKBONE_PATH/eagle2_hg_model"; add that string to
+    BACKBONE_OVERRIDES when the backbone is available locally.
+    """
+    resolved = BACKBONE_OVERRIDES.get(backbone_name, os.path.expandvars(backbone_name))
+    if "$" in resolved:
+        raise RuntimeError(
+            f"Backbone checkpoint path '{backbone_name}' contains an unresolved "
+            "environment variable. Add it to BACKBONE_OVERRIDES, set the env var, "
+            "or replace the config value with a local path/public Hugging Face repo id."
+        )
+    if os.path.isabs(resolved) and not os.path.exists(os.path.join(resolved, "config.json")):
+        raise RuntimeError(
+            f"Backbone checkpoint path '{resolved}' does not contain config.json."
+        )
+    return resolved
+
+
+def get_backbone_model_name(config):
+    """
+    Return a nested vision/VLM backbone path from policy-style configs.
+
+    In this file, "backbone" means the reusable perception/VLM feature extractor
+    inside a larger model. GR00T is a robotics policy, but the ViT attention we
+    want to compile lives in its Eagle/SigLIP2 backbone, not in the action head.
+    Different GR00T releases expose that backbone differently:
+
+    - N1.5: backbone_cfg.eagle_path -> an Eagle checkpoint repo/path
+    - N1-2B: backbone_cfg.model_name -> often an env-var based local path
+    - N1.6/N1.7/H: backbone_model_type="eagle" without a loadable path
+    """
+    if isinstance(config, dict):
+        backbone_cfg = config.get("backbone_cfg")
+        backbone_model_type = config.get("backbone_model_type")
+    else:
+        backbone_cfg = getattr(config, "backbone_cfg", None)
+        backbone_model_type = getattr(config, "backbone_model_type", None)
+    if backbone_cfg is None:
+        if backbone_model_type is not None:
+            raise ValueError(
+                f"Config declares backbone_model_type='{backbone_model_type}' "
+                "but does not include a loadable backbone checkpoint path."
+            )
+        return None
+
+    if isinstance(backbone_cfg, dict):
+        backbone_name = backbone_cfg.get("eagle_path") or backbone_cfg.get("model_name")
+    else:
+        backbone_name = (
+            getattr(backbone_cfg, "eagle_path", None)
+            or getattr(backbone_cfg, "model_name", None)
+        )
+    if backbone_name is None:
+        return None
+    return expand_backbone_model_name(backbone_name)
+
+
+def load_config_or_raise(model_name, *, source_model_name=None):
+    """Load a config and raise a concise error when a nested checkpoint is missing."""
+    try:
+        return AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    except (OSError, RepositoryNotFoundError) as exc:
+        source = f" referenced by {source_model_name}" if source_model_name else ""
+        raise RuntimeError(
+            f"Checkpoint '{model_name}'{source} is not available from Hugging Face. "
+            "Confirm the repo id is public, authenticate with a token that has access, "
+            "or provide a local checkpoint path."
+        )
+
+
+def resolve_vision_config(model_name):
+    """
+    Load the config that owns the visual transformer.
+
+    Standard VLMs expose a vision_config directly. Robotics policy checkpoints
+    such as GR00T can instead point at a reusable Eagle/SigLIP2 backbone; in
+    that case we lower the top-level policy config to the backbone config before
+    extracting the vision settings.
+    """
+    config = load_config_or_raise(model_name)
+    backbone_name = get_backbone_model_name(config)
+    if backbone_name is None:
+        return model_name, get_vision_config(config)
+
+    backbone_config = load_config_or_raise(
+        backbone_name,
+        source_model_name=model_name,
+    )
+    return backbone_name, get_vision_config(backbone_config)
+
+
+def resolve_policy_backbone_config(model_name):
+    """
+    Resolve configs that AutoConfig cannot load because they are policy models.
+
+    GR00T-N1.5, for example, has model_type="gr00t_n1_5", which vanilla
+    Transformers does not recognize. We therefore read config.json as plain JSON,
+    find the nested Eagle/SigLIP2 backbone, and then use AutoConfig on that
+    backbone because it is the model that owns the visual transformer layers.
+    """
+    config = load_hf_config_dict(model_name)
+    backbone_name = get_backbone_model_name(config)
+    if backbone_name is None:
+        return model_name, get_vision_config(config)
+
+    backbone_config = load_config_or_raise(
+        backbone_name,
+        source_model_name=model_name,
+    )
+    return backbone_name, get_vision_config(backbone_config)
+
+def get_visual_num_patches(vision_config, image_grid_thw=None, include_cls=True):
     """Return the visual-token extent used by the ViT plugin config."""
     if image_grid_thw is not None:
         grid_t, grid_h, grid_w = image_grid_thw
@@ -87,7 +232,9 @@ def get_visual_num_patches(vision_config, image_grid_thw=None):
     else:
         patch_h = patch_w = patch_size
 
-    num_patches = (image_h // patch_h) * (image_w // patch_w) + 1
+    num_patches = (image_h // patch_h) * (image_w // patch_w)
+    if include_cls:
+        num_patches += 1
     if hasattr(vision_config, "max_num_tiles"):
         target_length = num_patches + (8 - (num_patches % 8)) % 8
         return vision_config.max_num_tiles * target_length
@@ -112,6 +259,22 @@ def set_plugin_config_from_vision_config(vision_config, num_patches):
         head_dim=head_dim,
         num_patches=num_patches,
     )
+
+
+def load_hf_config_dict(model_name):
+    """Load config.json directly for repos without an AutoConfig registration."""
+    config_path = hf_hub_download(model_name, "config.json")
+    with open(config_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_vision_model(model):
+    """Return the visual tower from a multimodal model or the model itself."""
+    if hasattr(model, "vision_model"):
+        return model.vision_model
+    if hasattr(model, "visual"):
+        return model.visual
+    return model
 
 def create_windowed_rope_metadata(visual_model, pixel_values, image_grid_thw):
     """
@@ -218,6 +381,30 @@ def create_tiled_vision_inputs(vision_config):
     aspect_ratio_mask[:, :, 1:] = 0
     return pixel_values, aspect_ratio_ids, aspect_ratio_mask
 
+
+def create_raw_image_inputs(vision_config):
+    """
+    Create native PyTorch args for raw image visual input.
+
+    Input style:
+    raw_image_inputs -> [B, C, H, W]
+    """
+    image_size = vision_config.image_size
+    if isinstance(image_size, (tuple, list)):
+        image_h, image_w = image_size
+    else:
+        image_h = image_w = image_size
+    num_channels = getattr(vision_config, "num_channels", 3)
+    pixel_values = torch.randn(
+        1,
+        num_channels,
+        image_h,
+        image_w,
+        dtype=DTYPE,
+        device=DEVICE,
+    )
+    return (pixel_values,)
+
 def create_tiled_aspect_ratio_attention_mask(vision_config, aspect_ratio_mask):
     """
     Create an expanded additive mask from tiled aspect-ratio validity metadata.
@@ -281,6 +468,8 @@ def create_visual_plugin_metadata(model_type, visual_model, vision_config, pytor
                 aspect_ratio_mask,
             )
         }
+    if model_type in ("raw_image", "groot"):
+        return {}
     raise ValueError(f"Unsupported visual model type: {model_type}")
 
 def create_visual_inputs(model_type, visual_model, vision_config):
@@ -300,6 +489,8 @@ def create_visual_inputs(model_type, visual_model, vision_config):
         pytorch_args = create_patch_vector_inputs(vision_config)
     elif model_type == "mllama":
         pytorch_args = create_tiled_vision_inputs(vision_config)
+    elif model_type in ("raw_image", "groot"):
+        pytorch_args = create_raw_image_inputs(vision_config)
     else:
         raise ValueError(f"Unsupported visual model type: {model_type}")
 
@@ -487,6 +678,65 @@ def run_mllama(model_name):
     benchmark_visual(trt_visual_model, plugin_kwargs, run_name="TensorRT")
 
 
+def run_groot(model_name):
+    print(f"Loading {model_name}...")
+    backbone_name, vision_config = resolve_policy_backbone_config(model_name)
+    print(f"Using GR00T visual backbone: {backbone_name}")
+
+    globals()["TARGET_CONFIG"] = vision_config
+    set_plugin_config_from_vision_config(
+        vision_config,
+        get_visual_num_patches(vision_config, include_cls=False),
+    )
+    print(f"Plugin config: {get_vit_plugin_config()}")
+
+    model_pytorch = AutoModel.from_pretrained(
+        backbone_name,
+        trust_remote_code=True,
+        torch_dtype=DTYPE,
+    ).to(DEVICE)
+    model_pytorch.eval()
+
+    model_trt = AutoModel.from_pretrained(
+        backbone_name,
+        trust_remote_code=True,
+        torch_dtype=DTYPE,
+    ).to(DEVICE)
+    model_trt.eval()
+
+    visual_pytorch = get_vision_model(model_pytorch)
+    visual_trt = get_vision_model(model_trt)
+    visual_trt = replace_vit_attention_with_plugin(visual_trt, vision_config)
+    wrapper = ViTPluginWrapper(visual_trt, model_type="generic").eval()
+
+    pytorch_args, plugin_kwargs = create_visual_inputs(
+        "groot",
+        visual_trt,
+        vision_config,
+    )
+
+    print("Compiling TensorRT GR00T/Eagle visual model...")
+    trt_visual_model = compile_vit_plugin_model(
+        wrapper,
+        (),
+        DEVICE,
+        example_kwargs=plugin_kwargs,
+        dynamic_shapes={name: {} for name in plugin_kwargs},
+    )
+
+    verify_visual_output(
+        "GR00T/Eagle/SigLIP2",
+        visual_pytorch,
+        pytorch_args,
+        trt_visual_model,
+        plugin_kwargs,
+    )
+
+    print("Starting GR00T/Eagle/SigLIP2 Visual Benchmark...")
+    print(f"Device: {torch.cuda.get_device_name(0)}")
+    benchmark_visual(trt_visual_model, plugin_kwargs, run_name="TensorRT")
+
+
 # -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
@@ -496,3 +746,4 @@ if __name__ == "__main__":
 
     run_qwen(QWEN_MODEL_NAME)
     run_mllama(MLLAMA_MODEL_NAME)
+    run_groot(GROOT_MODEL_NAME)
