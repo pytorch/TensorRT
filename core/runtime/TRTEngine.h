@@ -268,9 +268,9 @@ struct TRTEngine : torch::CustomClassHolder {
   void set_resource_allocation_strategy(ResourceAllocationStrategy new_strategy);
   ResourceAllocationStrategy get_resource_allocation_strategy();
 
-  // All TensorRT-RTX-specific IRuntimeConfig state lives here. On non-RTX builds this
-  // still owns a shared IRuntimeConfig (so the execution-context allocation strategy is
-  // applied via the uniform code path) but the RTX-only setters become no-ops.
+  // Owns the IRuntimeConfig (where supported) and TRT-RTX runtime state. On older TRT
+  // without IRuntimeConfig (e.g. Jetpack) this just carries strategy values that get
+  // passed to the legacy createExecutionContext overload.
   TRTRuntimeConfig runtime_cfg;
 
   // Monolithic-capturability check used when this engine is wrapped by an outer whole-graph
@@ -282,8 +282,7 @@ struct TRTEngine : torch::CustomClassHolder {
   void disable_rtx_native_cudagraphs();
 
  private:
-  // Single entry point that (re)creates exec_ctx. Also creates (once) the IRuntimeConfig
-  // owned by runtime_cfg and applies all runtime config settings.
+  // Single entry point that (re)creates exec_ctx via runtime_cfg.create_execution_context.
   void recreate_execution_context();
 };
 

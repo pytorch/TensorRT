@@ -97,7 +97,7 @@ class CompilationSettings:
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
-        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. The cache is loaded on engine setup and saved on module cleanup. Uses file locking for concurrent access safety. Not used for standard TensorRT.
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Loaded on engine setup, saved on module cleanup. Not used for standard TensorRT.
         dynamic_shapes_kernel_specialization_strategy (str): Strategy for compiling shape-specialized kernels at runtime for dynamic shapes (TensorRT-RTX only). Options: "lazy" (compile in background, use fallback until ready), "eager" (compile immediately, blocking), "none" (always use fallback kernels). Default: "lazy".
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage

@@ -102,7 +102,8 @@ void save_runtime_cache_impl(const std::string& path, nvinfer1::IRuntimeCache* c
 
 } // namespace
 
-void TRTRuntimeConfig::ensure_initialized(nvinfer1::ICudaEngine* cuda_engine) {
+void TRTRuntimeConfig::ensure_initialized(TORCHTRT_UNUSED nvinfer1::ICudaEngine* cuda_engine) {
+#ifdef TRT_HAS_IRUNTIME_CONFIG
   if (config) {
     return;
   }
@@ -146,12 +147,20 @@ void TRTRuntimeConfig::ensure_initialized(nvinfer1::ICudaEngine* cuda_engine) {
     LOG_WARNING("Failed to set CUDA graph strategy; continuing with default.");
   }
 #endif
+#endif // TRT_HAS_IRUNTIME_CONFIG
 }
 
-void TRTRuntimeConfig::set_execution_context_allocation_strategy(
-    nvinfer1::ExecutionContextAllocationStrategy strategy) const {
-  TORCHTRT_ASSERT(config, "TRTRuntimeConfig::config must be initialized before setting allocation strategy");
-  config->setExecutionContextAllocationStrategy(strategy);
+std::shared_ptr<nvinfer1::IExecutionContext> TRTRuntimeConfig::create_execution_context(
+    nvinfer1::ICudaEngine* cuda_engine,
+    nvinfer1::ExecutionContextAllocationStrategy allocation_strategy) {
+  ensure_initialized(cuda_engine);
+#ifdef TRT_HAS_IRUNTIME_CONFIG
+  config->setExecutionContextAllocationStrategy(allocation_strategy);
+  return make_trt(cuda_engine->createExecutionContext(config.get()));
+#else
+  // Pre-10.11 TRT (e.g. Jetpack): use the legacy strategy overload directly.
+  return make_trt(cuda_engine->createExecutionContext(allocation_strategy));
+#endif
 }
 
 bool TRTRuntimeConfig::uses_internal_capture(TORCHTRT_UNUSED bool cudagraphs_enabled) const {

@@ -95,7 +95,7 @@ class TestCudaGraphStrategyCpp(TestCase):
     "C++ runtime is not available",
 )
 class TestCudaGraphStrategyInvalidValue(TestCase):
-    """Invalid strategy names are rejected at engine-packing time."""
+    """Invalid strategy names raise ValueError."""
 
     def test_invalid_strategy_raises(self):
         model = CudaGraphModel().eval().cuda()

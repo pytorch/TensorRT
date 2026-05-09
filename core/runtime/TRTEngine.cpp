@@ -675,12 +675,10 @@ void TRTEngine::recreate_execution_context() {
   // allocator changes, or process kills that happen between allocator changes and
   // teardown. No-op on standard TensorRT or when no cache path is configured.
   runtime_cfg.save_runtime_cache();
-  runtime_cfg.ensure_initialized(cuda_engine.get());
-  runtime_cfg.set_execution_context_allocation_strategy(
-      resource_allocation_strategy == ResourceAllocationStrategy::kDynamic
-          ? nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED
-          : nvinfer1::ExecutionContextAllocationStrategy::kSTATIC);
-  exec_ctx = make_trt(cuda_engine->createExecutionContext(runtime_cfg.config.get()));
+  const auto allocation_strategy = resource_allocation_strategy == ResourceAllocationStrategy::kDynamic
+      ? nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED
+      : nvinfer1::ExecutionContextAllocationStrategy::kSTATIC;
+  exec_ctx = runtime_cfg.create_execution_context(cuda_engine.get(), allocation_strategy);
   TORCHTRT_CHECK(exec_ctx.get() != nullptr, "Unable to (re)create TensorRT execution context");
 }
 

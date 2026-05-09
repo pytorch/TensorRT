@@ -27,11 +27,9 @@ enum class CudaGraphStrategyOption : int32_t {
   kWholeGraphCapture = 1,
 };
 
-// Encapsulates the nvinfer1::IRuntimeConfig owned by a TRTEngine along with the
-// TensorRT-RTX-specific state (runtime cache, dynamic shapes kernel strategy, native
-// CUDA graph strategy). All `#ifdef TRT_MAJOR_RTX` guards live in this file and its
-// implementation so callers can treat this struct uniformly between RTX and standard
-// TensorRT builds.
+// Encapsulates the IRuntimeConfig and TRT-RTX runtime state for a TRTEngine.
+// IRuntimeConfig and runtime-cache `#ifdef`s are confined to this TU; serialization-
+// index plumbing keeps its own RTX gates elsewhere.
 struct TRTRuntimeConfig {
   // Settings - typically populated from engine deserialization before `ensure_initialized`.
   std::string runtime_cache_path = "";
@@ -43,20 +41,26 @@ struct TRTRuntimeConfig {
   // owning engine's lifetime.
   bool rtx_native_cudagraphs_disabled = false;
 
-  // Live resources. The IRuntimeConfig is lazy-constructed on first `ensure_initialized`.
+  // Live resources. The IRuntimeConfig is lazy-constructed on first `ensure_initialized`
+  // and is unavailable on TensorRT versions older than 10.11 (e.g. Jetpack).
+#ifdef TRT_HAS_IRUNTIME_CONFIG
   std::shared_ptr<nvinfer1::IRuntimeConfig> config;
+#endif
 #ifdef TRT_MAJOR_RTX
   std::shared_ptr<nvinfer1::IRuntimeCache> runtime_cache;
 #endif
 
-  // Construct the IRuntimeConfig once and apply all TRT-RTX-specific settings. Safe to
-  // call multiple times; only the first call initializes and applies the RTX-only
-  // setters. On subsequent calls this is a no-op.
+  // Lazily construct the IRuntimeConfig and apply RTX-specific settings. Idempotent.
+  // No-op on builds without IRuntimeConfig (e.g. Jetpack).
   void ensure_initialized(nvinfer1::ICudaEngine* cuda_engine);
 
-  // Apply (or re-apply) the execution context allocation strategy on the IRuntimeConfig.
-  // Available on both standard TensorRT and TensorRT-RTX via IRuntimeConfig.
-  void set_execution_context_allocation_strategy(nvinfer1::ExecutionContextAllocationStrategy strategy) const;
+  // Lazy-initialize the IRuntimeConfig if needed and create an IExecutionContext that
+  // honors `allocation_strategy`. Selects the right `createExecutionContext` overload
+  // (IRuntimeConfig* vs ExecutionContextAllocationStrategy) so callers stay free of
+  // any TRT_HAS_IRUNTIME_CONFIG branching.
+  [[nodiscard]] std::shared_ptr<nvinfer1::IExecutionContext> create_execution_context(
+      nvinfer1::ICudaEngine* cuda_engine,
+      nvinfer1::ExecutionContextAllocationStrategy allocation_strategy);
 
   // Returns true if the TensorRT-RTX runtime owns capture/replay for this engine so the
   // caller should bypass its own at::cuda::CUDAGraph capture around enqueueV3. Always

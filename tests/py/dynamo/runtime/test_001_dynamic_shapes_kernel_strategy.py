@@ -205,7 +205,7 @@ class TestDynamicShapesKernelStrategyCpp(TestCase):
     "C++ runtime is not available",
 )
 class TestDynamicShapesKernelStrategyCppInvalidValue(TestCase):
-    """Invalid strategy names are rejected at engine-packing time on the C++ runtime path."""
+    """Invalid strategy names raise ValueError on the C++ runtime path."""
 
     def test_invalid_strategy_raises(self):
         model = DynamicConvModel().eval().cuda()
