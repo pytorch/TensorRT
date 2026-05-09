@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 set +x
 
 # Verifies the documented end-user flow for the ExecuTorch reference runner:
@@ -224,9 +225,18 @@ then
   exit 1
 fi
 
+export_script="examples/torchtrt_executorch_example/export_static_shape.py"
+if [[ ! -f "${export_script}" ]]; then
+  echo "Missing ${export_script}; restore the ExecuTorch export example before running this check" >&2
+  exit 1
+fi
+
 model_path="${verify_root}/model.pte"
-"${python_executable}" examples/torchtrt_executorch_example/export_static_shape.py --model_path="${model_path}"
-test -f "${model_path}"
+"${python_executable}" "${export_script}" --model_path="${model_path}"
+if [[ ! -f "${model_path}" ]]; then
+  echo "Export did not produce ${model_path}" >&2
+  exit 1
+fi
 
 tar -xzf "${tarball}" -C "${verify_root}"
 
