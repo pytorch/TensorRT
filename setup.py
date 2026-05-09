@@ -259,11 +259,44 @@ def build_libtorchtrt_cxx11_abi(
         else:
             cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
 
+    env = os.environ.copy()
+    if "TORCH_PATH" not in env:
+        stable_torch_path = resolve_torch_path()
+        if stable_torch_path is not None:
+            env["TORCH_PATH"] = stable_torch_path
+            print(f"Using TORCH_PATH={stable_torch_path}")
+
     print(f"building libtorchtrt {cmd=}")
-    status_code = subprocess.run(cmd).returncode
+    status_code = subprocess.run(cmd, env=env).returncode
 
     if status_code != 0:
         sys.exit(status_code)
+
+
+def resolve_torch_path():
+    explicit_torch_path = os.environ.get("TORCH_PATH")
+    if explicit_torch_path:
+        return explicit_torch_path
+
+    version_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    for env_var in ("CONDA_PREFIX", "VIRTUAL_ENV"):
+        prefix = os.environ.get(env_var)
+        if not prefix:
+            continue
+
+        candidate = os.path.join(prefix, "lib", version_dir, "site-packages", "torch")
+        if os.path.isdir(os.path.join(candidate, "include", "c10")) and os.path.isdir(
+            os.path.join(candidate, "lib")
+        ):
+            return candidate
+
+    torch_path = os.path.dirname(torch.__file__)
+    if os.path.isdir(os.path.join(torch_path, "include", "c10")) and os.path.isdir(
+        os.path.join(torch_path, "lib")
+    ):
+        return torch_path
+
+    return None
 
 
 def gen_version_file():
@@ -491,6 +524,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.tools",
+    "torch_tensorrt.executorch",
     "torch_tensorrt.runtime",
 ]
 
@@ -527,6 +561,7 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
+    "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
 
@@ -781,6 +816,7 @@ def get_sbsa_requirements(base_requirements):
         # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
         return requirements + [
             "torch>=2.12.0,<2.13.0",
+            "executorch>=1.2.0",
             "tensorrt>=10.16.1,<10.17.0",
         ]
 
@@ -791,7 +827,10 @@ def get_x86_64_requirements(base_requirements):
     if IS_DLFW_CI:
         return requirements
     else:
-        requirements = requirements + ["torch>=2.12.0,<2.13.0"]
+        requirements = requirements + [
+            "torch>=2.12.0,<2.13.0",
+            "executorch>=1.2.0",
+        ]
         if USE_TRT_RTX:
             return requirements + [
                 "tensorrt_rtx>=1.4.0.76",

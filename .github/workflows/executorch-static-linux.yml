@@ -1,0 +1,102 @@
+name: ExecuTorch Static Linux Build
+
+on:
+  workflow_call:
+    inputs:
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ""
+        type: string
+      repository:
+        description: 'Repository to checkout, defaults to ""'
+        default: ""
+        type: string
+      ref:
+        description: 'Reference to checkout, defaults to ""'
+        default: ""
+        type: string
+      test-infra-repository:
+        description: "Test infra repository to use"
+        default: "pytorch/test-infra"
+        type: string
+      test-infra-ref:
+        description: "Test infra reference to use"
+        default: ""
+        type: string
+
+jobs:
+  select-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - id: pick
+        env:
+          FULL_MATRIX: ${{ inputs.build-matrix }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "${GITHUB_OUTPUT}"
+          import json
+          import os
+
+          matrix = json.loads(os.environ["FULL_MATRIX"])
+          include = matrix.get("include", [])
+          if not include:
+              raise SystemExit("build-matrix include[] is empty")
+
+          preferred = None
+          for entry in include:
+              if entry.get("python_version") == "3.11":
+                  preferred = entry
+                  break
+
+          if preferred is None:
+              preferred = include[0]
+
+          print("matrix=" + json.dumps({"include": [preferred]}))
+          PY
+
+  build:
+    needs: select-matrix
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: executorch-static-build
+      repository: ${{ inputs.repository }}
+      ref: ${{ inputs.ref }}
+      test-infra-repository: ${{ inputs.test-infra-repository }}
+      test-infra-ref: ${{ inputs.test-infra-ref }}
+      build-matrix: ${{ needs.select-matrix.outputs.matrix }}
+      fail-on-empty: false
+      script: |
+        set -euo pipefail
+        EXECUTORCH_SRC="${RUNNER_TEMP}/executorch"
+
+        git clone --depth 1 --recurse-submodules --shallow-submodules \
+           https://github.com/pytorch/executorch.git "${EXECUTORCH_SRC}"
+        export EXECUTORCH_SOURCE_DIR="${EXECUTORCH_SRC}"
+       
+        BAZELISK_VERSION="1.26.0"
+        case "$(uname -m)" in
+          aarch64|arm64)
+            BAZEL_PLATFORM="arm64"
+            ;;
+          x86_64|amd64)
+            BAZEL_PLATFORM="amd64"
+            ;;
+          *)
+            echo "Unsupported Bazelisk platform: $(uname -m)"
+            exit 1
+            ;;
+        esac
+        mkdir -p "${RUNNER_TEMP}/bin"
+        curl -L "https://github.com/bazelbuild/bazelisk/releases/download/v${BAZELISK_VERSION}/bazelisk-linux-${BAZEL_PLATFORM}" \
+          -o "${RUNNER_TEMP}/bin/bazel"
+        chmod +x "${RUNNER_TEMP}/bin/bazel"
+        export PATH="${RUNNER_TEMP}/bin:${PATH}"
+        bazel --version
+
+        # this is to build the libtorchtrt.tar.gz
+        bazel build //:libtorchtrt --compilation_mode opt --config=linux
+        # this is to verify the end user's workflow
+        python -m pip install pyyaml
+        .github/scripts/verify-executorch-reference-runner.sh

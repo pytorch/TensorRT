@@ -61,7 +61,7 @@ config_setting(
 )
 
 cc_library(
-    name = "runtime",
+    name = "runtime_base",
     srcs = [
         "DeviceList.cpp",
         "Platform.cpp",
@@ -69,8 +69,8 @@ cc_library(
         "TRTEngine.cpp",
         "TRTEngineProfiler.cpp",
         "execute_engine.cpp",
-        "register_jit_hooks.cpp",
         "runtime.cpp",
+        "runtime_utils.cpp",
     ],
     hdrs = [
         "Platform.h",
@@ -100,6 +100,24 @@ cc_library(
         ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
+    alwayslink = True,
+)
+
+cc_library(
+    name = "runtime",
+    srcs = [
+        "register_jit_hooks.cpp",
+    ],
+    hdrs = [
+        "Platform.h",
+        "RTDevice.h",
+        "TRTEngine.h",
+        "TRTEngineProfiler.h",
+        "runtime.h",
+    ],
+    deps = [
+        ":runtime_base",
+    ],
     alwayslink = True,
 )
 

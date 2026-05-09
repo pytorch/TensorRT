@@ -38,6 +38,8 @@ local_repository(
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 
+local_executorch = use_repo_rule("//toolchains:local_executorch.bzl", "local_executorch")
+
 # CUDA should be installed on the system locally
 
 new_local_repository(
@@ -154,6 +156,11 @@ new_local_repository(
     path = "${TORCH_INSTALL_PATH}",
     build_file = "third_party/libtorch/BUILD"
 )
+
+# Detect ExecuTorch from the active Python environment (VIRTUAL_ENV / CONDA_PREFIX / PATH).
+# Optional overrides:
+#   EXECUTORCH_ROOT=/path/to/executorch
+local_executorch(name = "executorch")
 
 #new_local_repository(
 #   name = "tensorrt",
