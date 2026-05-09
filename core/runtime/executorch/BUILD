@@ -60,15 +60,20 @@ config_setting(
 cc_library(
     name = "tensorrt_executorch_backend",
     srcs = ["TensorRTBackend.cpp"],
-    hdrs = ["TensorRTBackend.h"],
+    hdrs = [
+        "TensorRTBackend.h",
+        "TensorRTBlobHeader.h",
+    ],
     # Build the TensorRT backend as a static library. The final application
     # links this target together with the ExecuTorch runtime it was compiled
     # against, avoiding any runtime plugin/dlopen dependency.
     deps = [
-        "//core/runtime:runtime_base",
-        "//core/util:prelude",
         "@executorch//:executorch_headers",
     ] + select({
+        ":jetpack": ["@cuda_l4t//:cudart"],
+        ":windows": ["@cuda_win//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }) + select({
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],
         ":rtx_win": ["@tensorrt_rtx_win//:nvinfer"],
         ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],

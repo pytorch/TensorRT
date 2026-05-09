@@ -183,9 +183,9 @@ elif [[ ! -f "${TensorRT_ROOT}/include/NvInfer.h" ]]; then
   exit 1
 fi
 
-# torch_tensorrt and the native runner both need TensorRT/PyTorch shared
-# libraries on the runtime path. Set this before importing torch_tensorrt or
-# exporting the .pte model.
+# torch_tensorrt needs TensorRT/PyTorch shared libraries while exporting the
+# .pte model. The native C++ runner below must not rely on libtorch.
+original_ld_library_path="${LD_LIBRARY_PATH:-}"
 torch_lib_dir="$("${python_executable}" - <<'PY'
 import os
 import torch
@@ -225,8 +225,49 @@ then
 fi
 
 model_path="${verify_root}/model.pte"
-"${python_executable}" examples/torchtrt_executorch_example/export_static_shape.py --model_path="${model_path}"
+"${python_executable}" - "${model_path}" <<'PY'
+import importlib.util
+import runpy
+import sys
+from pathlib import Path
+
+model_path = sys.argv[1]
+repo_root = Path.cwd()
+
+# Use the installed package for native extensions and the in-tree ExecuTorch
+# route for the serializer/backend under test.
+import torch_tensorrt  # noqa: F401
+
+
+def overlay_module(name: str, path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load {name} from {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+
+
+overlay_module(
+    "torch_tensorrt.executorch.serialization",
+    repo_root / "py/torch_tensorrt/executorch/serialization.py",
+)
+overlay_module(
+    "torch_tensorrt.executorch.backend",
+    repo_root / "py/torch_tensorrt/executorch/backend.py",
+)
+
+export_script = repo_root / "examples/torchtrt_executorch_example/export_static_shape.py"
+sys.argv = [str(export_script), "--model_path", model_path]
+runpy.run_path(str(export_script), run_name="__main__")
+PY
 test -f "${model_path}"
+
+if [[ -n "${TensorRT_ROOT:-}" && -d "${TensorRT_ROOT}/lib" ]]; then
+  export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${original_ld_library_path:+:${original_ld_library_path}}"
+else
+  export LD_LIBRARY_PATH="${original_ld_library_path}"
+fi
 
 tar -xzf "${tarball}" -C "${verify_root}"
 
@@ -245,11 +286,6 @@ fi
 
 export TORCHTRT_EXECUTORCH_SOURCE_DIR="${verify_root}/libtorchtrt_executorch"
 
-if [[ -z "${CMAKE_PREFIX_PATH:-}" ]]; then
-  CMAKE_PREFIX_PATH="$("${python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)")"
-  export CMAKE_PREFIX_PATH
-fi
-
 # Configure the example exactly as an end user would after unpacking
 # libtorchtrt.tar.gz.
 cmake_args=(
@@ -257,7 +293,6 @@ cmake_args=(
   -B "${verify_root}/build-executorch-reference-runner"
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}"
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}"
-  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
   -DPYTHON_EXECUTABLE="${python_executable}"
 )
 
@@ -272,6 +307,13 @@ cmake --build "${verify_root}/build-executorch-reference-runner" \
   -j"${MAX_JOBS:-$(nproc)}"
 
 runner_log="${verify_root}/my_runner.log"
+if command -v ldd >/dev/null 2>&1 &&
+  ldd "${verify_root}/build-executorch-reference-runner/my_runner" |
+    grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
+  echo "my_runner links PyTorch/libtorch shared libraries" >&2
+  exit 1
+fi
+
 "${verify_root}/build-executorch-reference-runner/my_runner" \
   --model_path="${model_path}" \
   --num_runs=1 2>&1 | tee "${runner_log}"
