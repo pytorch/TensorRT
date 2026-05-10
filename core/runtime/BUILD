@@ -60,8 +60,13 @@ config_setting(
     ],
 )
 
+# runtime_base: TRTEngine + device management + serialization utilities.
+# Does NOT include register_jit_hooks.cpp (TorchScript torch::class_ /
+# TORCH_LIBRARY registrations), so it can be linked into the static
+# ExecuTorch TensorRT backend without causing a duplicate-registration
+# crash when libtorchtrt.so is also loaded in the same process.
 cc_library(
-    name = "runtime",
+    name = "runtime_base",
     srcs = [
         "DeviceList.cpp",
         "Platform.cpp",
@@ -69,8 +74,8 @@ cc_library(
         "TRTEngine.cpp",
         "TRTEngineProfiler.cpp",
         "execute_engine.cpp",
-        "register_jit_hooks.cpp",
         "runtime.cpp",
+        "runtime_utils.cpp",
     ],
     hdrs = [
         "Platform.h",
@@ -100,6 +105,26 @@ cc_library(
         ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
+    alwayslink = True,
+)
+
+# runtime: full runtime including TorchScript torch::class_ / TORCH_LIBRARY
+# registrations. Used by the main libtorchtrt.so.
+cc_library(
+    name = "runtime",
+    srcs = [
+        "register_jit_hooks.cpp",
+    ],
+    hdrs = [
+        "Platform.h",
+        "RTDevice.h",
+        "TRTEngine.h",
+        "TRTEngineProfiler.h",
+        "runtime.h",
+    ],
+    deps = [
+        ":runtime_base",
+    ],
     alwayslink = True,
 )
 

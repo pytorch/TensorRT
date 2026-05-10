@@ -156,7 +156,6 @@ def _apply_symbolic_shape_expressions(
     logger.debug(
         f"[torch.ops.tensorrt.execute_engine]: Meta kernel found the following output FakeTensors: {outputs}"
     )
-
     return outputs
 
 
@@ -320,7 +319,46 @@ def no_op_placeholder_for_execute_engine(
     serialized_metadata: str,
     serialized_target_platform: str,
     serialized_require_output_allocator: str,
+    serialized_resource_allocation_strategy: str,
+    serialized_requires_native_multidevice: str,
 ) -> List[torch.Tensor]:
     raise RuntimeError(
         "The saved model is cross compiled for windows in Linux, should only be loadded in Windows via torch_tensorrt.load_cross_compiled_exported_program() api."
     )
+
+
+@torch.library.register_fake("tensorrt::no_op_placeholder_for_execute_engine")  # type: ignore
+def fake_no_op_placeholder_for_execute_engine(
+    inputs: List[torch.Tensor],
+    abi_version: str,
+    name: str,
+    serialized_device_info: str,
+    serialized_engine: str,
+    serialized_in_binding_names: str,
+    serialized_out_binding_names: str,
+    serialized_hardware_compatible: str,
+    serialized_metadata: str,
+    serialized_target_platform: str,
+    serialized_require_output_allocator: str,
+    serialized_resource_allocation_strategy: str,
+    serialized_requires_native_multidevice: str,
+) -> List[torch.Tensor]:
+    """Fake kernel for no_op_placeholder_for_execute_engine.
+
+    Allows ExecuTorch ExportPass subclasses (e.g. RemoveMixedTypeOperators) to
+    trace through this op during to_edge_transform_and_lower without hitting the
+    C++ schema validator.  Output shapes are inferred from the serialized metadata
+    embedded in the op's string args, same as fake_tensorrt_execute_engine.
+    """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+
+    metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
+    shape_info = metadata.get("inout_symexprs") if metadata else None
+    if shape_info:
+        return _apply_symbolic_shape_expressions(inputs, shape_info)
+    else:
+        raise RuntimeError(
+            "No symbolic shape expressions found in TensorRT engine metadata. "
+            "This engine may have been compiled with an older version of Torch-TensorRT. "
+            "Please recompile your model."
+        )

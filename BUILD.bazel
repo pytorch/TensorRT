@@ -1,4 +1,5 @@
 load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 
 config_setting(
     name = "windows",
@@ -43,7 +44,6 @@ pkg_tar(
     ],
 )
 
-
 pkg_tar(
     name = "include_rt",
     package_dir = "include/torch_tensorrt",
@@ -72,6 +72,110 @@ pkg_tar(
     package_dir = "lib/",
 )
 
+genrule(
+    name = "executorch_core_archive",
+    srcs = ["@executorch//:libexecutorch_core.a"],
+    outs = ["libexecutorch_core.a"],
+    cmd = "cp $(location @executorch//:libexecutorch_core.a) $@",
+)
+
+genrule(
+    name = "executorch_trt_backend_archive",
+    srcs = ["//core/runtime/executorch:tensorrt_executorch_backend"],
+    outs = ["libexecutorch_trt_backend.a"],
+    cmd = """
+set -e
+for f in $(locations //core/runtime/executorch:tensorrt_executorch_backend); do
+  case "$$f" in
+    *.lo) exec ar rcs $@ "$$f" ;;
+  esac
+done
+echo "Could not find a .lo object for //core/runtime/executorch:tensorrt_executorch_backend" >&2
+exit 1
+""",
+)
+
+alias(
+    name = "executorch_trt_backend",
+    actual = ":executorch_trt_backend_archive",
+)
+
+pkg_files(
+    name = "executorch_lib_pkg_files",
+    srcs = [
+        ":executorch_core_archive",
+        ":executorch_trt_backend_archive",
+    ],
+    prefix = "lib/",
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "executorch_lib",
+    srcs = [":executorch_lib_pkg_files"],
+    mode = "0644",
+    package_dir = "",
+)
+
+filegroup(
+    name = "executorch_source_package_root_files",
+    srcs = [
+        "libtorchtrt_executorch/CMakeLists.txt",
+        "libtorchtrt_executorch/README.md",
+    ],
+)
+
+pkg_tar(
+    name = "executorch_source_package_root",
+    srcs = [":executorch_source_package_root_files"],
+    mode = "0644",
+    package_dir = "libtorchtrt_executorch",
+    strip_prefix = "libtorchtrt_executorch",
+)
+
+filegroup(
+    name = "executorch_source_package_files",
+    srcs = [
+        "LICENSE",
+        "cmake/Modules/FindTensorRT.cmake",
+        "examples/executorch_reference_runner/CMakeLists.txt",
+        "examples/executorch_reference_runner/README.md",
+        "examples/executorch_reference_runner/main.cpp",
+        "//core/runtime:DeviceList.cpp",
+        "//core/runtime:Platform.cpp",
+        "//core/runtime:Platform.h",
+        "//core/runtime:RTDevice.cpp",
+        "//core/runtime:RTDevice.h",
+        "//core/runtime:TRTEngine.cpp",
+        "//core/runtime:TRTEngine.h",
+        "//core/runtime:TRTEngineProfiler.cpp",
+        "//core/runtime:TRTEngineProfiler.h",
+        "//core/runtime:runtime.cpp",
+        "//core/runtime:runtime.h",
+        "//core/runtime:runtime_utils.cpp",
+        "//core/runtime/executorch:TensorRTBackend.cpp",
+        "//core/runtime/executorch:TensorRTBackend.h",
+        "//core/util:Exception.cpp",
+        "//core/util:Exception.h",
+        "//core/util:build_info.h",
+        "//core/util:jit_util.h",
+        "//core/util:macros.h",
+        "//core/util:prelude.h",
+        "//core/util:trt_util.cpp",
+        "//core/util:trt_util.h",
+        "//core/util/logging:TorchTRTLogger.cpp",
+        "//core/util/logging:TorchTRTLogger.h",
+    ],
+)
+
+pkg_tar(
+    name = "executorch_source_package",
+    srcs = [":executorch_source_package_files"],
+    mode = "0644",
+    package_dir = "libtorchtrt_executorch",
+    strip_prefix = ".",
+)
+
 # Non-Windows tar target for lib_rt
 pkg_tar(
     name = "lib_rt",
@@ -93,28 +197,26 @@ pkg_tar(
 pkg_zip(
     name = "libtorchtrt_zip",
     srcs = [
-        "//core/plugins:impl_include_pkg_files",
+        "//:LICENSE",
         "//core:include_pkg_files",
+        "//core/plugins:impl_include_pkg_files",
         "//core/runtime:include_pkg_files",
         "//core/util:include_pkg_files",
         "//core/util/logging:include_pkg_files",
         "//cpp/lib:lib_pkg_files",
-        "//:LICENSE",
         "//third_party/torch_tensorrt:BUILD",
     ],
     out = "libtorchtrt.zip",
     package_dir = "torch_tensorrt",
 )
 
-# tar target
+# Main Torch-TensorRT C++ package payload.
 pkg_tar(
-    name = "libtorchtrt_tar",
+    name = "torch_tensorrt_package",
     srcs = [
         "//:LICENSE",
         "//third_party/torch_tensorrt:BUILD",
     ],
-    out = "libtorchtrt.tar.gz",
-    extension = "tar.gz",
     package_dir = "torch_tensorrt",
     deps = [
         ":include",
@@ -125,6 +227,20 @@ pkg_tar(
         ":windows": [],
         "//conditions:default": [":bin"],
     }),
+)
+
+# Combined release tarball. Keep the ExecuTorch backend source package as a
+# top-level sibling of torch_tensorrt/ so it can be consumed independently.
+pkg_tar(
+    name = "libtorchtrt_tar",
+    out = "libtorchtrt.tar.gz",
+    extension = "tar.gz",
+    package_dir = "",
+    deps = [
+        ":executorch_source_package",
+        ":executorch_source_package_root",
+        ":torch_tensorrt_package",
+    ],
 )
 
 # Main target that selects between zip and tar based on platform

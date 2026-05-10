@@ -79,6 +79,17 @@ jobs:
             use-rtx: false
             pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
 
+    executorch-static-build:
+        needs: [filter-matrix, build]
+        uses: ./.github/workflows/executorch-static-linux.yml
+        with:
+          repository: "pytorch/tensorrt"
+          ref: ""
+          test-infra-repository: pytorch/test-infra
+          test-infra-ref: main
+          build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+
+
     L0-dynamo-converter-tests:
         name: ${{ matrix.display-name }}
         needs: [filter-matrix, build]
@@ -482,6 +493,7 @@ jobs:
                 pushd .
                 cd tests/py/dynamo
                 python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
+                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_executorch_tests_results.xml executorch/
                 popd
 
     L2-dynamo-plugin-tests:
