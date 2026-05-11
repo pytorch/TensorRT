@@ -139,6 +139,7 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
   m.def("RESOURCE_ALLOCATION_STRATEGY_IDX", []() -> int64_t { return RESOURCE_ALLOCATION_STRATEGY_IDX; });
   m.def("REQUIRES_NATIVE_MULTIDEVICE_IDX", []() -> int64_t { return REQUIRES_NATIVE_MULTIDEVICE_IDX; });
+  m.def("ALIASED_IO_IDX", []() -> int64_t { return ALIASED_IO_IDX; });
   m.def("NATIVE_TRT_COLLECTIVES_AVAIL", []() -> bool {
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
     return true;

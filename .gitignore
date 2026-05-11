@@ -45,6 +45,13 @@ py/torch_tensorrt/bin
 py/torch_tensorrt/BUILD
 py/torch_tensorrt/LICENSE
 py/torch_tensorrt/WORKSPACE
+# Build copies these into the package dir for wheel packaging; sources of
+# record live at the repo root (core/, csrc/).
+py/torch_tensorrt/CMakeLists.txt
+py/torch_tensorrt/README.md
+py/torch_tensorrt/cmake/
+py/torch_tensorrt/core/
+py/torch_tensorrt/examples/
 py/wheelhouse
 py/.eggs
 notebooks/.ipynb_checkpoints/
