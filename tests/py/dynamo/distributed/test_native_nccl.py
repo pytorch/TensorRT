@@ -1415,58 +1415,18 @@ def _multirank_all_gather_correctness(
         _check_close(out[r], expected_row, f"all_gather row {r} rank={rank}")
 
 
-def _multirank_reduce_scatter_correctness(
-    rank: int, world_size: int, device: torch.device
-) -> None:
-    """reduce_scatter sum then scatters: rank r gets sum of row r."""
-    group = dist.group.WORLD
-    group_name = group.group_name if hasattr(group, "group_name") else ""
-
-    class ReduceScatter(nn.Module):
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            out = torch.ops._c10d_functional.reduce_scatter_tensor.default(
-                x, "sum", world_size, group_name
-            )
-            return torch.ops._c10d_functional.wait_tensor.default(out)
-
-    model = ReduceScatter().to(device).eval()
-    # Input: (world_size, 4), row r = fill(r+1) on every rank
-    inp = torch.stack(
-        [torch.full((4,), float(r + 1), device=device) for r in range(world_size)]
-    )
-
-    with torch.no_grad():
-        out = model(inp)
-
-    # Result for rank r: world_size * (r+1)
-    expected = torch.full((1, 4), float(world_size * (rank + 1)), device=device)
-    _check_close(out, expected, f"reduce_scatter rank={rank}")
-
-
 def _multirank_reduce_scatter_all_reduce_ops(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """reduce_scatter compiled via Torch-TensorRT must produce correct output
-    for every supported reduce_op (sum / prod / min / max / avg).
-
-    For each reduce_op:
-      1. Build a model that calls reduce_scatter_tensor with that op.
-      2. Run it eagerly on PyTorch as the reference.
-      3. Compile the same model with torch_tensorrt and run on TRT.
-      4. Assert TRT output matches eager output.
-
-    Regression guard for the bug where ``fused_nccl_reduce_scatter`` dropped
-    ``args[1]`` (reduce_op), causing all non-sum reductions to silently
-    compile as SUM on the native TRT collective path. The input is
-    constructed so that sum/prod/min/max/avg all give distinct row-wise
-    values, so a SUM-fallback bug fails every iteration except 'sum'.
+    """Regression guard for the fused_nccl_reduce_scatter args[1] (reduce_op)
+    forwarding bug — TRT output must match eager for every reduce_op accepted
+    by PyTorch's functional collective (sum / avg / min / max / product).
     """
     if world_size < 2:
-        # world_size == 1 takes the `if world_size == 1: return plug_inputs[0]`
-        # early return inside nccl_reduce_scatter_native, so the reduce_op
-        # path is never exercised. This test is meaningful only with >= 2 ranks.
+        # world_size == 1 short-circuits inside nccl_reduce_scatter_native,
+        # so the reduce_op path is never exercised.
         print(
-            f"[SKIP] _multirank_reduce_scatter_all_reduce_ops requires world_size >= 2"
+            "[SKIP] _multirank_reduce_scatter_all_reduce_ops requires world_size >= 2"
         )
         return
 
@@ -1491,17 +1451,14 @@ def _multirank_reduce_scatter_all_reduce_ops(
             )
             return torch.ops._c10d_functional.wait_tensor.default(out)
 
-    # Input shape: (world_size, 4); rank r contributes row i = (r+1) * (i+1).
-    # Concrete row-wise reductions across ranks for world_size=2:
-    #   row 0: ranks contribute [1, 2]   sum=3   prod=2   min=1   max=2   avg=1.5
-    #   row 1: ranks contribute [2, 4]   sum=6   prod=8   min=2   max=4   avg=3.0
-    # Every reduce_op produces a distinct value per row, so any wrong
-    # reduction (e.g. SUM-fallback bug) is caught unambiguously.
+    # Rank r contributes row i = (r+2) * (i+1). For world_size=2 row 0 reduces
+    # to sum=5, avg=2.5, min=2, max=3, product=6 — all distinct so any
+    # silent op-swap (e.g. SUM-fallback) is caught.
     inp = torch.stack(
         [
             torch.full(
                 (4,),
-                float((rank + 1) * (i + 1)),
+                float((rank + 2) * (i + 1)),
                 device=device,
                 dtype=torch.float32,
             )
@@ -1509,7 +1466,7 @@ def _multirank_reduce_scatter_all_reduce_ops(
         ]
     )
 
-    for reduce_op in ("sum", "prod", "min", "max", "avg"):
+    for reduce_op in ("sum", "avg", "min", "max", "product"):
         model = ReduceScatter(reduce_op, world_size, group_name).to(device).eval()
 
         with torch.no_grad():
@@ -1912,21 +1869,12 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_all_gather_correctness(self.rank, self.world_size, device)
 
-    @requires_nccl()
-    @skip_if_lt_x_gpu(2)
-    def test_reduce_scatter_correctness(self) -> None:
-        """reduce_scatter sum then scatters: rank r gets sum of row r."""
-        device = self._init_dist()
-        _multirank_reduce_scatter_correctness(self.rank, self.world_size, device)
-
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_reduce_scatter_all_reduce_ops(self) -> None:
-        """reduce_scatter compiled via TRT matches eager for every reduce_op.
-
-        Regression guard for the fused_nccl_reduce_scatter args[1] (reduce_op)
-        forwarding bug — covers sum/prod/min/max/avg.
+        """Regression guard for the fused_nccl_reduce_scatter args[1] (reduce_op)
+        forwarding bug — covers sum/avg/min/max/product.
         """
         device = self._init_dist()
         _multirank_reduce_scatter_all_reduce_ops(self.rank, self.world_size, device)
@@ -1985,7 +1933,6 @@ def run_multirank_tests() -> None:
     tests = [
         _multirank_all_reduce_correctness,
         _multirank_all_gather_correctness,
-        _multirank_reduce_scatter_correctness,
         _multirank_reduce_scatter_all_reduce_ops,
         _multirank_distributed_mode_tp_model,
         _multirank_distributed_mode_subgroup,
