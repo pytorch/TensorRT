@@ -96,7 +96,8 @@ void setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
     bool cudagraphs_enabled,
-    bool need_cudagraphs_record) {
+    bool need_cudagraphs_record,
+    std::unordered_map<std::string, at::Tensor>& bound_inputs_by_name) {
   auto* ctx = compiled_engine->exec_ctx();
   compiled_engine->reset_active_input_tensors();
 
@@ -138,7 +139,22 @@ void setup_input_tensors(
     } else {
       compiled_engine->active_input_tensors[i] = inputs[i].view(shape).contiguous();
 
-      if (need_cudagraphs_record) {
+      // An aliased input is one whose data_ptr will also be the address of an
+      // aliased output binding. Cudagraphs normally clone inputs into a
+      // persistent buffer so addresses are stable across replays; for an
+      // aliased input we deliberately bind to the user's tensor instead, so
+      // the engine writes through to the user's storage. The user is already
+      // required to pass stable input addresses under cudagraphs, so the
+      // aliasing contract is compatible.
+      bool is_aliased_input = false;
+      for (const auto& kv : compiled_engine->aliased_io) {
+        if (kv.second.input_binding_name == name) {
+          is_aliased_input = true;
+          break;
+        }
+      }
+
+      if (need_cudagraphs_record && !is_aliased_input) {
         // Create a persistent CUDA graph input staging buffer with a stable replay address.
         compiled_engine->cudagraph_input_staging_buffers[i] = compiled_engine->active_input_tensors[i].clone();
       }
@@ -146,12 +162,12 @@ void setup_input_tensors(
       TORCHTRT_CHECK(ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
 
       at::Tensor final_input;
-      if (cudagraphs_enabled) {
+      if (cudagraphs_enabled && !is_aliased_input) {
         // If using CUDAGraphs copy formatted input to the corresponding persistent staging buffer.
         compiled_engine->cudagraph_input_staging_buffers[i].copy_(compiled_engine->active_input_tensors[i], true);
         final_input = compiled_engine->cudagraph_input_staging_buffers[i];
       } else {
-        // Otherwise use the formatted buffer directly
+        // Aliased inputs OR non-cudagraphs path: use the active input tensor directly.
         final_input = compiled_engine->active_input_tensors[i];
       }
 
@@ -161,11 +177,17 @@ void setup_input_tensors(
       void* input_addr = final_input.numel() == 0 ? compiled_engine->empty_tensor_placeholder : final_input.data_ptr();
 
       TORCHTRT_CHECK(ctx->setTensorAddress(name.c_str(), input_addr), "Failed to bind tensor address for " << name);
+
+      // Record the bound tensor by binding name so the output-binding loop
+      // can resolve aliased outputs to their source input's storage.
+      bound_inputs_by_name[name] = final_input;
     }
   }
 }
 
-std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> compiled_engine) {
+std::vector<at::Tensor> create_output_tensors(
+    c10::intrusive_ptr<TRTEngine> compiled_engine,
+    const std::unordered_map<std::string, at::Tensor>& bound_inputs_by_name) {
   auto* ctx = compiled_engine->exec_ctx();
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
   for (auto output_indices : compiled_engine->out_binding_map) {
@@ -178,6 +200,30 @@ std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> comp
 
     auto dims = core::util::toVec(out_shape);
     auto type = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
+
+    // Aliased outputs share storage with a source input binding. Don't
+    // allocate; reuse the input tensor by identity. The wrapping Python
+    // module is responsible for excluding aliased outputs from the
+    // user-facing return tuple.
+    auto alias_it = compiled_engine->aliased_io.find(name);
+    if (alias_it != compiled_engine->aliased_io.end()) {
+      auto in_it = bound_inputs_by_name.find(alias_it->second.input_binding_name);
+      TORCHTRT_CHECK(
+          in_it != bound_inputs_by_name.end(),
+          "Aliased output " << name << " references input binding " << alias_it->second.input_binding_name
+                            << " but that input was not bound during this call.");
+      const auto& aliased_input = in_it->second;
+      TORCHTRT_CHECK(
+          aliased_input.sizes() == c10::IntArrayRef(dims),
+          "Aliased output " << name << " shape (" << dims << ") does not match source input "
+                            << alias_it->second.input_binding_name << " shape (" << aliased_input.sizes() << ")");
+      outputs[pyt_idx] = aliased_input;
+      LOG_DEBUG(
+          "Aliased output " << name << " (kind=" << alias_kind_to_string(alias_it->second.kind) << ") bound to input "
+                            << alias_it->second.input_binding_name << " — skipping fresh allocation");
+      continue;
+    }
+
     auto options = torch::TensorOptions()
                        .dtype(type)
                        .layout(at::kStrided)
@@ -306,6 +352,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
 
+    // Bound input tensors keyed by binding name. Populated by setup_input_tensors
+    // and consumed by create_output_tensors / the output binding loop to alias
+    // outputs to their source-input device pointers (no fresh allocation, no
+    // post-engine copy). The map's tensor refs keep the storage alive for the
+    // duration of the engine call.
+    std::unordered_map<std::string, at::Tensor> bound_inputs_by_name;
+
     // Intialize inputs and outputs to be available throughout the succeeding scopes
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
@@ -314,7 +367,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, effective_cudagraphs, need_cudagraphs_record);
+      setup_input_tensors(
+          inputs, compiled_engine, effective_cudagraphs, need_cudagraphs_record, bound_inputs_by_name);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
@@ -335,12 +389,30 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       if (can_use_pre_allocated_outputs) {
         outputs = compiled_engine->pre_allocated_outputs;
       } else {
-        outputs = create_output_tensors(compiled_engine);
+        outputs = create_output_tensors(compiled_engine, bound_inputs_by_name);
       }
 
       for (auto output_indices : compiled_engine->out_binding_map) {
         auto pyt_idx = output_indices.second;
         std::string name = compiled_engine->out_binding_names[pyt_idx];
+
+        // Aliased outputs share storage with a source input. We bind directly
+        // to the input's data_ptr and intentionally bypass the cudagraphs
+        // persistent-output-buffer path: there is no separate buffer to keep
+        // in sync, and copying into a persistent buffer would defeat the
+        // aliasing.
+        auto alias_it = compiled_engine->aliased_io.find(name);
+        if (alias_it != compiled_engine->aliased_io.end()) {
+          auto in_it = bound_inputs_by_name.find(alias_it->second.input_binding_name);
+          TORCHTRT_CHECK(
+              in_it != bound_inputs_by_name.end(),
+              "Aliased output " << name << " references unbound input " << alias_it->second.input_binding_name);
+          TORCHTRT_CHECK(
+              ctx->setTensorAddress(name.c_str(), in_it->second.data_ptr()),
+              "Failed to bind aliased output " << name << " to input " << alias_it->second.input_binding_name);
+          continue;
+        }
+
         if (need_cudagraphs_record) {
           // If recording a CUDA graph, update the persistent output staging buffer.
           compiled_engine->cudagraph_output_staging_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
@@ -411,11 +483,19 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     compiled_engine->clear_active_input_tensors();
 
     // When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first
-    // execution or when shape is changed.
-    if (compiled_engine->use_pre_allocated_outputs &&
+    // execution or when shape is changed. If the engine has aliased outputs we
+    // disable pre-allocation entirely: aliased outputs share storage with
+    // user-supplied inputs that may change between calls, so caching the
+    // tensor reference would lead to writes against stale storage.
+    if (compiled_engine->use_pre_allocated_outputs && !compiled_engine->aliased_io.empty()) {
+      LOG_DEBUG(
+          "Skipping pre_allocated_outputs cache because engine has aliased I/O; "
+          "aliased outputs reuse the user's input storage on every call.");
+    } else if (
+        compiled_engine->use_pre_allocated_outputs &&
         (compiled_engine->pre_allocated_outputs.size() == 0 || compiled_engine->output_tensors_are_unowned ||
          shape_changed)) {
-      compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine);
+      compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine, bound_inputs_by_name);
     }
 
     if (caller_on_default) {
@@ -427,7 +507,16 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     if (effective_cudagraphs) {
       // If in CUDAGraph mode, copy persistent staging outputs to returned tensors on the caller stream.
+      // Aliased outputs are skipped: the engine wrote directly into the user's
+      // input storage (we bound the aliased output binding to the user's
+      // tensor data_ptr in create_output_tensors / the output-binding loop),
+      // so no copy-back is needed AND cudagraph_output_staging_buffers[o] is
+      // uninitialized for aliased indices.
       for (size_t o = 0; o < compiled_engine->cudagraph_output_staging_buffers.size(); o++) {
+        const auto& name = compiled_engine->out_binding_names[o];
+        if (compiled_engine->aliased_io.find(name) != compiled_engine->aliased_io.end()) {
+          continue;
+        }
         outputs[o].copy_(compiled_engine->cudagraph_output_staging_buffers[o], false);
       }
     }
@@ -464,6 +553,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
       compiled_engine->auto_select_profile(inputs);
     }
+
+    // Discard map: the output-allocator path is incompatible with aliased I/O
+    // (validated at engine construction). The bound-inputs map is unused here.
+    std::unordered_map<std::string, at::Tensor> bound_inputs_by_name;
+
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
       if (compiled_engine->profile_execution) {
@@ -471,7 +565,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, false, false);
+      setup_input_tensors(inputs, compiled_engine, false, false, bound_inputs_by_name);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);

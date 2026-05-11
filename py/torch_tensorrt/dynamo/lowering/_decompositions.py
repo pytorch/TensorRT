@@ -184,9 +184,11 @@ def empty_permuted_decomposition(*args, **kwargs) -> torch.Tensor:  # type: igno
     return torch.empty([empty_size[l] for l in empty_permute], **kwargs).permute(perm)
 
 
-@register_torch_trt_decomposition(
-    torch.ops.aten.slice_scatter.default, registry=TORCH_TRT_DECOMPOSITIONS
-)
+# NOTE: slice_scatter is intentionally NOT registered as a Torch-TRT decomposition.
+# It is handled by the slice_scatter converter, which can emit either
+# IKVCacheUpdateLayer (with aliased I/O) for KV-cache update patterns, or fall
+# back to a scatter sequence equivalent to this function for the general case.
+# The converter calls slice_scatter_decomposition directly for the fallback path.
 def slice_scatter_decomposition(
     input_tensor: torch.Tensor,
     src_tensor: torch.Tensor,

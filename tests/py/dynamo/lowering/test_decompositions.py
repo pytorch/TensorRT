@@ -627,10 +627,10 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.slice_scatter(x, src, dim, start, end, step)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.scatter.src,
-        }
+        # slice_scatter is no longer decomposed — the converter handles it
+        # directly (emits IKVCacheUpdateLayer when KV-eligible, scatter
+        # otherwise). select_scatter is still decomposed via slice_scatter.
+        expected_ops = {torch.ops.aten.slice_scatter.default}
         unexpected_ops = {torch.ops.aten.select_scatter}
 
         inputs = [torch.zeros(8, 8).cuda(), torch.ones(8, 2).cuda(), 1, 6, None, 1]
@@ -689,11 +689,9 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.slice_scatter.default(x, src, dim, start, end, step)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.scatter.src,
-        }
-        unexpected_ops = {torch.ops.aten.slice_scatter}
+        # slice_scatter is no longer decomposed — survives to the converter.
+        expected_ops = {torch.ops.aten.slice_scatter.default}
+        unexpected_ops: set = set()
 
         inputs = [torch.zeros(8, 8).cuda(), torch.ones(2, 8).cuda(), 0, 2, 6, 2]
 
@@ -752,11 +750,9 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.slice_scatter.default(x, src, dim, start, end, step)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.scatter.src,
-        }
-        unexpected_ops = {torch.ops.aten.slice_scatter}
+        # slice_scatter is no longer decomposed — survives to the converter.
+        expected_ops = {torch.ops.aten.slice_scatter.default}
+        unexpected_ops: set = set()
 
         inputs = [
             torch.zeros(8, 8, 8).cuda(),
@@ -971,12 +967,14 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.select_scatter.default(x, src, dim, index)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
-        unexpected_ops = {
-            torch.ops.aten.select_scatter.default,
+        # select_scatter is still decomposed (to slice_scatter via the
+        # Torch-TRT decomposition); slice_scatter is no longer decomposed
+        # further and survives to the converter.
+        expected_ops = {
             torch.ops.aten.slice_scatter.default,
+            torch.ops.aten.unsqueeze.default,
         }
+        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
         inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 0, 0]
 
@@ -1034,12 +1032,14 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.select_scatter.default(x, src, dim, index)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
-        unexpected_ops = {
-            torch.ops.aten.select_scatter.default,
+        # select_scatter is still decomposed (to slice_scatter via the
+        # Torch-TRT decomposition); slice_scatter is no longer decomposed
+        # further and survives to the converter.
+        expected_ops = {
             torch.ops.aten.slice_scatter.default,
+            torch.ops.aten.unsqueeze.default,
         }
+        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
         inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 1, 0]
 
@@ -1097,12 +1097,14 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.select_scatter.default(x, src, dim, index)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
-        unexpected_ops = {
-            torch.ops.aten.select_scatter.default,
+        # select_scatter is still decomposed (to slice_scatter via the
+        # Torch-TRT decomposition); slice_scatter is no longer decomposed
+        # further and survives to the converter.
+        expected_ops = {
             torch.ops.aten.slice_scatter.default,
+            torch.ops.aten.unsqueeze.default,
         }
+        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
         inputs = [torch.zeros(2, 3, 4).cuda(), torch.ones(2, 4).cuda(), 1, 0]
 

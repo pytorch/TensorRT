@@ -38,6 +38,7 @@ from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ABI_TARGET_IDX,
+    ALIASED_IO_IDX,
     DEVICE_IDX,
     ENGINE_IDX,
     HW_COMPATIBLE_IDX,
@@ -452,6 +453,27 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # Internal alias used by the NCCL setup paths (matches the original
         # _PythonTorchTensorRTModule attribute name).
         self._has_nccl_ops: bool = self.requires_native_multidevice
+
+        # aliased_io is parsed for parity with the C++ runtime but the Python
+        # runtime does NOT enforce aliasing. Outputs are always allocated
+        # fresh; warn the user so engines that depend on in-place writes are
+        # not silently broken when running on the Python path.
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            deserialize_aliased_io,
+        )
+
+        self.aliased_io: Dict[str, Tuple[str, str]] = deserialize_aliased_io(
+            str(self.serialized_info[ALIASED_IO_IDX])
+        )
+        if self.aliased_io:
+            logger.warning(
+                "Engine has aliased I/O (%d outputs) but the Python TRT "
+                "runtime does not implement aliasing. The engine will allocate "
+                "fresh outputs and not write through to the user's input "
+                "storage. Install the C++ Torch-TensorRT runtime for true "
+                "in-place aliasing.",
+                len(self.aliased_io),
+            )
 
         metadata = self.decode_metadata(self.serialized_metadata)
         self.settings = metadata.get("settings", CompilationSettings())
