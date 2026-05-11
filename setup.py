@@ -816,7 +816,7 @@ def get_sbsa_requirements(base_requirements):
         # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
         return requirements + [
             "torch>=2.12.0,<2.13.0",
-            "executorch>=1.2.0",
+            "executorch==1.2.0",
             "tensorrt>=10.16.1,<10.17.0",
         ]
 
@@ -829,7 +829,7 @@ def get_x86_64_requirements(base_requirements):
     else:
         requirements = requirements + [
             "torch>=2.12.0,<2.13.0",
-            "executorch>=1.2.0",
+            "executorch==1.2.0",
         ]
         if USE_TRT_RTX:
             return requirements + [

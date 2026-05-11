@@ -29,7 +29,7 @@ both ExecuTorch and the Torch-TensorRT ExecuTorch source package, and linking
 
 ```bash
 # get the executorch source code
-git clone https://github.com/pytorch/executorch.git
+git clone --branch v1.2.0 --depth 1 --recurse-submodules --shallow-submodules https://github.com/pytorch/executorch.git
 # download the libtorchtrt.tar.gz
 tar xvf libtorchtrt.tar.gz
 
