@@ -72,6 +72,8 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     }
   }
 
+  enabled_precisions = settings.enabled_precisions;
+
   if (settings.disable_tf32) {
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
   }
