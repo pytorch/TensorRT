@@ -66,16 +66,23 @@ print(f"Loaded plugin: {PLUGIN_PATH}\n")
 
 BATCH_SIZE = 1
 NUM_HEADS = 4
-HEAD_DIM = 16
+HEAD_DIM = 64
 EMBED_DIM = NUM_HEADS * HEAD_DIM
-SEQ_LEN = 16
+SEQ_LEN = 256
+WINDOW_SIZE = 64
+MASK_TYPE_DENSE = 0
+MASK_TYPE_CU_SEQLENS = 1
 DTYPE = torch.float16
 DEVICE = torch.device("cuda:0")
-NUM_WARMUP = 10
-NUM_BENCHMARK_RUNS = 100
 
 def apply_qwen_vl_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
-    """Apply Qwen-VL rotate-half RoPE to [B, H, S, D] tensors."""
+    """
+    Apply Qwen-VL rotate-half RoPE to query/key tensors in [B, H, S, D].
+
+    Qwen-style RoPE stores the first half and second half of each head as the
+    two rotation components. This must match the C++ plugin's RoPE prepass for
+    the dense and cu_seqlens paths to compare against the same reference.
+    """
     cos = cos.view(1, 1, cos.shape[0], cos.shape[1]).to(dtype=x.dtype)
     sin = sin.view(1, 1, sin.shape[0], sin.shape[1]).to(dtype=x.dtype)
     half_dim = x.shape[-1] // 2
@@ -86,12 +93,24 @@ def apply_qwen_vl_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) ->
 
 
 def create_identity_rope(seq_len: int, dtype: torch.dtype, device: torch.device):
+    """
+    Create a no-op RoPE table.
+
+    The plugin always receives cos/sin tensors, so plain ViT attention uses
+    cos=1 and sin=0 instead of a special "no RoPE" code path.
+    """
     cos = torch.ones(seq_len, HEAD_DIM, dtype=dtype, device=device)
     sin = torch.zeros_like(cos)
     return cos, sin
 
 
 def create_qwen_vl_rope(seq_len: int, dtype: torch.dtype, device: torch.device):
+    """
+    Build Qwen-VL-style RoPE tables with shape [S, D].
+
+    The embedding duplicates the frequency matrix across the head dimension so
+    it aligns with rotate-half RoPE: [freqs, freqs].
+    """
     inv_freq = 1.0 / (
         10000.0 ** (torch.arange(0, HEAD_DIM, 2, dtype=torch.float32, device=device) / HEAD_DIM)
     )
@@ -102,10 +121,21 @@ def create_qwen_vl_rope(seq_len: int, dtype: torch.dtype, device: torch.device):
 
 
 def create_zero_mask(batch_size: int, seq_len: int, dtype: torch.dtype, device: torch.device):
+    """
+    Create a dense additive mask for full bidirectional attention.
+
+    A value of zero means every token can attend to every other token.
+    """
     return torch.zeros(batch_size, seq_len, seq_len, dtype=dtype, device=device)
 
 
-def create_window_mask(batch_size: int, seq_len: int, dtype: torch.dtype, device: torch.device, window_size: int = 4):
+def create_window_mask(batch_size: int, seq_len: int, dtype: torch.dtype, device: torch.device, window_size: int = WINDOW_SIZE):
+    """
+    Create a dense additive mask for independent local attention windows.
+
+    Values outside each window are set to the minimum representable value for
+    the dtype, which behaves like -inf after the attention score add.
+    """
     mask = torch.full((batch_size, seq_len, seq_len), torch.finfo(dtype).min, dtype=dtype, device=device)
     for start in range(0, seq_len, window_size):
         end = min(start + window_size, seq_len)
@@ -113,79 +143,114 @@ def create_window_mask(batch_size: int, seq_len: int, dtype: torch.dtype, device
     return mask
 
 
-# -----------------------------------------------------------------------------
-# Model-agnostic attention module
-# -----------------------------------------------------------------------------
-
-
-class ModelAgnosticViTAttention(nn.Module):
+def create_full_cu_seqlens(seq_len: int, device: torch.device):
     """
-    Model-agnostic attention wrapper for reference and plugin paths.
+    Create cu_seqlens for one packed full-attention segment.
 
-    Projection layout is inferred from the wrapped module:
-    - ``qkv`` + ``proj/out/out_proj`` => fused QKV attention
-    - ``q_proj/k_proj/v_proj`` + ``o_proj/out_proj/out`` => separate QKV attention
+    cu_seqlens is a prefix-sum array. [0, S] means one independent sequence
+    containing S tokens.
+    """
+    return torch.tensor([0, seq_len], dtype=torch.int32, device=device)
 
-    RoPE and masks are inferred from forward inputs:
-    - provided ``cos`` and ``sin`` means apply Qwen-VL-style rotate-half RoPE
-    - no ``cos``/``sin`` means identity RoPE
-    - provided ``attention_mask`` is used as-is
-    - no ``attention_mask`` means full bidirectional attention
+
+def create_window_cu_seqlens(seq_len: int, device: torch.device, window_size: int = WINDOW_SIZE):
+    """
+    Create cu_seqlens for independent contiguous attention windows.
+
+    For S=256 and window=64 this returns [0, 64, 128, 192, 256], meaning the
+    plugin should launch four independent 64-token attention problems over one
+    packed QKV tensor.
+    """
+    boundaries = list(range(0, seq_len, window_size))
+    if boundaries[-1] != seq_len:
+        boundaries.append(seq_len)
+    return torch.tensor(boundaries, dtype=torch.int32, device=device)
+
+
+# -----------------------------------------------------------------------------
+# PyTorch SDPA and TensorRT plugin models
+# -----------------------------------------------------------------------------
+
+class ViTSDPAModel(nn.Module):
+    """
+    PyTorch SDPA reference model for ViT/VLA attention.
+
+    Projection layout is selected explicitly:
+    - ``fused_qkv`` => one Linear produces Q, K, and V together
+    - ``separate_qkv`` => separate q_proj, k_proj, and v_proj layers
+
+    This model is the correctness baseline. It uses torch.nn.functional
+    scaled_dot_product_attention with the same dense additive mask semantics
+    that the plugin should reproduce.
     """
 
-    def __init__(self, original_attn: nn.Module, use_plugin: bool):
+    def __init__(self, projection_layout: str):
+        """
+        Create projection layers for the requested model-style layout.
+
+        The layer names intentionally match ViTPluginModel so load_state_dict()
+        can copy the exact same weights into the plugin model.
+        """
         super().__init__()
-        self.original_attn = original_attn
-        self.use_plugin = use_plugin
-        self.projection_layout = self._detect_projection_layout(original_attn)
-        self.output_proj = self._detect_output_projection(original_attn)
+        self.projection_layout = projection_layout
 
-    @staticmethod
-    def _detect_projection_layout(attn: nn.Module) -> str:
-        if hasattr(attn, "qkv"):
-            return "fused_qkv"
-        if all(hasattr(attn, attr) for attr in ("q_proj", "k_proj", "v_proj")):
-            return "separate_qkv"
-        if all(hasattr(attn, attr) for attr in ("query", "key", "value")):
-            return "separate_hf_vit"
-        raise ValueError(
-            f"Cannot detect QKV projection layout for {attn.__class__.__name__}"
-        )
-
-    @staticmethod
-    def _detect_output_projection(attn: nn.Module) -> nn.Module:
-        for attr in ("proj", "o_proj", "out_proj", "out"):
-            if hasattr(attn, attr):
-                return getattr(attn, attr)
-        if hasattr(attn, "output"):
-            output = getattr(attn, "output")
-            return output.dense if hasattr(output, "dense") else output
-        raise ValueError(f"Cannot detect output projection for {attn.__class__.__name__}")
-
-    def _project_qkv(self, x: torch.Tensor) -> torch.Tensor:
         if self.projection_layout == "fused_qkv":
-            return self.original_attn.qkv(x)
+            self.qkv = nn.Linear(EMBED_DIM, 3 * EMBED_DIM)
+            self.output_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+        elif self.projection_layout == "separate_qkv":
+            self.q_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+            self.k_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+            self.v_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+            self.output_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+        else:
+            raise ValueError(f"Unsupported projection layout: {projection_layout}")
+
+    def project_qkv(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Produce a fused [B, S, 3 * H * D] QKV tensor.
+
+        The plugin consumes fused QKV, so the SDPA reference uses the same
+        representation before splitting into [Q, K, V].
+        """
+        if self.projection_layout == "fused_qkv":
+            return self.qkv(x)
 
         if self.projection_layout == "separate_qkv":
-            q = self.original_attn.q_proj(x)
-            k = self.original_attn.k_proj(x)
-            v = self.original_attn.v_proj(x)
-        elif self.projection_layout == "separate_hf_vit":
-            q = self.original_attn.query(x)
-            k = self.original_attn.key(x)
-            v = self.original_attn.value(x)
+            q = self.q_proj(x)
+            k = self.k_proj(x)
+            v = self.v_proj(x)
         else:
             raise ValueError(f"Unknown projection layout: {self.projection_layout}")
         return torch.cat([q, k, v], dim=-1)
 
-    def _reference_attention(
+    def forward(
         self,
-        qkv: torch.Tensor,
-        cos: torch.Tensor,
-        sin: torch.Tensor,
-        attention_mask: torch.Tensor,
-        has_position_embeddings: bool,
+        x: torch.Tensor,
+        attention_mask: torch.Tensor = None,
+        cu_seqlens: torch.Tensor = None,
+        cos: torch.Tensor = None,
+        sin: torch.Tensor = None,
     ) -> torch.Tensor:
+        """
+        Run PyTorch SDPA using the dense equivalent of the requested attention.
+
+        cu_seqlens is accepted so the reference and plugin models can share the
+        same call signature, but SDPA consumes the dense additive mask.
+        """
+        batch_size, seq_len, _ = x.shape
+        qkv = self.project_qkv(x)
+        has_position_embeddings = cos is not None and sin is not None
+        if not has_position_embeddings:
+            cos, sin = create_identity_rope(seq_len, x.dtype, x.device)
+        else:
+            cos = cos.to(dtype=x.dtype)
+            sin = sin.to(dtype=x.dtype)
+
+        if attention_mask is None:
+            attention_mask = create_zero_mask(batch_size, seq_len, x.dtype, x.device)
+        else:
+            attention_mask = attention_mask.to(dtype=x.dtype)
+
         batch_size, seq_len, _ = qkv.shape
         qkv = qkv.view(batch_size, seq_len, 3, NUM_HEADS, HEAD_DIM).permute(2, 0, 3, 1, 4)
         query, key, value = qkv[0], qkv[1], qkv[2]
@@ -202,17 +267,81 @@ class ModelAgnosticViTAttention(nn.Module):
             dropout_p=0.0,
             is_causal=False,
         )
-        return attn.transpose(1, 2).contiguous().view(batch_size, seq_len, EMBED_DIM)
+        attn_out = attn.transpose(1, 2).contiguous().view(batch_size, seq_len, EMBED_DIM)
+        return self.output_proj(attn_out)
+
+
+class ViTPluginModel(nn.Module):
+    """
+    TensorRT plugin model for ViT/VLA attention.
+
+    The projection layers mirror ViTSDPAModel. The attention math is replaced by
+    the custom Torch op that convert_vit_attention lowers to ViTAttentionPlugin.
+    """
+
+    def __init__(
+        self,
+        projection_layout: str,
+        plugin_mask_type: int = MASK_TYPE_DENSE,
+        plugin_max_seq_len: int = 0,
+    ):
+        """
+        Create projection layers and remember plugin execution settings.
+
+        plugin_max_seq_len is only used for cu_seqlens FMHA. It is the maximum
+        segment length represented by the prefix-sum array, which can be smaller
+        than the total packed token count for windowed visual attention.
+        """
+        super().__init__()
+        self.projection_layout = projection_layout
+        self.plugin_mask_type = plugin_mask_type
+        self.plugin_max_seq_len = plugin_max_seq_len
+
+        if self.projection_layout == "fused_qkv":
+            self.qkv = nn.Linear(EMBED_DIM, 3 * EMBED_DIM)
+            self.output_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+        elif self.projection_layout == "separate_qkv":
+            self.q_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+            self.k_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+            self.v_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+            self.output_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
+        else:
+            raise ValueError(f"Unsupported projection layout: {projection_layout}")
+
+    def project_qkv(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Produce the fused [B, S, 3 * H * D] tensor consumed by the plugin.
+
+        Separate projection layouts are concatenated here so the plugin sees the
+        same input layout regardless of upstream model style.
+        """
+        if self.projection_layout == "fused_qkv":
+            return self.qkv(x)
+
+        if self.projection_layout == "separate_qkv":
+            q = self.q_proj(x)
+            k = self.k_proj(x)
+            v = self.v_proj(x)
+        else:
+            raise ValueError(f"Unknown projection layout: {self.projection_layout}")
+        return torch.cat([q, k, v], dim=-1)
 
     def forward(
         self,
         x: torch.Tensor,
         attention_mask: torch.Tensor = None,
+        cu_seqlens: torch.Tensor = None,
         cos: torch.Tensor = None,
         sin: torch.Tensor = None,
     ) -> torch.Tensor:
+        """
+        Run the TensorRT ViTAttentionPlugin through a Torch custom op.
+
+        Dense mode passes an additive mask. cu_seqlens mode passes prefix-sum
+        boundaries that describe independent packed attention regions.
+        """
         batch_size, seq_len, _ = x.shape
-        qkv = self._project_qkv(x)
+        qkv = self.project_qkv(x)
         has_position_embeddings = cos is not None and sin is not None
         if not has_position_embeddings:
             cos, sin = create_identity_rope(seq_len, x.dtype, x.device)
@@ -225,62 +354,59 @@ class ModelAgnosticViTAttention(nn.Module):
         else:
             attention_mask = attention_mask.to(dtype=x.dtype)
 
-        if self.use_plugin:
-            attn_out = torch.ops.tensorrt_vit_attention.attn.default(
-                qkv,
-                cos,
-                sin,
-                attention_mask,
-                NUM_HEADS,
-                HEAD_DIM,
-                1,
-            )
-        else:
-            attn_out = self._reference_attention(
-                qkv,
-                cos,
-                sin,
-                attention_mask,
-                has_position_embeddings,
-            )
+        mask_or_cu_seqlens = attention_mask
+        if self.plugin_mask_type == MASK_TYPE_CU_SEQLENS:
+            if cu_seqlens is None:
+                cu_seqlens = create_full_cu_seqlens(seq_len, x.device)
+            mask_or_cu_seqlens = cu_seqlens
+
+        attn_out = torch.ops.tensorrt_vit_attention.attn.default(
+            qkv,
+            cos,
+            sin,
+            mask_or_cu_seqlens,
+            NUM_HEADS,
+            HEAD_DIM,
+            1,
+            self.plugin_mask_type,
+            self.plugin_max_seq_len,
+        )
 
         return self.output_proj(attn_out)
-
-class FusedQKVFakeAttention(nn.Module):
-    """Fake module with Qwen/ViT-like fused QKV names."""
-
-    def __init__(self):
-        super().__init__()
-        self.qkv = nn.Linear(EMBED_DIM, 3 * EMBED_DIM)
-        self.proj = nn.Linear(EMBED_DIM, EMBED_DIM)
-
-class SeparateQKVFakeAttention(nn.Module):
-    """Fake module with Llama Vision/SigLip/GR00T-like separate QKV names."""
-
-    def __init__(self):
-        super().__init__()
-        self.q_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
-        self.k_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
-        self.v_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
-        self.o_proj = nn.Linear(EMBED_DIM, EMBED_DIM)
 
 
 @dataclass(frozen=True)
 class AttentionCase:
+    """Bundle one model-style attention layout with its runtime inputs."""
+
     name: str
-    attention_factory: Callable[[], nn.Module]
+    projection_layout: str
     kwargs_factory: Callable[[torch.Tensor], Dict[str, torch.Tensor]]
 
-
 def no_extra_inputs(x: torch.Tensor) -> Dict[str, torch.Tensor]:
-    return {}
+    """
+    Create inputs for full bidirectional attention with identity RoPE.
 
+    The dense path will synthesize a zero mask in forward(). The cu_seqlens path
+    uses [0, S] to represent the same full attention region.
+    """
+    _, seq_len, _ = x.shape
+    return {
+        "cu_seqlens": create_full_cu_seqlens(seq_len, x.device),
+    }
 
 def qwen_vl_inputs(x: torch.Tensor) -> Dict[str, torch.Tensor]:
+    """
+    Create inputs for QwenVL-style windowed visual attention.
+
+    This is the key validation case for packed cu_seqlens: the dense mask and
+    cu_seqlens tensor represent the same four independent windows.
+    """
     batch_size, seq_len, _ = x.shape
     cos, sin = create_qwen_vl_rope(seq_len, x.dtype, x.device)
     return {
         "attention_mask": create_window_mask(batch_size, seq_len, x.dtype, x.device),
+        "cu_seqlens": create_window_cu_seqlens(seq_len, x.device),
         "cos": cos,
         "sin": sin,
     }
@@ -289,22 +415,22 @@ def qwen_vl_inputs(x: torch.Tensor) -> Dict[str, torch.Tensor]:
 ATTENTION_CASES = [
     AttentionCase(
         name="Plain ViT Attention",
-        attention_factory=FusedQKVFakeAttention,
+        projection_layout="fused_qkv",
         kwargs_factory=no_extra_inputs,
     ),
     AttentionCase(
         name="QwenVL-Style Attention",
-        attention_factory=FusedQKVFakeAttention,
+        projection_layout="fused_qkv",
         kwargs_factory=qwen_vl_inputs,
     ),
     AttentionCase(
         name="LlamaVision-Style Attention",
-        attention_factory=SeparateQKVFakeAttention,
+        projection_layout="separate_qkv",
         kwargs_factory=no_extra_inputs,
     ),
     AttentionCase(
         name="GR00T/SigLip2-Style Attention",
-        attention_factory=SeparateQKVFakeAttention,
+        projection_layout="separate_qkv",
         kwargs_factory=no_extra_inputs,
     ),
 ]
@@ -314,34 +440,54 @@ ATTENTION_CASES = [
 # -----------------------------------------------------------------------------
 
 def register_vit_attention_op():
+    """
+    Register a Torch custom op that TorchDynamo can trace.
+
+    The Python implementation is only a placeholder shape function. During
+    Torch-TensorRT conversion, convert_vit_attention replaces this op with the
+    real TensorRT plugin layer.
+    """
     @torch.library.custom_op("tensorrt_vit_attention::attn", mutates_args=())
     def vit_attention(
         qkv: torch.Tensor,
         cos: torch.Tensor,
         sin: torch.Tensor,
-        attention_mask: torch.Tensor,
+        mask_or_cu_seqlens: torch.Tensor,
         num_heads: int,
         head_dim: int,
         qkv_fused: int = 1,
+        mask_type: int = MASK_TYPE_DENSE,
+        max_seq_len: int = 0,
     ) -> torch.Tensor:
+        """Return an empty-shaped output for eager/tracing fallback."""
         batch_size = qkv.shape[0]
         seq_len = qkv.shape[1]
-        return torch.zeros(batch_size, seq_len, EMBED_DIM, dtype=qkv.dtype, device=qkv.device)
+        output_dim = num_heads * head_dim
+        return torch.zeros(batch_size, seq_len, output_dim, dtype=qkv.dtype, device=qkv.device)
 
     @torch.library.register_fake("tensorrt_vit_attention::attn")
-    def _(qkv, cos, sin, attention_mask, num_heads, head_dim, qkv_fused=1):
+    def _(qkv, cos, sin, mask_or_cu_seqlens, num_heads, head_dim, qkv_fused=1, mask_type=MASK_TYPE_DENSE, max_seq_len=0):
+        """Provide fake tensor propagation for torch.export."""
         batch_size = qkv.shape[0]
         seq_len = qkv.shape[1]
-        return torch.empty(batch_size, seq_len, EMBED_DIM, dtype=qkv.dtype, device=qkv.device)
-
+        output_dim = num_heads * head_dim
+        return torch.empty(batch_size, seq_len, output_dim, dtype=qkv.dtype, device=qkv.device)
 
 register_vit_attention_op()
 
-
 @dynamo_tensorrt_converter(torch.ops.tensorrt_vit_attention.attn.default, supports_dynamic_shapes=True)
 def convert_vit_attention(ctx: ConversionContext, target, args, kwargs, name):
-    qkv, cos, sin, attention_mask, num_heads, head_dim = args[:6]
+    """
+    Convert the traced custom op into a ViTAttentionPlugin layer.
+
+    Scalar arguments become TensorRT plugin fields. Tensor arguments become
+    plugin inputs. max_seq_len is a field because FMHA needs it when cu_seqlens
+    packs several smaller attention regions into one QKV tensor.
+    """
+    qkv, cos, sin, mask_or_cu_seqlens, num_heads, head_dim = args[:6]
     qkv_fused = args[6] if len(args) > 6 else kwargs.get("qkv_fused", 1)
+    mask_type = args[7] if len(args) > 7 else kwargs.get("mask_type", MASK_TYPE_DENSE)
+    max_seq_len = args[8] if len(args) > 8 else kwargs.get("max_seq_len", 0)
 
     creator = trt.get_plugin_registry().get_plugin_creator("ViTAttentionPlugin", "1", "")
     if creator is None:
@@ -351,6 +497,8 @@ def convert_vit_attention(ctx: ConversionContext, target, args, kwargs, name):
         trt.PluginField("num_heads", np.array([num_heads], dtype=np.int32), trt.PluginFieldType.INT32),
         trt.PluginField("head_size", np.array([head_dim], dtype=np.int32), trt.PluginFieldType.INT32),
         trt.PluginField("qkv_fused", np.array([qkv_fused], dtype=np.int32), trt.PluginFieldType.INT32),
+        trt.PluginField("mask_type", np.array([mask_type], dtype=np.int32), trt.PluginFieldType.INT32),
+        trt.PluginField("max_seq_len", np.array([max_seq_len], dtype=np.int32), trt.PluginFieldType.INT32),
     ]
     fields = trt.PluginFieldCollection(field_list)
     plugin = creator.create_plugin(name, fields)
@@ -361,74 +509,69 @@ def convert_vit_attention(ctx: ConversionContext, target, args, kwargs, name):
         get_trt_tensor(ctx, qkv, "qkv"),
         get_trt_tensor(ctx, cos, "cos"),
         get_trt_tensor(ctx, sin, "sin"),
-        get_trt_tensor(ctx, attention_mask, "attention_mask"),
+        get_trt_tensor(ctx, mask_or_cu_seqlens, "mask_or_cu_seqlens"),
     ]
     layer = ctx.net.add_plugin_v2(input_tensors, plugin)
     return layer.get_output(0)
 
 # -----------------------------------------------------------------------------
-# Example execution
+# Correctness validation
 # -----------------------------------------------------------------------------
-
-def benchmark_model(fn, num_warmup: int = NUM_WARMUP, num_runs: int = NUM_BENCHMARK_RUNS):
-    for _ in range(num_warmup):
-        fn()
-    torch.cuda.synchronize()
-
-    start_event = torch.cuda.Event(enable_timing=True)
-    end_event = torch.cuda.Event(enable_timing=True)
-    timings = []
-
-    for _ in range(num_runs):
-        start_event.record()
-        fn()
-        end_event.record()
-        torch.cuda.synchronize()
-        timings.append(start_event.elapsed_time(end_event))
-
-    timings_tensor = torch.tensor(timings, dtype=torch.float32)
-    return (
-        timings_tensor.mean().item(),
-        timings_tensor.median().item(),
-        timings_tensor.std(unbiased=False).item(),
-    )
-
 
 def run_attention_case(
     case_name: str,
+    plugin_label: str,
+    plugin_mask_type: int,
     reference_model: nn.Module,
     plugin_model: nn.Module,
     x: torch.Tensor,
     kwargs,
 ):
+    """
+    Compile and validate one attention case for one plugin mask mode.
+
+    The reference model and plugin model share weights. Inputs are normalized to
+    positional tensors so this example can use the same torch_tensorrt.compile()
+    style as attention_plugin_example.py.
+    """
     plugin_model.load_state_dict(reference_model.state_dict())
+    batch_size, seq_len, _ = x.shape
+    attention_mask = kwargs.get(
+        "attention_mask",
+        create_zero_mask(batch_size, seq_len, x.dtype, x.device),
+    )
+    cu_seqlens = kwargs.get("cu_seqlens", create_full_cu_seqlens(seq_len, x.device))
+    cos, sin = kwargs.get("cos"), kwargs.get("sin")
+    if cos is None or sin is None:
+        cos, sin = create_identity_rope(seq_len, x.dtype, x.device)
+
+    runtime_inputs = (x, attention_mask, cu_seqlens, cos, sin)
 
     with torch.no_grad():
-        ref_out = reference_model(x, **kwargs)
+        ref_out = reference_model(*runtime_inputs)
 
-    print(f"\n=== {case_name} ===")
+    print(f"\n=== {case_name} | {plugin_label} ===")
     print("Compiling TensorRT ViT attention plugin model...")
-    dynamic_shapes = {"x": {}}
-    dynamic_shapes.update({key: {} for key in kwargs})
-    ep = torch.export.export(
-        plugin_model,
-        args=(x,),
-        kwargs=kwargs,
-        dynamic_shapes=dynamic_shapes,
-        strict=False,
-    )
-    trt_model = torch_tensorrt.dynamo.compile(
-        ep,
-        inputs=[x, *kwargs.values()],
-        use_explicit_typing=True,
-        use_fp32_acc=True,
-        device=DEVICE,
-        disable_tf32=True,
-        min_block_size=1,
-    )
+    inputs_spec = [
+        torch_tensorrt.Input(shape=tuple(x.shape), dtype=x.dtype),
+        torch_tensorrt.Input(shape=tuple(attention_mask.shape), dtype=attention_mask.dtype),
+        torch_tensorrt.Input(shape=tuple(cu_seqlens.shape), dtype=cu_seqlens.dtype),
+        torch_tensorrt.Input(shape=tuple(cos.shape), dtype=cos.dtype),
+        torch_tensorrt.Input(shape=tuple(sin.shape), dtype=sin.dtype),
+    ]
+    with torch_tensorrt.logging.errors():
+        trt_model = torch_tensorrt.compile(
+            plugin_model,
+            inputs=inputs_spec,
+            use_explicit_typing=True,
+            use_fp32_acc=True,
+            device=DEVICE,
+            disable_tf32=True,
+            min_block_size=1,
+        )
 
     with torch.no_grad():
-        plugin_out = trt_model(x, **kwargs)
+        plugin_out = trt_model(*runtime_inputs)
 
     print("Reference output shape:", ref_out.shape)
     print("Plugin output shape:", plugin_out.shape)
@@ -439,55 +582,67 @@ def run_attention_case(
     print(f"Cosine similarity: {cosine:.6f}")
     print(f"Result: {'PASS' if passed else 'FAIL'}")
 
-    ref_mean, ref_median, ref_std = benchmark_model(lambda: reference_model(x, **kwargs))
-    trt_mean, trt_median, trt_std = benchmark_model(lambda: trt_model(x, **kwargs))
-    print("Latency:")
-    print(f"  PyTorch SDPA | Mean: {ref_mean:.4f} ms | Median: {ref_median:.4f} ms | Std: {ref_std:.4f} ms")
-    print(f"  TensorRT     | Mean: {trt_mean:.4f} ms | Median: {trt_median:.4f} ms | Std: {trt_std:.4f} ms")
+    return passed, cosine, max_abs_diff
 
-    return passed, cosine, max_abs_diff, ref_mean, trt_mean
+
+def get_plugin_max_seq_len(plugin_mask_type: int, kwargs: Dict[str, torch.Tensor]) -> int:
+    """
+    Return the maximum segment length required by the FMHA cu_seqlens path.
+
+    For full attention this is S. For windowed attention this is the window
+    length. Dense mode returns 0 so the plugin falls back to runtime S.
+    """
+    if plugin_mask_type != MASK_TYPE_CU_SEQLENS or "cu_seqlens" not in kwargs:
+        return 0
+    cu_seqlens = kwargs["cu_seqlens"]
+    return int((cu_seqlens[1:] - cu_seqlens[:-1]).max().item())
 
 
 if __name__ == "__main__":
     torch.manual_seed(0)
     x = torch.randn(BATCH_SIZE, SEQ_LEN, EMBED_DIM, dtype=DTYPE, device=DEVICE)
 
-    print("\nViT Attention Plugin - Correctness and Latency Validation")
+    print("\nViT Attention Plugin - Dense Mask vs cu_seqlens Correctness Validation")
+    print(f"Config: B={BATCH_SIZE}, S={SEQ_LEN}, H={NUM_HEADS}, D={HEAD_DIM}, window={WINDOW_SIZE}")
     results = []
     for attention_case in ATTENTION_CASES:
-        reference_attn = attention_case.attention_factory()
-        plugin_attn = attention_case.attention_factory()
-        reference_model = ModelAgnosticViTAttention(
-            reference_attn,
-            use_plugin=False,
-        ).to(device=DEVICE, dtype=DTYPE).eval()
-        plugin_model = ModelAgnosticViTAttention(
-            plugin_attn,
-            use_plugin=True,
+        reference_model = ViTSDPAModel(
+            attention_case.projection_layout,
         ).to(device=DEVICE, dtype=DTYPE).eval()
         kwargs = attention_case.kwargs_factory(x)
-        results.append(
-            (
-                attention_case.name,
-                run_attention_case(
+
+        for plugin_label, plugin_mask_type in (
+            ("Dense additive mask", MASK_TYPE_DENSE),
+            ("cu_seqlens FMHA", MASK_TYPE_CU_SEQLENS),
+        ):
+            plugin_model = ViTPluginModel(
+                attention_case.projection_layout,
+                plugin_mask_type=plugin_mask_type,
+                plugin_max_seq_len=get_plugin_max_seq_len(plugin_mask_type, kwargs),
+            ).to(device=DEVICE, dtype=DTYPE).eval()
+            results.append(
+                (
                     attention_case.name,
-                    reference_model,
-                    plugin_model,
-                    x,
-                    kwargs,
-                ),
+                    plugin_label,
+                    run_attention_case(
+                        attention_case.name,
+                        plugin_label,
+                        plugin_mask_type,
+                        reference_model,
+                        plugin_model,
+                        x,
+                        kwargs,
+                    ),
+                )
             )
-        )
 
     print("\nSUMMARY")
-    for name, (passed, cosine, max_abs_diff, ref_mean, trt_mean) in results:
+    for name, plugin_label, (passed, cosine, max_abs_diff) in results:
         status = "PASS" if passed else "FAIL"
-        speedup = ref_mean / trt_mean if trt_mean > 0 else float("inf")
-        print(f"{name}: {status}")
+        print(f"{name} | {plugin_label}: {status}")
         print(f"  Cosine: {cosine:.4f}, Max abs diff: {max_abs_diff:.6f}")
-        print(f"  PyTorch: {ref_mean:.4f} ms, TensorRT: {trt_mean:.4f} ms, Speedup: {speedup:.2f}x")
 
-    all_passed = all(result[0] for _, result in results)
+    all_passed = all(result[0] for _, _, result in results)
     if all_passed:
         print("SUCCESS: All ViT attention plugin tests passed!")
     else:

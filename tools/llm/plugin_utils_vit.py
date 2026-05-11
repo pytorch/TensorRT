@@ -18,9 +18,13 @@ import torch
 import torch.nn as nn
 import torch_tensorrt
 
-# Default plugin path for ViT attention plugin
+_TENSORRT_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_WORKSPACE_ROOT = os.path.dirname(_TENSORRT_REPO_ROOT)
+
+# Default plugin path for ViT attention plugin. TensorRT-Edge-LLM is checked out
+# next to TensorRT in this workspace, not inside the TensorRT repository.
 DEFAULT_PLUGIN_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    _WORKSPACE_ROOT,
     "TensorRT-Edge-LLM",
     "build",
     "libNvInfer_edgellm_plugin.so",
@@ -42,10 +46,11 @@ def load_plugin(plugin_path: Optional[str] = None) -> bool:
     Raises:
         RuntimeError: If plugin file does not exist.
     """
-    path = plugin_path or DEFAULT_PLUGIN_PATH
+    path = plugin_path or os.environ.get("TRT_EDGE_LLM_PLUGIN_PATH") or DEFAULT_PLUGIN_PATH
     if not os.path.exists(path):
         raise RuntimeError(f"Plugin not found at {path}")
     ctypes.CDLL(path)
+    print(f"Loaded plugin: {path}")
     return True
 
 
@@ -54,6 +59,8 @@ def set_vit_plugin_config(
     head_dim: int,
     num_patches: int,
     max_batch_size: int = 4,
+    mask_type: int = 0,
+    max_seq_len: int = 0,
 ) -> None:
     """
     Set global configuration for the ViT plugin converter.
@@ -63,6 +70,8 @@ def set_vit_plugin_config(
         head_dim: Dimension of each attention head.
         num_patches: Number of image patches (including [CLS] token).
         max_batch_size: Maximum batch size.
+        mask_type: Plugin mask mode. 0=dense additive mask, 1=packed cu_seqlens.
+        max_seq_len: Maximum packed segment length for cu_seqlens FMHA.
     """
     global _VIT_PLUGIN_CONFIG
     _VIT_PLUGIN_CONFIG = {
@@ -70,6 +79,8 @@ def set_vit_plugin_config(
         "head_dim": head_dim,
         "num_patches": num_patches,
         "max_batch_size": max_batch_size,
+        "mask_type": mask_type,
+        "max_seq_len": max_seq_len,
     }
 
 def get_vit_plugin_config() -> Dict[str, Any]:
@@ -130,10 +141,12 @@ def _register_vit_plugin_op_impl() -> None:
         qkv: torch.Tensor,
         cos: torch.Tensor,
         sin: torch.Tensor,
-        attention_mask: torch.Tensor,
+        mask_or_cu_seqlens: torch.Tensor,
         num_heads: int,
         head_dim: int,
         qkv_fused: int = 1,
+        mask_type: int = 0,
+        max_seq_len: int = 0,
     ) -> torch.Tensor:
         """
         ViT attention operation.
@@ -142,10 +155,12 @@ def _register_vit_plugin_op_impl() -> None:
             qkv: Fused [Q, K, V] tensor of shape [B, S, (H*D*3)].
             cos: RoPE cosine tensor of shape [S, D].
             sin: RoPE sine tensor of shape [S, D].
-            attention_mask: Additive attention mask broadcastable to [B, H, S, S].
+            mask_or_cu_seqlens: Dense additive mask or INT32 cu_seqlens.
             num_heads: Number of attention heads.
             head_dim: Dimension per head.
             qkv_fused: Whether QKV is fused (1=yes, 0=no).
+            mask_type: 0 for dense additive mask, 1 for packed cu_seqlens.
+            max_seq_len: Max segment length when mask_type=1.
 
         Returns:
             Attention output of shape [B, S, H*D].
@@ -158,7 +173,7 @@ def _register_vit_plugin_op_impl() -> None:
         return attn_out
 
     @torch.library.register_fake("tensorrt_vit::attention")
-    def _(qkv, cos, sin, attention_mask, num_heads, head_dim, qkv_fused=1):
+    def _(qkv, cos, sin, mask_or_cu_seqlens, num_heads, head_dim, qkv_fused=1, mask_type=0, max_seq_len=0):
         batch_size, seq_len, _ = qkv.shape
         output_dim = num_heads * head_dim
         attn_out = torch.empty(
@@ -327,6 +342,9 @@ class ViTPluginAttention(nn.Module):
         if attention_mask is None:
             return torch.zeros(batch_size, seq_len, seq_len, dtype=dtype, device=device)
 
+        if attention_mask.dim() == 1 and attention_mask.dtype == torch.int32:
+            return attention_mask
+
         attention_mask = attention_mask.to(dtype=dtype)
         if attention_mask.dim() == 4:
             if attention_mask.shape[1] == 1:
@@ -344,6 +362,7 @@ class ViTPluginAttention(nn.Module):
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        max_seq_len: int = 0,
         **kwargs,
     ) -> torch.Tensor:
         squeeze_batch = False
@@ -361,6 +380,11 @@ class ViTPluginAttention(nn.Module):
             hidden_states.dtype,
             hidden_states.device,
         )
+        mask_type = 0
+        if attention_mask.dim() == 1 and attention_mask.dtype == torch.int32:
+            mask_type = 1
+            if max_seq_len <= 0:
+                max_seq_len = seq_len
 
         attn_out = torch.ops.tensorrt_vit.attention.default(
             qkv,
@@ -370,6 +394,8 @@ class ViTPluginAttention(nn.Module):
             self.num_heads,
             self.head_dim,
             1,
+            mask_type,
+            max_seq_len,
         )
         output = self.output_proj(attn_out)
         output = output.squeeze(0) if squeeze_batch else output
@@ -405,6 +431,7 @@ class ViTPluginWrapper(nn.Module):
         self.model_type = (
             self._detect_model_type(model) if model_type == "auto" else model_type
         )
+        self.max_window_seq_len = 0
 
     def _detect_model_type(self, model: nn.Module) -> str:
         """Auto-detect vision model type from model structure."""
@@ -463,6 +490,7 @@ class ViTPluginWrapper(nn.Module):
         rotary_pos_emb: torch.Tensor,
         attention_mask: torch.Tensor,
         window_attention_mask: torch.Tensor,
+        cu_window_seqlens: torch.Tensor,
         window_index: torch.Tensor,
         reverse_window_index: torch.Tensor,
     ) -> torch.Tensor:
@@ -490,11 +518,22 @@ class ViTPluginWrapper(nn.Module):
 
         blocks = self._get_blocks(visual)
         for layer_idx, block in enumerate(blocks):
+            full_attention = layer_idx in visual.fullatt_block_indexes
+            # Qwen2.5-VL's vision tower uses hidden_size=1280 and 16 heads,
+            # so its ViT attention head_dim is 80. This is distinct from the
+            # language model head size, which is 128.
+            fmha_supported = (
+                isinstance(block.attn, ViTPluginAttention)
+                and block.attn.head_dim in (64, 80, 128)
+            )
             attention_mask_now = (
                 attention_mask
-                if layer_idx in visual.fullatt_block_indexes
+                if full_attention
+                else cu_window_seqlens
+                if fmha_supported
                 else window_attention_mask
             )
+            max_seq_len_now = 0 if full_attention or not fmha_supported else self.max_window_seq_len
 
             residual = hidden_states
             hidden_states = block.norm1(hidden_states)
@@ -502,6 +541,7 @@ class ViTPluginWrapper(nn.Module):
                 hidden_states,
                 attention_mask=attention_mask_now,
                 position_embeddings=position_embeddings,
+                max_seq_len=max_seq_len_now,
             )
             hidden_states = residual + hidden_states
 
@@ -658,6 +698,7 @@ class ViTPluginWrapper(nn.Module):
         rotary_pos_emb: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
         window_attention_mask: Optional[torch.Tensor] = None,
+        cu_window_seqlens: Optional[torch.Tensor] = None,
         window_index: Optional[torch.Tensor] = None,
         reverse_window_index: Optional[torch.Tensor] = None,
         aspect_ratio_ids: Optional[torch.Tensor] = None,
@@ -674,19 +715,21 @@ class ViTPluginWrapper(nn.Module):
                 rotary_pos_emb is None
                 or attention_mask is None
                 or window_attention_mask is None
+                or cu_window_seqlens is None
                 or window_index is None
                 or reverse_window_index is None
             ):
                 raise ValueError(
                     "Qwen-VL ViTPluginWrapper expects rotary_pos_emb, "
-                    "attention_mask, window_attention_mask, window_index, and "
-                    "reverse_window_index."
+                    "attention_mask, window_attention_mask, cu_window_seqlens, "
+                    "window_index, and reverse_window_index."
                 )
             return self._forward_qwen_vl(
                 pixel_values,
                 rotary_pos_emb,
                 attention_mask,
                 window_attention_mask,
+                cu_window_seqlens,
                 window_index,
                 reverse_window_index,
             )
@@ -838,6 +881,12 @@ def compile_vit_plugin_model(
         example_inputs = ()
     if example_kwargs is None:
         example_kwargs = {}
+    if dynamic_shapes:
+        dynamic_shapes = {
+            name: shape
+            for name, shape in dynamic_shapes.items()
+            if isinstance(example_kwargs.get(name), torch.Tensor)
+        }
 
     ep = torch.export.export(
         model,
@@ -847,7 +896,9 @@ def compile_vit_plugin_model(
         strict=False,
     )
 
-    compile_inputs = list(example_inputs) + list(example_kwargs.values())
+    compile_inputs = list(example_inputs) + [
+        value for value in example_kwargs.values() if isinstance(value, torch.Tensor)
+    ]
     with torch_tensorrt.dynamo.Debugger() if debug else nullcontext():
         trt_model = torch_tensorrt.dynamo.compile(
             ep,

@@ -60,7 +60,7 @@ DEVICE = torch.device("cuda:0")
 #   "<path from config.json>": "<local checkpoint dir or public HF repo id>"
 BACKBONE_OVERRIDES = {
     # Example for nvidia/GR00T-N1-2B.
-    TODO: This public SigLIP checkpoint is only a smoke-test stand-in for exercising
+    # TODO: This public SigLIP checkpoint is only a smoke-test stand-in for exercising
     # policy -> backbone resolution. It is not the real GR00T Eagle backbone as it is not publicly accessible.
     "$GR00T_BACKBONE_PATH/eagle2_hg_model": "google/siglip-base-patch16-224",
 }
@@ -301,6 +301,7 @@ def create_windowed_rope_metadata(visual_model, pixel_values, image_grid_thw):
     )
     if isinstance(cu_window_seqlens, torch.Tensor):
         cu_window_seqlens = cu_window_seqlens.to(device="cpu", dtype=torch.long).tolist()
+    max_window_seq_len = max(end - start for start, end in zip(cu_window_seqlens[:-1], cu_window_seqlens[1:]))
     for start, end in zip(cu_window_seqlens[:-1], cu_window_seqlens[1:]):
         window_attention_mask[:, start:end, start:end] = 0
 
@@ -308,6 +309,8 @@ def create_windowed_rope_metadata(visual_model, pixel_values, image_grid_thw):
         "rotary_pos_emb": rotary_pos_emb.to(device=DEVICE),
         "attention_mask": attention_mask,
         "window_attention_mask": window_attention_mask,
+        "cu_window_seqlens": torch.tensor(cu_window_seqlens, dtype=torch.int32, device=DEVICE),
+        "max_window_seq_len": max_window_seq_len,
         "window_index": window_index,
         "reverse_window_index": reverse_window_index,
     }
@@ -597,6 +600,7 @@ def run_qwen(model_name):
         model_trt.visual,
         vision_config,
     )
+    wrapper.max_window_seq_len = plugin_kwargs.pop("max_window_seq_len")
 
     print("Compiling TensorRT visual model...")
     trt_visual_model = compile_vit_plugin_model(

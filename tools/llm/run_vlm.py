@@ -422,6 +422,7 @@ def _create_qwen_vit_plugin_core_inputs(
 
     if isinstance(cu_window_seqlens, torch.Tensor):
         cu_window_seqlens = cu_window_seqlens.to(device="cpu", dtype=torch.long).tolist()
+    max_window_seq_len = max(end - start for start, end in zip(cu_window_seqlens[:-1], cu_window_seqlens[1:]))
 
     for start, end in zip(cu_window_seqlens[:-1], cu_window_seqlens[1:]):
         window_attention_mask[:, start:end, start:end] = 0
@@ -430,6 +431,8 @@ def _create_qwen_vit_plugin_core_inputs(
         "rotary_pos_emb": rotary_pos_emb.to(device=device),
         "attention_mask": attention_mask,
         "window_attention_mask": window_attention_mask,
+        "cu_window_seqlens": torch.tensor(cu_window_seqlens, dtype=torch.int32, device=device),
+        "max_window_seq_len": max_window_seq_len,
         "window_index": window_index,
         "reverse_window_index": reverse_window_index,
     }
@@ -453,6 +456,7 @@ class _QwenVITPluginVisualAdapter(torch.nn.Module):
                 rotary_pos_emb=self.core_inputs["rotary_pos_emb"],
                 attention_mask=self.core_inputs["attention_mask"],
                 window_attention_mask=self.core_inputs["window_attention_mask"],
+                cu_window_seqlens=self.core_inputs["cu_window_seqlens"],
                 window_index=self.core_inputs["window_index"],
                 reverse_window_index=self.core_inputs["reverse_window_index"],
             )
@@ -462,6 +466,7 @@ class _QwenVITPluginVisualAdapter(torch.nn.Module):
                 self.core_inputs["rotary_pos_emb"],
                 self.core_inputs["attention_mask"],
                 self.core_inputs["window_attention_mask"],
+                self.core_inputs["cu_window_seqlens"],
                 self.core_inputs["window_index"],
                 self.core_inputs["reverse_window_index"],
             )
@@ -499,6 +504,7 @@ def _compile_qwen_vision_with_vit_plugin(
         device,
         torch_dtype,
     )
+    wrapper.max_window_seq_len = core_inputs.pop("max_window_seq_len")
 
     compile_kwargs = {
         "pixel_values": pixel_values,
