@@ -27,6 +27,19 @@ Functions
 
 .. autofunction:: enable_output_allocator
 
+Stream Management
+------------------
+
+.. autofunction:: stream_plan
+
+.. autofunction:: apply_stream_plan
+
+.. autoclass:: StreamPlan
+   :members:
+
+.. autoexception:: StreamPlanError
+
+
 Classes
 ---------
 

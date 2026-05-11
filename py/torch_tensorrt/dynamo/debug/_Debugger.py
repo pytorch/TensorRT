@@ -6,10 +6,14 @@ import os
 import sys
 import tempfile
 from logging.config import dictConfig
-from typing import Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 from unittest import mock
 
+if TYPE_CHECKING:
+    from torch_tensorrt.runtime.stream_plan import StreamPlan
+
 import torch
+import torch.fx
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
@@ -231,6 +235,30 @@ class Debugger:
             }
             config["loggers"][""]["handlers"].append("file")
         return config
+
+    def dump_stream_plan(
+        self,
+        gm: torch.fx.GraphModule,
+        plan: "StreamPlan",
+        *,
+        fmt: str = "png",
+        title: str = "Stream Plan",
+    ) -> str:
+        """
+        Render the stream plan into the active debug logging directory.
+
+        Writes ``<logging_dir>/stream_plans/stream_plan.<fmt>`` and returns
+        the full path.  Requires the ``pydot`` package.
+        """
+        from torch_tensorrt.dynamo.debug._stream_plan import stream_plan_dot
+
+        out_dir = os.path.join(self.cfg.logging_dir, "stream_plans")
+        os.makedirs(out_dir, exist_ok=True)
+        path = os.path.join(out_dir, f"stream_plan.{fmt}")
+        dot = stream_plan_dot(gm, plan, title=title)
+        getattr(dot, f"write_{fmt}")(path)
+        _LOGGER.debug("Stream plan written to %s", path)
+        return path
 
     def set_capture_tensorrt_api_recording_json_file(self) -> None:
         if self.cfg.capture_tensorrt_api_recording is False:

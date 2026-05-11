@@ -71,10 +71,12 @@ cc_library(
         "execute_engine.cpp",
         "register_jit_hooks.cpp",
         "runtime.cpp",
+        "stream_ops.cpp",
     ],
     hdrs = [
         "Platform.h",
         "RTDevice.h",
+        "StreamGuard.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
         "runtime.h",
@@ -108,6 +110,7 @@ filegroup(
     srcs = [
         "Platform.h",
         "RTDevice.h",
+        "StreamGuard.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
         "runtime.h",

@@ -50,11 +50,46 @@ def torch_tensorrt_backend(
     return DEFAULT_BACKEND(gm, sample_inputs, **kwargs)
 
 
+def _try_apply_stream_plan(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """Best-effort stream plan application for the torch.compile backend.
+
+    Skips silently when cudagraphs are active or fewer than 2 TRT subgraphs
+    exist (no parallelism to exploit).  Any StreamPlanError is logged as a
+    warning so compilation still succeeds.
+    """
+    from torch_tensorrt.runtime._cudagraphs import _PY_RT_CUDAGRAPHS, CudaGraphsMode
+    from torch_tensorrt.runtime.stream_plan import (
+        StreamPlanError,
+        _trt_nodes,
+        apply_stream_plan,
+    )
+
+    if _PY_RT_CUDAGRAPHS != CudaGraphsMode.STANDARD:
+        logger.debug("stream_plan: skipping — TRT cudagraphs active")
+        return gm
+    trt_node_list = _trt_nodes(gm)
+    if len(trt_node_list) < 2:
+        logger.debug("stream_plan: skipping — fewer than 2 TRT subgraphs")
+        return gm
+    try:
+        gm = apply_stream_plan(gm)
+        logger.debug("stream_plan: applied across %d subgraphs", len(trt_node_list))
+    except StreamPlanError as exc:
+        logger.warning("stream_plan: skipping — %s", exc)
+    except Exception:
+        logger.warning("stream_plan: unexpected failure, skipping", exc_info=True)
+    return gm
+
+
 @td.register_backend(name="aot_torch_tensorrt_aten")  # type: ignore[misc]
 def aot_torch_tensorrt_aten_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
     import torch.distributed as dist
+
+    # Extract stream_plan before parse_dynamo_kwargs strips unknown keys.
+    _raw = kwargs.get("options", kwargs)
+    enable_stream_plan: bool = bool(_raw.get("stream_plan", False))
 
     settings, engine_cache = parse_dynamo_kwargs(kwargs)
 
@@ -78,7 +113,10 @@ def aot_torch_tensorrt_aten_backend(
             "Wrapping the backend with aot_autograd for Distributed examples\n"
         )
         _pretraced_backend_autograd = functools.partial(
-            _pretraced_backend, settings=settings, engine_cache=engine_cache
+            _pretraced_backend,
+            settings=settings,
+            engine_cache=engine_cache,
+            enable_stream_plan=enable_stream_plan,
         )
         settings_aot_autograd = {}
         settings_aot_autograd["decompositions"] = get_decompositions(
@@ -129,7 +167,10 @@ def aot_torch_tensorrt_aten_backend(
         aot_settings = copy.copy(settings)
         aot_settings.use_distributed_mode_trace = True
         _pretraced_backend_autograd = functools.partial(
-            _pretraced_backend, settings=aot_settings, engine_cache=engine_cache
+            _pretraced_backend,
+            settings=aot_settings,
+            engine_cache=engine_cache,
+            enable_stream_plan=enable_stream_plan,
         )
         aot_decomps = get_decompositions(
             settings.enable_experimental_decompositions, settings.decompose_attention
@@ -143,7 +184,9 @@ def aot_torch_tensorrt_aten_backend(
             decompositions=aot_decomps,
         )(gm, sample_inputs)
 
-    return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
+    return _pretraced_backend(
+        gm, sample_inputs, settings, engine_cache, enable_stream_plan=enable_stream_plan
+    )
 
 
 def _strip_trt_sdpa_kwargs(gm: torch.fx.GraphModule) -> None:
@@ -274,6 +317,7 @@ def _pretraced_backend(
     sample_inputs: Sequence[Any],
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Any = None,
+    enable_stream_plan: bool = False,
 ) -> torch.fx.GraphModule | Callable[..., Any]:
     """Helper function to manage translation of traced FX module to TRT engines
 
@@ -375,6 +419,8 @@ def _pretraced_backend(
             # due to an unsupported op).  These nodes will be executed by
             # PyTorch which does not accept use_fp32_acc / sliding_window_size.
             _strip_trt_sdpa_kwargs(trt_compiled)
+            if enable_stream_plan:
+                trt_compiled = _try_apply_stream_plan(trt_compiled)
             return trt_compiled
     except (AssertionError, RuntimeError, TypeError):
         if not settings.pass_through_build_failures:

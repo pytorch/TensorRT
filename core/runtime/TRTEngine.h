@@ -194,13 +194,18 @@ struct TRTEngine : torch::CustomClassHolder {
 
   // CUDAGraph-Related Functionality
   at::cuda::CUDAGraph cudagraph = {};
-  at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
-  at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
+  at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream(0);
+  at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream(0);
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
+
+  // Set to true once we've warned that this engine was invoked on the default
+  // stream and fell back to a pool stream.  Prevents the warning from spamming
+  // tight inference loops.
+  bool warned_default_stream = false;
 
   // Single placeholder buffer for empty tensor inputs (allocated once, reused)
   void* empty_tensor_placeholder = nullptr;

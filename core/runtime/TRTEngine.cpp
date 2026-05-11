@@ -128,6 +128,8 @@ TRTEngine::TRTEngine(
   device_info = most_compatible_device.value();
   multi_gpu_device_check();
   set_rt_device(device_info);
+  engine_stream = c10::cuda::getDefaultCUDAStream(device_info.id);
+  caller_stream = c10::cuda::getDefaultCUDAStream(device_info.id);
 
   rt = make_trt(nvinfer1::createInferRuntime(util::logging::get_logger()));
 

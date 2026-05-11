@@ -3,9 +3,49 @@ import logging
 from typing import Any, Dict, List
 
 import torch
+
+# _stream_ops registers schemas + Python fallback implementations when the C++
+# runtime is absent.  Import it here so schemas exist before the @register_fake
+# decorators below execute.
+from torch_tensorrt.dynamo.runtime import _stream_ops  # noqa: F401
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 logger = logging.getLogger(__name__)
+
+
+# Meta kernels — always registered regardless of runtime availability.
+# Schemas are guaranteed to exist (_stream_ops registered them above if needed).
+
+
+# ── Meta kernels for stream-control ops ──────────────────────────────────────
+# Schemas now take torch.classes.tensorrt.StreamGuard ScriptObjects rather
+# than raw int handles.  Meta kernels operate over fake guards; they don't
+# touch CUDA streams, just return values of the right shape so AOT Autograd
+# / FakeTensorMode can trace through them.
+
+
+@torch.library.register_fake("tensorrt::enter_compute_stream")  # type: ignore
+def fake_enter_compute_stream(
+    primary: Any, caller_guard: Any, device_index: int
+) -> int:
+    # Returns the caller's stream handle as an int token.  Meta kernels don't
+    # touch real streams so any non-zero placeholder is fine for tracing.
+    return 0
+
+
+@torch.library.register_fake("tensorrt::exit_compute_stream")  # type: ignore
+def fake_exit_compute_stream(caller_guard: Any, device_index: int) -> None:
+    pass
+
+
+@torch.library.register_fake("tensorrt::set_stream")  # type: ignore
+def fake_set_stream(guard: Any, device_index: int) -> int:
+    return 0
+
+
+@torch.library.register_fake("tensorrt::sync_streams")  # type: ignore
+def fake_sync_streams(src: Any, dst: Any, device_index: int) -> int:
+    return 0
 
 
 def _apply_symbolic_shape_expressions(
@@ -224,6 +264,59 @@ def fake_tensorrt_execute_engine(
             "This engine may have been compiled with an older version of Torch-TensorRT. "
             "Please recompile your model."
         )
+
+
+@torch.library.register_fake("tensorrt::call_trt_with_token")  # type: ignore
+def fake_call_trt_with_token(
+    token: int, engine: Any, inputs: List[torch.Tensor]
+) -> Any:
+    # Token is an ordering edge only.  Shape inference identical to execute_engine.
+    return fake_tensorrt_execute_engine(inputs, engine)
+
+
+@torch._library.register_fake_class("tensorrt::StreamGuard")
+class FakeStreamGuard:
+    """Meta-mode shadow of torch.classes.tensorrt.StreamGuard.
+
+    StreamGuard is a stateless (modulo the runtime stream handle) holder, so
+    the fake just records its two pickled fields.  This lets torch.export
+    flatten StreamGuard ScriptObjects during retrace without touching the
+    real C++ class.
+    """
+
+    def __init__(self, device_index: int = 0, auto_bind: bool = False) -> None:
+        self._device_index = int(device_index)
+        self._auto_bind = bool(auto_bind)
+        self._handle: int = 0
+
+    @classmethod
+    def __obj_unflatten__(cls, flattened: Any) -> Any:
+        kwargs = dict(flattened)
+        return cls(
+            device_index=kwargs.get("device_index", 0),
+            auto_bind=kwargs.get("auto_bind", False),
+        )
+
+    def bind(self, handle: int) -> None:
+        self._handle = int(handle)
+
+    def clear(self) -> None:
+        self._handle = 0
+
+    def get_handle(self) -> int:
+        return self._handle
+
+    def is_bound(self) -> bool:
+        return self._handle != 0
+
+    def device_index(self) -> int:
+        return self._device_index
+
+    def auto_bind(self) -> bool:
+        return self._auto_bind
+
+    def set_auto_bind(self, value: bool) -> None:
+        self._auto_bind = bool(value)
 
 
 @torch._library.register_fake_class("tensorrt::Engine")

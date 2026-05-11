@@ -316,9 +316,40 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
-    if (compiled_engine->engine_stream == c10::cuda::getDefaultCUDAStream(current_device_id)) {
-      // Create a new stream if the engine stream is the default stream
-      compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+    auto default_stream = c10::cuda::getDefaultCUDAStream(current_device_id);
+    // When the caller has already switched to a non-default stream (e.g. a CUDA
+    // green context stream, an apply_stream_plan-managed stream, or a
+    // torch.cuda.stream context), enqueue directly on that stream so TRT
+    // kernels are visible to the profiler on the intended stream.  The separate
+    // engine_stream + two-way sync below is only needed when the caller is on
+    // the default stream.
+    //
+    // Default-stream invocations defeat any stream-level concurrency the user
+    // expected from green contexts or apply_stream_plan.  We warn once per
+    // engine to surface the bug without breaking existing eager flows.  The
+    // pool-stream fallback that follows produces semantically-correct results
+    // (the two-way event fences make it equivalent to running on the caller
+    // stream directly).
+    bool caller_on_default = (compiled_engine->caller_stream == default_stream);
+    if (caller_on_default) {
+      if (!compiled_engine->warned_default_stream) {
+        LOG_WARNING(
+            "TRT engine '" << compiled_engine->name
+                           << "' invoked on the default CUDA stream. "
+                              "Falling back to a stream-pool stream and fencing both ways. "
+                              "For multi-engine concurrency or green-context SM partitioning, "
+                              "set a non-default stream first via apply_stream_plan(...), "
+                              "torch.cuda.stream(...), or StreamGuard.bind(...). "
+                              "This warning fires once per engine.");
+        compiled_engine->warned_default_stream = true;
+      }
+      if (compiled_engine->engine_stream == default_stream) {
+        // Create a new stream if the engine stream is the default stream
+        compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+      }
+    } else {
+      // Run on the caller's stream directly
+      compiled_engine->engine_stream = compiled_engine->caller_stream;
     }
 
     { // Engine Execution (execute on engine stream)
@@ -330,10 +361,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
       }
 
-      // Block engine stream until results are available on caller stream
-      at::cuda::CUDAEvent caller_exec_complete;
-      caller_exec_complete.record(compiled_engine->caller_stream);
-      caller_exec_complete.block(compiled_engine->engine_stream);
+      if (caller_on_default) {
+        // Block engine stream until results are available on caller stream
+        at::cuda::CUDAEvent caller_exec_complete;
+        caller_exec_complete.record(compiled_engine->caller_stream);
+        caller_exec_complete.block(compiled_engine->engine_stream);
+      }
 
       if (!cudagraphs_enabled) {
         // Direct execution uses the caller buffers directly
@@ -354,7 +387,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         // Replay the CUDAGraph
         compiled_engine->cudagraph.replay(); // Has a cudaDeviceSynchronize internally
       }
-    } // End engine exeuction (resets to caller stream)
+    } // End engine execution (resets to caller stream)
 
     // When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first
     // execution or when shape is changed.
@@ -364,10 +397,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine);
     }
 
-    // Block caller stream until engine execution is complete
-    at::cuda::CUDAEvent trt_exec_complete;
-    trt_exec_complete.record(compiled_engine->engine_stream);
-    trt_exec_complete.block(compiled_engine->caller_stream);
+    if (caller_on_default) {
+      // Block caller stream until engine execution is complete
+      at::cuda::CUDAEvent trt_exec_complete;
+      trt_exec_complete.record(compiled_engine->engine_stream);
+      trt_exec_complete.block(compiled_engine->caller_stream);
+    }
 
     if (cudagraphs_enabled) {
       // If in CUDAGraph mode, results need to be copied to the result buffers (on caller stream)
@@ -425,9 +460,25 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
-    if (compiled_engine->engine_stream == c10::cuda::getDefaultCUDAStream(current_device_id)) {
-      // Create a new stream if the engine stream is the default stream
-      compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+    auto default_stream = c10::cuda::getDefaultCUDAStream(current_device_id);
+    bool caller_on_default = (compiled_engine->caller_stream == default_stream);
+    if (caller_on_default) {
+      if (!compiled_engine->warned_default_stream) {
+        LOG_WARNING(
+            "TRT engine '" << compiled_engine->name
+                           << "' invoked on the default CUDA stream. "
+                              "Falling back to a stream-pool stream and fencing both ways. "
+                              "For multi-engine concurrency or green-context SM partitioning, "
+                              "set a non-default stream first via apply_stream_plan(...), "
+                              "torch.cuda.stream(...), or StreamGuard.bind(...). "
+                              "This warning fires once per engine.");
+        compiled_engine->warned_default_stream = true;
+      }
+      if (compiled_engine->engine_stream == default_stream) {
+        compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+      }
+    } else {
+      compiled_engine->engine_stream = compiled_engine->caller_stream;
     }
 
     { // Engine Execution (execute on engine stream)
@@ -439,20 +490,24 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
       }
 
-      // Block engine stream until results are available on caller stream
-      at::cuda::CUDAEvent caller_exec_complete;
-      caller_exec_complete.record(compiled_engine->caller_stream);
-      caller_exec_complete.block(compiled_engine->engine_stream);
+      if (caller_on_default) {
+        // Block engine stream until results are available on caller stream
+        at::cuda::CUDAEvent caller_exec_complete;
+        caller_exec_complete.record(compiled_engine->caller_stream);
+        caller_exec_complete.block(compiled_engine->engine_stream);
+      }
 
       // Direct execution uses the caller buffers directly
       compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
 
-    } // End engine exeuction (resets to caller stream)
+    } // End engine execution (resets to caller stream)
 
-    // Block caller stream until engine execution is complete
-    at::cuda::CUDAEvent trt_exec_complete;
-    trt_exec_complete.record(compiled_engine->engine_stream);
-    trt_exec_complete.block(compiled_engine->caller_stream);
+    if (caller_on_default) {
+      // Block caller stream until engine execution is complete
+      at::cuda::CUDAEvent trt_exec_complete;
+      trt_exec_complete.record(compiled_engine->engine_stream);
+      trt_exec_complete.block(compiled_engine->caller_stream);
+    }
 
     std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
     if (compiled_engine->profile_execution) {

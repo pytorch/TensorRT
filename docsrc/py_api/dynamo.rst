@@ -33,3 +33,7 @@ Classes
 --------
 
 .. autoclass:: CompilationSettings
+
+.. autoclass:: Debugger
+   :members:
+   :special-members: __enter__, __exit__
