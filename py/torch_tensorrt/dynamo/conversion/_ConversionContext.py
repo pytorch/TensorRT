@@ -17,6 +17,7 @@ class ConversionContext:
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
         weight_refit_map: Dictionary mapping weight names to their corresponding np.array
         cpu_weights_reference_holder: Dictionary mapping weight names to their corresponding torch.Tensor
+        current_node: The FX node currently being converted, used by converters that need access to graph-level metadata (e.g. annotations set by lowering passes)
     """
 
     net: TRTNetwork

@@ -14,7 +14,11 @@ _SOFTMAX_TARGETS = {
     torch.ops.aten.softmax.int,
 }
 _MATMUL_TARGETS = {
+    torch.ops.aten.matmul,
     torch.ops.aten.matmul.default,
+    torch.ops.aten.dot.default,
+    torch.ops.aten.mm.default,
+    torch.ops.aten.mv.default,
     torch.ops.aten.bmm.default,
 }
 # Shape-only ops that may sit between a quantize_op output and a matmul input.
@@ -63,10 +67,14 @@ def insert_fp8_softmax_qdq(
 
     TRT's Method 2 FP8 MHA fusion requires FP8 Q/DQ on Q, K, V **and** on the
     softmax output.  modelopt's ``NVFP4_FP8_MHA_CONFIG`` specifies a
-    ``*softmax_quantizer`` but the HF ``_QuantAttention.softmax_quantizer`` is
-    only applied in the Triton FA path — not in the standard
-    ``F.scaled_dot_product_attention`` path used by ``torch.export``.
-    Consequently the exported FX graph has::
+    ``*softmax_quantizer`` glob, but in practice no SDPA-based modelopt
+    attention wrapper applies it: the HF ``_QuantAttention`` does not create a
+    ``softmax_quantizer`` at all (only Q/K/V bmm quantizers), and the diffusers
+    ``_QuantAttention`` creates one but only invokes it on the ``torch.bmm``
+    code path — its ``F.scaled_dot_product_attention`` replacement routes
+    through a custom ``FP8SDPA`` op that skips softmax quantization.
+    Consequently, for any model that ends up on the SDPA path used by
+    ``torch.export``, the exported FX graph has::
 
         matmul(q_fp8, k_fp8.T)  →  mul(1/sqrt(D))  →  softmax  →  matmul(·, v_fp8)
 

@@ -4,6 +4,7 @@ from typing import Optional, Tuple, Union
 
 import torch
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -38,11 +39,16 @@ def _maybe_set_fp8_softmax(
     scale_val = ctx.current_node.meta.get("_fp8_softmax_scale")
     if scale_val is None:
         return False
+    # Scale dtype must match the IAttention output (= pre-quant Q/K/V) dtype;
+    # using float32 unconditionally fails TRT compilation on some platforms.
+    output_dtype = _enums.dtype._from(attention_layer.get_output(0).dtype).to(
+        torch.dtype
+    )
     scale_tensor = get_trt_tensor(
         ctx,
-        torch.tensor(scale_val, dtype=torch.float32),
+        torch.tensor(scale_val, dtype=output_dtype),
         name + "_softmax_fp8_scale",
-        dtype=torch.float32,
+        dtype=output_dtype,
     )
     attention_layer.normalization_quantize_to_type = trt.DataType.FP8
     attention_layer.normalization_quantize_scale = scale_tensor
