@@ -53,7 +53,6 @@ struct ConversionCtx {
   std::shared_ptr<nvinfer1::IBuilder> builder;
   std::shared_ptr<nvinfer1::INetworkDefinition> net;
   std::shared_ptr<nvinfer1::IBuilderConfig> cfg;
-  std::set<nvinfer1::DataType> enabled_precisions;
   BuilderSettings settings;
   util::logging::TorchTRTLogger logger;
   // Pointers to data that needs to remain alive until conversion is done
