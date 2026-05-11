@@ -1,6 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <fstream>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -184,6 +185,12 @@ struct TRTEngine : torch::CustomClassHolder {
   void set_pre_allocated_outputs(bool enable);
   void set_output_tensors_as_unowned(bool enable);
   bool are_output_tensors_unowned();
+  void clear_active_input_tensors();
+  void reset_active_input_tensors();
+  // Mark active input tensor allocations as used by a CUDA stream so the CUDA
+  // caching allocator does not recycle their storage while that stream may still
+  // access it.
+  void record_active_input_tensor_stream_usage(const c10::cuda::CUDAStream& stream);
   TorchTRTRuntimeStates runtime_states;
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
@@ -196,8 +203,15 @@ struct TRTEngine : torch::CustomClassHolder {
   at::cuda::CUDAGraph cudagraph = {};
   at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
-  std::vector<at::Tensor> input_buffers = {};
-  std::vector<at::Tensor> output_buffers = {};
+  std::vector<at::Tensor> cudagraph_input_staging_buffers = {};
+  std::vector<at::Tensor> cudagraph_output_staging_buffers = {};
+
+  // Per-call formatted input buffers. In standard mode these are bound
+  // directly to TRT; in CUDA graph mode they are async-copy sources for
+  // persistent CUDA graph input staging buffers.
+  std::vector<at::Tensor> active_input_tensors = {};
+  std::list<std::vector<int64_t>> active_shape_tensor_values = {};
+
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;

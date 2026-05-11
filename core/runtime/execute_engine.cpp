@@ -96,9 +96,8 @@ void setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
     bool cudagraphs_enabled,
-    bool need_cudagraphs_record,
-    std::list<std::vector<int64_t>>& inputShapeTensorValues) {
-  std::list<at::Tensor> formatted_inputs(compiled_engine->num_io.first);
+    bool need_cudagraphs_record) {
+  compiled_engine->reset_active_input_tensors();
 
   for (size_t i = 0; i < inputs.size(); i++) {
     std::string name = compiled_engine->in_binding_names[i];
@@ -124,26 +123,27 @@ void setup_input_tensors(
       auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
       std::vector<int64_t> inputs_cpu_vec(
           input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
-      inputShapeTensorValues.emplace_back(inputs_cpu_vec);
+      compiled_engine->active_shape_tensor_values.emplace_back(std::move(inputs_cpu_vec));
       TORCHTRT_CHECK(
-          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
+          compiled_engine->exec_ctx->setTensorAddress(
+              name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
           "Error while setting the tensor address for shape inputs");
 
       if (cudagraphs_enabled) {
         // @peri044 I dont know if this makes sense since they are supposed to be GPU buffers
-        compiled_engine->input_buffers[i] = input_cpu;
+        compiled_engine->cudagraph_input_staging_buffers[i] = input_cpu;
       }
       TORCHTRT_CHECK(
-          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
+          compiled_engine->exec_ctx->setTensorAddress(
+              name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
           "Error while setting the tensor address for shape inputs");
 
     } else {
-      at::Tensor contig_input = inputs[i].view(shape).contiguous();
-      formatted_inputs.emplace_back(std::move(contig_input));
+      compiled_engine->active_input_tensors[i] = inputs[i].view(shape).contiguous();
 
       if (need_cudagraphs_record) {
-        // Create a new persistent input buffer
-        compiled_engine->input_buffers[i] = std::move(formatted_inputs.back().clone());
+        // Create a persistent CUDA graph input staging buffer with a stable replay address.
+        compiled_engine->cudagraph_input_staging_buffers[i] = compiled_engine->active_input_tensors[i].clone();
       }
 
       TORCHTRT_CHECK(
@@ -151,12 +151,12 @@ void setup_input_tensors(
 
       at::Tensor final_input;
       if (cudagraphs_enabled) {
-        // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
-        compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);
-        final_input = compiled_engine->input_buffers[i];
+        // If using CUDAGraphs copy formatted input to the corresponding persistent staging buffer.
+        compiled_engine->cudagraph_input_staging_buffers[i].copy_(compiled_engine->active_input_tensors[i], true);
+        final_input = compiled_engine->cudagraph_input_staging_buffers[i];
       } else {
         // Otherwise use the formatted buffer directly
-        final_input = formatted_inputs.back();
+        final_input = compiled_engine->active_input_tensors[i];
       }
 
       // Get tensor address, using placeholder for empty tensors
@@ -252,9 +252,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
 
-    // Shape tensor CPU buffers must outlive inferShapes() and enqueueV3()
-    std::list<std::vector<int64_t>> inputShapeTensorValues;
-
     // Intialize inputs and outputs to be available throughout the succeeding scopes
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
@@ -263,7 +260,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record, inputShapeTensorValues);
+      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
@@ -291,14 +288,14 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         auto pyt_idx = output_indices.second;
         std::string name = compiled_engine->out_binding_names[pyt_idx];
         if (need_cudagraphs_record) {
-          // If we are recording the cuda graph then we need to update the persistent output buffer
-          compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
+          // If recording a CUDA graph, update the persistent output staging buffer.
+          compiled_engine->cudagraph_output_staging_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
         }
 
         if (cudagraphs_enabled) {
           TORCHTRT_CHECK(
               compiled_engine->exec_ctx->setTensorAddress(
-                  name.c_str(), compiled_engine->output_buffers[pyt_idx].data_ptr()),
+                  name.c_str(), compiled_engine->cudagraph_output_staging_buffers[pyt_idx].data_ptr()),
               "Error while setting the output tensor address");
         } else {
           TORCHTRT_CHECK(
@@ -320,6 +317,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       // Create a new stream if the engine stream is the default stream
       compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
     }
+
+    compiled_engine->record_active_input_tensor_stream_usage(
+        cudagraphs_enabled ? compiled_engine->caller_stream : compiled_engine->engine_stream);
 
     { // Engine Execution (execute on engine stream)
       c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
@@ -356,6 +356,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
     } // End engine exeuction (resets to caller stream)
 
+    compiled_engine->clear_active_input_tensors();
+
     // When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first
     // execution or when shape is changed.
     if (compiled_engine->use_pre_allocated_outputs &&
@@ -370,9 +372,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     trt_exec_complete.block(compiled_engine->caller_stream);
 
     if (cudagraphs_enabled) {
-      // If in CUDAGraph mode, results need to be copied to the result buffers (on caller stream)
-      for (size_t o = 0; o < compiled_engine->output_buffers.size(); o++) {
-        outputs[o].copy_(compiled_engine->output_buffers[o], false);
+      // If in CUDAGraph mode, copy persistent staging outputs to returned tensors on the caller stream.
+      for (size_t o = 0; o < compiled_engine->cudagraph_output_staging_buffers.size(); o++) {
+        outputs[o].copy_(compiled_engine->cudagraph_output_staging_buffers[o], false);
       }
     }
 
@@ -386,9 +388,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   };
 
   auto run_output_allocator = [&]() {
-    // Shape tensor CPU buffers must outlive inferShapes() and enqueueV3()
-    std::list<std::vector<int64_t>> inputShapeTensorValues;
-
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
       if (compiled_engine->profile_execution) {
@@ -396,7 +395,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, false, false, inputShapeTensorValues);
+      setup_input_tensors(inputs, compiled_engine, false, false);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
@@ -430,6 +429,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
     }
 
+    compiled_engine->record_active_input_tensor_stream_usage(compiled_engine->engine_stream);
+
     { // Engine Execution (execute on engine stream)
       c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
 
@@ -448,6 +449,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
 
     } // End engine exeuction (resets to caller stream)
+
+    compiled_engine->clear_active_input_tensors();
 
     // Block caller stream until engine execution is complete
     at::cuda::CUDAEvent trt_exec_complete;
