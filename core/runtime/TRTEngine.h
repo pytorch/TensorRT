@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 #include <utility>
 
 #include "ATen/core/function_schema.h"
@@ -37,6 +38,40 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+// Origin of an aliased input/output binding pair. KV_CACHE_UPDATE is enforced
+// by TensorRT itself (via IKVCacheUpdateLayer; reported through
+// ICudaEngine::getAliasedInputTensor); USER is declared by the Torch-TensorRT
+// compile flow (TRT doesn't know about it; runtime validates and binds).
+enum class AliasKind : int8_t {
+  kKVCacheUpdate = 0,
+  kUser = 1,
+};
+
+struct AliasedIOSpec {
+  std::string input_binding_name;
+  AliasKind kind;
+};
+
+inline std::string alias_kind_to_string(AliasKind k) {
+  switch (k) {
+    case AliasKind::kKVCacheUpdate:
+      return "kv_cache_update";
+    case AliasKind::kUser:
+      return "user";
+  }
+  return "unknown";
+}
+
+inline AliasKind alias_kind_from_string(const std::string& s) {
+  if (s == "kv_cache_update")
+    return AliasKind::kKVCacheUpdate;
+  if (s == "user")
+    return AliasKind::kUser;
+  // Unknown kinds are conservatively treated as KV-cache-update — TRT enforces
+  // those without extra runtime work, so worst case the runtime silently no-ops.
+  return AliasKind::kKVCacheUpdate;
+}
+
 using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // ABI_VERSION
     std::tuple<std::string, std::string>, // name
@@ -49,7 +84,8 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>, // Platform
     std::tuple<std::string, std::string>, // Resource Allocation Strategy
-    std::tuple<std::string, std::string> // requires_native_multidevice
+    std::tuple<std::string, std::string>, // requires_native_multidevice
+    std::tuple<std::string, std::string> // aliased_io
     >;
 
 struct TorchTRTRuntimeStates {
@@ -137,6 +173,14 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<std::string> in_binding_names = {}; // ITO: PYT IDX
   std::vector<std::string> out_binding_names = {}; // ITO: PYT IDX
 
+  // For each output binding name that aliases an input binding, the alias spec.
+  // Populated either by build-time conversion records (forwarded from
+  // TRTInterpreterResult) or by reconciliation against the engine's own
+  // ICudaEngine::getAliasedInputTensor at construction time. The runtime
+  // consults this map in the output-binding loop to skip allocation and bind
+  // the same device pointer as the source input.
+  std::unordered_map<std::string, AliasedIOSpec> aliased_io = {};
+
   bool hardware_compatible = false; // Whether the engine was compiled in hardware compatible mode
   std::string serialized_metadata; // This is a base64 encoded pkl object used to store metadata such as settings used
                                    // in compilation
@@ -154,7 +198,8 @@ struct TRTEngine : torch::CustomClassHolder {
       const std::string& serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
           TRTEngine::ResourceAllocationStrategy::kStatic,
-      RuntimeSettings runtime_settings = RuntimeSettings{});
+      RuntimeSettings runtime_settings = RuntimeSettings{},
+      const std::unordered_map<std::string, AliasedIOSpec>& aliased_io = {});
 
   TRTEngine(std::vector<std::string> serialized_info);
 
@@ -170,7 +215,8 @@ struct TRTEngine : torch::CustomClassHolder {
       const std::string& serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
           TRTEngine::ResourceAllocationStrategy::kStatic,
-      RuntimeSettings runtime_settings = RuntimeSettings{});
+      RuntimeSettings runtime_settings = RuntimeSettings{},
+      const std::unordered_map<std::string, AliasedIOSpec>& aliased_io = {});
 
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
