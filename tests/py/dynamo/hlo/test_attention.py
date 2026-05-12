@@ -4,15 +4,19 @@ Covers all SDPA kernel variants, MHA/GQA/MQA attention patterns, causal vs
 non-causal masking, bool/float/broadcast mask shapes, decode-phase attention
 (seq_q=1), non-power-of-2 head dims, LLM-realistic configs, and multiple dtypes.
 
-Known limitations (decompose_attention=True required)
+Known limitations
 -----------------------------------------------------
-  Large causal sequences (seq >= 512, is_causal=True)
-    IAttentionLayer produces ~80% element mismatch at long sequences.
+  TensorRT 10.x (resolved in TRT 11.0):
+  For TensorRT 10.x, large causal sequences of k/v (seq >= 512, is_causal=True) in FP16/BF16
+    IAttentionLayer produces ~80% element mismatch at long sequences. Thus, we use FP32 for
+    the scale factor. If you want to use the accurate dtype, please set `decompose_attention=True`
+    or upgrade to TRT 11.0 or later.
 
-  FP32 GQA/MQA
-    PyTorch's core_aten decomposition expands scaled_dot_product_attention
+  PyTorch 2.12.0 (resolved in PyTorch 2.13.0):
+    PyTorch 2.12.0's core_aten decomposition expands scaled_dot_product_attention
     into matmul + _safe_softmax before the TRT converter runs.  No converter
     is registered for _safe_softmax, so FP32 GQA requires decompose_attention=True.
+    To resolve this issue, please upgrade to PyTorch 2.13.0 or later.
 
 Notes on attn_bias_is_causal
 -----------------------------
@@ -82,8 +86,7 @@ class TestSDPA(DispatchTestCase):
     """aten.scaled_dot_product_attention — all configurations.
 
     test_no_mask
-        Standard MHA, no mask.  decompose=True for large causal (seq >= 512)
-        and flash-dispatch configs (large heads+head_dim).
+        Standard MHA, no mask.
 
     test_decode
         Decode-step (seq_q=1, K/V span full context), no mask.
@@ -99,7 +102,7 @@ class TestSDPA(DispatchTestCase):
 
     test_gqa
         GQA/MQA (Hq != Hkv).  IAttentionLayer native; no K/V expansion.
-        FP32 and large causal (seq >= 512) require decompose_attention=True.
+        FP32 and large causal (seq >= 512) are tested.
     """
 
     # fmt: off
@@ -123,9 +126,12 @@ class TestSDPA(DispatchTestCase):
             # Non-power-of-2 head dims
             ("d48_fp16",                1,  4,   32,   32,  48, False, None,  torch.float16, False, 1e-2),
             ("d96_fp16",                1,  4,   32,   32,  96, False, None,  torch.float16, False, 1e-2),
-            # Large causal → decompose; loosen atol for fp16 accumulation at long seq
-            ("s512_ca_fp16",            1,  8,  512,  512,  64, True,  None,  torch.float16, True,  0.1),
-            ("s2048_ca_fp16",           1,  8, 2048, 2048,  64, True,  None,  torch.float16, True,  0.1),
+            # Large causal in fp16
+            ("s512_ca_fp16",            1,  8,  512,  512,  64, True,  None,  torch.float16, False, 1e-2),
+            ("s2048_ca_fp16",           1,  8, 2048, 2048,  64, True,  None,  torch.float16, False, 1e-2),
+            # Large causal in bf16
+            ("s512_ca_bf16",            1,  8,  512,  512,  64, True,  None,  torch.bfloat16, False, 1e-2),
+            ("s2048_ca_bf16",           1,  8, 2048, 2048,  64, True,  None,  torch.bfloat16, False, 1e-2),
             # --- FP16, custom scale ---
             ("scale_0125_fp16",         2,  8,   64,   64,  64, False, 0.125, torch.float16, False, 1e-2),
             ("scale_05_ca_fp16",        2,  8,   64,   64,  64, True,  0.5,   torch.float16, False, 1e-2),
@@ -140,10 +146,10 @@ class TestSDPA(DispatchTestCase):
             ("b1_h8_s32_d64_nc_bf16",   1,  8,   32,   32,  64, False, None,  torch.bfloat16, False, 1e-2),
             ("b2_h8_s128_d64_ca_bf16",  2,  8,  128,  128,  64, True,  None,  torch.bfloat16, False, 1e-2),
             # LLM-realistic configs
-            ("llama32_1b_prefill_fp16", 1, 32, 2048, 2048,  64, True,  None,  torch.float16, True,  0.1),   # Llama-3.2-1B, large causal → decompose
-            ("llama32_3b_prefill_fp16", 1, 24, 2048, 2048, 128, True,  None,  torch.float16, True,  1e-2),  # Llama-3.2-3B
+            ("llama32_1b_prefill_fp16", 1, 32, 2048, 2048,  64, True,  None,  torch.float16, False, 1e-2),  # Llama-3.2-1B, large causal
+            ("llama32_3b_prefill_fp16", 1, 24, 2048, 2048, 128, True,  None,  torch.float16, False, 1e-2),  # Llama-3.2-3B
             ("qwen25_05b_fp16",         1, 14,  128,  128,  64, True,  None,  torch.float16, False, 1e-2),  # Qwen2.5-0.5B
-            ("mistral_7b_fp16",         1, 32,  512,  512, 128, True,  None,  torch.float16, True,  1e-2),  # Mistral-7B, flash dispatch → decompose
+            ("mistral_7b_fp16",         1, 32,  512,  512, 128, True,  None,  torch.float16, False, 1e-2),  # Mistral-7B, flash dispatch
         ]
     )
     # fmt: on
@@ -245,8 +251,8 @@ class TestSDPA(DispatchTestCase):
             # Decode step (seq_q=1): IAttentionLayer handles non-square Q/K natively
             ("decode_full_fp16",     2, 8,   1,  32, 64, (2, 8,   1,  32), torch.float16, False),
             ("decode_bcast_fp16",    2, 8,   1,  32, 64, (1, 1,   1,  32), torch.float16, False),
-            # Cross-attention (seq_q != seq_k): non-square → use decompose_attention
-            ("cross_attn_fp16",      1, 8,  16,  64, 64, (1, 8,  16,  64), torch.float16, True),
+            # Cross-attention (seq_q != seq_k): non-square
+            ("cross_attn_fp16",      1, 8,  16,  64, 64, (1, 8,  16,  64), torch.float16, False),
         ]
     )
     # fmt: on
@@ -343,10 +349,11 @@ class TestSDPA(DispatchTestCase):
         [
             # (name, batch, q_heads, kv_heads, seq_len, head_dim, is_causal, dtype, use_decompose)
             ("gqa_32q_8kv_s128_fp16",    1, 32, 8,  128, 128, True,  torch.float16, False),
-            ("gqa_32q_8kv_s2048_fp16",   1, 32, 8, 2048, 128, True,  torch.float16, True),   # large causal → decompose
+            ("gqa_32q_8kv_s2048_fp16",   1, 32, 8, 2048, 128, True,  torch.float16, False),  # large causal in fp16
+            ("gqa_32q_8kv_s2048_bf16",   1, 32, 8, 2048, 128, True,  torch.bfloat16,False),  # large causal in bf16
             ("gqa_16q_4kv_s128_fp16",    2, 16, 4,  128,  64, True,  torch.float16, False),
             ("gqa_8q_2kv_nc_fp16",       2,  8, 2,   64,  64, False, torch.float16, False),
-            ("gqa_8q_4kv_fp32",          2,  8, 4,   64,  64, False, torch.float32, True),   # FP32: _safe_softmax path → decompose
+            ("gqa_8q_4kv_fp32",          2,  8, 4,   64,  64, False, torch.float32, False),  # decomposed to _safe_softmax + matmul in torch 2.12.0 but not in 2.13.0
             ("gqa_24q_8kv_fp16",         1, 24, 8,  128, 128, True,  torch.float16, False),  # Llama-3.2-3B
             ("gqa_14q_2kv_fp16",         1, 14, 2,  128,  64, True,  torch.float16, False),  # Qwen2.5-0.5B
             # MQA (kv_heads = 1)
@@ -406,14 +413,14 @@ class TestFlashAttention(DispatchTestCase):
     test_attn_bias_is_causal_opt have no equivalent here.
 
     test_no_mask
-        Standard MHA, no mask.  decompose=True for large causal (seq >= 512).
+        Standard MHA, no mask.
 
     test_decode
         Decode-phase (seq_q=1, seq_k>1) via IAttentionLayer.
 
     test_gqa
         GQA/MQA (Hq != Hkv).  IAttentionLayer native.
-        Large causal (seq >= 512) uses decompose_attention=True.
+        Large causal (seq >= 512) are tested.
     """
 
     # ------------------------------------------------------------------
@@ -431,15 +438,18 @@ class TestFlashAttention(DispatchTestCase):
             ("scale_05_nc_fp16",  2,  8,  128,  64, False, 0.5,   torch.float16,  False, 2e-2),
             ("b4_h16_s128_fp16",  4, 16,  128,  64, True,  None,  torch.float16,  False, 1e-2),
             ("b1_h8_d128_ca_fp16",1,  8,  128, 128, True,  None,  torch.float16,  False, 1e-2),
-            ("b1_h32_s256_ca_fp16",1, 32,  256,  64, True,  None,  torch.float16,  False, 1e-2),
+            ("b1_h32_s256_ca_fp16",1,32,  256,  64, True,  None,  torch.float16,  False, 1e-2),
             # Non-power-of-2 head dim
             ("d48_fp16",          1,  4,   64,  48, False, None,  torch.float16,  False, 1e-2),
             ("d96_fp16",          1,  4,   64,  96, False, None,  torch.float16,  False, 1e-2),
             # BF16
             ("causal_bf16",       2,  8,  128,  64, True,  None,  torch.bfloat16, False, 1e-2),
-            # Large causal → decompose; loosen atol for fp16 accumulation
-            ("s512_ca_fp16",      1,  8,  512,  64, True,  None,  torch.float16,  True,  0.1),
-            ("s2048_ca_fp16",     1, 32, 2048,  64, True,  None,  torch.float16,  True,  0.1),
+            # Large causal in fp16
+            ("s512_ca_fp16",      1,  8,  512,  64, True,  None,  torch.float16,  False, 1e-2),
+            ("s2048_ca_fp16",     1, 32, 2048,  64, True,  None,  torch.float16,  False, 1e-2),
+            # Large causal in bf16
+            ("s512_ca_bf16",      1,  8,  512,  64, True,  None,  torch.bfloat16, False, 1e-2),
+            ("s2048_ca_bf16",     1, 32, 2048,  64, True,  None,  torch.bfloat16, False, 1e-2),
         ]
     )
     # fmt: on
@@ -539,9 +549,6 @@ class TestFlashAttention(DispatchTestCase):
             # GQA decode (seq_q=1)
             ("gqa_decode_32q_8kv_fp16", 2, 32, 8,    1, 128, False, torch.float16, False, 1e-2),
             ("mqa_decode_32q_1kv_fp16", 2, 32, 1,    1, 128, False, torch.float16, False, 1e-2),
-            # Note: large causal GQA (seq >= 512) is untestable via flash attention —
-            # decompose=False hits IAttentionLayer mismatch, decompose=True fails
-            # because PyTorch's export-time decomposition does not support Hq != Hkv.
         ]
     )
     # fmt: on
