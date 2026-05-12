@@ -201,10 +201,8 @@ Result<DelegateHandle*> TensorRTBackend::init(
     ArrayRef<CompileSpec> compile_specs) const {
   (void)compile_specs;
 
-  TORCHTRT_ET_CHECK_NOT_NULL(
-      processed, Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
-  TORCHTRT_ET_CHECK_NOT_NULL(
-      processed->data(), Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
+  TORCHTRT_ET_CHECK_NOT_NULL(processed, Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
+  TORCHTRT_ET_CHECK_NOT_NULL(processed->data(), Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
 
   TensorRTBlobHeader header;
   if (!TensorRTBlobHeader::parse(processed->data(), processed->size(), header)) {
@@ -335,8 +333,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   for (size_t i = 0; i < num_inputs; ++i) {
     EValue* arg = args[i];
-    TORCHTRT_ET_CHECK_NOT_NULL(
-        arg, Error::InvalidArgument, "TensorRTBackend::execute: input %zu is not a tensor", i);
+    TORCHTRT_ET_CHECK_NOT_NULL(arg, Error::InvalidArgument, "TensorRTBackend::execute: input %zu is not a tensor", i);
     if (!arg->isTensor()) {
       ET_LOG(Error, "TensorRTBackend::execute: input %zu is not a tensor", i);
       return Error::InvalidArgument;
@@ -440,8 +437,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   std::vector<std::pair<size_t, void*>> outputs_needing_copy;
   for (size_t o = 0; o < num_outputs; ++o) {
     EValue* arg = args[num_inputs + o];
-    TORCHTRT_ET_CHECK_NOT_NULL(
-        arg, Error::InvalidArgument, "TensorRTBackend::execute: output %zu is not a tensor", o);
+    TORCHTRT_ET_CHECK_NOT_NULL(arg, Error::InvalidArgument, "TensorRTBackend::execute: output %zu is not a tensor", o);
     if (!arg->isTensor()) {
       ET_LOG(Error, "TensorRTBackend::execute: output %zu is not a tensor", o);
       return Error::InvalidArgument;
