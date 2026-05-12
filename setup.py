@@ -798,9 +798,7 @@ elif NO_TS:
 with open(os.path.join(get_root_dir(), "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-EXECUTORCH_REQUIREMENT = (
-    "executorch @ git+https://github.com/pytorch/executorch.git@release/1.3"
-)
+EXECUTORCH_REQUIREMENT = "executorch>=1.2.0"
 
 
 def get_jetpack_requirements(base_requirements):
