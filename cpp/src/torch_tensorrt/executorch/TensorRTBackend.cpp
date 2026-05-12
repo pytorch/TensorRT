@@ -5,8 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "core/runtime/executorch/TensorRTBackend.h"
-#include "core/runtime/executorch/TensorRTBlobHeader.h"
+#include "torch_tensorrt/executorch/TensorRTBackend.h"
+#include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
 #include <cstdint>
 #include <cstring>

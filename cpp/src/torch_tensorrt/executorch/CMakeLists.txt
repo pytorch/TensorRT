@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(libtorchtrt_executorch LANGUAGES CXX)
+project(torch_tensorrt_executorch LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
@@ -7,14 +7,21 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/Modules")
+foreach(_torchtrt_cmake_module_dir IN ITEMS
+    "${CMAKE_CURRENT_LIST_DIR}/cmake/Modules"
+    "${CMAKE_CURRENT_LIST_DIR}/../../../../cmake/Modules"
+)
+    if(EXISTS "${_torchtrt_cmake_module_dir}")
+        list(APPEND CMAKE_MODULE_PATH "${_torchtrt_cmake_module_dir}")
+    endif()
+endforeach()
 
 find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 
 set(_torchtrt_executorch_sources
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/executorch/TensorRTBackend.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
 )
 
 add_library(executorch_trt_backend STATIC ${_torchtrt_executorch_sources})
@@ -26,7 +33,7 @@ set_target_properties(executorch_trt_backend
 
 target_include_directories(executorch_trt_backend
     PUBLIC
-        "${CMAKE_CURRENT_LIST_DIR}"
+        "${CMAKE_CURRENT_LIST_DIR}/../../../include"
 )
 
 target_compile_definitions(executorch_trt_backend
@@ -69,7 +76,7 @@ elseif(DEFINED EXECUTORCH_ROOT AND EXISTS "${EXECUTORCH_ROOT}/runtime")
     endif()
     list(APPEND _torchtrt_executorch_link_libraries "${EXECUTORCH_CORE_LIBRARY}")
 else()
-    message(FATAL_ERROR "Add ExecuTorch before libtorchtrt_executorch or set EXECUTORCH_ROOT to an ExecuTorch source tree")
+    message(FATAL_ERROR "Add ExecuTorch before torch_tensorrt_executorch or set EXECUTORCH_ROOT to an ExecuTorch source tree")
 endif()
 
 target_link_libraries(executorch_trt_backend
