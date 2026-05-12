@@ -798,6 +798,10 @@ elif NO_TS:
 with open(os.path.join(get_root_dir(), "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+EXECUTORCH_REQUIREMENT = (
+    "executorch @ git+https://github.com/pytorch/executorch.git@release/1.3"
+)
+
 
 def get_jetpack_requirements(base_requirements):
     requirements = base_requirements + ["numpy<2.0.0"]
@@ -816,7 +820,7 @@ def get_sbsa_requirements(base_requirements):
         # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
         return requirements + [
             "torch>=2.12.0,<2.13.0",
-            "executorch==1.2.0",
+            EXECUTORCH_REQUIREMENT,
             "tensorrt>=10.16.1,<10.17.0",
         ]
 
@@ -829,7 +833,7 @@ def get_x86_64_requirements(base_requirements):
     else:
         requirements = requirements + [
             "torch>=2.12.0,<2.13.0",
-            "executorch==1.2.0",
+            EXECUTORCH_REQUIREMENT,
         ]
         if USE_TRT_RTX:
             return requirements + [

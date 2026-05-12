@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-executorch = pytest.importorskip("executorch")
+pytest.importorskip("executorch.exir")
 
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
     ENGINE_IDX,
