@@ -340,12 +340,16 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
             + "/torch_tensorrt"
         )
     else:
+        # The tarball contains two top-level siblings: `torch_tensorrt/` (wheel
+        # payload) and `libtorchtrt_executorch/` (independent C++ reference
+        # distribution). Restrict extraction to the `torch_tensorrt/` member so
+        # the executorch sources don't get merged into the Python package dir.
         os.system(
             "tar -xzf "
             + dir_path
             + "/../bazel-bin/libtorchtrt.tar.gz --strip-components=1 -C "
             + dir_path
-            + "/torch_tensorrt"
+            + "/torch_tensorrt torch_tensorrt"
         )
 
 
