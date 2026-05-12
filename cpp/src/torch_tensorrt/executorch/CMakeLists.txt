@@ -21,6 +21,7 @@ find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 
 set(_torchtrt_executorch_sources
+    "${CMAKE_CURRENT_LIST_DIR}/TensorRTBindingNames.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"
 )

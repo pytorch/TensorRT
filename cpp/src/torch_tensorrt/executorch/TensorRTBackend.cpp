@@ -6,15 +6,14 @@
  */
 
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
+#include "TensorRTBindingNames.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
-#include <charconv>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -40,6 +39,14 @@ using ::executorch::runtime::FreeableBuffer;
 using ::executorch::runtime::MemoryAllocator;
 using ::executorch::runtime::Result;
 using ::executorch::runtime::Span;
+
+#define TORCHTRT_ET_CHECK_NOT_NULL(VALUE, ERROR_CODE, ...) \
+  do {                                                     \
+    if ((VALUE) == nullptr) {                              \
+      ET_LOG(Error, __VA_ARGS__);                          \
+      return ERROR_CODE;                                   \
+    }                                                      \
+  } while (false)
 
 void TRTLogger::log(Severity severity, const char* msg) noexcept {
   if (severity <= Severity::kERROR) {
@@ -75,6 +82,14 @@ EngineHandle::~EngineHandle() {
 
 namespace {
 
+struct EngineHandleDeleter {
+  void operator()(EngineHandle* handle) const {
+    if (handle != nullptr) {
+      handle->~EngineHandle();
+    }
+  }
+};
+
 nvinfer1::Dims to_trt_dims(const exec_aten::Tensor& t) {
   nvinfer1::Dims dims{};
   dims.nbDims = t.dim();
@@ -85,46 +100,6 @@ nvinfer1::Dims to_trt_dims(const exec_aten::Tensor& t) {
     dims.d[d] = static_cast<int64_t>(t.size(d));
   }
   return dims;
-}
-
-bool parse_binding_index(const std::string& name, size_t& index) {
-  size_t delim = name.find_last_of("._");
-  if (delim == std::string::npos) {
-    return false;
-  }
-  const size_t index_start = delim + 1;
-  if (index_start >= name.size()) {
-    return false;
-  }
-  const char* begin = name.data() + index_start;
-  const char* end = name.data() + name.size();
-  const auto result = std::from_chars(begin, end, index);
-  return result.ec == std::errc() && result.ptr == end;
-}
-
-bool append_binding_name(std::vector<std::string>& names, const std::string& name) {
-  size_t position = 0;
-  if (!parse_binding_index(name, position)) {
-    return false;
-  }
-
-  if (names.size() <= position) {
-    names.resize(position + 1);
-  }
-  if (!names[position].empty()) {
-    return false;
-  }
-  names[position] = name;
-  return true;
-}
-
-bool all_binding_names_present(const std::vector<std::string>& names) {
-  for (const auto& name : names) {
-    if (name.empty()) {
-      return false;
-    }
-  }
-  return true;
 }
 
 // Keep this local to the ExecuTorch backend: it reconstructs delegate argument
@@ -142,11 +117,51 @@ bool infer_binding_names(
     }
     const std::string name(raw_name);
     auto& target = engine->getTensorIOMode(name.c_str()) == nvinfer1::TensorIOMode::kINPUT ? inputs : outputs;
-    if (!append_binding_name(target, name)) {
+    if (!detail::append_binding_name(target, name)) {
       return false;
     }
   }
-  return all_binding_names_present(inputs) && all_binding_names_present(outputs);
+  return detail::all_binding_names_present(inputs) && detail::all_binding_names_present(outputs);
+}
+
+Error initialize_engine_io(EngineHandle& handle) {
+  if (handle.input_binding_names.empty() && handle.output_binding_names.empty() &&
+      !infer_binding_names(handle.engine.get(), handle.input_binding_names, handle.output_binding_names)) {
+    ET_LOG(Error, "TensorRTBackend::init: failed to infer TensorRT binding names");
+    return Error::InvalidProgram;
+  }
+
+  handle.num_inputs = handle.input_binding_names.size();
+  handle.num_outputs = handle.output_binding_names.size();
+
+  handle.exec_ctx.reset(handle.engine->createExecutionContext());
+  TORCHTRT_ET_CHECK_NOT_NULL(
+      handle.exec_ctx, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT execution context");
+
+  return Error::Ok;
+}
+
+Error initialize_input_profiles(EngineHandle& handle) {
+  for (const auto& name : handle.input_binding_names) {
+    if (handle.engine->isShapeInferenceIO(name.c_str())) {
+      ET_LOG(Error, "TensorRTBackend::init: shape tensor input '%s' is not supported", name.c_str());
+      return Error::InvalidProgram;
+    }
+  }
+
+  handle.input_profile_bounds.reserve(handle.num_inputs);
+  for (const auto& name : handle.input_binding_names) {
+    InputProfileBounds bounds;
+    bounds.min = handle.engine->getProfileShape(name.c_str(), 0, nvinfer1::OptProfileSelector::kMIN);
+    bounds.max = handle.engine->getProfileShape(name.c_str(), 0, nvinfer1::OptProfileSelector::kMAX);
+    if (bounds.min.nbDims < 0 || bounds.max.nbDims < 0) {
+      ET_LOG(Error, "TensorRTBackend::init: getProfileShape failed for input '%s'", name.c_str());
+      return Error::InvalidProgram;
+    }
+    handle.input_profile_bounds.push_back(bounds);
+  }
+
+  return Error::Ok;
 }
 
 bool is_cuda_accessible_ptr(const void* ptr) {
@@ -186,10 +201,10 @@ Result<DelegateHandle*> TensorRTBackend::init(
     ArrayRef<CompileSpec> compile_specs) const {
   (void)compile_specs;
 
-  if (processed == nullptr || processed->data() == nullptr) {
-    ET_LOG(Error, "TensorRTBackend::init: null processed buffer");
-    return Error::InvalidArgument;
-  }
+  TORCHTRT_ET_CHECK_NOT_NULL(
+      processed, Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
+  TORCHTRT_ET_CHECK_NOT_NULL(
+      processed->data(), Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
 
   TensorRTBlobHeader header;
   if (!TensorRTBlobHeader::parse(processed->data(), processed->size(), header)) {
@@ -198,17 +213,13 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
 
   MemoryAllocator* allocator = context.get_runtime_allocator();
-  if (allocator == nullptr) {
-    ET_LOG(Error, "TensorRTBackend::init: null runtime allocator");
-    return Error::InvalidState;
-  }
+  TORCHTRT_ET_CHECK_NOT_NULL(allocator, Error::InvalidState, "TensorRTBackend::init: null runtime allocator");
 
   EngineHandle* handle = allocator->allocateInstance<EngineHandle>();
-  if (handle == nullptr) {
-    ET_LOG(Error, "TensorRTBackend::init: EngineHandle allocation failed");
-    return Error::MemoryAllocationFailed;
-  }
+  TORCHTRT_ET_CHECK_NOT_NULL(
+      handle, Error::MemoryAllocationFailed, "TensorRTBackend::init: EngineHandle allocation failed");
   new (handle) EngineHandle();
+  std::unique_ptr<EngineHandle, EngineHandleDeleter> handle_guard(handle);
 
   handle->input_binding_names = std::move(header.input_binding_names);
   handle->output_binding_names = std::move(header.output_binding_names);
@@ -218,14 +229,12 @@ Result<DelegateHandle*> TensorRTBackend::init(
   if (cuda_err != cudaSuccess) {
     ET_LOG(
         Error, "TensorRTBackend::init: cudaSetDevice(%d) failed: %s", handle->device_id, cudaGetErrorString(cuda_err));
-    handle->~EngineHandle();
     return Error::InvalidProgram;
   }
 
   cuda_err = cudaStreamCreate(&handle->stream);
   if (cuda_err != cudaSuccess) {
     ET_LOG(Error, "TensorRTBackend::init: cudaStreamCreate failed: %s", cudaGetErrorString(cuda_err));
-    handle->~EngineHandle();
     return Error::InvalidProgram;
   }
 
@@ -240,56 +249,22 @@ Result<DelegateHandle*> TensorRTBackend::init(
   handle->unified_memory = is_integrated != 0;
 
   handle->runtime.reset(nvinfer1::createInferRuntime(handle->logger));
-  if (!handle->runtime) {
-    ET_LOG(Error, "TensorRTBackend::init: failed to create TensorRT runtime");
-    handle->~EngineHandle();
-    return Error::InvalidProgram;
-  }
+  TORCHTRT_ET_CHECK_NOT_NULL(
+      handle->runtime, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT runtime");
 
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
   handle->engine.reset(handle->runtime->deserializeCudaEngine(engine_data, header.engine_size));
-  if (!handle->engine) {
-    ET_LOG(Error, "TensorRTBackend::init: failed to deserialize TensorRT engine");
-    handle->~EngineHandle();
-    return Error::InvalidProgram;
+  TORCHTRT_ET_CHECK_NOT_NULL(
+      handle->engine, Error::InvalidProgram, "TensorRTBackend::init: failed to deserialize TensorRT engine");
+
+  Error err = initialize_engine_io(*handle);
+  if (err != Error::Ok) {
+    return err;
   }
 
-  if (handle->input_binding_names.empty() && handle->output_binding_names.empty() &&
-      !infer_binding_names(handle->engine.get(), handle->input_binding_names, handle->output_binding_names)) {
-    ET_LOG(Error, "TensorRTBackend::init: failed to infer TensorRT binding names");
-    handle->~EngineHandle();
-    return Error::InvalidProgram;
-  }
-
-  handle->num_inputs = handle->input_binding_names.size();
-  handle->num_outputs = handle->output_binding_names.size();
-
-  handle->exec_ctx.reset(handle->engine->createExecutionContext());
-  if (!handle->exec_ctx) {
-    ET_LOG(Error, "TensorRTBackend::init: failed to create TensorRT execution context");
-    handle->~EngineHandle();
-    return Error::InvalidProgram;
-  }
-
-  for (const auto& name : handle->input_binding_names) {
-    if (handle->engine->isShapeInferenceIO(name.c_str())) {
-      ET_LOG(Error, "TensorRTBackend::init: shape tensor input '%s' is not supported", name.c_str());
-      handle->~EngineHandle();
-      return Error::InvalidProgram;
-    }
-  }
-
-  handle->input_profile_bounds.reserve(handle->num_inputs);
-  for (const auto& name : handle->input_binding_names) {
-    InputProfileBounds bounds;
-    bounds.min = handle->engine->getProfileShape(name.c_str(), 0, nvinfer1::OptProfileSelector::kMIN);
-    bounds.max = handle->engine->getProfileShape(name.c_str(), 0, nvinfer1::OptProfileSelector::kMAX);
-    if (bounds.min.nbDims < 0 || bounds.max.nbDims < 0) {
-      ET_LOG(Error, "TensorRTBackend::init: getProfileShape failed for input '%s'", name.c_str());
-      handle->~EngineHandle();
-      return Error::InvalidProgram;
-    }
-    handle->input_profile_bounds.push_back(bounds);
+  err = initialize_input_profiles(*handle);
+  if (err != Error::Ok) {
+    return err;
   }
 
   processed->Free();
@@ -300,6 +275,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
       handle->num_inputs,
       handle->num_outputs);
 
+  handle_guard.release();
   return static_cast<DelegateHandle*>(handle);
 }
 
@@ -317,10 +293,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
 // ---------------------------------------------------------------------------
 Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle* handle, Span<EValue*> args) const {
   (void)context;
-  if (handle == nullptr) {
-    ET_LOG(Error, "TensorRTBackend::execute: null delegate handle");
-    return Error::InvalidArgument;
-  }
+  TORCHTRT_ET_CHECK_NOT_NULL(handle, Error::InvalidArgument, "TensorRTBackend::execute: null delegate handle");
   auto* engine = static_cast<EngineHandle*>(handle);
 
   const size_t num_inputs = engine->num_inputs;
@@ -345,10 +318,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
   nvinfer1::IExecutionContext* ctx = engine->exec_ctx.get();
   cudaStream_t stream = engine->stream;
-  if (ctx == nullptr || stream == nullptr) {
-    ET_LOG(Error, "TensorRTBackend::execute: backend is not initialized");
-    return Error::InvalidState;
-  }
+  TORCHTRT_ET_CHECK_NOT_NULL(ctx, Error::InvalidState, "TensorRTBackend::execute: backend is not initialized");
+  TORCHTRT_ET_CHECK_NOT_NULL(stream, Error::InvalidState, "TensorRTBackend::execute: backend is not initialized");
 
   if (engine->cached_input_ptrs.empty()) {
     engine->cached_input_ptrs.resize(num_inputs, nullptr);
@@ -364,7 +335,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   for (size_t i = 0; i < num_inputs; ++i) {
     EValue* arg = args[i];
-    if (arg == nullptr || !arg->isTensor()) {
+    TORCHTRT_ET_CHECK_NOT_NULL(
+        arg, Error::InvalidArgument, "TensorRTBackend::execute: input %zu is not a tensor", i);
+    if (!arg->isTensor()) {
       ET_LOG(Error, "TensorRTBackend::execute: input %zu is not a tensor", i);
       return Error::InvalidArgument;
     }
@@ -467,7 +440,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   std::vector<std::pair<size_t, void*>> outputs_needing_copy;
   for (size_t o = 0; o < num_outputs; ++o) {
     EValue* arg = args[num_inputs + o];
-    if (arg == nullptr || !arg->isTensor()) {
+    TORCHTRT_ET_CHECK_NOT_NULL(
+        arg, Error::InvalidArgument, "TensorRTBackend::execute: output %zu is not a tensor", o);
+    if (!arg->isTensor()) {
       ET_LOG(Error, "TensorRTBackend::execute: output %zu is not a tensor", o);
       return Error::InvalidArgument;
     }

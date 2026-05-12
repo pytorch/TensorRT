@@ -69,14 +69,34 @@ cc_library(
 )
 
 cc_library(
-    name = "tensorrt_executorch_backend",
+    name = "tensorrt_executorch_blob_header",
     srcs = [
-        "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
     ],
     hdrs = [
-        "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
+    ],
+    strip_include_prefix = "include",
+)
+
+cc_library(
+    name = "tensorrt_executorch_binding_names",
+    srcs = [
+        "src/torch_tensorrt/executorch/TensorRTBindingNames.cpp",
+    ],
+    hdrs = [
+        "src/torch_tensorrt/executorch/TensorRTBindingNames.h",
+    ],
+    strip_include_prefix = "src/torch_tensorrt/executorch",
+)
+
+cc_library(
+    name = "tensorrt_executorch_backend",
+    srcs = [
+        "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
+    ],
+    hdrs = [
+        "include/torch_tensorrt/executorch/TensorRTBackend.h",
     ],
     # Build the TensorRT backend as a static library. The final application
     # links this target together with the ExecuTorch runtime it was compiled
@@ -87,7 +107,10 @@ cc_library(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     strip_include_prefix = "include",
-    deps = select({
+    deps = [
+        ":tensorrt_executorch_binding_names",
+        ":tensorrt_executorch_blob_header",
+    ] + select({
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
             "@cuda//:cudart",
@@ -108,6 +131,8 @@ filegroup(
     srcs = [
         "src/torch_tensorrt/executorch/CMakeLists.txt",
         "src/torch_tensorrt/executorch/README.md",
+        "src/torch_tensorrt/executorch/TensorRTBindingNames.cpp",
+        "src/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
     ],
