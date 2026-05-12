@@ -25,7 +25,7 @@
 namespace torch_tensorrt {
 namespace executorch_backend {
 
-struct TrtDeleter {
+struct TRTDeleter {
   template <typename T>
   void operator()(T* p) const {
     delete p;
@@ -33,9 +33,9 @@ struct TrtDeleter {
 };
 
 template <typename T>
-using TrtUniquePtr = std::unique_ptr<T, TrtDeleter>;
+using TRTUniquePtr = std::unique_ptr<T, TRTDeleter>;
 
-class TrtLogger : public nvinfer1::ILogger {
+class TRTLogger : public nvinfer1::ILogger {
  public:
   void log(Severity severity, const char* msg) noexcept override;
 };
@@ -46,10 +46,10 @@ struct InputProfileBounds {
 };
 
 struct EngineHandle {
-  TrtLogger logger;
-  TrtUniquePtr<nvinfer1::IRuntime> runtime;
-  TrtUniquePtr<nvinfer1::ICudaEngine> engine;
-  TrtUniquePtr<nvinfer1::IExecutionContext> exec_ctx;
+  TRTLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime;
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine;
+  TRTUniquePtr<nvinfer1::IExecutionContext> exec_ctx;
   cudaStream_t stream = nullptr;
   std::vector<std::string> input_binding_names;
   std::vector<std::string> output_binding_names;

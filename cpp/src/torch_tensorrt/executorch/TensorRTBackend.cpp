@@ -39,7 +39,7 @@ using ::executorch::runtime::MemoryAllocator;
 using ::executorch::runtime::Result;
 using ::executorch::runtime::Span;
 
-void TrtLogger::log(Severity severity, const char* msg) noexcept {
+void TRTLogger::log(Severity severity, const char* msg) noexcept {
   if (severity <= Severity::kERROR) {
     ET_LOG(Error, "TensorRT: %s", msg);
   } else if (severity == Severity::kWARNING) {
@@ -155,8 +155,8 @@ bool is_cuda_accessible_ptr(const void* ptr) {
 // is_available
 // ---------------------------------------------------------------------------
 bool TensorRTBackend::is_available() const {
-  TrtLogger logger;
-  TrtUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  TRTLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
   return runtime != nullptr;
 }
 
