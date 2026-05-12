@@ -4,16 +4,17 @@ project(my_runner LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(_default_project_root "${CMAKE_CURRENT_LIST_DIR}/../../..")
+get_filename_component(_torchtrt_package_root "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+get_filename_component(_default_project_root "${_torchtrt_package_root}/.." ABSOLUTE)
 set(EXECUTORCH_SOURCE_DIR
     "${_default_project_root}/executorch"
     CACHE PATH
     "Path to the ExecuTorch source tree"
 )
 set(TORCHTRT_EXECUTORCH_SOURCE_DIR
-    "${_default_project_root}/libtorchtrt_executorch"
+    "${_torchtrt_package_root}/src/torch_tensorrt"
     CACHE PATH
-    "Path to the unpacked libtorchtrt_executorch source package"
+    "Path to the unpacked Torch-TensorRT ExecuTorch source package"
 )
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
@@ -32,15 +33,15 @@ if(NOT EXISTS "${EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
 endif()
 
 if(NOT TORCHTRT_EXECUTORCH_SOURCE_DIR)
-  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR is empty. Set it to the unpacked libtorchtrt_executorch source package")
+  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR is empty. Set it to the unpacked Torch-TensorRT ExecuTorch source package")
 endif()
 
 if(NOT EXISTS "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
-  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR must point to the unpacked libtorchtrt_executorch source package with a CMakeLists.txt: ${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
+  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR must point to the unpacked Torch-TensorRT ExecuTorch source package with a CMakeLists.txt: ${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
 endif()
 
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/executorch")
-add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/libtorchtrt_executorch")
+add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torchtrt_executorch")
 
 add_executable(my_runner main.cpp)
 target_link_libraries(

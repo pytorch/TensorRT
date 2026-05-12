@@ -34,12 +34,13 @@ git clone --branch release/1.3 --depth 1 --recurse-submodules --shallow-submodul
 tar xvf libtorchtrt.tar.gz
 
 export EXECUTORCH_SOURCE_DIR=/path/to/executorch
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${PWD}/libtorchtrt_executorch"
+export TORCHTRT_PACKAGE_DIR="${PWD}/torch_tensorrt"
+export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt"
 export TensorRT_ROOT=/path/to/extracted/TensorRT
 export CMAKE_PREFIX_PATH=$(python -c "import torch; print(torch.utils.cmake_prefix_path)")
 export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
-cmake -S "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/examples/executorch_reference_runner" \
+cmake -S "${TORCHTRT_PACKAGE_DIR}/examples/executorch_reference_runner" \
   -B build-executorch-reference-runner \
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}" \

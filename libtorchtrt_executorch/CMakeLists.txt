@@ -7,7 +7,23 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/Modules")
+get_filename_component(_torchtrt_packaged_root "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/core/runtime/runtime.cpp" AND EXISTS "${_torchtrt_packaged_root}/include/torch_tensorrt/core/runtime/runtime.h")
+    set(_torchtrt_source_root "${CMAKE_CURRENT_LIST_DIR}")
+    set(_torchtrt_include_root "${_torchtrt_packaged_root}/include/torch_tensorrt")
+else()
+    get_filename_component(_torchtrt_source_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+    set(_torchtrt_include_root "${_torchtrt_source_root}")
+endif()
+
+set(_torchtrt_executorch_backend_source "${_torchtrt_source_root}/core/runtime/executorch/TensorRTBackend.cpp")
+set(_torchtrt_executorch_backend_include_dir "${_torchtrt_source_root}/core/runtime/executorch")
+if(EXISTS "${_torchtrt_source_root}/executorch/TensorRTBackend.cpp")
+    set(_torchtrt_executorch_backend_source "${_torchtrt_source_root}/executorch/TensorRTBackend.cpp")
+    set(_torchtrt_executorch_backend_include_dir "${_torchtrt_include_root}/executorch")
+endif()
+
+list(APPEND CMAKE_MODULE_PATH "${_torchtrt_source_root}/cmake/Modules")
 
 find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
@@ -15,17 +31,17 @@ find_package(Torch REQUIRED)
 find_package(Threads REQUIRED)
 
 set(_torchtrt_executorch_sources
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/executorch/TensorRTBackend.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/DeviceList.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/Platform.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/RTDevice.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/TRTEngine.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/TRTEngineProfiler.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/runtime.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/runtime/runtime_utils.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/util/Exception.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/util/trt_util.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/core/util/logging/TorchTRTLogger.cpp"
+    "${_torchtrt_executorch_backend_source}"
+    "${_torchtrt_source_root}/core/runtime/DeviceList.cpp"
+    "${_torchtrt_source_root}/core/runtime/Platform.cpp"
+    "${_torchtrt_source_root}/core/runtime/RTDevice.cpp"
+    "${_torchtrt_source_root}/core/runtime/TRTEngine.cpp"
+    "${_torchtrt_source_root}/core/runtime/TRTEngineProfiler.cpp"
+    "${_torchtrt_source_root}/core/runtime/runtime.cpp"
+    "${_torchtrt_source_root}/core/runtime/runtime_utils.cpp"
+    "${_torchtrt_source_root}/core/util/Exception.cpp"
+    "${_torchtrt_source_root}/core/util/trt_util.cpp"
+    "${_torchtrt_source_root}/core/util/logging/TorchTRTLogger.cpp"
 )
 
 add_library(executorch_trt_backend STATIC ${_torchtrt_executorch_sources})
@@ -37,7 +53,10 @@ set_target_properties(executorch_trt_backend
 
 target_include_directories(executorch_trt_backend
     PUBLIC
-        "${CMAKE_CURRENT_LIST_DIR}"
+        "${_torchtrt_include_root}"
+    PRIVATE
+        "${_torchtrt_source_root}"
+        "${_torchtrt_executorch_backend_include_dir}"
 )
 
 set(_torchtrt_executorch_link_libraries
@@ -70,7 +89,7 @@ elseif(DEFINED EXECUTORCH_ROOT AND EXISTS "${EXECUTORCH_ROOT}/runtime")
     endif()
     list(APPEND _torchtrt_executorch_link_libraries "${EXECUTORCH_CORE_LIBRARY}")
 else()
-    message(FATAL_ERROR "Add ExecuTorch before libtorchtrt_executorch or set EXECUTORCH_ROOT to an ExecuTorch source tree")
+    message(FATAL_ERROR "Add ExecuTorch before the Torch-TensorRT ExecuTorch backend or set EXECUTORCH_ROOT to an ExecuTorch source tree")
 endif()
 
 if(NOT WIN32)
