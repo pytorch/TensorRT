@@ -57,11 +57,8 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
     switch (*p) {
       case nvinfer1::DataType::kHALF:
-// tensorrt_rtx is strong typed, cannot set fp16 by builder config, only do this for tensorrt build
-#ifndef TRT_MAJOR_RTX
-        cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
+        LOG_DEBUG("FP16 precision has been requested; relying on network tensor types instead of builder flags");
         break;
-#endif
       case nvinfer1::DataType::kINT8:
         LOG_DEBUG("INT8 precision has been enabled, we assume the network has Q/DQ nodes obtained from modelopt");
         break;
