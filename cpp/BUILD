@@ -85,9 +85,9 @@ cc_library(
         "src/torch_tensorrt/executorch/TensorRTBindingNames.cpp",
     ],
     hdrs = [
-        "src/torch_tensorrt/executorch/TensorRTBindingNames.h",
+        "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
     ],
-    strip_include_prefix = "src/torch_tensorrt/executorch",
+    strip_include_prefix = "include",
 )
 
 cc_library(
@@ -132,7 +132,6 @@ filegroup(
         "src/torch_tensorrt/executorch/CMakeLists.txt",
         "src/torch_tensorrt/executorch/README.md",
         "src/torch_tensorrt/executorch/TensorRTBindingNames.cpp",
-        "src/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
     ],
@@ -150,6 +149,7 @@ filegroup(
     name = "executorch_api_headers",
     srcs = [
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
+        "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
     ],
 )

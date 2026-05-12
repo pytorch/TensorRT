@@ -6,7 +6,7 @@
  */
 
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
-#include "TensorRTBindingNames.h"
+#include "torch_tensorrt/executorch/TensorRTBindingNames.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
 #include <cstdint>

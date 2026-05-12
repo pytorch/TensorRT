@@ -1,4 +1,4 @@
-#include "TensorRTBindingNames.h"
+#include "torch_tensorrt/executorch/TensorRTBindingNames.h"
 
 #include <charconv>
 #include <cstddef>

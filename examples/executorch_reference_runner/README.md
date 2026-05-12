@@ -40,6 +40,7 @@ git clone https://github.com/pytorch/executorch.git
 tar xvf libtorchtrt.tar.gz
 
 export EXECUTORCH_SOURCE_DIR=/path/to/executorch
+# tarball untared path
 export TORCH_TENSORRT_ROOT="${PWD}/torch_tensorrt"
 export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
 export TensorRT_ROOT=/path/to/extracted/TensorRT
