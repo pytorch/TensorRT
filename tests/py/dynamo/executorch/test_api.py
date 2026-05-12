@@ -5,12 +5,12 @@ import pytest
 
 
 @pytest.mark.unit
-def test_lazy_import_error_when_executorch_missing(monkeypatch):
+def test_lazy_import_error_when_executorch_exir_missing(monkeypatch):
     original_module = sys.modules.pop("torch_tensorrt.executorch", None)
     original_find_spec = importlib.util.find_spec
 
     def fake_find_spec(name, package=None):
-        if name == "executorch":
+        if name == "executorch.exir":
             return None
         return original_find_spec(name, package)
 

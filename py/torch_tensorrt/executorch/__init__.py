@@ -4,12 +4,21 @@ from typing import TYPE_CHECKING, NoReturn
 if TYPE_CHECKING:
     from executorch.exir import EdgeCompileConfig
 
-if importlib.util.find_spec("executorch") is None:
+
+def _executorch_exir_available() -> bool:
+    try:
+        return importlib.util.find_spec("executorch.exir") is not None
+    except (ImportError, AttributeError, ValueError):
+        return False
+
+
+if not _executorch_exir_available():
 
     def __getattr__(name: str) -> NoReturn:
         raise ImportError(
             f"Cannot access torch_tensorrt.executorch.{name}: "
-            "ExecuTorch is required. Install with: pip install executorch"
+            "ExecuTorch is required with executorch.exir. "
+            "Install an ExecuTorch package that provides executorch.exir"
         )
 
     __all__ = [
