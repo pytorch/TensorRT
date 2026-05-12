@@ -22,6 +22,7 @@ find_package(Threads REQUIRED)
 
 set(_torchtrt_executorch_sources
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"
 )
 
 add_library(executorch_trt_backend STATIC ${_torchtrt_executorch_sources})

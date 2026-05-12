@@ -70,7 +70,10 @@ cc_library(
 
 cc_library(
     name = "tensorrt_executorch_backend",
-    srcs = ["src/torch_tensorrt/executorch/TensorRTBackend.cpp"],
+    srcs = [
+        "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
+        "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
+    ],
     hdrs = [
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
@@ -106,6 +109,7 @@ filegroup(
         "src/torch_tensorrt/executorch/CMakeLists.txt",
         "src/torch_tensorrt/executorch/README.md",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
+        "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
     ],
 )
 

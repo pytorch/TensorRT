@@ -8,11 +8,13 @@
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
+#include <charconv>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -85,21 +87,48 @@ nvinfer1::Dims to_trt_dims(const exec_aten::Tensor& t) {
   return dims;
 }
 
-int64_t binding_index(const std::string& name) {
-  size_t delim = name.find('.');
+bool parse_binding_index(const std::string& name, size_t& index) {
+  size_t delim = name.find_last_of("._");
   if (delim == std::string::npos) {
-    delim = name.find('_');
+    return false;
   }
-  if (delim == std::string::npos || delim + 1 >= name.size()) {
-    return -1;
+  const size_t index_start = delim + 1;
+  if (index_start >= name.size()) {
+    return false;
   }
-  try {
-    return std::stoll(name.substr(delim + 1));
-  } catch (...) {
-    return -1;
-  }
+  const char* begin = name.data() + index_start;
+  const char* end = name.data() + name.size();
+  const auto result = std::from_chars(begin, end, index);
+  return result.ec == std::errc() && result.ptr == end;
 }
 
+bool append_binding_name(std::vector<std::string>& names, const std::string& name) {
+  size_t position = 0;
+  if (!parse_binding_index(name, position)) {
+    return false;
+  }
+
+  if (names.size() <= position) {
+    names.resize(position + 1);
+  }
+  if (!names[position].empty()) {
+    return false;
+  }
+  names[position] = name;
+  return true;
+}
+
+bool all_binding_names_present(const std::vector<std::string>& names) {
+  for (const auto& name : names) {
+    if (name.empty()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Keep this local to the ExecuTorch backend: it reconstructs delegate argument
+// order from TensorRT IO names without depending on the core/runtime stack.
 bool infer_binding_names(
     nvinfer1::ICudaEngine* engine,
     std::vector<std::string>& inputs,
@@ -112,28 +141,12 @@ bool infer_binding_names(
       return false;
     }
     const std::string name(raw_name);
-    const int64_t idx = binding_index(name);
     auto& target = engine->getTensorIOMode(name.c_str()) == nvinfer1::TensorIOMode::kINPUT ? inputs : outputs;
-    if (idx >= 0) {
-      if (target.size() <= static_cast<size_t>(idx)) {
-        target.resize(static_cast<size_t>(idx) + 1);
-      }
-      target[static_cast<size_t>(idx)] = name;
-    } else {
-      target.push_back(name);
-    }
-  }
-  for (const auto& name : inputs) {
-    if (name.empty()) {
+    if (!append_binding_name(target, name)) {
       return false;
     }
   }
-  for (const auto& name : outputs) {
-    if (name.empty()) {
-      return false;
-    }
-  }
-  return true;
+  return all_binding_names_present(inputs) && all_binding_names_present(outputs);
 }
 
 bool is_cuda_accessible_ptr(const void* ptr) {
