@@ -345,7 +345,7 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
             + dir_path
             + "/../bazel-bin/libtorchtrt.tar.gz --strip-components=1 -C "
             + dir_path
-            + "/torch_tensorrt"
+            + "/torch_tensorrt torch_tensorrt"
         )
 
 
