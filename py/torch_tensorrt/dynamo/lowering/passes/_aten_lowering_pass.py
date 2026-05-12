@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 )
 
 from .complex_graph_rewrite import complex_graph_detection
+from .constant_duplication import constant_duplication
 from .constant_folding import constant_fold
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_prims_broadcast import fuse_prims_broadcast
@@ -34,6 +35,7 @@ post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
     constant_fold,
+    constant_duplication,
     repair_input_as_output,
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
