@@ -39,7 +39,23 @@ nox.options.sessions = [
 def install_deps(session):
     print("Installing deps")
     session.install("-r", os.path.join(TOP_DIR, "py", "requirements.txt"))
-    session.install("-r", os.path.join(TOP_DIR, "tests", "py", "requirements.txt"))
+    session.install(
+        "--upgrade",
+        "pip>=25.1",
+    )
+    session.install(
+        "--pre",
+        "--extra-index-url",
+        "https://pypi.nvidia.com",
+        "--extra-index-url",
+        "https://download.pytorch.org/whl/nightly/cu130",
+        "--group",
+        "test",
+        "--group",
+        "test-ext",
+        "--group",
+        "quantization",
+    )
 
 
 def download_models(session):

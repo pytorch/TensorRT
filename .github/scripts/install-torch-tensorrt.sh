@@ -2,7 +2,6 @@
 set -x
 
 TORCH=$(grep "^torch>" ${PWD}/py/requirements.txt)
-TORCHVISION=$(grep "^torchvision>" ${PWD}/tests/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
 
@@ -13,10 +12,34 @@ if [[ $(uname -m) == "aarch64" ]]; then
 fi
 
 # Install all the dependencies required for Torch-TensorRT
-pip install --pre -r ${PWD}/tests/py/requirements.txt
-# dependencies in the tests/py/requirements.txt might install a different version of torch or torchvision
+pip install --upgrade "pip>=25.1" "tomli>=1.1.0; python_version < '3.11'"
+pip install \
+    --pre \
+    --extra-index-url https://pypi.nvidia.com \
+    --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+    --group test \
+    --group test-ext \
+    --group quantization
+TORCHVISION=$(python - <<'PY'
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
+with open("pyproject.toml", "rb") as f:
+    deps = tomllib.load(f)["dependency-groups"]["test-ext"]
+
+for dep in deps:
+    if dep.startswith("torchvision"):
+        print(dep)
+        break
+else:
+    raise SystemExit("torchvision was not found in dependency group test-ext")
+PY
+)
+# test dependencies might install a different version of torch or torchvision
 # eg. timm will install the latest torchvision, however we want to use the torchvision from nightly
-# reinstall torch torchvisionto make sure we have the correct version
+# reinstall torch torchvision to make sure we have the correct version
 pip uninstall -y torch torchvision
 pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
