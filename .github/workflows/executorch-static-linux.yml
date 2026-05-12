@@ -15,6 +15,10 @@ on:
         description: 'Reference to checkout, defaults to ""'
         default: ""
         type: string
+      executorch-ref:
+        description: "ExecuTorch branch or tag to checkout; defaults to latest main"
+        default: "main"
+        type: string
       test-infra-repository:
         description: "Test infra repository to use"
         default: "pytorch/test-infra"
@@ -70,8 +74,14 @@ jobs:
       script: |
         set -euo pipefail
         EXECUTORCH_SRC="${RUNNER_TEMP}/executorch"
+        EXECUTORCH_REF="${{ inputs.executorch-ref }}"
+        case "${EXECUTORCH_REF}" in
+          ""|"latest"|"latest-main"|"latest_main"|"latest main")
+            EXECUTORCH_REF="main"
+            ;;
+        esac
 
-        git clone --depth 1 --recurse-submodules --shallow-submodules \
+        git clone --depth 1 --branch "${EXECUTORCH_REF}" --recurse-submodules --shallow-submodules \
            https://github.com/pytorch/executorch.git "${EXECUTORCH_SRC}"
         export EXECUTORCH_SOURCE_DIR="${EXECUTORCH_SRC}"
        

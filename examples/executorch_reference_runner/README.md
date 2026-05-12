@@ -34,12 +34,21 @@ torch_tensorrt/bin/example_executorch_runner
 ```
 
 ```bash
-# get the executorch source code
-git clone https://github.com/pytorch/executorch.git
+# Get the ExecuTorch source code. Set EXECUTORCH_REF to a branch or tag;
+# leave it unset for the latest main.
+EXECUTORCH_REF="${EXECUTORCH_REF:-main}"
+case "${EXECUTORCH_REF}" in
+  latest|latest-main|latest_main|"latest main")
+    EXECUTORCH_REF="main"
+    ;;
+esac
+git clone --depth 1 --branch "${EXECUTORCH_REF}" --recurse-submodules --shallow-submodules \
+  https://github.com/pytorch/executorch.git executorch
+
 # download the libtorchtrt.tar.gz
 tar xvf libtorchtrt.tar.gz
 
-export EXECUTORCH_SOURCE_DIR=/path/to/executorch
+export EXECUTORCH_SOURCE_DIR="${PWD}/executorch"
 # tarball untared path
 export TORCH_TENSORRT_ROOT="${PWD}/torch_tensorrt"
 export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
