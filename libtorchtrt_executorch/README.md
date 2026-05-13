@@ -44,7 +44,6 @@ build the ExecuTorch core runtime first:
 ```bash
 export EXECUTORCH_ROOT="${PWD}/executorch"
 export TensorRT_ROOT=/path/to/extracted/TensorRT
-export CMAKE_PREFIX_PATH=/path/to/torch/share/cmake
 export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
 cmake -S "${EXECUTORCH_ROOT}" -B "${EXECUTORCH_ROOT}/cmake-out" \
@@ -64,8 +63,7 @@ Then build the TensorRT backend archive from this package:
 ```bash
 cmake -S torch_tensorrt/src/torch_tensorrt -B build-torchtrt-executorch \
   -DEXECUTORCH_ROOT="${EXECUTORCH_ROOT}" \
-  -DTensorRT_ROOT="${TensorRT_ROOT}" \
-  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+  -DTensorRT_ROOT="${TensorRT_ROOT}"
 
 cmake --build build-torchtrt-executorch --target executorch_trt_backend -j
 ```

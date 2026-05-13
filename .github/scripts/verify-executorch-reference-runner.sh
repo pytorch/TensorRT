@@ -270,11 +270,6 @@ export TORCHTRT_PACKAGE_DIR="${verify_root}/torch_tensorrt"
 # ${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt.
 export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt/executorch"
 
-if [[ -z "${CMAKE_PREFIX_PATH:-}" ]]; then
-  CMAKE_PREFIX_PATH="$("${python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)")"
-  export CMAKE_PREFIX_PATH
-fi
-
 # Configure the example exactly as an end user would after unpacking
 # libtorchtrt.tar.gz.
 cmake_args=(
@@ -282,7 +277,6 @@ cmake_args=(
   -B "${verify_root}/build-executorch-reference-runner"
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}"
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}"
-  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
   -DPYTHON_EXECUTABLE="${python_executable}"
 )
 

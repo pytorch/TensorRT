@@ -23,6 +23,32 @@ list(APPEND CMAKE_MODULE_PATH "${_torchtrt_source_root}/cmake/Modules")
 
 find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
+
+if(NOT Torch_DIR)
+    set(_torchtrt_python_executable "")
+    if(DEFINED PYTHON_EXECUTABLE AND EXISTS "${PYTHON_EXECUTABLE}")
+        set(_torchtrt_python_executable "${PYTHON_EXECUTABLE}")
+    else()
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if(Python3_Interpreter_FOUND)
+            set(_torchtrt_python_executable "${Python3_EXECUTABLE}")
+        endif()
+    endif()
+
+    if(_torchtrt_python_executable)
+        execute_process(
+            COMMAND "${_torchtrt_python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)"
+            RESULT_VARIABLE _torchtrt_torch_prefix_result
+            OUTPUT_VARIABLE _torchtrt_torch_prefix
+            ERROR_QUIET
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(_torchtrt_torch_prefix_result EQUAL 0 AND _torchtrt_torch_prefix)
+            list(APPEND CMAKE_PREFIX_PATH "${_torchtrt_torch_prefix}")
+        endif()
+    endif()
+endif()
+
 find_package(Torch REQUIRED)
 find_package(Threads REQUIRED)
 
