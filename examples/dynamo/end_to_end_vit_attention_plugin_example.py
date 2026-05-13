@@ -38,6 +38,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../tools/llm"))
 
 from plugin_utils_vit import (
     ViTPluginWrapper,
+    VIT_INPUT_CONTRACT_NATIVE,
+    VIT_INPUT_CONTRACT_TILED_ASPECT_RATIO,
+    VIT_INPUT_CONTRACT_WINDOWED_ROPE,
     compile_vit_plugin_model,
     get_vit_plugin_config,
     load_plugin,
@@ -593,14 +596,17 @@ def run_qwen(model_name):
     model_trt.eval()
 
     visual_trt = replace_vit_attention_with_plugin(model_trt.visual, vision_config)
-    wrapper = ViTPluginWrapper(visual_trt, model_type="qwen_vl").eval()
-
     pytorch_args, plugin_kwargs = create_visual_inputs(
         "qwen_vl",
         model_trt.visual,
         vision_config,
     )
-    wrapper.max_window_seq_len = plugin_kwargs.pop("max_window_seq_len")
+    max_window_seq_len = plugin_kwargs.pop("max_window_seq_len")
+    wrapper = ViTPluginWrapper(
+        visual_trt,
+        input_contract=VIT_INPUT_CONTRACT_WINDOWED_ROPE,
+        max_window_seq_len=max_window_seq_len,
+    ).eval()
 
     print("Compiling TensorRT visual model...")
     trt_visual_model = compile_vit_plugin_model(
@@ -652,7 +658,10 @@ def run_mllama(model_name):
         visual_trt,
         vision_config,
     )
-    wrapper = ViTPluginWrapper(visual_trt, model_type="mllama").eval()
+    wrapper = ViTPluginWrapper(
+        visual_trt,
+        input_contract=VIT_INPUT_CONTRACT_TILED_ASPECT_RATIO,
+    ).eval()
 
     pytorch_args, plugin_kwargs = create_visual_inputs(
         "mllama",
@@ -711,7 +720,10 @@ def run_groot(model_name):
     visual_pytorch = get_vision_model(model_pytorch)
     visual_trt = get_vision_model(model_trt)
     visual_trt = replace_vit_attention_with_plugin(visual_trt, vision_config)
-    wrapper = ViTPluginWrapper(visual_trt, model_type="generic").eval()
+    wrapper = ViTPluginWrapper(
+        visual_trt,
+        input_contract=VIT_INPUT_CONTRACT_NATIVE,
+    ).eval()
 
     pytorch_args, plugin_kwargs = create_visual_inputs(
         "groot",

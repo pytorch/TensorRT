@@ -24,16 +24,17 @@ def unsqueeze(
     dim: int,
 ) -> TRTTensor:
     # tensorrt version < 10.7.0, use the old unsqueeze implementation
-    if is_tensorrt_version_supported("10.7.0"):
+    if is_tensorrt_version_supported("10.7.0") and -1 not in input.shape:
         # use the new unsqueeze implementation
         axes = get_trt_tensor(ctx, dim, f"{name}_axes")
         layer = ctx.net.add_unsqueeze(input, axes)
         set_layer_name(layer, target, name, source_ir)
         return layer.get_output(0)
     else:
-        logger.warning(
-            "IUnsqueezeLayer is supported starting from TensorRT 10.7.0, using the old unsqueeze implementation in the current TensorRT version"
-        )
+        if not is_tensorrt_version_supported("10.7.0"):
+            logger.warning(
+                "IUnsqueezeLayer is supported starting from TensorRT 10.7.0, using the old unsqueeze implementation in the current TensorRT version"
+            )
         return unsqueeze_old(ctx, target, source_ir, name, input, dim)
 
 

@@ -20,6 +20,19 @@ register_vit_plugin_op()
 
 import torch # noqa: E402 (must be after register_vit_plugin_op so the op exists)
 
+_VIT_PLUGIN_CONVERSION_COUNT = 0
+
+
+def reset_vit_plugin_conversion_count() -> None:
+    """Reset the number of ViT plugin nodes lowered during TRT conversion."""
+    global _VIT_PLUGIN_CONVERSION_COUNT
+    _VIT_PLUGIN_CONVERSION_COUNT = 0
+
+
+def get_vit_plugin_conversion_count() -> int:
+    """Return the number of ViT plugin nodes lowered during TRT conversion."""
+    return _VIT_PLUGIN_CONVERSION_COUNT
+
 
 def _as_int(value, default):
     """Return value as a Python int when export preserved it as a scalar."""
@@ -50,6 +63,9 @@ def _infer_mask_type(mask_arg, default):
 )
 def convert_vit_attention(ctx: ConversionContext, target, args, kwargs, name):
     """Convert tensorrt_vit::attention to TensorRT ViTAttentionPlugin."""
+    global _VIT_PLUGIN_CONVERSION_COUNT
+    _VIT_PLUGIN_CONVERSION_COUNT += 1
+
     qkv, cos, sin, mask_or_cu_seqlens, num_heads, head_dim = args[:6]
     qkv_fused = args[6] if len(args) > 6 else kwargs.get("qkv_fused", 1)
     mask_type = args[7] if len(args) > 7 else kwargs.get("mask_type", 0)

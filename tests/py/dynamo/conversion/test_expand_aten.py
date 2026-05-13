@@ -81,6 +81,27 @@ class TestExpandConverter(DispatchTestCase):
             ExpandTargetDynamic(), input_specs, use_dynamo_tracer=True
         )
 
+    def test_expand_dynamic_gqa_pattern(self):
+        class ExpandGroupedQueryAttention(torch.nn.Module):
+            def forward(self, x):
+                seq_len = x.shape[2]
+                x = torch.ops.aten.unsqueeze.default(x, 2)
+                return torch.ops.aten.expand.default(x, (1, 2, 8, seq_len, 128))
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=(1, 2, 4, 128),
+                opt_shape=(1, 2, 8, 128),
+                max_shape=(1, 2, 16, 128),
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            ExpandGroupedQueryAttention(),
+            input_specs,
+            use_dynamo_tracer=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()

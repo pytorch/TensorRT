@@ -10,7 +10,364 @@ from transformers.generation.stopping_criteria import (
 )
 
 
-def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
+_VISION_MODULE_ATTRS = ("visual", "vision_model", "vision_tower", "vision_encoder")
+
+
+def _is_windowed_rope_vision_module(module: torch.nn.Module) -> bool:
+    return (
+        hasattr(module, "patch_embed")
+        and hasattr(module, "blocks")
+        and hasattr(module, "rot_pos_emb")
+        and hasattr(module, "get_window_index")
+    )
+
+
+def _is_merged_windowed_rope_vision_module(module: torch.nn.Module) -> bool:
+    return _is_windowed_rope_vision_module(module) and hasattr(module, "merger")
+
+
+def _is_tiled_aspect_ratio_vision_module(module: torch.nn.Module) -> bool:
+    return (
+        hasattr(module, "patch_embedding")
+        and hasattr(module, "global_transformer")
+        and hasattr(module, "pre_tile_positional_embedding")
+    )
+
+
+def _is_native_vit_vision_module(module: torch.nn.Module) -> bool:
+    has_patch_embedding = any(
+        hasattr(module, attr_name)
+        for attr_name in ("patch_embed", "patch_embedding", "embeddings")
+    )
+    has_transformer = any(
+        hasattr(module, attr_name)
+        for attr_name in ("blocks", "encoder", "transformer", "global_transformer")
+    )
+    return has_patch_embedding and has_transformer
+
+
+def _is_compiled_vit_plugin_adapter(module: torch.nn.Module) -> bool:
+    return hasattr(module, "compiled_visual") and hasattr(module, "input_contract")
+
+
+def _is_vision_module(module: torch.nn.Module) -> bool:
+    return (
+        _is_windowed_rope_vision_module(module)
+        or _is_tiled_aspect_ratio_vision_module(module)
+        or _is_native_vit_vision_module(module)
+        or _is_compiled_vit_plugin_adapter(module)
+    )
+
+
+def _contains_vision_module(module: torch.nn.Module) -> bool:
+    for attr_name in _VISION_MODULE_ATTRS:
+        if isinstance(getattr(module, attr_name, None), torch.nn.Module):
+            return True
+
+    for _, child in module.named_modules():
+        if child is module:
+            continue
+        if _is_vision_module(child):
+            return True
+    return False
+
+
+_LANGUAGE_MODULE_ATTRS = (
+    "language_model",
+    "text_model",
+    "llm",
+    "decoder",
+    "model",
+)
+
+
+def get_language_model(model: torch.nn.Module) -> torch.nn.Module:
+    for attr_name in _LANGUAGE_MODULE_ATTRS:
+        candidate = getattr(model, attr_name, None)
+        if not isinstance(candidate, torch.nn.Module):
+            continue
+        if attr_name == "model" and _contains_vision_module(candidate):
+            continue
+        return candidate
+
+    for module_name, module in model.named_modules():
+        if module is model:
+            continue
+        if module_name.rsplit(".", 1)[-1] not in _LANGUAGE_MODULE_ATTRS:
+            continue
+        if _contains_vision_module(module):
+            continue
+        return module
+
+    raise ValueError(
+        "Cannot find a language-model submodule. Expected a language/text "
+        "model leaf module that does not also contain the vision tower."
+    )
+
+
+def get_vision_model(model: torch.nn.Module) -> torch.nn.Module:
+    visual = getattr(model, "visual", None)
+    if isinstance(visual, torch.nn.Module):
+        return visual
+
+    for parent_attr in ("model", "language_model"):
+        parent = getattr(model, parent_attr, None)
+        if not isinstance(parent, torch.nn.Module):
+            continue
+        visual = getattr(parent, "visual", None)
+        if isinstance(visual, torch.nn.Module):
+            return visual
+
+    for _, module in model.named_modules():
+        if module is model:
+            continue
+        if _is_merged_windowed_rope_vision_module(module):
+            return module
+
+    for attr_name in _VISION_MODULE_ATTRS:
+        if attr_name == "visual":
+            continue
+        candidate = getattr(model, attr_name, None)
+        if isinstance(candidate, torch.nn.Module):
+            return candidate
+
+    for parent_attr in ("model", "language_model"):
+        parent = getattr(model, parent_attr, None)
+        if not isinstance(parent, torch.nn.Module):
+            continue
+        for attr_name in _VISION_MODULE_ATTRS:
+            candidate = getattr(parent, attr_name, None)
+            if isinstance(candidate, torch.nn.Module):
+                return candidate
+
+    for _, module in model.named_modules():
+        if module is model:
+            continue
+        if _is_vision_module(module):
+            return module
+
+    raise ValueError(
+        "Cannot find a vision-model submodule. Expected a Hugging Face vision "
+        "tower alias or a module with ViT-like patch embedding and transformer "
+        "blocks/encoder."
+    )
+
+
+def extract_vision_tensor(vision_output) -> torch.Tensor:
+    """Normalize Hugging Face vision outputs to a tensor of image embeddings."""
+    if isinstance(vision_output, torch.Tensor):
+        tensor = vision_output
+    elif hasattr(vision_output, "last_hidden_state"):
+        tensor = vision_output.last_hidden_state
+    elif hasattr(vision_output, "pooler_output"):
+        tensor = vision_output.pooler_output
+    elif isinstance(vision_output, (tuple, list)):
+        tensor = vision_output[0]
+    else:
+        raise TypeError(
+            "Vision model returned an unsupported output type: "
+            f"{type(vision_output).__name__}"
+        )
+
+    if tensor.dim() == 3 and tensor.shape[0] == 1:
+        tensor = tensor.squeeze(0)
+    return tensor
+
+
+def _find_qwen_visual_with_merger(model: torch.nn.Module):
+    candidates = []
+    for parent in (model, getattr(model, "model", None), getattr(model, "language_model", None)):
+        if isinstance(parent, torch.nn.Module):
+            candidates.append(getattr(parent, "visual", None))
+
+    try:
+        candidates.append(get_vision_model(model))
+    except ValueError:
+        pass
+
+    for candidate in candidates:
+        if isinstance(candidate, torch.nn.Module) and hasattr(candidate, "merger"):
+            return candidate
+
+    for _, module in model.named_modules():
+        if hasattr(module, "merger"):
+            return module
+    return None
+
+
+def _maybe_merge_qwen_image_embeds(
+    model: torch.nn.Module,
+    image_embeds: torch.Tensor,
+    expected_tokens: int | None,
+) -> torch.Tensor:
+    if expected_tokens is None or image_embeds.shape[0] == expected_tokens:
+        return image_embeds
+    if image_embeds.dim() != 2:
+        return image_embeds
+
+    visual = _find_qwen_visual_with_merger(model)
+    if visual is None:
+        return image_embeds
+
+    spatial_merge_unit = getattr(visual, "spatial_merge_unit", None)
+    if spatial_merge_unit is not None:
+        expected_raw_tokens = expected_tokens * int(spatial_merge_unit)
+        if image_embeds.shape[0] != expected_raw_tokens:
+            return image_embeds
+
+    try:
+        merged = visual.merger(image_embeds)
+    except Exception:
+        return image_embeds
+
+    return merged if isinstance(merged, torch.Tensor) else image_embeds
+
+
+def get_qwen_image_embeds(
+    model: torch.nn.Module,
+    pixel_values: torch.Tensor,
+    image_grid_thw: torch.Tensor,
+    expected_tokens: int | None = None,
+) -> torch.Tensor:
+    """
+    Return Qwen image embeddings at the token level expected by the LM.
+
+    Prefer the full Hugging Face VLM helper when available, since it owns the
+    exact visual merge/projector path. Fall back to the resolved visual module
+    for compiled adapters and older model implementations.
+    """
+    get_image_features = getattr(model, "get_image_features", None)
+    if callable(get_image_features):
+        call_attempts = (
+            lambda: get_image_features(
+                pixel_values=pixel_values,
+                image_grid_thw=image_grid_thw,
+            ),
+            lambda: get_image_features(pixel_values, image_grid_thw),
+            lambda: get_image_features(pixel_values),
+        )
+        for call in call_attempts:
+            try:
+                image_embeds = extract_vision_tensor(call())
+                return _maybe_merge_qwen_image_embeds(
+                    model, image_embeds, expected_tokens
+                )
+            except TypeError:
+                continue
+
+    image_embeds = extract_vision_tensor(
+        get_vision_model(model)(pixel_values, image_grid_thw)
+    )
+    return _maybe_merge_qwen_image_embeds(model, image_embeds, expected_tokens)
+
+
+def _get_qwen_rope_owner(model: torch.nn.Module):
+    if hasattr(model, "get_rope_index"):
+        return model
+    parent = getattr(model, "model", None)
+    if hasattr(parent, "get_rope_index"):
+        return parent
+    return None
+
+
+def _get_qwen_config_attr(model: torch.nn.Module, attr_name: str):
+    for owner in (model, getattr(model, "model", None)):
+        config = getattr(owner, "config", None)
+        value = getattr(config, attr_name, None)
+        if value is not None:
+            return value
+    return None
+
+
+def get_qwen_mm_token_type_ids(
+    model: torch.nn.Module,
+    input_ids: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Build Qwen multimodal token type ids from special image/video tokens.
+
+    Qwen uses 0 for text tokens, 1 for image tokens, and 2 for video tokens.
+    """
+    mm_token_type_ids = torch.zeros_like(input_ids, dtype=torch.int32)
+
+    image_token_id = _get_qwen_config_attr(model, "image_token_id")
+    if image_token_id is not None:
+        mm_token_type_ids = torch.where(
+            input_ids == int(image_token_id),
+            torch.ones_like(mm_token_type_ids),
+            mm_token_type_ids,
+        )
+
+    video_token_id = _get_qwen_config_attr(model, "video_token_id")
+    if video_token_id is not None:
+        mm_token_type_ids = torch.where(
+            input_ids == int(video_token_id),
+            torch.full_like(mm_token_type_ids, 2),
+            mm_token_type_ids,
+        )
+
+    return mm_token_type_ids
+
+
+def get_qwen_position_ids(
+    model: torch.nn.Module,
+    input_ids: torch.Tensor,
+    image_grid_thw: torch.Tensor | None = None,
+    attention_mask: torch.Tensor | None = None,
+    video_grid_thw: torch.Tensor | None = None,
+    second_per_grid_ts: torch.Tensor | None = None,
+    mm_token_type_ids: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """
+    Return Qwen2.5-VL multimodal RoPE position ids when the model exposes
+    get_rope_index, otherwise fall back to plain text position ids.
+    """
+    rope_owner = _get_qwen_rope_owner(model)
+    if rope_owner is None:
+        return torch.arange(
+            input_ids.shape[1], dtype=torch.long, device=input_ids.device
+        ).unsqueeze(0)
+
+    kwargs = {"input_ids": input_ids}
+    if image_grid_thw is not None:
+        kwargs["image_grid_thw"] = image_grid_thw
+    if video_grid_thw is not None:
+        kwargs["video_grid_thw"] = video_grid_thw
+    if second_per_grid_ts is not None:
+        kwargs["second_per_grid_ts"] = second_per_grid_ts
+    if attention_mask is not None:
+        kwargs["attention_mask"] = attention_mask
+    if mm_token_type_ids is None:
+        mm_token_type_ids = get_qwen_mm_token_type_ids(model, input_ids)
+    kwargs["mm_token_type_ids"] = mm_token_type_ids
+
+    try:
+        position_ids = rope_owner.get_rope_index(**kwargs)
+    except TypeError:
+        try:
+            position_ids = rope_owner.get_rope_index(
+                input_ids,
+                image_grid_thw,
+                video_grid_thw,
+                second_per_grid_ts,
+                attention_mask,
+                mm_token_type_ids,
+            )
+        except TypeError:
+            position_ids = rope_owner.get_rope_index(
+                input_ids,
+                image_grid_thw,
+                video_grid_thw,
+                attention_mask,
+                mm_token_type_ids,
+            )
+
+    if isinstance(position_ids, tuple):
+        position_ids = position_ids[0]
+    return position_ids.to(device=input_ids.device, dtype=torch.long)
+
+
+def export_llm(model, inputs, min_seq_len=1, max_seq_len=16, position_ids=None):
     """
     Exports the LLM model into an ExportedProgram with dynamic shapes.
     In the case of guard failures due to some PyTorch kernel implements, we also
@@ -19,7 +376,9 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
     with torch.no_grad():
         # max=1024 has contraint violation error. https://github.com/pytorch/pytorch/issues/125604
         seq_len = torch.export.Dim("seq_len", min=min_seq_len, max=max_seq_len)
-        position_ids = torch.arange(inputs.shape[1]).unsqueeze(0).to(inputs.device)
+        if position_ids is None:
+            position_ids = torch.arange(inputs.shape[1]).unsqueeze(0).to(inputs.device)
+        position_seq_dim = position_ids.dim() - 1
         try:
             print("Trying to export the model using torch.export.export()..")
             # strict=False only enables aotautograd tracing and excludes dynamo.
@@ -27,7 +386,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
                 model,
                 args=(inputs,),
                 kwargs={"position_ids": position_ids},
-                dynamic_shapes=({1: seq_len}, {1: seq_len}),
+                dynamic_shapes=({1: seq_len}, {position_seq_dim: seq_len}),
                 strict=False,
             )
         except:
@@ -39,7 +398,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
                 model,
                 args=(inputs,),
                 kwargs={"position_ids": position_ids},
-                dynamic_shapes=({1: seq_len}, {1: seq_len}),
+                dynamic_shapes=({1: seq_len}, {position_seq_dim: seq_len}),
                 strict=False,
                 prefer_deferred_runtime_asserts_over_guards=True,
             )
@@ -587,6 +946,10 @@ def _prepare_qwen_mm_inputs(
     """
     vision_time = 0.0
     image_embeds = None
+    seq_tokens = input_ids.clone()
+    seq_embeds = emb_layer(seq_tokens)
+    image_mask = seq_tokens == model.config.image_token_id
+    num_image_tokens = image_mask.sum().item()
 
     if pixel_values is not None:
         if with_timing:
@@ -594,24 +957,27 @@ def _prepare_qwen_mm_inputs(
             vision_end = torch.cuda.Event(enable_timing=True)
             vision_start.record()
 
-        image_embeds = model.visual(pixel_values, image_grid_thw)
+        image_embeds = get_qwen_image_embeds(
+            model,
+            pixel_values,
+            image_grid_thw,
+            expected_tokens=num_image_tokens,
+        )
 
         if with_timing:
             vision_end.record()
             torch.cuda.synchronize()
             vision_time = vision_start.elapsed_time(vision_end)
 
-    seq_tokens = input_ids.clone()
-    seq_embeds = emb_layer(seq_tokens)
-
     if image_embeds is not None:
-        mask = seq_tokens == model.config.image_token_id
-        num_image_tokens = mask.sum().item()
         if num_image_tokens != image_embeds.shape[0]:
             raise ValueError(
-                f"Number of image tokens ({num_image_tokens}) does not match number of image embeddings ({image_embeds.shape[0]})."
+                "Number of image tokens "
+                f"({num_image_tokens}) does not match number of image embeddings "
+                f"({image_embeds.shape[0]}). Image embedding shape: "
+                f"{tuple(image_embeds.shape)}."
             )
-        mask_expanded = mask.unsqueeze(-1).expand_as(seq_embeds)
+        mask_expanded = image_mask.unsqueeze(-1).expand_as(seq_embeds)
         seq_embeds = seq_embeds.masked_scatter(
             mask_expanded, image_embeds.to(seq_embeds.dtype)
         )
@@ -627,6 +993,7 @@ def generate_mm_qwen2_5_vl(
     pixel_values: torch.Tensor | None,
     input_ids: torch.Tensor,
     image_grid_thw: torch.Tensor,
+    attention_mask: torch.Tensor | None,
     eos_token_id: int,
     emb_layer: torch.nn.Embedding,
     max_new_tokens: int = 64,
@@ -635,6 +1002,8 @@ def generate_mm_qwen2_5_vl(
     """
     Custom generation function for the Qwen2_5_VLForConditionalGeneration model, with optional timing.
     """
+    language_model = get_language_model(model)
+
     if with_timing:
         overall_start = torch.cuda.Event(enable_timing=True)
         overall_end = torch.cuda.Event(enable_timing=True)
@@ -663,20 +1032,24 @@ def generate_mm_qwen2_5_vl(
 
     step_times = []
     generated = 0
+    seq_attention_mask = (
+        attention_mask.clone()
+        if attention_mask is not None
+        else torch.ones_like(seq_tokens, dtype=torch.long)
+    )
     while generated < max_new_tokens:
         if with_timing:
             lm_start.record()
 
-        position_ids = (
-            torch.arange(
-                0, seq_tokens.size(1), dtype=torch.long, device=seq_tokens.device
-            )
-            .unsqueeze(0)
-            .expand(seq_embeds.size(0), seq_embeds.size(1))
+        position_ids = get_qwen_position_ids(
+            model,
+            seq_tokens,
+            image_grid_thw=image_grid_thw,
+            attention_mask=seq_attention_mask,
         )
 
         with torch.no_grad():
-            outputs = model.model(
+            outputs = language_model(
                 inputs_embeds=seq_embeds,
                 position_ids=position_ids,
             )
@@ -695,6 +1068,18 @@ def generate_mm_qwen2_5_vl(
             step_times.append(lm_start.elapsed_time(lm_end))
 
         seq_tokens = torch.cat([seq_tokens, next_tok[:, None]], dim=1)
+        seq_attention_mask = torch.cat(
+            [
+                seq_attention_mask,
+                torch.ones(
+                    seq_attention_mask.shape[0],
+                    1,
+                    dtype=seq_attention_mask.dtype,
+                    device=seq_attention_mask.device,
+                ),
+            ],
+            dim=1,
+        )
         next_emb = emb_layer(next_tok)[:, None, :]
         seq_embeds = torch.cat([seq_embeds, next_emb], dim=1)
 
@@ -722,6 +1107,7 @@ def generate_mm_qwen2_5_vl_with_static_cache(
     pixel_values: torch.Tensor | None,
     input_ids: torch.Tensor,
     image_grid_thw: torch.Tensor,
+    attention_mask: torch.Tensor | None,
     eos_token_id: int,
     emb_layer: torch.nn.Embedding,
     max_new_tokens: int = 64,
@@ -731,6 +1117,8 @@ def generate_mm_qwen2_5_vl_with_static_cache(
     """
     Greedy Decoder for Qwen-2.5-VL using static KV-cache, with optional timing.
     """
+    language_model = get_language_model(model)
+
     if with_timing:
         overall_start = torch.cuda.Event(enable_timing=True)
         overall_end = torch.cuda.Event(enable_timing=True)
@@ -758,7 +1146,7 @@ def generate_mm_qwen2_5_vl_with_static_cache(
         )
 
     kv_cache = get_zeroed_static_cache_inputs(
-        model.model, device=device, has_position_ids=True
+        language_model, device=device, has_position_ids=True
     )
     start_idx = 0
     end_idx = seq_embeds.size(1)
@@ -766,6 +1154,11 @@ def generate_mm_qwen2_5_vl_with_static_cache(
     max_total_len = end_idx + max_new_tokens
     output_tokens = seq_tokens.clone()
     step_times = []
+    seq_attention_mask = (
+        attention_mask.clone()
+        if attention_mask is not None
+        else torch.ones_like(output_tokens, dtype=torch.long)
+    )
 
     while output_tokens.size(1) < max_total_len:
         if with_timing:
@@ -773,14 +1166,13 @@ def generate_mm_qwen2_5_vl_with_static_cache(
 
         cur_embeds = seq_embeds if generated == 0 else seq_embeds[:, -1:, :]
 
-        if generated == 0:
-            position_ids = (
-                torch.arange(cur_embeds.shape[1]).unsqueeze(0).to(cur_embeds.device)
-            )
-        else:
-            position_ids = torch.tensor([[start_idx]], dtype=torch.int64).to(
-                cur_embeds.device
-            )
+        full_position_ids = get_qwen_position_ids(
+            model,
+            output_tokens,
+            image_grid_thw=image_grid_thw,
+            attention_mask=seq_attention_mask,
+        )
+        position_ids = full_position_ids if generated == 0 else full_position_ids[..., -1:]
 
         input_signature = (
             cur_embeds,
@@ -790,7 +1182,7 @@ def generate_mm_qwen2_5_vl_with_static_cache(
             end_idx,
         )
 
-        outputs_and_kv = model.model(*input_signature)
+        outputs_and_kv = language_model(*input_signature)
         hidden_states, kv_cache = outputs_and_kv[0], outputs_and_kv[1:]
 
         logits = model.lm_head(hidden_states[:, -1, :])
@@ -799,6 +1191,18 @@ def generate_mm_qwen2_5_vl_with_static_cache(
 
         next_embed = emb_layer(next_tok)[:, None, :]
         seq_embeds = next_embed
+        seq_attention_mask = torch.cat(
+            [
+                seq_attention_mask,
+                torch.ones(
+                    seq_attention_mask.shape[0],
+                    1,
+                    dtype=seq_attention_mask.dtype,
+                    device=seq_attention_mask.device,
+                ),
+            ],
+            dim=1,
+        )
 
         generated += 1
         start_idx = end_idx

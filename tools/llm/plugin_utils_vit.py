@@ -205,7 +205,11 @@ if not (
 # Importing plugin_converter_vit at the bottom of this file registers the
 # Torch-TensorRT converter for tensorrt_vit::attention.
 
-from plugin_converter_vit import convert_vit_attention  # noqa: E402 (must be after op registration)
+from plugin_converter_vit import (  # noqa: E402 (must be after op registration)
+    convert_vit_attention,
+    get_vit_plugin_conversion_count,
+    reset_vit_plugin_conversion_count,
+)
 
 # -----------------------------------------------------------------------------
 # Plugin Attention Module
@@ -234,11 +238,13 @@ class ViTPluginAttention(nn.Module):
         config: Any,
         layer_idx: int,
         return_tuple: bool = False,
+        use_plugin_op: bool = True,
     ):
         super().__init__()
         self.original_attn = original_attn
         self.layer_idx = layer_idx
         self.return_tuple = return_tuple
+        self.use_plugin_op = use_plugin_op
 
         self.projection_layout = self._detect_projection_layout(original_attn)
         self.output_proj = self._detect_output_projection(original_attn)
@@ -329,7 +335,12 @@ class ViTPluginAttention(nn.Module):
             return cos, sin
 
         cos, sin = position_embeddings
-        return cos.to(dtype=hidden_states.dtype), sin.to(dtype=hidden_states.dtype)
+        if not self.use_plugin_op:
+            return cos.to(device=hidden_states.device), sin.to(device=hidden_states.device)
+        return (
+            cos.to(device=hidden_states.device, dtype=hidden_states.dtype),
+            sin.to(device=hidden_states.device, dtype=hidden_states.dtype),
+        )
 
     def _normalize_attention_mask(
         self,
@@ -356,6 +367,40 @@ class ViTPluginAttention(nn.Module):
                     attention_mask.shape[3],
                 )
         return attention_mask
+
+    def _rotate_half(self, x: torch.Tensor) -> torch.Tensor:
+        x1 = x[..., : x.shape[-1] // 2]
+        x2 = x[..., x.shape[-1] // 2 :]
+        return torch.cat((-x2, x1), dim=-1)
+
+    def _torch_attention(
+        self,
+        qkv: torch.Tensor,
+        cos: torch.Tensor,
+        sin: torch.Tensor,
+        attention_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        batch_size, seq_len, _ = qkv.shape
+        qkv = qkv.reshape(batch_size, seq_len, 3, self.num_heads, self.head_dim)
+        q, k, v = qkv.permute(2, 0, 3, 1, 4).unbind(0)
+
+        cos = cos.unsqueeze(0).unsqueeze(0)
+        sin = sin.unsqueeze(0).unsqueeze(0)
+        q = (q * cos) + (self._rotate_half(q) * sin)
+        k = (k * cos) + (self._rotate_half(k) * sin)
+
+        attn_weights = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim**0.5)
+        if attention_mask.dim() == 3:
+            attention_mask = attention_mask.unsqueeze(1)
+        attn_weights = attn_weights + attention_mask
+        attn_weights = torch.nn.functional.softmax(
+            attn_weights, dim=-1, dtype=torch.float32
+        ).to(v.dtype)
+        attn_out = torch.matmul(attn_weights, v)
+        attn_out = attn_out.transpose(1, 2).reshape(
+            batch_size, seq_len, self.num_heads * self.head_dim
+        )
+        return attn_out
 
     def forward(
         self,
@@ -386,17 +431,22 @@ class ViTPluginAttention(nn.Module):
             if max_seq_len <= 0:
                 max_seq_len = seq_len
 
-        attn_out = torch.ops.tensorrt_vit.attention.default(
-            qkv,
-            cos,
-            sin,
-            attention_mask,
-            self.num_heads,
-            self.head_dim,
-            1,
-            mask_type,
-            max_seq_len,
-        )
+        if self.use_plugin_op:
+            attn_out = torch.ops.tensorrt_vit.attention.default(
+                qkv,
+                cos,
+                sin,
+                attention_mask,
+                self.num_heads,
+                self.head_dim,
+                1,
+                mask_type,
+                max_seq_len,
+            )
+        else:
+            if mask_type == 1:
+                raise ValueError("PyTorch reference attention requires a dense mask.")
+            attn_out = self._torch_attention(qkv, cos, sin, attention_mask)
         output = self.output_proj(attn_out)
         output = output.squeeze(0) if squeeze_batch else output
         if self.return_tuple:
@@ -408,289 +458,270 @@ class ViTPluginAttention(nn.Module):
 # Model Wrappers
 # -----------------------------------------------------------------------------
 
+VIT_INPUT_CONTRACT_NATIVE = "native"
+VIT_INPUT_CONTRACT_WINDOWED_ROPE = "windowed_rope"
+VIT_INPUT_CONTRACT_TILED_ASPECT_RATIO = "tiled_aspect_ratio"
+
+def _require_tensor(value: Optional[torch.Tensor], name: str) -> torch.Tensor:
+    if value is None:
+        raise ValueError(f"ViT plugin forward requires {name}.")
+    return value
+
+
+def _get_windowed_rope_visual_model(model: nn.Module) -> nn.Module:
+    if hasattr(model, "visual"):
+        return model.visual
+    if hasattr(model, "patch_embed") and hasattr(model, "blocks"):
+        return model
+    raise ValueError("Cannot find a windowed-RoPE visual backbone.")
+
+
+def _get_windowed_rope_blocks(visual_model: nn.Module) -> nn.ModuleList:
+    if hasattr(visual_model, "blocks"):
+        return visual_model.blocks
+    raise ValueError("Cannot find windowed-RoPE visual blocks.")
+
+
+def _forward_windowed_rope_vision(
+    model: nn.Module,
+    pixel_values: torch.Tensor,
+    rotary_pos_emb: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    window_attention_mask: Optional[torch.Tensor] = None,
+    cu_window_seqlens: Optional[torch.Tensor] = None,
+    window_index: Optional[torch.Tensor] = None,
+    reverse_window_index: Optional[torch.Tensor] = None,
+    max_window_seq_len: int = 0,
+    **kwargs,
+) -> torch.Tensor:
+    visual = _get_windowed_rope_visual_model(model)
+    rotary_pos_emb = _require_tensor(rotary_pos_emb, "rotary_pos_emb")
+    attention_mask = _require_tensor(attention_mask, "attention_mask")
+    window_attention_mask = _require_tensor(
+        window_attention_mask, "window_attention_mask"
+    )
+    cu_window_seqlens = _require_tensor(cu_window_seqlens, "cu_window_seqlens")
+    window_index = _require_tensor(window_index, "window_index")
+    reverse_window_index = _require_tensor(reverse_window_index, "reverse_window_index")
+
+    hidden_states = visual.patch_embed(pixel_values)
+
+    seq_len, _ = hidden_states.size()
+    hidden_states = hidden_states.reshape(
+        seq_len // visual.spatial_merge_unit,
+        visual.spatial_merge_unit,
+        -1,
+    )
+    hidden_states = hidden_states[window_index, :, :]
+    hidden_states = hidden_states.reshape(seq_len, -1)
+
+    rotary_pos_emb = rotary_pos_emb.reshape(
+        seq_len // visual.spatial_merge_unit,
+        visual.spatial_merge_unit,
+        -1,
+    )
+    rotary_pos_emb = rotary_pos_emb[window_index, :, :]
+    rotary_pos_emb = rotary_pos_emb.reshape(seq_len, -1)
+    emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
+    position_embeddings = (emb.cos(), emb.sin())
+
+    blocks = _get_windowed_rope_blocks(visual)
+    for layer_idx, block in enumerate(blocks):
+        full_attention = layer_idx in visual.fullatt_block_indexes
+        attention_mask_now = attention_mask if full_attention else window_attention_mask
+
+        residual = hidden_states
+        hidden_states = block.norm1(hidden_states)
+        hidden_states = block.attn(
+            hidden_states,
+            attention_mask=attention_mask_now,
+            position_embeddings=position_embeddings,
+            max_seq_len=0,
+        )
+        hidden_states = residual + hidden_states
+
+        residual = hidden_states
+        hidden_states = block.norm2(hidden_states)
+        hidden_states = block.mlp(hidden_states)
+        hidden_states = residual + hidden_states
+
+    hidden_states = visual.merger(hidden_states)
+    hidden_states = hidden_states[reverse_window_index, :]
+    return hidden_states
+
+
+def _forward_tiled_aspect_ratio_vision(
+    model: nn.Module,
+    pixel_values: torch.Tensor,
+    aspect_ratio_ids: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    **kwargs,
+) -> torch.Tensor:
+    aspect_ratio_ids = _require_tensor(aspect_ratio_ids, "aspect_ratio_ids")
+    attention_mask = _require_tensor(attention_mask, "attention_mask")
+    vision = model.vision_model if hasattr(model, "vision_model") else model
+    batch_size, num_concurrent_media, num_tiles, num_channels, height, width = (
+        pixel_values.shape
+    )
+    pixel_values = pixel_values.reshape(
+        batch_size * num_concurrent_media * num_tiles,
+        num_channels,
+        height,
+        width,
+    )
+    aspect_ratio_ids = aspect_ratio_ids.reshape(
+        batch_size * num_concurrent_media, -1
+    )
+
+    target_dtype = vision.patch_embedding.weight.dtype
+    target_device = vision.patch_embedding.weight.device
+    patch_embeds = vision.patch_embedding(
+        pixel_values.to(target_device, target_dtype)
+    )
+    hidden_state = patch_embeds.flatten(2).transpose(1, 2)
+
+    _, num_patches, dim = hidden_state.shape
+    hidden_state = hidden_state.reshape(
+        batch_size * num_concurrent_media,
+        num_tiles,
+        -1,
+        dim,
+    )
+    hidden_state = vision.pre_tile_positional_embedding(
+        hidden_state,
+        aspect_ratio_ids,
+    )
+
+    hidden_state = hidden_state.reshape(
+        batch_size * num_concurrent_media * num_tiles,
+        num_patches,
+        dim,
+    )
+    hidden_state = vision.apply_class_embedding(hidden_state)
+    num_patches += 1
+
+    hidden_state = hidden_state.reshape(
+        batch_size * num_concurrent_media,
+        num_tiles,
+        num_patches,
+        dim,
+    )
+    hidden_state = vision.gated_positional_embedding(
+        hidden_state,
+        aspect_ratio_ids,
+    )
+    hidden_state = vision.layernorm_pre(hidden_state)
+
+    num_padding_patches = (8 - (hidden_state.shape[-2] % 8)) % 8
+    hidden_state = torch.nn.functional.pad(
+        hidden_state,
+        (0, 0, 0, num_padding_patches),
+        mode="constant",
+        value=0,
+    )
+    slice_index = -num_padding_patches if num_padding_patches > 0 else None
+
+    hidden_state = hidden_state.view(batch_size * num_concurrent_media, -1, dim)
+    output = vision.transformer(
+        hidden_state,
+        attention_mask=attention_mask,
+    )
+    hidden_state = output.last_hidden_state
+    hidden_state = vision.layernorm_post(hidden_state)
+
+    hidden_state = hidden_state.reshape(
+        batch_size * num_concurrent_media,
+        num_tiles,
+        num_patches + num_padding_patches,
+        dim,
+    )
+    hidden_state = vision.post_tile_positional_embedding(
+        hidden_state,
+        aspect_ratio_ids,
+    )
+    hidden_state = hidden_state.reshape(
+        batch_size * num_concurrent_media,
+        num_tiles * (num_patches + num_padding_patches),
+        dim,
+    )
+    global_output = vision.global_transformer(
+        hidden_state,
+        attention_mask=attention_mask,
+    )
+    hidden_state = global_output.last_hidden_state
+
+    hidden_state = hidden_state.reshape(
+        batch_size * num_concurrent_media,
+        num_tiles,
+        num_patches + num_padding_patches,
+        dim,
+    )
+    hidden_state = hidden_state[:, :, :slice_index]
+    hidden_state = hidden_state.reshape(
+        batch_size,
+        num_concurrent_media,
+        num_tiles,
+        num_patches,
+        dim,
+    )
+
+    all_intermediate_hidden_states = [
+        output.hidden_states[i] for i in vision.intermediate_layers_indices
+    ]
+    intermediate_hidden_states = torch.stack(
+        all_intermediate_hidden_states,
+        dim=-1,
+    )
+    intermediate_hidden_states = intermediate_hidden_states.reshape(
+        batch_size * num_concurrent_media,
+        num_tiles,
+        num_patches + num_padding_patches,
+        -1,
+    )
+    intermediate_hidden_states = intermediate_hidden_states[:, :, :slice_index]
+    intermediate_hidden_states = intermediate_hidden_states.reshape(
+        batch_size,
+        num_concurrent_media,
+        num_tiles,
+        num_patches,
+        -1,
+    )
+
+    return torch.cat([hidden_state, intermediate_hidden_states], dim=-1)
+
+
+def _forward_native_vision(
+    model: nn.Module,
+    pixel_values: torch.Tensor,
+    **kwargs,
+) -> torch.Tensor:
+    output = model(pixel_values)
+    if hasattr(output, "last_hidden_state"):
+        return output.last_hidden_state
+    if isinstance(output, (tuple, list)):
+        return output[0]
+    return output
+
+
 class ViTPluginWrapper(nn.Module):
     """
     Generic wrapper for vision models with plugin attention.
 
-    This is the vision-side equivalent of LLMPluginWrapper: it owns the
-    tensor-only forward path after attention modules have been replaced. The
-    attention module itself is model-agnostic; this wrapper handles the parts
-    around the transformer layers that still differ by vision tower family.
+    The caller chooses the tensor input contract and provides the corresponding
+    tensors during export/runtime. The contract describes the vision tower's
+    tensor interface, not a concrete model name.
     """
 
-    def __init__(self, model: nn.Module, model_type: str = "auto"):
-        """
-        Initialize the wrapper.
-
-        Args:
-            model: The vision model with replaced attention modules.
-            model_type: Type of model ("qwen_vl", "mllama", "vit", or "auto").
-        """
+    def __init__(
+        self,
+        model: nn.Module,
+        input_contract: str = VIT_INPUT_CONTRACT_NATIVE,
+        max_window_seq_len: int = 0,
+    ):
         super().__init__()
         self.model = model
-        self.model_type = (
-            self._detect_model_type(model) if model_type == "auto" else model_type
-        )
-        self.max_window_seq_len = 0
-
-    def _detect_model_type(self, model: nn.Module) -> str:
-        """Auto-detect vision model type from model structure."""
-        model_class = model.__class__.__name__.lower()
-        if "qwen" in model_class or hasattr(model, "visual"):
-            return "qwen_vl"
-        elif "mllama" in model_class or "llama" in model_class:
-            return "mllama"
-        elif hasattr(model, "patch_embed") and hasattr(model, "blocks"):
-            return "qwen_vl"
-        elif hasattr(model, "patch_embedding") and hasattr(model, "global_transformer"):
-            return "mllama"
-        elif "vit" in model_class or "dino" in model_class:
-            return "vit"
-        else:
-            return "generic"
-
-    def _get_vision_model(self) -> nn.Module:
-        """Get the vision backbone based on model type."""
-        # HuggingFace convention: vision_model or embeddings
-        if hasattr(self.model, "vision_model"):
-            return self.model.vision_model
-        elif hasattr(self.model, "embeddings"):
-            return self.model
-        else:
-            raise ValueError(
-                f"Cannot find vision backbone for model type: {self.model_type}"
-            )
-
-    def _get_qwen_visual_model(self) -> nn.Module:
-        """Get a Qwen-VL visual backbone."""
-        if hasattr(self.model, "visual"):
-            return self.model.visual
-        if hasattr(self.model, "patch_embed") and hasattr(self.model, "blocks"):
-            return self.model
-        raise ValueError(
-            f"Cannot find Qwen-VL visual backbone for model type: {self.model_type}"
-        )
-
-    def _get_encoder(self, vision_model: nn.Module) -> nn.Module:
-        """Get the transformer encoder from the vision model."""
-        if hasattr(vision_model, "encoder"):
-            return vision_model.encoder
-        else:
-            raise ValueError("Cannot find transformer encoder in vision model")
-
-    def _get_blocks(self, visual_model: nn.Module) -> nn.ModuleList:
-        """Get the list of visual transformer blocks."""
-        if hasattr(visual_model, "blocks"):
-            return visual_model.blocks
-        raise ValueError("Cannot find Qwen-VL visual blocks")
-
-    def _forward_qwen_vl(
-        self,
-        pixel_values: torch.Tensor,
-        rotary_pos_emb: torch.Tensor,
-        attention_mask: torch.Tensor,
-        window_attention_mask: torch.Tensor,
-        cu_window_seqlens: torch.Tensor,
-        window_index: torch.Tensor,
-        reverse_window_index: torch.Tensor,
-    ) -> torch.Tensor:
-        visual = self._get_qwen_visual_model()
-        hidden_states = visual.patch_embed(pixel_values)
-
-        seq_len, _ = hidden_states.size()
-        hidden_states = hidden_states.reshape(
-            seq_len // visual.spatial_merge_unit,
-            visual.spatial_merge_unit,
-            -1,
-        )
-        hidden_states = hidden_states[window_index, :, :]
-        hidden_states = hidden_states.reshape(seq_len, -1)
-
-        rotary_pos_emb = rotary_pos_emb.reshape(
-            seq_len // visual.spatial_merge_unit,
-            visual.spatial_merge_unit,
-            -1,
-        )
-        rotary_pos_emb = rotary_pos_emb[window_index, :, :]
-        rotary_pos_emb = rotary_pos_emb.reshape(seq_len, -1)
-        emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
-        position_embeddings = (emb.cos(), emb.sin())
-
-        blocks = self._get_blocks(visual)
-        for layer_idx, block in enumerate(blocks):
-            full_attention = layer_idx in visual.fullatt_block_indexes
-            # Qwen2.5-VL's vision tower uses hidden_size=1280 and 16 heads,
-            # so its ViT attention head_dim is 80. This is distinct from the
-            # language model head size, which is 128.
-            fmha_supported = (
-                isinstance(block.attn, ViTPluginAttention)
-                and block.attn.head_dim in (64, 80, 128)
-            )
-            attention_mask_now = (
-                attention_mask
-                if full_attention
-                else cu_window_seqlens
-                if fmha_supported
-                else window_attention_mask
-            )
-            max_seq_len_now = 0 if full_attention or not fmha_supported else self.max_window_seq_len
-
-            residual = hidden_states
-            hidden_states = block.norm1(hidden_states)
-            hidden_states = block.attn(
-                hidden_states,
-                attention_mask=attention_mask_now,
-                position_embeddings=position_embeddings,
-                max_seq_len=max_seq_len_now,
-            )
-            hidden_states = residual + hidden_states
-
-            residual = hidden_states
-            hidden_states = block.norm2(hidden_states)
-            hidden_states = block.mlp(hidden_states)
-            hidden_states = residual + hidden_states
-
-        hidden_states = visual.merger(hidden_states)
-        hidden_states = hidden_states[reverse_window_index, :]
-        return hidden_states
-
-    def _forward_mllama(
-        self,
-        pixel_values: torch.Tensor,
-        aspect_ratio_ids: torch.Tensor,
-        attention_mask: torch.Tensor,
-    ) -> torch.Tensor:
-        vision = (
-            self.model.vision_model if hasattr(self.model, "vision_model") else self.model
-        )
-        batch_size, num_concurrent_media, num_tiles, num_channels, height, width = (
-            pixel_values.shape
-        )
-        pixel_values = pixel_values.reshape(
-            batch_size * num_concurrent_media * num_tiles,
-            num_channels,
-            height,
-            width,
-        )
-        aspect_ratio_ids = aspect_ratio_ids.reshape(
-            batch_size * num_concurrent_media, -1
-        )
-
-        target_dtype = vision.patch_embedding.weight.dtype
-        target_device = vision.patch_embedding.weight.device
-        patch_embeds = vision.patch_embedding(
-            pixel_values.to(target_device, target_dtype)
-        )
-        hidden_state = patch_embeds.flatten(2).transpose(1, 2)
-
-        _, num_patches, dim = hidden_state.shape
-        hidden_state = hidden_state.reshape(
-            batch_size * num_concurrent_media,
-            num_tiles,
-            -1,
-            dim,
-        )
-        hidden_state = vision.pre_tile_positional_embedding(
-            hidden_state,
-            aspect_ratio_ids,
-        )
-
-        hidden_state = hidden_state.reshape(
-            batch_size * num_concurrent_media * num_tiles,
-            num_patches,
-            dim,
-        )
-        hidden_state = vision.apply_class_embedding(hidden_state)
-        num_patches += 1
-
-        hidden_state = hidden_state.reshape(
-            batch_size * num_concurrent_media,
-            num_tiles,
-            num_patches,
-            dim,
-        )
-        hidden_state = vision.gated_positional_embedding(
-            hidden_state,
-            aspect_ratio_ids,
-        )
-        hidden_state = vision.layernorm_pre(hidden_state)
-
-        num_padding_patches = (8 - (hidden_state.shape[-2] % 8)) % 8
-        hidden_state = torch.nn.functional.pad(
-            hidden_state,
-            (0, 0, 0, num_padding_patches),
-            mode="constant",
-            value=0,
-        )
-        slice_index = -num_padding_patches if num_padding_patches > 0 else None
-
-        hidden_state = hidden_state.view(batch_size * num_concurrent_media, -1, dim)
-        output = vision.transformer(
-            hidden_state,
-            attention_mask=attention_mask,
-        )
-        hidden_state = output.last_hidden_state
-        hidden_state = vision.layernorm_post(hidden_state)
-
-        hidden_state = hidden_state.reshape(
-            batch_size * num_concurrent_media,
-            num_tiles,
-            num_patches + num_padding_patches,
-            dim,
-        )
-        hidden_state = vision.post_tile_positional_embedding(
-            hidden_state,
-            aspect_ratio_ids,
-        )
-        hidden_state = hidden_state.reshape(
-            batch_size * num_concurrent_media,
-            num_tiles * (num_patches + num_padding_patches),
-            dim,
-        )
-        global_output = vision.global_transformer(
-            hidden_state,
-            attention_mask=attention_mask,
-        )
-        hidden_state = global_output.last_hidden_state
-
-        hidden_state = hidden_state.reshape(
-            batch_size * num_concurrent_media,
-            num_tiles,
-            num_patches + num_padding_patches,
-            dim,
-        )
-        hidden_state = hidden_state[:, :, :slice_index]
-        hidden_state = hidden_state.reshape(
-            batch_size,
-            num_concurrent_media,
-            num_tiles,
-            num_patches,
-            dim,
-        )
-
-        all_intermediate_hidden_states = [
-            output.hidden_states[i] for i in vision.intermediate_layers_indices
-        ]
-        intermediate_hidden_states = torch.stack(
-            all_intermediate_hidden_states,
-            dim=-1,
-        )
-        intermediate_hidden_states = intermediate_hidden_states.reshape(
-            batch_size * num_concurrent_media,
-            num_tiles,
-            num_patches + num_padding_patches,
-            -1,
-        )
-        intermediate_hidden_states = intermediate_hidden_states[:, :, :slice_index]
-        intermediate_hidden_states = intermediate_hidden_states.reshape(
-            batch_size,
-            num_concurrent_media,
-            num_tiles,
-            num_patches,
-            -1,
-        )
-
-        return torch.cat([hidden_state, intermediate_hidden_states], dim=-1)
+        self.input_contract = input_contract
+        self.max_window_seq_len = max_window_seq_len
 
     def forward(
         self,
@@ -703,55 +734,28 @@ class ViTPluginWrapper(nn.Module):
         reverse_window_index: Optional[torch.Tensor] = None,
         aspect_ratio_ids: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """
-        Forward pass with plugin attention.
-
-        Qwen-VL and Mllama/Llama Vision both need tensor metadata that is
-        prepared outside torch.export. Generic ViT-like models can still use the
-        model's native tensor-only forward.
-        """
-        if self.model_type == "qwen_vl":
-            if (
-                rotary_pos_emb is None
-                or attention_mask is None
-                or window_attention_mask is None
-                or cu_window_seqlens is None
-                or window_index is None
-                or reverse_window_index is None
-            ):
-                raise ValueError(
-                    "Qwen-VL ViTPluginWrapper expects rotary_pos_emb, "
-                    "attention_mask, window_attention_mask, cu_window_seqlens, "
-                    "window_index, and reverse_window_index."
-                )
-            return self._forward_qwen_vl(
+        if self.input_contract == VIT_INPUT_CONTRACT_WINDOWED_ROPE:
+            return _forward_windowed_rope_vision(
+                self.model,
                 pixel_values,
-                rotary_pos_emb,
-                attention_mask,
-                window_attention_mask,
-                cu_window_seqlens,
-                window_index,
-                reverse_window_index,
+                rotary_pos_emb=rotary_pos_emb,
+                attention_mask=attention_mask,
+                window_attention_mask=window_attention_mask,
+                cu_window_seqlens=cu_window_seqlens,
+                window_index=window_index,
+                reverse_window_index=reverse_window_index,
+                max_window_seq_len=self.max_window_seq_len,
             )
-
-        if self.model_type == "mllama":
-            if aspect_ratio_ids is None or attention_mask is None:
-                raise ValueError(
-                    "Mllama ViTPluginWrapper expects aspect_ratio_ids and "
-                    "precomputed attention_mask."
-                )
-            return self._forward_mllama(
+        if self.input_contract == VIT_INPUT_CONTRACT_TILED_ASPECT_RATIO:
+            return _forward_tiled_aspect_ratio_vision(
+                self.model,
                 pixel_values,
-                aspect_ratio_ids,
-                attention_mask,
+                aspect_ratio_ids=aspect_ratio_ids,
+                attention_mask=attention_mask,
             )
-
-        output = self.model(pixel_values)
-        if hasattr(output, "last_hidden_state"):
-            return output.last_hidden_state
-        if isinstance(output, (tuple, list)):
-            return output[0]
-        return output
+        if self.input_contract == VIT_INPUT_CONTRACT_NATIVE:
+            return _forward_native_vision(self.model, pixel_values)
+        raise ValueError(f"Unsupported ViT plugin input contract: {self.input_contract}")
 
 
 # -----------------------------------------------------------------------------
@@ -762,6 +766,7 @@ class ViTPluginWrapper(nn.Module):
 def replace_vit_attention_with_plugin(
     model: nn.Module,
     config: Any,
+    use_plugin_op: bool = True,
 ) -> nn.Module:
     """
     Replace all supported vision attention modules with plugin attention.
@@ -786,7 +791,9 @@ def replace_vit_attention_with_plugin(
     if hasattr(visual_model, "blocks"):
         for i, block in enumerate(visual_model.blocks):
             if hasattr(block, "attn"):
-                block.attn = ViTPluginAttention(block.attn, config, i)
+                block.attn = ViTPluginAttention(
+                    block.attn, config, i, use_plugin_op=use_plugin_op
+                )
                 replacement_count += 1
         if replacement_count:
             return model
@@ -826,6 +833,7 @@ def replace_vit_attention_with_plugin(
                     config,
                     i,
                     return_tuple=True,
+                    use_plugin_op=use_plugin_op,
                 )
                 replacement_count += 1
 
@@ -837,7 +845,7 @@ def replace_vit_attention_with_plugin(
         for i, layer in enumerate(vision_model.encoder.layer):
             if hasattr(layer, "attention"):
                 layer.attention.self = ViTPluginAttention(
-                    layer.attention.self, config, i
+                    layer.attention.self, config, i, use_plugin_op=use_plugin_op
                 )
                 replacement_count += 1
 
@@ -845,6 +853,11 @@ def replace_vit_attention_with_plugin(
         raise ValueError("Cannot find supported ViT attention modules")
 
     return model
+
+
+def count_vit_plugin_attention_modules(model: nn.Module) -> int:
+    """Count ViT attention modules replaced with the plugin wrapper."""
+    return sum(1 for module in model.modules() if isinstance(module, ViTPluginAttention))
 
 # -----------------------------------------------------------------------------
 # Compilation

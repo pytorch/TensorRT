@@ -19,12 +19,18 @@ from contextlib import nullcontext
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
-from modelopt.torch.quantization.utils import export_torch_mode
-from quantize_utils import (
-    convert_linear_to_tensorrt_quantized,
-    load_quantization_config,
-    quantize_model,
-)
+
+try:
+    from modelopt.torch.quantization.utils import export_torch_mode
+    from quantize_utils import (
+        convert_linear_to_tensorrt_quantized,
+        load_quantization_config,
+        quantize_model,
+    )
+
+    QUANTIZATION_AVAILABLE = True
+except ImportError:
+    QUANTIZATION_AVAILABLE = False
 from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import (
@@ -34,6 +40,24 @@ from utils import (
     record_stats,
     time_generate,
 )
+
+# Import plugin utilities (optional)
+try:
+    from plugin_utils import (
+        LLMPluginWrapper,
+        benchmark_plugin_generation,
+        compile_plugin_model,
+        create_kv_caches,
+        generate_with_plugin,
+        load_plugin,
+        register_plugin_op,
+        replace_attention_with_plugin,
+        set_plugin_config_from_model,
+    )
+
+    PLUGIN_AVAILABLE = True
+except ImportError as e:
+    PLUGIN_AVAILABLE = False
 
 DEVICE = torch.device("cuda:0")
 
@@ -56,31 +80,40 @@ def get_model(args):
             moved to CUDA device with the specified precision
     """
     with torch.no_grad():
+        # For plugin backend, we don't set attn_implementation
+        attn_impl_kwargs = {}
+        if args.backend in ("sdpa", "iattention"):
+            attn_impl_kwargs["attn_implementation"] = "sdpa"
+
         model = (
             AutoModelForCausalLM.from_pretrained(
                 args.model,
                 use_cache=False,
-                attn_implementation="sdpa",
                 ignore_mismatched_sizes=True,
+                **attn_impl_kwargs,
             )
             .eval()
             .cuda()
         )
-        # register SDPA variant for the model
-        register_sdpa.enable_sdpa_converter(args.model, model.config)
+        # Register SDPA lowering pass only for sdpa backend.
+        # For iattention backend, the core TRT IAttention converters handle SDPA ops
+        # directly without needing the custom lowering pass.
+        if args.backend == "sdpa":
+            register_sdpa.enable_sdpa_converter(args.model, model.config)
 
-    hf_quant_config = load_quantization_config(args.model)
-    if hf_quant_config:
-        model = convert_linear_to_tensorrt_quantized(
-            model, args.model_precision, hf_quant_config
-        ).cuda()
-        print(
-            f"Model is {hf_quant_config['quant_algo']} pre-quantized hf model. Quantized linear layers are applied"
-        )
-        if args.quant_format:
-            raise RuntimeError(
-                f"Quantization cannot be applied for pre-quantized hf model"
+    if QUANTIZATION_AVAILABLE:
+        hf_quant_config = load_quantization_config(args.model)
+        if hf_quant_config:
+            model = convert_linear_to_tensorrt_quantized(
+                model, args.model_precision, hf_quant_config
+            ).cuda()
+            print(
+                f"Model is {hf_quant_config['quant_algo']} pre-quantized hf model. Quantized linear layers are applied"
             )
+            if args.quant_format:
+                raise RuntimeError(
+                    f"Quantization cannot be applied for pre-quantized hf model"
+                )
 
     if args.model_precision == "FP16":
         model = model.to(torch.float16)
@@ -114,19 +147,32 @@ def compile_torchtrt(model, input_ids, args):
             for optimized inference
     """
     max_seq_len = input_ids.shape[1] + args.num_tokens
-    with export_torch_mode():
+    if QUANTIZATION_AVAILABLE:
+        with export_torch_mode():
+            ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
+    else:
         ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
     # Set precision specific flags
     use_fp32_acc = False
+    use_explicit_typing = False
     if args.model_precision == "FP16":
+        enabled_precisions = {torch.float32}
         use_fp32_acc = True
+        use_explicit_typing = True
+    elif args.model_precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+        use_fp32_acc = False
+    else:
+        enabled_precisions = {torch.float32}
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[input_ids, position_ids],
+            enabled_precisions=enabled_precisions,
             # truncate_double=True,
+            use_explicit_typing=use_explicit_typing,
             use_fp32_acc=use_fp32_acc,
             device=DEVICE,
             disable_tf32=True,
@@ -208,6 +254,15 @@ if __name__ == "__main__":
         help="Precision to use in the model. Options: FP16, BF16, FP32",
     )
     arg_parser.add_argument(
+        "--backend",
+        type=str,
+        default="sdpa",
+        help="Backend to use. Options: sdpa, iattention, plugin. "
+        "'sdpa' uses custom SDPA lowering pass + converter (matmul+softmax+matmul). "
+        "'iattention' uses TensorRT native IAttention layer (no KV cache support yet). "
+        "'plugin' uses TensorRT Edge-LLM attention plugin with built-in KV cache.",
+    )
+    arg_parser.add_argument(
         "--iterations", type=int, default=5, help="no. of iterations to run"
     )
     arg_parser.add_argument(
@@ -265,6 +320,26 @@ if __name__ == "__main__":
     )
     args = arg_parser.parse_args()
 
+    # Validate arguments
+    if args.backend not in ("sdpa", "iattention", "plugin"):
+        raise ValueError(
+            f"Unknown backend '{args.backend}'. Options: sdpa, iattention, plugin"
+        )
+    if args.backend == "plugin" and not PLUGIN_AVAILABLE:
+        raise RuntimeError(
+            "Plugin backend requested but plugin utilities are not available."
+        )
+    if args.cache and args.backend == "plugin":
+        print("Warning: --cache is only applicable with 'sdpa' backend. Ignoring.")
+        args.cache = ""
+    if args.cache and args.backend == "iattention":
+        print(
+            "Warning: --cache is not supported with 'iattention' backend "
+            "(static_cache passes are incompatible with native IAttention converters). "
+            "Ignoring --cache."
+        )
+        args.cache = ""
+
     with torch.inference_mode():
         model = get_model(args)
 
@@ -289,7 +364,11 @@ if __name__ == "__main__":
         pyt_timings = None
         pyt_stats = None
 
-        if args.quant_format != None:
+        if args.quant_format is not None:
+            if not QUANTIZATION_AVAILABLE:
+                raise RuntimeError(
+                    "Quantization requested but modelopt is not installed."
+                )
             model = quantize_model(model, args, tokenizer)
         if args.enable_pytorch_run:
             pyt_gen_tokens = generate(
@@ -312,54 +391,117 @@ if __name__ == "__main__":
                     compile_time_s=None,
                 )
 
-        if args.cache == "static_v1":
-            # This import is required to register static v1 KV cache transformations as lowering passes
-            import static_cache_v1
-        if args.cache == "static_v2":
-            # This import is required to register static v2 KV cache transformations as lowering passes
-            import static_cache_v2
+        # Backend selection: sdpa, iattention, or plugin
+        if args.backend == "plugin":
+            # Plugin backend
+            if not PLUGIN_AVAILABLE:
+                raise RuntimeError("Plugin backend requested but not available")
 
-        # Compile the model with Torch-TensorRT
-        trt_model = compile_torchtrt(model, input_ids, args)
+            dtype = (
+                torch.float16
+                if args.model_precision == "FP16"
+                else (
+                    torch.bfloat16 if args.model_precision == "BF16" else torch.float32
+                )
+            )
+            config = model.config
+            max_seq_len = max(2048, MAX_OUTPUT_SEQ_LENGTH)
 
-        if args.cache == "static_v1" or args.cache == "static_v2":
-            if args.cudagraph:
-                # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
-                # trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
-                torch_tensorrt.runtime.set_cudagraphs_mode(True)
+            # Load plugin and register op
+            load_plugin()
+            register_plugin_op()
+            set_plugin_config_from_model(config, max_seq_len)
 
-            trt_gen_tokens = generate_with_static_cache(
+            # Replace attention with plugin
+            model = replace_attention_with_plugin(
+                model, config, max_seq_len, DEVICE, dtype
+            )
+            wrapper = LLMPluginWrapper(model)
+
+            # Compile plugin model
+            trt_model = compile_plugin_model(
+                wrapper, config, max_seq_len, DEVICE, dtype, args.debug
+            )
+
+            # Create KV caches
+            kv_caches = create_kv_caches(
+                config, max_seq_len, args.batch_size, DEVICE, dtype
+            )
+
+            # Generate
+            trt_gen_tokens, _ = generate_with_plugin(
                 trt_model,
                 input_ids.clone(),
-                MAX_OUTPUT_SEQ_LENGTH,
+                kv_caches,
+                args.num_tokens,
                 tokenizer.eos_token_id,
+                DEVICE,
             )
 
             if args.benchmark:
-                trt_timings = time_generate(
-                    generate_with_static_cache,
-                    trt_model,
-                    input_ids.clone(),
-                    MAX_OUTPUT_SEQ_LENGTH,
-                    tokenizer.eos_token_id,
-                    iterations=args.iterations,
-                )
+                trt_timings = []
+                for i in range(args.iterations):
+                    elapsed_ms = benchmark_plugin_generation(
+                        trt_model,
+                        config,
+                        input_ids.shape[1],
+                        args.num_tokens,
+                        max_seq_len,
+                        DEVICE,
+                        dtype,
+                    )
+                    trt_timings.append(elapsed_ms / 1000.0)
         else:
-            trt_gen_tokens = generate(
-                trt_model,
-                input_ids.clone(),
-                MAX_OUTPUT_SEQ_LENGTH,
-                tokenizer.eos_token_id,
-            )
-            if args.benchmark:
-                trt_timings = time_generate(
-                    generate,
+            # SDPA or IAttention backend
+            # For iattention, args.cache is already cleared by validation above.
+            if args.cache == "static_v1":
+                # This import is required to register static v1 KV cache transformations as lowering passes
+                import static_cache_v1
+            if args.cache == "static_v2":
+                # This import is required to register static v2 KV cache transformations as lowering passes
+                import static_cache_v2
+
+            # Compile the model with Torch-TensorRT
+            trt_model = compile_torchtrt(model, input_ids, args)
+
+            if args.cache == "static_v1" or args.cache == "static_v2":
+                if args.cudagraph:
+                    # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
+                    # trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
+                    torch_tensorrt.runtime.set_cudagraphs_mode(True)
+
+                trt_gen_tokens = generate_with_static_cache(
                     trt_model,
                     input_ids.clone(),
                     MAX_OUTPUT_SEQ_LENGTH,
                     tokenizer.eos_token_id,
-                    iterations=args.iterations,
                 )
+
+                if args.benchmark:
+                    trt_timings = time_generate(
+                        generate_with_static_cache,
+                        trt_model,
+                        input_ids.clone(),
+                        MAX_OUTPUT_SEQ_LENGTH,
+                        tokenizer.eos_token_id,
+                        iterations=args.iterations,
+                    )
+            else:
+                trt_gen_tokens = generate(
+                    trt_model,
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
+                )
+                if args.benchmark:
+                    trt_timings = time_generate(
+                        generate,
+                        trt_model,
+                        input_ids.clone(),
+                        MAX_OUTPUT_SEQ_LENGTH,
+                        tokenizer.eos_token_id,
+                        iterations=args.iterations,
+                    )
 
         if args.benchmark:
             trt_stats = record_stats(
