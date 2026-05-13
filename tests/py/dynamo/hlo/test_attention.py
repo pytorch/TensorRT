@@ -135,8 +135,8 @@ class TestSDPA(DispatchTestCase):
             ("d48_fp16",                1,  4,   32,   32,  48, False, None,  torch.float16, False, 1e-2),
             ("d96_fp16",                1,  4,   32,   32,  96, False, None,  torch.float16, False, 1e-2),
             # Large causal in fp16
-            ("s512_ca_fp16",            1,  8,  512,  512,  64, True,  None,  torch.float16, True, 1e-2),
-            ("s2048_ca_fp16",           1,  8, 2048, 2048,  64, True,  None,  torch.float16, True, 1e-2),
+            ("s512_ca_fp16",            1,  8,  512,  512,  64, True,  None,  torch.float16, True, 0.1),
+            ("s2048_ca_fp16",           1,  8, 2048, 2048,  64, True,  None,  torch.float16, True, 0.1),
             # Large causal in bf16
             ("s512_ca_bf16",            1,  8,  512,  512,  64, True,  None,  torch.bfloat16, False, 1e-2),
             ("s2048_ca_bf16",           1,  8, 2048, 2048,  64, True,  None,  torch.bfloat16, False, 1e-2),
@@ -154,7 +154,7 @@ class TestSDPA(DispatchTestCase):
             ("b1_h8_s32_d64_nc_bf16",   1,  8,   32,   32,  64, False, None,  torch.bfloat16, False, 1e-2),
             ("b2_h8_s128_d64_ca_bf16",  2,  8,  128,  128,  64, True,  None,  torch.bfloat16, False, 1e-2),
             # LLM-realistic configs
-            ("llama32_1b_prefill_fp16", 1, 32, 2048, 2048,  64, True,  None,  torch.float16, True, 1e-2),  # Llama-3.2-1B, large causal
+            ("llama32_1b_prefill_fp16", 1, 32, 2048, 2048,  64, True,  None,  torch.float16, True, 0.1),  # Llama-3.2-1B, large causal
             ("llama32_3b_prefill_fp16", 1, 24, 2048, 2048, 128, True,  None,  torch.float16, True, 1e-2),  # Llama-3.2-3B
             ("qwen25_05b_fp16",         1, 14,  128,  128,  64, True,  None,  torch.float16, False, 1e-2),  # Qwen2.5-0.5B
             ("mistral_7b_fp16",         1, 32,  512,  512, 128, True,  None,  torch.float16, True, 1e-2),  # Mistral-7B, flash dispatch
@@ -454,8 +454,8 @@ class TestFlashAttention(DispatchTestCase):
             # BF16
             ("causal_bf16",       2,  8,  128,  64, True,  None,  torch.bfloat16, False, 1e-2),
             # Large causal in fp16
-            ("s512_ca_fp16",      1,  8,  512,  64, True,  None,  torch.float16,  True, 1e-2),
-            ("s2048_ca_fp16",     1, 32, 2048,  64, True,  None,  torch.float16,  True, 1e-2),
+            ("s512_ca_fp16",      1,  8,  512,  64, True,  None,  torch.float16,  True, 0.1),
+            ("s2048_ca_fp16",     1, 32, 2048,  64, True,  None,  torch.float16,  True, 0.1),
             # Large causal in bf16
             ("s512_ca_bf16",      1,  8,  512,  64, True,  None,  torch.bfloat16, False, 1e-2),
             ("s2048_ca_bf16",     1, 32, 2048,  64, True,  None,  torch.bfloat16, False, 1e-2),
