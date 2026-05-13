@@ -37,6 +37,7 @@ TARGET_PLATFORM_IDX = -1  # Not implemented
 REQUIRES_OUTPUT_ALLOCATOR_IDX = -1  # Not implemented
 SERIALIZATION_LEN = -1  # Not implemented
 REQUIRES_NATIVE_MULTIDEVICE_IDX = -1  # Not implemented
+ALIASED_IO_IDX = -1  # Not implemented
 
 if ENABLED_FEATURES.torch_tensorrt_runtime:
     ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()  # 0
@@ -57,7 +58,32 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
     REQUIRES_NATIVE_MULTIDEVICE_IDX = (
         torch.ops.tensorrt.REQUIRES_NATIVE_MULTIDEVICE_IDX()
     )  # 11
-    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 12
+    ALIASED_IO_IDX = torch.ops.tensorrt.ALIASED_IO_IDX()  # 12
+    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 13
+
+
+def user_output_count(
+    output_binding_names: List[str], aliased_io: Dict[str, Tuple[str, str]]
+) -> int:
+    """Derive the boundary between user-visible outputs and side-effect
+    aliased outputs.
+
+    By convention the TRTInterpreter appends side-effect aliased outputs
+    (those added on behalf of layers like ``IKVCacheUpdateLayer`` that
+    require their output to be a network output) to the END of
+    ``output_binding_names``. So the user-output count is one past the
+    index of the last name that is *not* in ``aliased_io``.
+
+    Returns ``len(output_binding_names)`` if no outputs are aliased OR
+    if every output is aliased (in which case we conservatively treat
+    them all as user-returned — a pure-side-effect engine is degenerate).
+    """
+    if not aliased_io:
+        return len(output_binding_names)
+    for i in range(len(output_binding_names) - 1, -1, -1):
+        if output_binding_names[i] not in aliased_io:
+            return i + 1
+    return len(output_binding_names)
 
 
 @for_all_methods(needs_torch_tensorrt_runtime)
@@ -93,6 +119,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         requires_output_allocator: bool = False,
         requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+        aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -153,6 +180,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
         self.symbolic_shape_expressions = symbolic_shape_expressions
         self.requires_native_multidevice = requires_native_multidevice
+        # Map of output binding name -> (input binding name, kind_str)
+        self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
 
         if (
             serialized_engine
@@ -227,6 +256,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         )
         engine_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = str(
             int(self.requires_native_multidevice)
+        )
+        engine_info[ALIASED_IO_IDX] = TorchTensorRTModule._pack_aliased_io(
+            self.aliased_io
         )
         # rank/world_size are runtime facts; queried from ProcessGroup at execution time
 
@@ -424,8 +456,23 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             list(input_tensors), self.engine
         )
 
+        # The interpreter may have appended extra "side-effect" outputs to
+        # satisfy the network-output requirement of aliased layers (e.g.
+        # IKVCacheUpdateLayer). Truncate to the user-facing count; mutation
+        # effects are visible on the corresponding input tensors. The
+        # boundary is derived from output_binding_names + aliased_io — no
+        # extra state needed.
+        if self.aliased_io:
+            n = user_output_count(self.output_binding_names, self.aliased_io)
+            if n < len(outputs):
+                outputs = outputs[:n]
+
         if len(outputs) == 1:
             return outputs[0]
+
+        if len(outputs) == 0:
+            # Pure side-effect engine (model has no return value).
+            return ()
 
         return tuple(outputs)
 
@@ -488,3 +535,21 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         delim = torch.ops.tensorrt.SERIALIZED_ENGINE_BINDING_DELIM()[0]
         packed_bindings: str = delim.join(binding_names)
         return packed_bindings
+
+    @staticmethod
+    def _pack_aliased_io(aliased_io: Dict[str, Tuple[str, str]]) -> str:
+        """Encode the aliased_io map into the wire format consumed by the
+        C++ runtime. One record per (output_binding -> input_binding, kind)
+        entry. Records are joined by ``SERIALIZED_ENGINE_BINDING_DELIM``
+        ('%') — same convention as ``_pack_binding_names``. Within a
+        record the field separator is '@' (TRT binding names are
+        alphanumeric + underscore so '@' cannot collide)."""
+        if not aliased_io:
+            return ""
+        delim = torch.ops.tensorrt.SERIALIZED_ENGINE_BINDING_DELIM()[0]
+        records = [
+            f"{out_name}@{in_name}@{kind_str}"
+            for out_name, (in_name, kind_str) in aliased_io.items()
+        ]
+        packed: str = delim.join(records)
+        return packed

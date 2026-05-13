@@ -37,6 +37,63 @@ std::string serialize_bindings(const std::vector<std::string>& bindings) {
   return serialized_binding_info;
 }
 
+// Aliased I/O wire format:
+//   record:  "<output_name>@<input_name>@<kind>"
+//   joined:  records separated by TRTEngine::BINDING_DELIM ('%')
+// '@' is the intra-record field separator — TRT binding names are
+// alphanumeric + underscore so '@' cannot collide with a binding name.
+static const char ALIASED_IO_FIELD_DELIM = '@';
+
+std::string serialize_aliased_io(const std::unordered_map<std::string, AliasedIOSpec>& aliased_io) {
+  if (aliased_io.empty()) {
+    return "";
+  }
+  std::stringstream ss;
+  bool first = true;
+  for (const auto& kv : aliased_io) {
+    if (!first) {
+      ss << TRTEngine::BINDING_DELIM;
+    }
+    first = false;
+    ss << kv.first << ALIASED_IO_FIELD_DELIM << kv.second.input_binding_name << ALIASED_IO_FIELD_DELIM
+       << alias_kind_to_string(kv.second.kind);
+  }
+  std::string out = ss.str();
+  LOG_DEBUG("Serialized aliased_io: " << out);
+  return out;
+}
+
+std::unordered_map<std::string, AliasedIOSpec> deserialize_aliased_io(const std::string& s) {
+  std::unordered_map<std::string, AliasedIOSpec> out;
+  if (s.empty()) {
+    return out;
+  }
+  size_t pos = 0;
+  while (pos < s.size()) {
+    size_t rec_end = s.find(TRTEngine::BINDING_DELIM, pos);
+    std::string rec = (rec_end == std::string::npos) ? s.substr(pos) : s.substr(pos, rec_end - pos);
+
+    size_t f1 = rec.find(ALIASED_IO_FIELD_DELIM);
+    if (f1 == std::string::npos) {
+      LOG_WARNING("Skipping malformed aliased_io record (missing first field delim): " << rec);
+    } else {
+      size_t f2 = rec.find(ALIASED_IO_FIELD_DELIM, f1 + 1);
+      if (f2 == std::string::npos) {
+        LOG_WARNING("Skipping malformed aliased_io record (missing second field delim): " << rec);
+      } else {
+        std::string out_name = rec.substr(0, f1);
+        std::string in_name = rec.substr(f1 + 1, f2 - f1 - 1);
+        std::string kind_str = rec.substr(f2 + 1);
+        out[out_name] = AliasedIOSpec{in_name, alias_kind_from_string(kind_str)};
+      }
+    }
+    if (rec_end == std::string::npos)
+      break;
+    pos = rec_end + 1;
+  }
+  return out;
+}
+
 // Base64 alphabet (RFC 4648 §4)
 static const std::string sym_table = // NOLINT(cert-err58-cpp)
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; //=

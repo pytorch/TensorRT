@@ -147,6 +147,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         requires_output_allocator: bool = False,
         requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+        aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
         _debugger_config: Optional[DebuggerConfig] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
@@ -206,6 +207,19 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_names = (
             output_binding_names if output_binding_names is not None else []
         )
+        # aliased_io is accepted for API compatibility with TorchTensorRTModule
+        # but the Python runtime does NOT honor aliasing — outputs are always
+        # allocated fresh and not bound to input device pointers. Use the C++
+        # runtime (use_python_runtime=False) for true in-place aliasing.
+        self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
+        if self.aliased_io:
+            logger.warning(
+                "Aliased I/O is set on the engine (%d outputs) but the Python "
+                "runtime does not implement aliasing. The engine will fail at "
+                "execution time with a memory-address mismatch. Use the C++ "
+                "runtime (use_python_runtime=False) for aliased I/O support.",
+                len(self.aliased_io),
+            )
         self.initialized = False
         self.target_device_id = (
             settings.device.gpu_id

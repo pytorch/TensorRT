@@ -69,7 +69,8 @@ TRTEngine::TRTEngine(
     bool hardware_compatible,
     bool requires_output_allocator,
     const std::string& serialized_metadata,
-    const ResourceAllocationStrategy resource_allocation_strategy)
+    const ResourceAllocationStrategy resource_allocation_strategy,
+    const std::unordered_map<std::string, AliasedIOSpec>& aliased_io)
     : TRTEngine(
           "deserialized_trt",
           serialized_engine,
@@ -80,7 +81,8 @@ TRTEngine::TRTEngine(
           hardware_compatible,
           requires_output_allocator,
           serialized_metadata,
-          resource_allocation_strategy) {}
+          resource_allocation_strategy,
+          aliased_io) {}
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
     : TRTEngine(
@@ -95,7 +97,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           serialized_info[SERIALIZED_METADATA_IDX],
           (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]))
                ? ResourceAllocationStrategy::kDynamic
-               : ResourceAllocationStrategy::kStatic)) {
+               : ResourceAllocationStrategy::kStatic),
+          deserialize_aliased_io(serialized_info[ALIASED_IO_IDX])) {
   this->requires_native_multidevice = std::stoi(serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]);
   if (this->requires_native_multidevice) {
     LOG_INFO("Loaded distributed TRT engine (contains NCCL collectives); NCCL comm will be bound on first execution");
@@ -112,7 +115,8 @@ TRTEngine::TRTEngine(
     bool hardware_compatible,
     bool requires_output_allocator,
     const std::string& serialized_metadata,
-    const ResourceAllocationStrategy resource_allocation_strategy) {
+    const ResourceAllocationStrategy resource_allocation_strategy,
+    const std::unordered_map<std::string, AliasedIOSpec>& aliased_io) {
   TORCHTRT_CHECK(
       is_supported_on_current_platform(target_platform),
       "This engine was not built to run on this platform (built for: " << target_platform << ", current platform: "
@@ -267,6 +271,40 @@ TRTEngine::TRTEngine(
       out_binding_names[pyt_idx] = binding_name;
     }
     num_io = std::make_pair(inputs_size, outputs);
+  }
+
+  // Store the build-time aliased_io map as the starting point. Then reconcile
+  // against ICudaEngine::getAliasedInputTensor — that API is the source of
+  // truth for KV-cache-style aliasing (TRT-enforced via IKVCacheUpdateLayer)
+  // and may report aliases the build-time path didn't record (e.g. for
+  // engines built outside Torch-TensorRT). User-declared aliases (kind=kUser)
+  // are preserved as-is since TRT doesn't know about them.
+  this->aliased_io = aliased_io;
+  for (const auto& out_name : this->out_binding_names) {
+    // TRT returns nullptr / empty string for non-aliased outputs; any thrown
+    // exception is a real error in the engine state and propagates.
+    const char* aliased_in = cuda_engine->getAliasedInputTensor(out_name.c_str());
+    if (aliased_in == nullptr || aliased_in[0] == '\0') {
+      continue;
+    }
+    auto it = this->aliased_io.find(out_name);
+    if (it == this->aliased_io.end()) {
+      this->aliased_io[out_name] = AliasedIOSpec{std::string(aliased_in), AliasKind::kKVCacheUpdate};
+      LOG_DEBUG("aliased_io reconciliation: discovered " << out_name << " -> " << aliased_in << " (kv_cache_update)");
+    } else if (it->second.input_binding_name != std::string(aliased_in)) {
+      LOG_WARNING(
+          "aliased_io: build-time map disagrees with engine for output "
+          << out_name << " (build: " << it->second.input_binding_name << ", engine: " << aliased_in
+          << "); using engine value.");
+      it->second = AliasedIOSpec{std::string(aliased_in), AliasKind::kKVCacheUpdate};
+    }
+    // Validation: aliased outputs must not also require an output allocator,
+    // since aliasing requires the output shape to match the input's static
+    // shape, which is incompatible with the dynamic-allocation path.
+    TORCHTRT_CHECK(
+        !this->requires_output_allocator,
+        "Aliased output " << out_name
+                          << " is incompatible with dynamic output allocator. Aliasing requires fixed output shape.");
   }
 
 #ifndef NDEBUG
@@ -505,7 +543,8 @@ FlattenedState TRTEngine::__obj_flatten__() {
       std::tuple("requires_output_allocator", serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]),
       std::tuple("target_platform", serialized_info[TARGET_PLATFORM_IDX]),
       std::tuple("resource_allocation_strategy", serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]),
-      std::tuple("requires_native_multidevice", serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]));
+      std::tuple("requires_native_multidevice", serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]),
+      std::tuple("aliased_io", serialized_info[ALIASED_IO_IDX]));
 }
 
 std::vector<std::string> TRTEngine::serialize() {
@@ -531,6 +570,7 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
   serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = this->requires_native_multidevice ? "1" : "0";
+  serialized_info[ALIASED_IO_IDX] = serialize_aliased_io(this->aliased_io);
   // rank/world_size are runtime facts (may differ at load time); not serialized.
 
   return serialized_info;
