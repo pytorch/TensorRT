@@ -8,9 +8,31 @@ import unittest
 
 import torch
 import torch_tensorrt as torchtrt
+from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+# Parameterize end-to-end cache tests over both runtime paths. The C++ variant is
+# skipped inside the test body when the C++ runtime is not available.
+_RUNTIMES = [("python", True), ("cpp", False)]
+
+
+def _compile(model, inputs, *, use_python_runtime, runtime_cache_path):
+    kwargs = {
+        "ir": "dynamo",
+        "inputs": inputs,
+        "enabled_precisions": {torch.float32},
+        "use_python_runtime": use_python_runtime,
+        "min_block_size": 1,
+        "runtime_cache_path": runtime_cache_path,
+    }
+    return torchtrt.compile(model, **kwargs)
+
+
+def _skip_if_cpp_unavailable(testcase, use_python_runtime):
+    if not use_python_runtime and not ENABLED_FEATURES.torch_tensorrt_runtime:
+        testcase.skipTest("C++ runtime is not available")
 
 
 @unittest.skipIf(
@@ -22,7 +44,7 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
     "torchvision is not installed",
 )
 class TestRuntimeCacheModels(TestCase):
-    """End-to-end model tests with runtime cache enabled."""
+    """End-to-end model tests with runtime cache enabled — both runtimes."""
 
     def setUp(self):
         self.cache_dir = tempfile.mkdtemp()
@@ -32,18 +54,18 @@ class TestRuntimeCacheModels(TestCase):
         shutil.rmtree(self.cache_dir, ignore_errors=True)
         torch._dynamo.reset()
 
-    def test_resnet18_with_runtime_cache(self):
+    @parameterized.expand(_RUNTIMES)
+    def test_resnet18_with_runtime_cache(self, _name, use_python_runtime):
+        _skip_if_cpp_unavailable(self, use_python_runtime)
         import torchvision.models as models
 
         model = models.resnet18(pretrained=True).eval().cuda()
         input_tensor = torch.randn(1, 3, 224, 224).cuda()
 
-        compiled = torchtrt.compile(
+        compiled = _compile(
             model,
-            ir="dynamo",
-            inputs=[torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
-            use_python_runtime=True,
-            min_block_size=1,
+            [torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
+            use_python_runtime=use_python_runtime,
             runtime_cache_path=self.cache_path,
         )
 
@@ -56,7 +78,6 @@ class TestRuntimeCacheModels(TestCase):
             f"ResNet18 cosine similarity {cos_sim} below threshold {COSINE_THRESHOLD}",
         )
 
-        # Verify runtime cache is saved on cleanup
         del compiled
         gc.collect()
         self.assertTrue(
@@ -64,8 +85,10 @@ class TestRuntimeCacheModels(TestCase):
             "Runtime cache should be saved after ResNet18 inference",
         )
 
-    def test_resnet18_cache_reuse(self):
-        """Compile + infer twice with same cache path. Second run should load cached data."""
+    @parameterized.expand(_RUNTIMES)
+    def test_resnet18_cache_reuse(self, _name, use_python_runtime):
+        """Compile + infer twice with same cache path. Second run loads cached data."""
+        _skip_if_cpp_unavailable(self, use_python_runtime)
         import torchvision.models as models
 
         model = models.resnet18(pretrained=True).eval().cuda()
@@ -73,15 +96,13 @@ class TestRuntimeCacheModels(TestCase):
         ref_output = model(input_tensor)
 
         compile_kwargs = {
-            "ir": "dynamo",
             "inputs": [torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
-            "use_python_runtime": True,
-            "min_block_size": 1,
+            "use_python_runtime": use_python_runtime,
             "runtime_cache_path": self.cache_path,
         }
 
         # First compilation — cold cache
-        compiled1 = torchtrt.compile(model, **compile_kwargs)
+        compiled1 = _compile(model, **compile_kwargs)
         _ = compiled1(input_tensor)
         del compiled1
         gc.collect()
@@ -90,7 +111,7 @@ class TestRuntimeCacheModels(TestCase):
         cache_size_1 = os.path.getsize(self.cache_path)
 
         # Second compilation — warm cache
-        compiled2 = torchtrt.compile(model, **compile_kwargs)
+        compiled2 = _compile(model, **compile_kwargs)
         output2 = compiled2(input_tensor)
 
         cos_sim = cosine_similarity(ref_output, output2)
@@ -102,22 +123,21 @@ class TestRuntimeCacheModels(TestCase):
         del compiled2
         gc.collect()
         cache_size_2 = os.path.getsize(self.cache_path)
-        # Cache should exist and be non-empty after both runs
         self.assertGreater(cache_size_1, 0)
         self.assertGreater(cache_size_2, 0)
 
-    def test_mobilenet_v2_with_runtime_cache(self):
+    @parameterized.expand(_RUNTIMES)
+    def test_mobilenet_v2_with_runtime_cache(self, _name, use_python_runtime):
+        _skip_if_cpp_unavailable(self, use_python_runtime)
         import torchvision.models as models
 
         model = models.mobilenet_v2(pretrained=True).eval().cuda()
         input_tensor = torch.randn(1, 3, 224, 224).cuda()
 
-        compiled = torchtrt.compile(
+        compiled = _compile(
             model,
-            ir="dynamo",
-            inputs=[torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
-            use_python_runtime=True,
-            min_block_size=1,
+            [torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
+            use_python_runtime=use_python_runtime,
             runtime_cache_path=self.cache_path,
         )
 
@@ -140,7 +160,7 @@ class TestRuntimeCacheModels(TestCase):
     "Runtime cache is only available with TensorRT-RTX",
 )
 class TestRuntimeCacheDynamicShapes(TestCase):
-    """Tests runtime cache with dynamic input shapes."""
+    """Tests runtime cache with dynamic input shapes, exercised on both runtimes."""
 
     def setUp(self):
         self.cache_dir = tempfile.mkdtemp()
@@ -150,7 +170,10 @@ class TestRuntimeCacheDynamicShapes(TestCase):
         shutil.rmtree(self.cache_dir, ignore_errors=True)
         torch._dynamo.reset()
 
-    def test_dynamic_batch_with_cache(self):
+    @parameterized.expand(_RUNTIMES)
+    def test_dynamic_batch_with_cache(self, _name, use_python_runtime):
+        _skip_if_cpp_unavailable(self, use_python_runtime)
+
         class ConvModel(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -162,10 +185,9 @@ class TestRuntimeCacheDynamicShapes(TestCase):
 
         model = ConvModel().eval().cuda()
 
-        compiled = torchtrt.compile(
+        compiled = _compile(
             model,
-            ir="dynamo",
-            inputs=[
+            [
                 torchtrt.Input(
                     min_shape=(1, 3, 32, 32),
                     opt_shape=(4, 3, 32, 32),
@@ -173,38 +195,28 @@ class TestRuntimeCacheDynamicShapes(TestCase):
                     dtype=torch.float32,
                 )
             ],
-            use_python_runtime=True,
-            min_block_size=1,
+            use_python_runtime=use_python_runtime,
             runtime_cache_path=self.cache_path,
         )
 
-        # Test with batch size 1
-        input_bs1 = torch.randn(1, 3, 32, 32).cuda()
-        ref_bs1 = model(input_bs1)
-        out_bs1 = compiled(input_bs1)
-        cos_sim_1 = cosine_similarity(ref_bs1, out_bs1)
-        self.assertTrue(
-            cos_sim_1 > COSINE_THRESHOLD,
-            f"BS=1 cosine similarity {cos_sim_1} below threshold",
-        )
+        for batch_size in (1, 4):
+            input_tensor = torch.randn(batch_size, 3, 32, 32).cuda()
+            ref_output = model(input_tensor)
+            out = compiled(input_tensor)
+            cos_sim = cosine_similarity(ref_output, out)
+            self.assertTrue(
+                cos_sim > COSINE_THRESHOLD,
+                f"BS={batch_size} cosine similarity {cos_sim} below threshold",
+            )
 
-        # Test with batch size 4
-        input_bs4 = torch.randn(4, 3, 32, 32).cuda()
-        ref_bs4 = model(input_bs4)
-        out_bs4 = compiled(input_bs4)
-        cos_sim_4 = cosine_similarity(ref_bs4, out_bs4)
-        self.assertTrue(
-            cos_sim_4 > COSINE_THRESHOLD,
-            f"BS=4 cosine similarity {cos_sim_4} below threshold",
-        )
-
-        # Verify cache is saved
         del compiled
         gc.collect()
         self.assertTrue(os.path.isfile(self.cache_path))
 
-    def test_cache_valid_across_shapes(self):
+    @parameterized.expand(_RUNTIMES)
+    def test_cache_valid_across_shapes(self, _name, use_python_runtime):
         """Save cache from one shape, load and verify it works with another shape in range."""
+        _skip_if_cpp_unavailable(self, use_python_runtime)
 
         class SimpleConv(torch.nn.Module):
             def __init__(self):
@@ -217,7 +229,6 @@ class TestRuntimeCacheDynamicShapes(TestCase):
         model = SimpleConv().eval().cuda()
 
         compile_kwargs = {
-            "ir": "dynamo",
             "inputs": [
                 torchtrt.Input(
                     min_shape=(1, 3, 16, 16),
@@ -226,13 +237,12 @@ class TestRuntimeCacheDynamicShapes(TestCase):
                     dtype=torch.float32,
                 )
             ],
-            "use_python_runtime": True,
-            "min_block_size": 1,
+            "use_python_runtime": use_python_runtime,
             "runtime_cache_path": self.cache_path,
         }
 
         # First run with batch=2 — saves cache
-        compiled1 = torchtrt.compile(model, **compile_kwargs)
+        compiled1 = _compile(model, **compile_kwargs)
         input_bs2 = torch.randn(2, 3, 16, 16).cuda()
         _ = compiled1(input_bs2)
         del compiled1
@@ -241,7 +251,7 @@ class TestRuntimeCacheDynamicShapes(TestCase):
         self.assertTrue(os.path.isfile(self.cache_path))
 
         # Second run with batch=3 — loads same cache
-        compiled2 = torchtrt.compile(model, **compile_kwargs)
+        compiled2 = _compile(model, **compile_kwargs)
         input_bs3 = torch.randn(3, 3, 16, 16).cuda()
         ref_bs3 = model(input_bs3)
         out_bs3 = compiled2(input_bs3)
@@ -268,8 +278,10 @@ class TestRuntimeCachePerformance(TestCase):
         shutil.rmtree(self.cache_dir, ignore_errors=True)
         torch._dynamo.reset()
 
-    def test_warmup_timing(self):
-        """Measure cold vs warm cache inference time. Informational only — no strict pass/fail."""
+    @parameterized.expand(_RUNTIMES)
+    def test_warmup_timing(self, _name, use_python_runtime):
+        """Measure cold vs warm cache inference time. Informational — no strict assertion."""
+        _skip_if_cpp_unavailable(self, use_python_runtime)
 
         class MLP(torch.nn.Module):
             def __init__(self):
@@ -285,15 +297,12 @@ class TestRuntimeCachePerformance(TestCase):
         input_tensor = torch.randn(16, 256).cuda()
 
         compile_kwargs = {
-            "ir": "dynamo",
             "inputs": [torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
-            "use_python_runtime": True,
-            "min_block_size": 1,
+            "use_python_runtime": use_python_runtime,
             "runtime_cache_path": self.cache_path,
         }
 
-        # Cold cache compilation + inference
-        compiled1 = torchtrt.compile(model, **compile_kwargs)
+        compiled1 = _compile(model, **compile_kwargs)
         torch.cuda.synchronize()
         start = time.perf_counter()
         _ = compiled1(input_tensor)
@@ -303,19 +312,16 @@ class TestRuntimeCachePerformance(TestCase):
         gc.collect()
         torch._dynamo.reset()
 
-        # Warm cache compilation + inference
-        compiled2 = torchtrt.compile(model, **compile_kwargs)
+        compiled2 = _compile(model, **compile_kwargs)
         torch.cuda.synchronize()
         start = time.perf_counter()
         _ = compiled2(input_tensor)
         torch.cuda.synchronize()
         warm_time = time.perf_counter() - start
 
-        print(f"\n  Cold cache first inference: {cold_time*1000:.1f}ms")
-        print(f"  Warm cache first inference: {warm_time*1000:.1f}ms")
-        print(f"  Speedup: {cold_time/warm_time:.2f}x")
-
-        # No strict assertion — just log for visibility
+        print(f"\n  [{_name}] Cold cache first inference: {cold_time*1000:.1f}ms")
+        print(f"  [{_name}] Warm cache first inference: {warm_time*1000:.1f}ms")
+        print(f"  [{_name}] Speedup: {cold_time/warm_time:.2f}x")
         self.assertTrue(True, "Timing test completed (informational)")
 
 

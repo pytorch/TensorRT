@@ -35,6 +35,10 @@ HW_COMPATIBLE_IDX = -1  # Not implemented
 SERIALIZED_METADATA_IDX = -1  # Not implemented
 TARGET_PLATFORM_IDX = -1  # Not implemented
 REQUIRES_OUTPUT_ALLOCATOR_IDX = -1  # Not implemented
+RESOURCE_ALLOCATION_STRATEGY_IDX = -1  # Not implemented
+RUNTIME_CACHE_PATH_IDX = -1  # Not implemented
+DYNAMIC_SHAPES_KERNEL_STRATEGY_IDX = -1  # Not implemented
+CUDA_GRAPH_STRATEGY_IDX = -1  # Not implemented
 SERIALIZATION_LEN = -1  # Not implemented
 REQUIRES_NATIVE_MULTIDEVICE_IDX = -1  # Not implemented
 
@@ -57,7 +61,25 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
     REQUIRES_NATIVE_MULTIDEVICE_IDX = (
         torch.ops.tensorrt.REQUIRES_NATIVE_MULTIDEVICE_IDX()
     )  # 11
-    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 12
+    if ENABLED_FEATURES.tensorrt_rtx:
+        RUNTIME_CACHE_PATH_IDX = torch.ops.tensorrt.RUNTIME_CACHE_PATH_IDX()  # 12
+        DYNAMIC_SHAPES_KERNEL_STRATEGY_IDX = (
+            torch.ops.tensorrt.DYNAMIC_SHAPES_KERNEL_STRATEGY_IDX()
+        )  # 13
+        CUDA_GRAPH_STRATEGY_IDX = torch.ops.tensorrt.CUDA_GRAPH_STRATEGY_IDX()  # 14
+    SERIALIZATION_LEN = (
+        torch.ops.tensorrt.SERIALIZATION_LEN()
+    )  # 15 (RTX) / 12 (standard)
+
+_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP: Dict[str, int] = {
+    "lazy": 0,
+    "eager": 1,
+    "none": 2,
+}
+_CUDA_GRAPH_STRATEGY_MAP: Dict[str, int] = {
+    "disabled": 0,
+    "whole_graph_capture": 1,
+}
 
 
 @for_all_methods(needs_torch_tensorrt_runtime)
@@ -151,6 +173,28 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.engine = None
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
+        # TensorRT-RTX-only runtime config mirror. The engine-info serialization slots
+        # only exist on RTX builds (see below), but we validate the strategy names on
+        # every build so typos are caught regardless of backend.
+        self.runtime_cache_path = settings.runtime_cache_path
+        self.dynamic_shapes_kernel_specialization_strategy = (
+            settings.dynamic_shapes_kernel_specialization_strategy
+        )
+        if (
+            self.dynamic_shapes_kernel_specialization_strategy
+            not in _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP
+        ):
+            raise ValueError(
+                f"Invalid dynamic_shapes_kernel_specialization_strategy "
+                f"{self.dynamic_shapes_kernel_specialization_strategy!r}; expected one of "
+                f"{list(_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP.keys())}"
+            )
+        self.cuda_graph_strategy = settings.cuda_graph_strategy
+        if self.cuda_graph_strategy not in _CUDA_GRAPH_STRATEGY_MAP:
+            raise ValueError(
+                f"Invalid cuda_graph_strategy {self.cuda_graph_strategy!r}; expected one of "
+                f"{list(_CUDA_GRAPH_STRATEGY_MAP.keys())}"
+            )
         self.symbolic_shape_expressions = symbolic_shape_expressions
         self.requires_native_multidevice = requires_native_multidevice
 
@@ -229,6 +273,18 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             int(self.requires_native_multidevice)
         )
         # rank/world_size are runtime facts; queried from ProcessGroup at execution time
+        # Strategy names are validated at __init__ time so typos fail fast on every
+        # build; the index slots themselves only exist on RTX.
+        if ENABLED_FEATURES.tensorrt_rtx:
+            engine_info[RUNTIME_CACHE_PATH_IDX] = self.runtime_cache_path or ""
+            engine_info[DYNAMIC_SHAPES_KERNEL_STRATEGY_IDX] = str(
+                _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP[
+                    self.dynamic_shapes_kernel_specialization_strategy
+                ]
+            )
+            engine_info[CUDA_GRAPH_STRATEGY_IDX] = str(
+                _CUDA_GRAPH_STRATEGY_MAP[self.cuda_graph_strategy]
+            )
 
         return engine_info
 

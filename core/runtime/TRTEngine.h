@@ -14,6 +14,7 @@
 #include "torch/custom_class.h"
 
 #include "core/runtime/TRTEngineProfiler.h"
+#include "core/runtime/TRTRuntimeConfig.h"
 #include "core/util/prelude.h"
 
 // TensorRT 10.16+ has native NCCL collective support via IExecutionContext::setCommunicator()
@@ -45,7 +46,14 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>, // Platform
     std::tuple<std::string, std::string>, // Resource Allocation Strategy
-    std::tuple<std::string, std::string>>; // requires_native_multidevice
+    std::tuple<std::string, std::string> // requires_native_multidevice
+#ifdef TRT_MAJOR_RTX
+    ,
+    std::tuple<std::string, std::string>, // Runtime Cache Path (TRT-RTX)
+    std::tuple<std::string, std::string>, // Dynamic Shapes Kernel Strategy (TRT-RTX)
+    std::tuple<std::string, std::string> // CUDA Graph Strategy (TRT-RTX)
+#endif
+    >;
 
 struct TorchTRTRuntimeStates {
   // Indicates whether CUDAGraphs were enabled in the previous execute_engine
@@ -140,31 +148,33 @@ struct TRTEngine : torch::CustomClassHolder {
 
   ~TRTEngine();
   TRTEngine(
-      const std::string& serialized_engine,
+      std::string serialized_engine,
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
       const Platform& target_platform = get_current_platform(),
       bool hardware_compatible = false,
       bool requires_output_allocator = false,
-      const std::string& serialized_metadata = "",
+      std::string serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
-          TRTEngine::ResourceAllocationStrategy::kStatic);
+          TRTEngine::ResourceAllocationStrategy::kStatic,
+      TRTRuntimeConfig runtime_cfg = TRTRuntimeConfig{});
 
   TRTEngine(std::vector<std::string> serialized_info);
 
   TRTEngine(
-      const std::string& mod_name,
-      const std::string& serialized_engine,
+      std::string mod_name,
+      std::string serialized_engine,
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
       const Platform& target_platform = get_current_platform(),
       bool hardware_compatible = false,
       bool requires_output_allocator = false,
-      const std::string& serialized_metadata = "",
+      std::string serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
-          TRTEngine::ResourceAllocationStrategy::kStatic);
+          TRTEngine::ResourceAllocationStrategy::kStatic,
+      TRTRuntimeConfig runtime_cfg = TRTRuntimeConfig{});
 
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
@@ -257,6 +267,23 @@ struct TRTEngine : torch::CustomClassHolder {
   ResourceAllocationStrategy resource_allocation_strategy = kStatic;
   void set_resource_allocation_strategy(ResourceAllocationStrategy new_strategy);
   ResourceAllocationStrategy get_resource_allocation_strategy();
+
+  // Owns the IRuntimeConfig (where supported) and TRT-RTX runtime state. On older TRT
+  // without IRuntimeConfig (e.g. Jetpack) this just carries strategy values that get
+  // passed to the legacy createExecutionContext overload.
+  TRTRuntimeConfig runtime_cfg;
+
+  // Monolithic-capturability check used when this engine is wrapped by an outer whole-graph
+  // capture (e.g. CudaGraphsTorchTensorRTModule). Non-RTX builds always return true.
+  bool is_monolithic_capturable(cudaStream_t stream) const;
+
+  // Disable TensorRT-RTX native CUDA graph capture on this engine (one-shot, invoked when
+  // an outer stream capture is detected around execute_engine). No-op on non-RTX.
+  void disable_rtx_native_cudagraphs();
+
+ private:
+  // Single entry point that (re)creates exec_ctx via runtime_cfg.create_execution_context.
+  void recreate_execution_context();
 };
 
 } // namespace runtime

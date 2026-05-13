@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
     CACHE_BUILT_ENGINES,
     CPU_MEMORY_BUDGET,
+    CUDA_GRAPH_STRATEGY,
     DECOMPOSE_ATTENTION,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -96,7 +97,7 @@ class CompilationSettings:
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
-        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. The cache is loaded on engine setup and saved on module cleanup. Uses file locking for concurrent access safety. Not used for standard TensorRT.
+        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Loaded on engine setup, saved on module cleanup. Not used for standard TensorRT.
         dynamic_shapes_kernel_specialization_strategy (str): Strategy for compiling shape-specialized kernels at runtime for dynamic shapes (TensorRT-RTX only). Options: "lazy" (compile in background, use fallback until ready), "eager" (compile immediately, blocking), "none" (always use fallback kernels). Default: "lazy".
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -119,6 +120,7 @@ class CompilationSettings:
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
+        cuda_graph_strategy (str): TensorRT-RTX CUDA graph strategy: "disabled" (default) or "whole_graph_capture" (let TensorRT-RTX manage CUDA graph capture/replay internally). When set and combined with `torch_tensorrt.runtime.set_cudagraphs_mode(True)` on RTX, overrides manual capture. Not used for standard TensorRT.
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
     """
@@ -182,6 +184,7 @@ class CompilationSettings:
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
+    cuda_graph_strategy: str = CUDA_GRAPH_STRATEGY
     decompose_attention: bool = DECOMPOSE_ATTENTION
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
 
