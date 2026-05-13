@@ -1415,32 +1415,82 @@ def _multirank_all_gather_correctness(
         _check_close(out[r], expected_row, f"all_gather row {r} rank={rank}")
 
 
-def _multirank_reduce_scatter_correctness(
+def _multirank_reduce_scatter_all_reduce_ops(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """reduce_scatter sum then scatters: rank r gets sum of row r."""
+    """Regression guard for the fused_nccl_reduce_scatter args[1] (reduce_op)
+    forwarding bug — TRT output must match eager for every reduce_op accepted
+    by PyTorch's functional collective (sum / avg / min / max / product).
+    """
+    if world_size < 2:
+        # world_size == 1 short-circuits inside nccl_reduce_scatter_native,
+        # so the reduce_op path is never exercised.
+        print(
+            "[SKIP] _multirank_reduce_scatter_all_reduce_ops requires world_size >= 2"
+        )
+        return
+
+    import torch_tensorrt
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+
     group = dist.group.WORLD
     group_name = group.group_name if hasattr(group, "group_name") else ""
 
     class ReduceScatter(nn.Module):
+        def __init__(self, reduce_op: str, world_size: int, group_name: str) -> None:
+            super().__init__()
+            self.reduce_op = reduce_op
+            self.world_size = world_size
+            self.group_name = group_name
+
         def forward(self, x: torch.Tensor) -> torch.Tensor:
             out = torch.ops._c10d_functional.reduce_scatter_tensor.default(
-                x, "sum", world_size, group_name
+                x, self.reduce_op, self.world_size, self.group_name
             )
             return torch.ops._c10d_functional.wait_tensor.default(out)
 
-    model = ReduceScatter().to(device).eval()
-    # Input: (world_size, 4), row r = fill(r+1) on every rank
+    # Rank r contributes row i = (r+2) * (i+1). For world_size=2 row 0 reduces
+    # to sum=5, avg=2.5, min=2, max=3, product=6 — all distinct so any
+    # silent op-swap (e.g. SUM-fallback) is caught.
     inp = torch.stack(
-        [torch.full((4,), float(r + 1), device=device) for r in range(world_size)]
+        [
+            torch.full(
+                (4,),
+                float((rank + 2) * (i + 1)),
+                device=device,
+                dtype=torch.float32,
+            )
+            for i in range(world_size)
+        ]
     )
 
-    with torch.no_grad():
-        out = model(inp)
+    for reduce_op in ("sum", "avg", "min", "max", "product"):
+        model = ReduceScatter(reduce_op, world_size, group_name).to(device).eval()
 
-    # Result for rank r: world_size * (r+1)
-    expected = torch.full((1, 4), float(world_size * (rank + 1)), device=device)
-    _check_close(out, expected, f"reduce_scatter rank={rank}")
+        with torch.no_grad():
+            ref = model(inp)
+
+        trt_model = torch.compile(
+            model,
+            backend="torch_tensorrt",
+            dynamic=False,
+            options={
+                "use_python_runtime": True,
+                "min_block_size": 1,
+                "use_distributed_mode_trace": True,
+            },
+        )
+
+        with torch.no_grad():
+            out = trt_model(inp)
+
+        _check_close(
+            out,
+            ref,
+            f"reduce_scatter reduce_op={reduce_op!r} (TRT vs eager) rank={rank}",
+        )
 
 
 def _multirank_distributed_mode_tp_model(
@@ -1819,12 +1869,15 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_all_gather_correctness(self.rank, self.world_size, device)
 
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
-    def test_reduce_scatter_correctness(self) -> None:
-        """reduce_scatter sum then scatters: rank r gets sum of row r."""
+    def test_reduce_scatter_all_reduce_ops(self) -> None:
+        """Regression guard for the fused_nccl_reduce_scatter args[1] (reduce_op)
+        forwarding bug — covers sum/avg/min/max/product.
+        """
         device = self._init_dist()
-        _multirank_reduce_scatter_correctness(self.rank, self.world_size, device)
+        _multirank_reduce_scatter_all_reduce_ops(self.rank, self.world_size, device)
 
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
@@ -1880,7 +1933,7 @@ def run_multirank_tests() -> None:
     tests = [
         _multirank_all_reduce_correctness,
         _multirank_all_gather_correctness,
-        _multirank_reduce_scatter_correctness,
+        _multirank_reduce_scatter_all_reduce_ops,
         _multirank_distributed_mode_tp_model,
         _multirank_distributed_mode_subgroup,
         _multirank_cpp_runtime_bind_nccl,
