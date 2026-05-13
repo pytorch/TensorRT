@@ -373,6 +373,7 @@ class DispatchTestCase(TRTTestCase):
         immutable_weights=True,
         decompose_attention=False,
         attn_bias_is_causal=True,
+        require_full_compilation=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -384,6 +385,7 @@ class DispatchTestCase(TRTTestCase):
             immutable_weights=immutable_weights,
             decompose_attention=decompose_attention,
             attn_bias_is_causal=attn_bias_is_causal,
+            require_full_compilation=require_full_compilation,
         )
 
         mod = self.generate_graph(
@@ -448,6 +450,13 @@ class DispatchTestCase(TRTTestCase):
             output_dtypes=output_dtypes,
             compilation_settings=compilation_settings,
         )
+
+        if require_full_compilation:
+            missing = interp.validate_conversion()
+            self.assertTrue(
+                len(missing) == 0,
+                f"require_full_compilation=True but the following ops don't have TRT converter: {missing}",
+            )
 
         super().run_test(
             mod,
