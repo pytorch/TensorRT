@@ -247,25 +247,28 @@ tar -tf "${tarball}" > "${tar_entries}"
 grep -qx "torch_tensorrt/BUILD" "${tar_entries}"
 grep -qx "torch_tensorrt/bin/torchtrtc" "${tar_entries}"
 grep -qx "torch_tensorrt/include/torch_tensorrt/core/runtime/runtime.h" "${tar_entries}"
-grep -qx "torch_tensorrt/include/torch_tensorrt/executorch/TensorRTBackend.h" "${tar_entries}"
+grep -qx "torch_tensorrt/include/torch_tensorrt/core/runtime/executorch/TensorRTBackend.h" "${tar_entries}"
 grep -qx "torch_tensorrt/lib/libtorchtrt.so" "${tar_entries}"
 grep -qx "torch_tensorrt/lib/libtorchtrt_plugins.so" "${tar_entries}"
 grep -qx "torch_tensorrt/lib/libtorchtrt_runtime.so" "${tar_entries}"
 grep -qx "torch_tensorrt/src/torch_tensorrt/CMakeLists.txt" "${tar_entries}"
-grep -qx "torch_tensorrt/src/torch_tensorrt/executorch/TensorRTBackend.cpp" "${tar_entries}"
+grep -qx "torch_tensorrt/src/torch_tensorrt/core/runtime/executorch/TensorRTBackend.cpp" "${tar_entries}"
 grep -qx "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt" "${tar_entries}"
 
 if grep -Eq '(^|/)libtorchtrt_executorch/' "${tar_entries}"; then
   echo "libtorchtrt_executorch must not appear in libtorchtrt.tar.gz" >&2
   exit 1
 fi
-if grep -Eq '^torch_tensorrt/src/torch_tensorrt/executorch/(core|runtime|partitioning|conversion|ir|lowering|util)/' "${tar_entries}"; then
-  echo "shared Torch-TensorRT source trees must not be duplicated under torch_tensorrt/src/torch_tensorrt/executorch" >&2
+if grep -Eq '^torch_tensorrt/src/torch_tensorrt/executorch/' "${tar_entries}"; then
+  echo "torch_tensorrt/src/torch_tensorrt/executorch must not appear in libtorchtrt.tar.gz" >&2
   exit 1
 fi
 
 export TORCHTRT_PACKAGE_DIR="${verify_root}/torch_tensorrt"
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt"
+# Exercise the runner's compatibility path for callers that still pass the
+# historical ExecuTorch subdirectory. The runner normalizes this to
+# ${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt.
+export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt/executorch"
 
 if [[ -z "${CMAKE_PREFIX_PATH:-}" ]]; then
   CMAKE_PREFIX_PATH="$("${python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)")"

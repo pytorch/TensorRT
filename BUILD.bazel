@@ -170,7 +170,7 @@ pkg_tar(
     name = "executorch_backend_source_package",
     srcs = [":executorch_backend_source_package_files"],
     mode = "0644",
-    package_dir = "src/torch_tensorrt/executorch",
+    package_dir = "src/torch_tensorrt/core/runtime/executorch",
     strip_prefix = "core/runtime/executorch",
 )
 
@@ -185,7 +185,7 @@ pkg_tar(
     name = "executorch_include_package",
     srcs = [":executorch_include_package_files"],
     mode = "0644",
-    package_dir = "include/torch_tensorrt/executorch",
+    package_dir = "include/torch_tensorrt/core/runtime/executorch",
     strip_prefix = "core/runtime/executorch",
 )
 

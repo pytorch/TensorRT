@@ -37,6 +37,17 @@ if(NOT TORCHTRT_EXECUTORCH_SOURCE_DIR)
 endif()
 
 if(NOT EXISTS "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
+  get_filename_component(_torchtrt_executorch_source_parent "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/.." ABSOLUTE)
+  if(EXISTS "${_torchtrt_executorch_source_parent}/CMakeLists.txt" AND EXISTS "${_torchtrt_executorch_source_parent}/core/runtime/executorch/TensorRTBackend.cpp")
+    set(TORCHTRT_EXECUTORCH_SOURCE_DIR
+        "${_torchtrt_executorch_source_parent}"
+        CACHE PATH
+        "Path to the unpacked Torch-TensorRT ExecuTorch source package"
+        FORCE)
+  endif()
+endif()
+
+if(NOT EXISTS "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
   message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR must point to the unpacked Torch-TensorRT ExecuTorch source package with a CMakeLists.txt: ${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
 endif()
 

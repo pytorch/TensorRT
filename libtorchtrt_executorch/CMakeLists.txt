@@ -18,10 +18,6 @@ endif()
 
 set(_torchtrt_executorch_backend_source "${_torchtrt_source_root}/core/runtime/executorch/TensorRTBackend.cpp")
 set(_torchtrt_executorch_backend_include_dir "${_torchtrt_source_root}/core/runtime/executorch")
-if(EXISTS "${_torchtrt_source_root}/executorch/TensorRTBackend.cpp")
-    set(_torchtrt_executorch_backend_source "${_torchtrt_source_root}/executorch/TensorRTBackend.cpp")
-    set(_torchtrt_executorch_backend_include_dir "${_torchtrt_include_root}/executorch")
-endif()
 
 list(APPEND CMAKE_MODULE_PATH "${_torchtrt_source_root}/cmake/Modules")
 
