@@ -1,4 +1,4 @@
-#include "torch_tensorrt/executorch/TensorRTBindingNames.h"
+#include "torch_tensorrt/serialization/TensorRTBindingNames.h"
 
 #include "gtest/gtest.h"
 
@@ -7,8 +7,7 @@
 #include <vector>
 
 namespace torch_tensorrt {
-namespace executorch_backend {
-namespace detail {
+namespace serialization {
 namespace {
 
 TEST(ExecuTorchBindingNames, ParseBindingIndexAcceptsDotAndUnderscoreSuffixes) {
@@ -58,7 +57,15 @@ TEST(ExecuTorchBindingNames, AppendBindingNameRejectsInvalidDuplicateAndMissingP
   EXPECT_FALSE(append_binding_name(names, "other_0"));
 }
 
+TEST(ExecuTorchBindingNames, SerializeAndSplitBindingNamesUseSharedDelimiter) {
+  const std::vector<std::string> names = {"input_0", "input_1", "output.0"};
+
+  const std::string serialized = serialize_binding_names(names);
+
+  EXPECT_EQ(serialized, "input_0%input_1%output.0");
+  EXPECT_EQ(split_serialized_binding_names(serialized), names);
+}
+
 } // namespace
-} // namespace detail
-} // namespace executorch_backend
+} // namespace serialization
 } // namespace torch_tensorrt

@@ -12,25 +12,19 @@
  * crash when libtorchtrt.so is also loaded in the same process.
  */
 
-#include <sstream>
 #include <string>
 #include <vector>
 
 #include "core/runtime/runtime.h"
 #include "core/util/macros.h"
+#include "torch_tensorrt/serialization/TensorRTBindingNames.h"
 
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
 std::string serialize_bindings(const std::vector<std::string>& bindings) {
-  std::stringstream ss;
-  for (size_t i = 0; i < bindings.size() - 1; i++) {
-    ss << bindings[i] << TRTEngine::BINDING_DELIM;
-  }
-  ss << bindings[bindings.size() - 1];
-
-  std::string serialized_binding_info = ss.str();
+  std::string serialized_binding_info = serialization::serialize_binding_names(bindings);
 
   LOG_DEBUG("Serialized Binding Info: " << serialized_binding_info);
 

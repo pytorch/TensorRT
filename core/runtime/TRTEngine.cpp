@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <utility>
 
 #include <cuda_runtime.h>
 #include "NvInfer.h"
@@ -24,17 +25,6 @@ namespace runtime {
 std::string slugify(std::string s) {
   std::replace(s.begin(), s.end(), '.', '_');
   return s;
-}
-
-std::vector<std::string> split(const std::string& str, char delim) {
-  std::vector<std::string> strings;
-  size_t start;
-  size_t end = 0;
-  while ((start = str.find_first_not_of(delim, end)) != std::string::npos) {
-    end = str.find(delim, start);
-    strings.push_back(str.substr(start, end - start));
-  }
-  return strings;
 }
 
 DynamicOutputAllocator::DynamicOutputAllocator(const std::unordered_map<std::string, at::ScalarType>& output_dtypes)
@@ -87,8 +77,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           serialized_info[NAME_IDX],
           serialized_info[ENGINE_IDX],
           RTDevice(serialized_info[DEVICE_IDX]),
-          split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
-          split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
+          serialization::split_serialized_binding_names(serialized_info[INPUT_BINDING_NAMES_IDX]),
+          serialization::split_serialized_binding_names(serialized_info[OUTPUT_BINDING_NAMES_IDX]),
           Platform(serialized_info[TARGET_PLATFORM_IDX]),
           static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX])),
           static_cast<bool>(std::stoi(serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])),
@@ -162,48 +152,19 @@ TRTEngine::TRTEngine(
   runtime_states.context_changed = false;
 
   if (_in_binding_names.size() == 0 && _out_binding_names.size() == 0) {
-    uint64_t inputs = 0;
-    uint64_t outputs = 0;
+    serialization::TensorRTBindingNames binding_names;
+    TORCHTRT_CHECK(
+        serialization::infer_engine_binding_names(*cuda_engine, binding_names),
+        "Unable to determine binding indices from TensorRT engine binding names"
+            << "\nEnsure module was compiled with Torch-TensorRT.ts or follows Torch-TensorRT Runtime conventions");
 
-    for (int64_t trt_idx = 0; trt_idx < cuda_engine->getNbIOTensors(); trt_idx++) {
-      std::string bind_name = cuda_engine->getIOTensorName(trt_idx);
-      LOG_DEBUG("Binding name: " << bind_name);
-      auto delim = bind_name.find(".");
-      if (delim == std::string::npos) {
-        delim = bind_name.find("_");
-        TORCHTRT_CHECK(
-            delim != std::string::npos,
-            "Unable to determine binding index for input "
-                << bind_name
-                << "\nEnsure module was compiled with Torch-TensorRT.ts or follows Torch-TensorRT Runtime conventions");
-      }
-      std::string idx_s = bind_name.substr(delim + 1);
-      uint64_t pyt_idx = static_cast<uint64_t>(std::stoi(idx_s));
-
-      if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
-        inputs++;
-        in_binding_map[trt_idx] = pyt_idx;
-        LOG_DEBUG("TRT Binding index: " << trt_idx << "corresponds to PYT Input index: " << pyt_idx);
-      } else {
-        outputs++;
-        out_binding_map[trt_idx] = pyt_idx;
-        LOG_DEBUG("TRT Binding index: " << trt_idx << "corresponds to PYT Output: " << pyt_idx);
-      }
-    }
-
-    num_io = std::make_pair(inputs, outputs);
-    in_binding_names.resize(inputs);
-    input_buffers.resize(inputs);
-    out_binding_names.resize(outputs);
-    output_buffers.resize(outputs);
-    for (int64_t x = 0; x < cuda_engine->getNbIOTensors(); x++) {
-      std::string bind_name = cuda_engine->getIOTensorName(x);
-      if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
-        in_binding_names[in_binding_map.at(x)] = bind_name;
-      } else {
-        out_binding_names[out_binding_map.at(x)] = bind_name;
-      }
-    }
+    num_io = std::make_pair(binding_names.input_names.size(), binding_names.output_names.size());
+    in_binding_map = std::move(binding_names.input_map);
+    out_binding_map = std::move(binding_names.output_map);
+    in_binding_names = std::move(binding_names.input_names);
+    out_binding_names = std::move(binding_names.output_names);
+    input_buffers.resize(num_io.first);
+    output_buffers.resize(num_io.second);
   } else {
     uint64_t inputs_size = _in_binding_names.size();
     in_binding_names.resize(inputs_size);

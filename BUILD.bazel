@@ -48,6 +48,7 @@ pkg_tar(
     name = "include_rt",
     package_dir = "include/torch_tensorrt",
     deps = [
+        ":include_serialization_relative",
         "//core/runtime:include",
     ],
 )
@@ -68,9 +69,40 @@ pkg_files(
     prefix = "include/torch_tensorrt/executorch/",
 )
 
+pkg_files(
+    name = "include_serialization_pkg_files",
+    srcs = [
+        "//cpp:serialization_api_headers",
+    ],
+    prefix = "include/torch_tensorrt/serialization/",
+)
+
+pkg_tar(
+    name = "include_serialization",
+    srcs = [":include_serialization_pkg_files"],
+    package_dir = "",
+)
+
+pkg_files(
+    name = "include_serialization_relative_pkg_files",
+    srcs = [
+        "//cpp:serialization_api_headers",
+    ],
+    prefix = "serialization/",
+)
+
+pkg_tar(
+    name = "include_serialization_relative",
+    srcs = [":include_serialization_relative_pkg_files"],
+    package_dir = "",
+)
+
 pkg_tar(
     name = "include_executorch",
-    srcs = [":include_executorch_pkg_files"],
+    srcs = [
+        ":include_executorch_pkg_files",
+        ":include_serialization_pkg_files",
+    ],
     package_dir = "",
 )
 

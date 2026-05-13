@@ -89,6 +89,7 @@ cc_library(
         "-lstdc++fs",
     ],
     deps = [
+        "//cpp:tensorrt_serialization",
         "//core/plugins:torch_tensorrt_plugins",
         "//core/util:prelude",
     ] + if_torch_nccl(["@torch_nccl//:nccl_headers"]) + select({

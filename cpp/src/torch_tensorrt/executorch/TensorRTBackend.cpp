@@ -102,26 +102,22 @@ nvinfer1::Dims to_trt_dims(const exec_aten::Tensor& t) {
   return dims;
 }
 
-// Keep this local to the ExecuTorch backend: it reconstructs delegate argument
-// order from TensorRT IO names without depending on the core/runtime stack.
 bool infer_binding_names(
     nvinfer1::ICudaEngine* engine,
     std::vector<std::string>& inputs,
     std::vector<std::string>& outputs) {
-  inputs.clear();
-  outputs.clear();
-  for (int32_t i = 0; i < engine->getNbIOTensors(); ++i) {
-    const char* raw_name = engine->getIOTensorName(i);
-    if (raw_name == nullptr) {
-      return false;
-    }
-    const std::string name(raw_name);
-    auto& target = engine->getTensorIOMode(name.c_str()) == nvinfer1::TensorIOMode::kINPUT ? inputs : outputs;
-    if (!detail::append_binding_name(target, name)) {
-      return false;
-    }
+  if (engine == nullptr) {
+    return false;
   }
-  return detail::all_binding_names_present(inputs) && detail::all_binding_names_present(outputs);
+
+  detail::TensorRTBindingNames binding_names;
+  if (!detail::infer_engine_binding_names(*engine, binding_names)) {
+    return false;
+  }
+
+  inputs = std::move(binding_names.input_names);
+  outputs = std::move(binding_names.output_names);
+  return true;
 }
 
 Error initialize_engine_io(EngineHandle& handle) {

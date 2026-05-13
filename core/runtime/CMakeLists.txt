@@ -29,6 +29,7 @@ target_sources(${lib_name}
 target_include_directories(${lib_name}
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/cpp/include>"
 )
 
 target_link_libraries(${lib_name}

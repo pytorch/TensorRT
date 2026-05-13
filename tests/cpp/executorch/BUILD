@@ -14,7 +14,7 @@ cc_test(
     name = "test_executorch_binding_names",
     srcs = ["test_executorch_binding_names.cpp"],
     deps = [
-        "//cpp:tensorrt_executorch_binding_names",
+        "//cpp:tensorrt_serialization",
         "@googletest//:gtest_main",
     ],
 )

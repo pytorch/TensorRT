@@ -831,7 +831,6 @@ def get_x86_64_requirements(base_requirements):
     else:
         requirements = requirements + [
             "torch>=2.13.0.dev,<2.14.0",
-            "executorch>=1.2.0",
         ]
         if USE_TRT_RTX:
             return requirements + [
@@ -839,6 +838,7 @@ def get_x86_64_requirements(base_requirements):
             ]
         else:
             requirements = requirements + [
+                "executorch>=1.2.0",
                 "tensorrt>=10.16.1,<10.17.0",
             ]
             cuda_version = torch.version.cuda
