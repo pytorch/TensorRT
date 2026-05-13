@@ -44,7 +44,6 @@ pkg_tar(
     ],
 )
 
-
 pkg_tar(
     name = "include_rt",
     package_dir = "include/torch_tensorrt",
@@ -130,7 +129,7 @@ pkg_tar(
     name = "executorch_source_package_root",
     srcs = [":executorch_source_package_root_files"],
     mode = "0644",
-    package_dir = "libtorchtrt_executorch",
+    package_dir = "src/torch_tensorrt",
     strip_prefix = "libtorchtrt_executorch",
 )
 
@@ -139,33 +138,16 @@ filegroup(
     srcs = [
         "LICENSE",
         "cmake/Modules/FindTensorRT.cmake",
-        "examples/executorch_reference_runner/CMakeLists.txt",
-        "examples/executorch_reference_runner/README.md",
-        "examples/executorch_reference_runner/main.cpp",
         "//core/runtime:DeviceList.cpp",
         "//core/runtime:Platform.cpp",
-        "//core/runtime:Platform.h",
         "//core/runtime:RTDevice.cpp",
-        "//core/runtime:RTDevice.h",
         "//core/runtime:TRTEngine.cpp",
-        "//core/runtime:TRTEngine.h",
         "//core/runtime:TRTEngineProfiler.cpp",
-        "//core/runtime:TRTEngineProfiler.h",
         "//core/runtime:runtime.cpp",
-        "//core/runtime:runtime.h",
         "//core/runtime:runtime_utils.cpp",
-        "//core/runtime/executorch:TensorRTBackend.cpp",
-        "//core/runtime/executorch:TensorRTBackend.h",
         "//core/util:Exception.cpp",
-        "//core/util:Exception.h",
-        "//core/util:build_info.h",
-        "//core/util:jit_util.h",
-        "//core/util:macros.h",
-        "//core/util:prelude.h",
         "//core/util:trt_util.cpp",
-        "//core/util:trt_util.h",
         "//core/util/logging:TorchTRTLogger.cpp",
-        "//core/util/logging:TorchTRTLogger.h",
     ],
 )
 
@@ -173,8 +155,55 @@ pkg_tar(
     name = "executorch_source_package",
     srcs = [":executorch_source_package_files"],
     mode = "0644",
-    package_dir = "libtorchtrt_executorch",
+    package_dir = "src/torch_tensorrt",
     strip_prefix = ".",
+)
+
+filegroup(
+    name = "executorch_backend_source_package_files",
+    srcs = [
+        "//core/runtime/executorch:TensorRTBackend.cpp",
+    ],
+)
+
+pkg_tar(
+    name = "executorch_backend_source_package",
+    srcs = [":executorch_backend_source_package_files"],
+    mode = "0644",
+    package_dir = "src/torch_tensorrt/core/runtime/executorch",
+    strip_prefix = "core/runtime/executorch",
+)
+
+filegroup(
+    name = "executorch_include_package_files",
+    srcs = [
+        "//core/runtime/executorch:TensorRTBackend.h",
+    ],
+)
+
+pkg_tar(
+    name = "executorch_include_package",
+    srcs = [":executorch_include_package_files"],
+    mode = "0644",
+    package_dir = "include/torch_tensorrt/core/runtime/executorch",
+    strip_prefix = "core/runtime/executorch",
+)
+
+filegroup(
+    name = "executorch_reference_runner_package_files",
+    srcs = [
+        "examples/executorch_reference_runner/CMakeLists.txt",
+        "examples/executorch_reference_runner/README.md",
+        "examples/executorch_reference_runner/main.cpp",
+    ],
+)
+
+pkg_tar(
+    name = "executorch_reference_runner_package",
+    srcs = [":executorch_reference_runner_package_files"],
+    mode = "0644",
+    package_dir = "examples/executorch_reference_runner",
+    strip_prefix = "examples/executorch_reference_runner",
 )
 
 # Non-Windows tar target for lib_rt
@@ -198,13 +227,13 @@ pkg_tar(
 pkg_zip(
     name = "libtorchtrt_zip",
     srcs = [
-        "//core/plugins:impl_include_pkg_files",
+        "//:LICENSE",
         "//core:include_pkg_files",
+        "//core/plugins:impl_include_pkg_files",
         "//core/runtime:include_pkg_files",
         "//core/util:include_pkg_files",
         "//core/util/logging:include_pkg_files",
         "//cpp/lib:lib_pkg_files",
-        "//:LICENSE",
         "//third_party/torch_tensorrt:BUILD",
     ],
     out = "libtorchtrt.zip",
@@ -220,6 +249,11 @@ pkg_tar(
     ],
     package_dir = "torch_tensorrt",
     deps = [
+        ":executorch_backend_source_package",
+        ":executorch_include_package",
+        ":executorch_reference_runner_package",
+        ":executorch_source_package",
+        ":executorch_source_package_root",
         ":include",
         ":include_core",
         ":lib",
@@ -230,16 +264,13 @@ pkg_tar(
     }),
 )
 
-# Combined release tarball. Keep the ExecuTorch backend source package as a
-# top-level sibling of torch_tensorrt/ so it can be consumed independently.
+# Combined release tarball.
 pkg_tar(
     name = "libtorchtrt_tar",
     out = "libtorchtrt.tar.gz",
     extension = "tar.gz",
     package_dir = "",
     deps = [
-        ":executorch_source_package",
-        ":executorch_source_package_root",
         ":torch_tensorrt_package",
     ],
 )

@@ -1,10 +1,8 @@
 import base64
 from types import SimpleNamespace
 
+import executorch.exir  # noqa: F401
 import pytest
-
-executorch = pytest.importorskip("executorch")
-
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
     ENGINE_IDX,
     REQUIRES_OUTPUT_ALLOCATOR_IDX,

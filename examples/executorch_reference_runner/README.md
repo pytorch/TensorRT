@@ -29,22 +29,21 @@ both ExecuTorch and the Torch-TensorRT ExecuTorch source package, and linking
 
 ```bash
 # get the executorch source code
-git clone https://github.com/pytorch/executorch.git
+git clone --branch release/1.3 --depth 1 --recurse-submodules --shallow-submodules https://github.com/pytorch/executorch.git
 # download the libtorchtrt.tar.gz
 tar xvf libtorchtrt.tar.gz
 
 export EXECUTORCH_SOURCE_DIR=/path/to/executorch
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${PWD}/libtorchtrt_executorch"
+export TORCHTRT_PACKAGE_DIR="${PWD}/torch_tensorrt"
+export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt"
 export TensorRT_ROOT=/path/to/extracted/TensorRT
-export CMAKE_PREFIX_PATH=$(python -c "import torch; print(torch.utils.cmake_prefix_path)")
 export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
-cmake -S "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/examples/executorch_reference_runner" \
+cmake -S "${TORCHTRT_PACKAGE_DIR}/examples/executorch_reference_runner" \
   -B build-executorch-reference-runner \
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}" \
-  -DTensorRT_ROOT="${TensorRT_ROOT}" \
-  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+  -DTensorRT_ROOT="${TensorRT_ROOT}"
 
 cmake --build build-executorch-reference-runner --target my_runner -j
 ```

@@ -240,34 +240,43 @@ fi
 
 tar -xzf "${tarball}" -C "${verify_root}"
 
-# Check the release tarball contract used by the README: libtorchtrt_executorch
-# must be a top-level source package, separate from torch_tensorrt/.
+# Check the release tarball contract used by the README. The ExecuTorch source
+# package and reference runner live under the single torch_tensorrt/ top level.
 tar_entries="${verify_root}/libtorchtrt_tar_entries.txt"
 tar -tf "${tarball}" > "${tar_entries}"
-grep -qx "libtorchtrt_executorch/CMakeLists.txt" "${tar_entries}"
-grep -qx "libtorchtrt_executorch/examples/executorch_reference_runner/CMakeLists.txt" "${tar_entries}"
 grep -qx "torch_tensorrt/BUILD" "${tar_entries}"
+grep -qx "torch_tensorrt/bin/torchtrtc" "${tar_entries}"
+grep -qx "torch_tensorrt/include/torch_tensorrt/core/runtime/runtime.h" "${tar_entries}"
+grep -qx "torch_tensorrt/include/torch_tensorrt/core/runtime/executorch/TensorRTBackend.h" "${tar_entries}"
+grep -qx "torch_tensorrt/lib/libtorchtrt.so" "${tar_entries}"
+grep -qx "torch_tensorrt/lib/libtorchtrt_plugins.so" "${tar_entries}"
+grep -qx "torch_tensorrt/lib/libtorchtrt_runtime.so" "${tar_entries}"
+grep -qx "torch_tensorrt/src/torch_tensorrt/CMakeLists.txt" "${tar_entries}"
+grep -qx "torch_tensorrt/src/torch_tensorrt/core/runtime/executorch/TensorRTBackend.cpp" "${tar_entries}"
+grep -qx "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt" "${tar_entries}"
 
-if grep -q "^torch_tensorrt/libtorchtrt_executorch/" "${tar_entries}"; then
-  echo "libtorchtrt_executorch must be a top-level tar entry, not nested under torch_tensorrt/" >&2
+if grep -Eq '(^|/)libtorchtrt_executorch/' "${tar_entries}"; then
+  echo "libtorchtrt_executorch must not appear in libtorchtrt.tar.gz" >&2
+  exit 1
+fi
+if grep -Eq '^torch_tensorrt/src/torch_tensorrt/executorch/' "${tar_entries}"; then
+  echo "torch_tensorrt/src/torch_tensorrt/executorch must not appear in libtorchtrt.tar.gz" >&2
   exit 1
 fi
 
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${verify_root}/libtorchtrt_executorch"
-
-if [[ -z "${CMAKE_PREFIX_PATH:-}" ]]; then
-  CMAKE_PREFIX_PATH="$("${python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)")"
-  export CMAKE_PREFIX_PATH
-fi
+export TORCHTRT_PACKAGE_DIR="${verify_root}/torch_tensorrt"
+# Exercise the runner's compatibility path for callers that still pass the
+# historical ExecuTorch subdirectory. The runner normalizes this to
+# ${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt.
+export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_PACKAGE_DIR}/src/torch_tensorrt/executorch"
 
 # Configure the example exactly as an end user would after unpacking
 # libtorchtrt.tar.gz.
 cmake_args=(
-  -S "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/examples/executorch_reference_runner"
+  -S "${TORCHTRT_PACKAGE_DIR}/examples/executorch_reference_runner"
   -B "${verify_root}/build-executorch-reference-runner"
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}"
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}"
-  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
   -DPYTHON_EXECUTABLE="${python_executable}"
 )
 

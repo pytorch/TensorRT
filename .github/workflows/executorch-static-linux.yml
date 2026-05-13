@@ -71,10 +71,10 @@ jobs:
         set -euo pipefail
         EXECUTORCH_SRC="${RUNNER_TEMP}/executorch"
 
-        git clone --depth 1 --recurse-submodules --shallow-submodules \
+        git clone --depth 1 --branch release/1.3 --recurse-submodules --shallow-submodules \
            https://github.com/pytorch/executorch.git "${EXECUTORCH_SRC}"
         export EXECUTORCH_SOURCE_DIR="${EXECUTORCH_SRC}"
-       
+
         BAZELISK_VERSION="1.26.0"
         case "$(uname -m)" in
           aarch64|arm64)
