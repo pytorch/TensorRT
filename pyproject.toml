@@ -76,11 +76,15 @@ debug = [
 ]
 
 test = [
-    "pytest",
-    "pytest-xdist",
-    "pytest-forked>=1.6.0",
-    "parameterized>=0.2.0",
     "expecttest==0.1.6",
+    "networkx",
+    "numpy",
+    "parameterized>=0.2.0",
+    "pytest>=8.2.1",
+    "pytest-forked>=1.6.0",
+    "pytest-xdist>=3.6.1",
+    "pyyaml",
+    "setuptools",
 ]
 
 test-ext = [
@@ -88,7 +92,6 @@ test-ext = [
     "transformers>=5.0.0",
     "torchvision>=0.27.0.dev,<0.28.0",
     "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
-    #"nvidia-modelopt[hf]@git+https://github.com/NVIDIA/Model-Optimizer.git; python_version >'3.10' and python_version <'3.14'"
 ]
 
 docs = [
@@ -102,7 +105,9 @@ docs = [
     "pillow",
 ]
 
-quantization = ["nvidia-modelopt[hf]>=0.43.0"]
+quantization = [
+    "nvidia-modelopt[hf]>=0.43.0; python_version > '3.9' and python_version < '3.13'",
+]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"

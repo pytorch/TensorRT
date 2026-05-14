@@ -3,6 +3,7 @@
 import logging
 from typing import Dict, Sequence, Tuple, Union
 
+import tensorrt as trt
 from torch.fx.node import Argument, Target
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -16,8 +17,6 @@ from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_all_reduce_op,
     tensorrt_fused_nccl_reduce_scatter_op,
 )
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -55,12 +54,15 @@ if ENABLED_FEATURES.native_trt_collectives:
         name: str,
     ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
         """Reduce-scatter using native TensorRT DistCollective API"""
+        # Fused node args: (inp, reduce_op, group_size, group_name)
+        reduce_op = args[1] if len(args) > 1 else "sum"
         return impl.nccl_ops.nccl_reduce_scatter_native(
             ctx,
             target,
             SourceIR.ATEN,
             name,
             [args[0]],
+            reduce_op=reduce_op,
         )
 
     @dynamo_tensorrt_converter(

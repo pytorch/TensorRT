@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 #include "NvInfer.h"
+#include "c10/cuda/CUDACachingAllocator.h"
 #include "c10/cuda/CUDAStream.h"
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 #include "torch/cuda.h"
@@ -48,6 +49,24 @@ void* DynamicOutputAllocator::reallocateOutputAsync(
 
 void DynamicOutputAllocator::notifyShape(char const* tensorName, nvinfer1::Dims const& dims) noexcept {
   shapes[tensorName] = dims;
+}
+
+void TRTEngine::clear_active_input_tensors() {
+  active_input_tensors.clear();
+  active_shape_tensor_values.clear();
+}
+
+void TRTEngine::reset_active_input_tensors() {
+  clear_active_input_tensors();
+  active_input_tensors.resize(num_io.first);
+}
+
+void TRTEngine::record_active_input_tensor_stream_usage(const c10::cuda::CUDAStream& stream) {
+  for (const auto& input : active_input_tensors) {
+    if (input.defined() && input.is_cuda() && input.has_storage() && input.numel() > 0) {
+      c10::cuda::CUDACachingAllocator::recordStream(input.storage().data_ptr(), stream);
+    }
+  }
 }
 
 TRTEngine::TRTEngine(
@@ -163,12 +182,12 @@ TRTEngine::TRTEngine(
     out_binding_map = std::move(binding_names.output_map);
     in_binding_names = std::move(binding_names.input_names);
     out_binding_names = std::move(binding_names.output_names);
-    input_buffers.resize(num_io.first);
-    output_buffers.resize(num_io.second);
+    cudagraph_input_staging_buffers.resize(num_io.first);
+    cudagraph_output_staging_buffers.resize(num_io.second);
   } else {
     uint64_t inputs_size = _in_binding_names.size();
     in_binding_names.resize(inputs_size);
-    input_buffers.resize(inputs_size);
+    cudagraph_input_staging_buffers.resize(inputs_size);
     for (uint64_t pyt_idx = 0; pyt_idx < inputs_size; pyt_idx++) {
       auto binding_name = _in_binding_names[pyt_idx];
       // Check if the binding name provided is in the list of engine's bindings
@@ -198,7 +217,7 @@ TRTEngine::TRTEngine(
 
     uint64_t outputs = _out_binding_names.size();
     out_binding_names.resize(outputs);
-    output_buffers.resize(outputs);
+    cudagraph_output_staging_buffers.resize(outputs);
     for (size_t pyt_idx = 0; pyt_idx < outputs; pyt_idx++) {
       auto binding_name = _out_binding_names[pyt_idx];
       // Check if the binding name provided is in the list of engine's bindings

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0d6c091b"></script>
+    <script src="../_static/documentation_options.js?v=0f8183b3"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -669,7 +669,7 @@ to select device type.</p>
 <li><p><strong>inputs</strong> (<em>Union</em><em>[</em><em>torch.Tensor</em><em>, </em><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt.Input"><em>Input</em></a><em>]</em>) – Torch input tensors or Input specifications</p></li>
 <li><p><strong>arg_inputs</strong> (<em>Tuple</em><em>[</em><em>Union</em><em>[</em><em>torch.Tensor</em><em>, </em><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt.Input"><em>Input</em></a><em>]</em><em>, </em><em>...</em><em>]</em>) – Same as inputs. Alias for better understanding with kwarg_inputs.</p></li>
 <li><p><strong>kwarg_inputs</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>Union</em><em>[</em><em>torch.Tensor</em><em>, </em><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt.Input"><em>Input</em></a><em>]</em><em>]</em>) – Optional, kwarg inputs to the module forward function.</p></li>
-<li><p><strong>output_format</strong> (<em>str</em>) – Format to save the model. Options include exported_program | torchscript | aot_inductor.</p></li>
+<li><p><strong>output_format</strong> (<em>str</em>) – Format to save the model. Options include exported_program | torchscript | aot_inductor | executorch.</p></li>
 <li><p><strong>retrace</strong> (<em>bool</em>) – <p>When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.</p>
 <p>For TRT-compiled modules with dynamic shapes, both retrace=True and retrace=False are supported:</p>
 <ul>
@@ -735,6 +735,9 @@ equality constraints. Use explicit dynamic_shapes for these cases.</p></li>
 parameter takes precedence.</p></li>
 </ul>
 </p></li>
+<li><p><strong>kwargs</strong> – Additional format-specific kwargs. <code class="docutils literal notranslate"><span class="pre">partitioners=</span></code> is only used
+with <code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code>; otherwise it is ignored with
+a warning.</p></li>
 </ul>
 </dd>
 </dl>

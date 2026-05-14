@@ -24,7 +24,7 @@ will result in a minor version bump and significant bug fixes will result in a p
 4. Version bump PR
     - There should be a PR which will be the PR that bumps the actual version of the library, this PR should contain the following
         - Bump version in `py/setup.py`
-        - Make sure dependency versions are updated in `py/requirements.txt`, `tests/py/requirements.txt` and `py/setup.py`
+        - Make sure dependency versions are updated in `py/requirements.txt`, `pyproject.toml` dependency groups, and `py/setup.py`
         - Bump version in `cpp/include/macros.h`
         - Add new link to doc versions in `docsrc/conf.py`
         - Generate frozen docs for new version
