@@ -514,22 +514,114 @@ def inline_trt_modules(
                 )
             # set trt_node.meta with trt_module_node.meta
             assert num_outputs > 0
-            trt_node.meta["val"] = trt_module_node.meta["val"]
 
+            # Filter SymInt entries from meta["val"]:
+            # The partitioner can include ops like aten.sym_size.int inside a
+            # TRT subgraph. Their outputs are SymInts at the FX level even
+            # though the TRT engine boundary can only emit tensors. That
+            # leaves a SymInt sitting in meta["val"] of a Tensor[]-returning
+            # op, which breaks torch.export.serialize. Strip those entries
+            # here and record a remap so we can re-derive each one downstream
+            # from a tensor output's shape.
+            orig_val = trt_module_node.meta["val"]
+
+            if not isinstance(orig_val, (list, tuple)):
+                if not torch.is_tensor(orig_val):
+                    raise RuntimeError(
+                        f"{trt_module_node.name}: meta['val'] is a single "
+                        f"non-Tensor of type {type(orig_val).__name__}. "
+                        f"execute_engine schema requires Tensor[]."
+                    )
+                trt_node.meta["val"] = orig_val
+                symint_remap: Dict[int, Tuple[int, int]] = {}
+            else:
+                new_val = []
+                symint_remap = {}
+                for _i, _v in enumerate(orig_val):
+                    if torch.is_tensor(_v):
+                        new_val.append(_v)
+                    elif isinstance(_v, torch.SymInt):
+                        found = None
+                        for _j, _cand in enumerate(orig_val):
+                            if not torch.is_tensor(_cand):
+                                continue
+                            for _d, _sz in enumerate(_cand.shape):
+                                if (
+                                    isinstance(_sz, torch.SymInt)
+                                    and _sz.node.expr == _v.node.expr
+                                ):
+                                    _new_j = sum(
+                                        1
+                                        for _x in orig_val[:_j]
+                                        if torch.is_tensor(_x)
+                                    )
+                                    found = (_new_j, _d)
+                                    break
+                            if found:
+                                break
+                        if found is None:
+                            raise RuntimeError(
+                                f"Could not re-derive SymInt output #{_i}"
+                                f"={_v!r} of {trt_module_node.name} from any "
+                                f"tensor output's shape. Partitioner produced "
+                                f"an unrecoverable SymInt output."
+                            )
+                        symint_remap[_i] = found
+                    else:
+                        raise RuntimeError(
+                            f"Unexpected non-Tensor output #{_i} of "
+                            f"{trt_module_node.name}: type="
+                            f"{type(_v).__name__} value={_v!r}"
+                        )
+                trt_node.meta["val"] = type(orig_val)(new_val)
+
+        # ----- Sub-task B: rewire downstream getitem users -----
         if num_outputs == 1:
-            # Insert getitem nodes as outputs (for export serialization to work)
+            # Single-output engine: partitioner did not insert a getitem.
+            # Add one ourselves to unbox the single Tensor[] entry into a
+            # plain Tensor for the downstream consumer (typically the
+            # graph's output node).
             with gm.graph.inserting_after(trt_node):
                 getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
                 getitem_output.meta["val"] = trt_node.meta["val"]
             trt_module_node.replace_all_uses_with(getitem_output)
         else:
-            # Multiple outputs case:
-            # Replace uses of submodule with the trt_node.
-            # getitem nodes are already added inherently by the partitioner
             trt_module_node.replace_all_uses_with(trt_node)
-            getitem_nodes = trt_node.users
-            for idx, getitem_node in enumerate(getitem_nodes):
-                getitem_node.meta["val"] = trt_node.meta["val"][idx]
+            getitem_nodes = list(trt_node.users)
+            for getitem_node in getitem_nodes:
+                if (
+                    getitem_node.op != "call_function"
+                    or getitem_node.target is not operator.getitem
+                ):
+                    continue
+                parent, old_idx = getitem_node.args
+                if old_idx in symint_remap:
+                    # Was a SymInt slot. Replace with sym_size(g(trt, new_idx), dim).
+                    new_idx, dim = symint_remap[old_idx]
+                    with gm.graph.inserting_before(getitem_node):
+                        tensor_get = gm.graph.call_function(
+                            operator.getitem, (trt_node, new_idx)
+                        )
+                        tensor_get.meta["val"] = trt_node.meta["val"][new_idx]
+                        sym_size_node = gm.graph.call_function(
+                            torch.ops.aten.sym_size.int, (tensor_get, dim)
+                        )
+                        sym_size_node.meta["val"] = (
+                            trt_node.meta["val"][new_idx].shape[dim]
+                        )
+                    getitem_node.replace_all_uses_with(sym_size_node)
+                    gm.graph.erase_node(getitem_node)
+                else:
+                    # Was a tensor slot. Renumber to its position in the
+                    # filtered list.
+                    new_idx = sum(
+                        1
+                        for _k in range(old_idx)
+                        if torch.is_tensor(orig_val[_k])
+                    )
+                    if new_idx != old_idx:
+                        getitem_node.args = (parent, new_idx)
+                    getitem_node.meta["val"] = trt_node.meta["val"][new_idx]
 
         # Erase the TRT submodule (call_module) node.
         gm.graph.erase_node(trt_module_node)
