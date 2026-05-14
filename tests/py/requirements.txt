@@ -1,3 +1,6 @@
+# Compatibility stub for tooling that still expects this file to exist.
+# Shared test dependencies live in pyproject.toml dependency groups.
+
 # This file is specifically to install correct version of libraries during CI testing.
 # networkx library issue: https://discuss.pytorch.org/t/installing-pytorch-under-python-3-8-question-about-networkx-version/196740
 expecttest
