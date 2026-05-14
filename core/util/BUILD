@@ -1,6 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -153,11 +154,27 @@ cc_library(
     alwayslink = True,
 )
 
+cc_library(
+    name = "file_lock",
+    srcs = [
+        "file_lock.cpp",
+    ],
+    hdrs = [
+        "file_lock.h",
+    ],
+    linkopts = select({
+        ":windows": [],
+        "//conditions:default": ["-lstdc++fs"],
+    }),
+    alwayslink = True,
+)
+
 filegroup(
     name = "include_files",
     srcs = [
         "Exception.h",
         "build_info.h",
+        "file_lock.h",
         "jit_util.h",
         "macros.h",
         "prelude.h",
@@ -175,6 +192,6 @@ pkg_tar(
 pkg_files(
     name = "include_pkg_files",
     srcs = ["//core/util:include_files"],
-    visibility = ["//visibility:public"],
     prefix = "include/torch_tensorrt/core/util/",
+    visibility = ["//visibility:public"],
 )
