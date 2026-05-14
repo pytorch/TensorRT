@@ -14,10 +14,6 @@ set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/torch_tensorrt/torch_tensorrt.h"
 )
 
-set(SERIALIZATION_HEADER_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/torch_tensorrt/serialization/TensorRTBindingNames.h"
-)
-
 target_sources(${lib_name}
     PRIVATE
         ${CXX_SRCS}
@@ -90,7 +86,6 @@ target_include_directories(${torchtrt_lib_name}
 )
 
 install(FILES ${HEADER_FILES} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/torch_tensorrt/")
-install(FILES ${SERIALIZATION_HEADER_FILES} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/torch_tensorrt/serialization/")
 
 ################################
 # API library torchtrt_runtime #

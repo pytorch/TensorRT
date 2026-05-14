@@ -77,8 +77,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           serialized_info[NAME_IDX],
           serialized_info[ENGINE_IDX],
           RTDevice(serialized_info[DEVICE_IDX]),
-          serialization::split_serialized_binding_names(serialized_info[INPUT_BINDING_NAMES_IDX]),
-          serialization::split_serialized_binding_names(serialized_info[OUTPUT_BINDING_NAMES_IDX]),
+          split_serialized_binding_names(serialized_info[INPUT_BINDING_NAMES_IDX]),
+          split_serialized_binding_names(serialized_info[OUTPUT_BINDING_NAMES_IDX]),
           Platform(serialized_info[TARGET_PLATFORM_IDX]),
           static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX])),
           static_cast<bool>(std::stoi(serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])),
@@ -152,9 +152,9 @@ TRTEngine::TRTEngine(
   runtime_states.context_changed = false;
 
   if (_in_binding_names.size() == 0 && _out_binding_names.size() == 0) {
-    serialization::TensorRTBindingNames binding_names;
+    TensorRTBindingNames binding_names;
     TORCHTRT_CHECK(
-        serialization::infer_engine_binding_names(*cuda_engine, binding_names),
+        infer_engine_binding_names(*cuda_engine, binding_names),
         "Unable to determine binding indices from TensorRT engine binding names"
             << "\nEnsure module was compiled with Torch-TensorRT.ts or follows Torch-TensorRT Runtime conventions");
 

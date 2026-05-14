@@ -12,7 +12,8 @@
 #include <vector>
 
 namespace torch_tensorrt {
-namespace serialization {
+namespace core {
+namespace runtime {
 
 inline constexpr char kBindingNameDelimiter = '%';
 
@@ -129,5 +130,6 @@ inline bool infer_engine_binding_names(const nvinfer1::ICudaEngine& engine, Tens
   return true;
 }
 
-} // namespace serialization
+} // namespace runtime
+} // namespace core
 } // namespace torch_tensorrt

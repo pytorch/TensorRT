@@ -1,4 +1,4 @@
-#include "torch_tensorrt/serialization/TensorRTBindingNames.h"
+#include "core/runtime/TensorRTBindingNames.h"
 
 #include "gtest/gtest.h"
 
@@ -7,7 +7,8 @@
 #include <vector>
 
 namespace torch_tensorrt {
-namespace serialization {
+namespace core {
+namespace runtime {
 namespace {
 
 TEST(ExecuTorchBindingNames, ParseBindingIndexAcceptsDotAndUnderscoreSuffixes) {
@@ -67,5 +68,6 @@ TEST(ExecuTorchBindingNames, SerializeAndSplitBindingNamesUseSharedDelimiter) {
 }
 
 } // namespace
-} // namespace serialization
+} // namespace runtime
+} // namespace core
 } // namespace torch_tensorrt

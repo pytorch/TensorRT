@@ -13,9 +13,9 @@
 #include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
+#include "core/runtime/TensorRTBindingNames.h"
 #include "core/runtime/TRTEngineProfiler.h"
 #include "core/util/prelude.h"
-#include "torch_tensorrt/serialization/TensorRTBindingNames.h"
 
 // TensorRT 10.16+ has native NCCL collective support via IExecutionContext::setCommunicator()
 #if NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 16)
@@ -187,7 +187,7 @@ struct TRTEngine : torch::CustomClassHolder {
   bool are_output_tensors_unowned();
   TorchTRTRuntimeStates runtime_states;
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
-  static constexpr char BINDING_DELIM = ::torch_tensorrt::serialization::kBindingNameDelimiter;
+  static constexpr char BINDING_DELIM = kBindingNameDelimiter;
 
   // Serde re-export functionality
   FlattenedState __obj_flatten__();

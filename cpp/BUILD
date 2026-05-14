@@ -86,22 +86,6 @@ cc_library(
 )
 
 cc_library(
-    name = "tensorrt_serialization",
-    hdrs = [
-        "include/torch_tensorrt/serialization/TensorRTBindingNames.h",
-    ],
-    strip_include_prefix = "include",
-    deps = select({
-        ":jetpack": ["@tensorrt_l4t//:nvinfer"],
-        ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
-        ":rtx_win": ["@tensorrt_rtx_win//:nvinfer"],
-        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
-        ":windows": ["@tensorrt_win//:nvinfer"],
-        "//conditions:default": ["@tensorrt//:nvinfer"],
-    }),
-)
-
-cc_library(
     name = "tensorrt_executorch_blob_header",
     srcs = [
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
@@ -119,7 +103,7 @@ cc_library(
     ],
     strip_include_prefix = "include",
     deps = [
-        ":tensorrt_serialization",
+        "//core/runtime:tensorrt_binding_names",
     ],
 )
 
@@ -170,19 +154,11 @@ filegroup(
 )
 
 filegroup(
-    name = "serialization_api_headers",
-    srcs = [
-        "include/torch_tensorrt/serialization/TensorRTBindingNames.h",
-    ],
-)
-
-filegroup(
     name = "api_headers",
     srcs = glob(
         ["include/**/*.h"],
         exclude = [
             "include/torch_tensorrt/executorch/**/*.h",
-            "include/torch_tensorrt/serialization/**/*.h",
         ],
     ),
 )

@@ -15,16 +15,16 @@
 #include <string>
 #include <vector>
 
+#include "core/runtime/TensorRTBindingNames.h"
 #include "core/runtime/runtime.h"
 #include "core/util/macros.h"
-#include "torch_tensorrt/serialization/TensorRTBindingNames.h"
 
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
 std::string serialize_bindings(const std::vector<std::string>& bindings) {
-  std::string serialized_binding_info = serialization::serialize_binding_names(bindings);
+  std::string serialized_binding_info = serialize_binding_names(bindings);
 
   LOG_DEBUG("Serialized Binding Info: " << serialized_binding_info);
 

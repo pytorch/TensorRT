@@ -37,6 +37,14 @@ target_include_directories(executorch_trt_backend
         "${CMAKE_CURRENT_LIST_DIR}/../../../include"
 )
 
+get_filename_component(_torchtrt_repo_root "${CMAKE_CURRENT_LIST_DIR}/../../../.." ABSOLUTE)
+if(EXISTS "${_torchtrt_repo_root}/core/runtime/TensorRTBindingNames.h")
+    target_include_directories(executorch_trt_backend
+        PUBLIC
+            "${_torchtrt_repo_root}"
+    )
+endif()
+
 target_compile_definitions(executorch_trt_backend
     PUBLIC
         C10_USING_CUSTOM_GENERATED_MACROS

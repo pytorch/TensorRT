@@ -1,19 +1,23 @@
 #pragma once
 
-#include "torch_tensorrt/serialization/TensorRTBindingNames.h"
+#if __has_include("torch_tensorrt/core/runtime/TensorRTBindingNames.h")
+#include "torch_tensorrt/core/runtime/TensorRTBindingNames.h"
+#else
+#include "core/runtime/TensorRTBindingNames.h"
+#endif
 
 namespace torch_tensorrt {
 namespace executorch_backend {
 namespace detail {
 
-using ::torch_tensorrt::serialization::all_binding_names_present;
-using ::torch_tensorrt::serialization::append_binding_name;
-using ::torch_tensorrt::serialization::infer_engine_binding_names;
-using ::torch_tensorrt::serialization::kBindingNameDelimiter;
-using ::torch_tensorrt::serialization::parse_binding_index;
-using ::torch_tensorrt::serialization::serialize_binding_names;
-using ::torch_tensorrt::serialization::split_serialized_binding_names;
-using ::torch_tensorrt::serialization::TensorRTBindingNames;
+using ::torch_tensorrt::core::runtime::all_binding_names_present;
+using ::torch_tensorrt::core::runtime::append_binding_name;
+using ::torch_tensorrt::core::runtime::infer_engine_binding_names;
+using ::torch_tensorrt::core::runtime::kBindingNameDelimiter;
+using ::torch_tensorrt::core::runtime::parse_binding_index;
+using ::torch_tensorrt::core::runtime::serialize_binding_names;
+using ::torch_tensorrt::core::runtime::split_serialized_binding_names;
+using ::torch_tensorrt::core::runtime::TensorRTBindingNames;
 
 } // namespace detail
 } // namespace executorch_backend
