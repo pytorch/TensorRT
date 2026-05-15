@@ -199,6 +199,8 @@ pkg_tar(
 pkg_tar(
     name = "bin",
     srcs = ["//cpp/bin/torchtrtc"] + select({
+        ":rtx_win": [],
+        ":windows": [],
         ":jetpack": [],
         ":rtx_x86_64": [],
         "//conditions:default": [
@@ -239,6 +241,8 @@ pkg_tar(
         ":include_core",
         ":lib",
     ] + select({
+        ":rtx_win": [],
+        ":windows": [],
         ":jetpack": [],
         ":rtx_x86_64": [],
         "//conditions:default": [
