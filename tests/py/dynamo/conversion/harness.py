@@ -374,6 +374,7 @@ class DispatchTestCase(TRTTestCase):
         decompose_attention=False,
         attn_bias_is_causal=True,
         require_full_compilation=False,
+        disable_tf32=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -386,6 +387,7 @@ class DispatchTestCase(TRTTestCase):
             decompose_attention=decompose_attention,
             attn_bias_is_causal=attn_bias_is_causal,
             require_full_compilation=require_full_compilation,
+            disable_tf32=disable_tf32,
         )
 
         mod = self.generate_graph(
