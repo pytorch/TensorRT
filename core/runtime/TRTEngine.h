@@ -14,8 +14,8 @@
 #include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
-#include "core/runtime/TensorRTBindingNames.h"
 #include "core/runtime/TRTEngineProfiler.h"
+#include "core/runtime/TensorRTBindingNames.h"
 #include "core/util/prelude.h"
 
 // TensorRT 10.16+ has native NCCL collective support via IExecutionContext::setCommunicator()
