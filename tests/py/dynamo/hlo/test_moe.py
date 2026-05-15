@@ -238,6 +238,11 @@ class TestMixtralStyleMoE(DispatchTestCase):
             .to(dtype)
         )
         x = torch.randn(batch, seq, hidden, dtype=dtype)
+        if dtype == torch.float32:
+            # small diff between tf32 and float32 may cause the topk function to choose different experts
+            disable_tf32 = True
+        else:
+            disable_tf32 = False
         self.run_test(
             mod,
             [x],
@@ -247,6 +252,7 @@ class TestMixtralStyleMoE(DispatchTestCase):
             enable_passes=True,
             use_dynamo_tracer=True,
             require_full_compilation=True,
+            disable_tf32=disable_tf32,
         )
 
 
@@ -333,6 +339,11 @@ class TestQwen2StyleMoE(DispatchTestCase):
             .to(dtype)
         )
         x = torch.randn(batch, seq, hidden, dtype=dtype)
+        if dtype == torch.float32:
+            # small diff between tf32 and float32 may cause the topk function to choose different experts
+            disable_tf32 = True
+        else:
+            disable_tf32 = False
         self.run_test(
             mod,
             [x],
@@ -342,6 +353,7 @@ class TestQwen2StyleMoE(DispatchTestCase):
             enable_passes=True,
             use_dynamo_tracer=True,
             require_full_compilation=True,
+            disable_tf32=disable_tf32,
         )
 
 
