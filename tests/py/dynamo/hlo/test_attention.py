@@ -74,10 +74,10 @@ _FLASH_ATTN_SKIP = unittest.skipIf(
     "Flash attention requires Ampere (SM80) or higher, and a PyTorch build with USE_FLASH_ATTENTION=1",
 )
 
-# skip RTX on Windows
-_TRT_RTX_WINDOWS_SKIP = unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx and sys.platform == "win32",
-    "This test is skipped on TensorRT-RTX on Windows",
+# skip on Windows
+_WINDOWS_SKIP = unittest.skipIf(
+    sys.platform == "win32",
+    "This test is skipped on Windows because USE_FLASH_ATTENTION was not enabled for build",
 )
 
 
@@ -417,7 +417,7 @@ class TestSDPA(DispatchTestCase):
 
 
 @_FLASH_ATTN_SKIP
-@_TRT_RTX_WINDOWS_SKIP
+@_WINDOWS_SKIP
 class TestFlashAttention(DispatchTestCase):
     """_scaled_dot_product_flash_attention kernel (Ampere+ required).
 
