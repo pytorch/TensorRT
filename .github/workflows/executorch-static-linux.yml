@@ -73,17 +73,9 @@ jobs:
       fail-on-empty: false
       script: |
         set -euo pipefail
-        EXECUTORCH_SRC="${RUNNER_TEMP}/executorch"
-        EXECUTORCH_REF="${{ inputs.executorch-ref }}"
-        case "${EXECUTORCH_REF}" in
-          ""|"latest"|"latest-main"|"latest_main"|"latest main")
-            EXECUTORCH_REF="main"
-            ;;
-        esac
-
-        git clone --depth 1 --branch "${EXECUTORCH_REF}" --recurse-submodules --shallow-submodules \
-           https://github.com/pytorch/executorch.git "${EXECUTORCH_SRC}"
-        export EXECUTORCH_SOURCE_DIR="${EXECUTORCH_SRC}"
+        export EXECUTORCH_ROOT="${RUNNER_TEMP}/executorch"
+        export EXECUTORCH_REF="${{ inputs.executorch-ref }}"
+        source .github/scripts/setup-executorch-ci.sh || exit 1
        
         BAZELISK_VERSION="1.26.0"
         case "$(uname -m)" in
