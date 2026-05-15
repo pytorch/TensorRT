@@ -13,12 +13,6 @@ Known limitations
     or upgrade to TRT 11.0 or later. TODO: @Evan to verify whether TensorRT-RTX 1.5 resolves
     this bug.
 
-  PyTorch 2.12.0 (resolved in PyTorch 2.13.0):
-    PyTorch 2.12.0's core_aten decomposition expands scaled_dot_product_attention
-    into matmul + _safe_softmax before the TRT converter runs.  No converter
-    is registered for _safe_softmax, so FP32 GQA requires decompose_attention=True.
-    To resolve this issue, please upgrade to PyTorch 2.13.0 or later.
-
 Notes on attn_bias_is_causal
 -----------------------------
   Default True: the force_causal_efficient_attention lowering pass strips
@@ -361,7 +355,7 @@ class TestSDPA(DispatchTestCase):
             ("gqa_32q_8kv_s2048_bf16",   1, 32, 8, 2048, 128, True,  torch.bfloat16,False),  # large causal in bf16
             ("gqa_16q_4kv_s128_fp16",    2, 16, 4,  128,  64, True,  torch.float16, False),
             ("gqa_8q_2kv_nc_fp16",       2,  8, 2,   64,  64, False, torch.float16, False),
-            ("gqa_8q_4kv_fp32",          2,  8, 4,   64,  64, False, torch.float32, False),  # decomposed to _safe_softmax + matmul in torch 2.12.0 but not in 2.13.0
+            ("gqa_8q_4kv_fp32",          2,  8, 4,   64,  64, False, torch.float32, False),
             ("gqa_24q_8kv_fp16",         1, 24, 8,  128, 128, True,  torch.float16, False),  # Llama-3.2-3B
             ("gqa_14q_2kv_fp16",         1, 14, 2,  128,  64, True,  torch.float16, False),  # Qwen2.5-0.5B
             # MQA (kv_heads = 1)
