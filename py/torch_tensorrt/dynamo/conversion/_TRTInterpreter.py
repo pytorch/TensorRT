@@ -313,8 +313,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if self.compilation_settings.disable_tf32:
             builder_config.clear_flag(trt.BuilderFlag.TF32)
-            # NVIDIA_TF32_OVERRIDE=0 is used to disable TF32 accumulation
-            os.environ["NVIDIA_TF32_OVERRIDE"] = "0"
 
         if self.compilation_settings.immutable_weights:
             # non-refittable engine
