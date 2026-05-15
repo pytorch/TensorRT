@@ -569,38 +569,49 @@ def get_trt_tensor(
 
 
 @overload
-def get_positive_dim(dim: int, dim_size: int) -> int: ...
+def get_positive_dim(
+    dim: Union[int, torch.SymInt], dim_size: Union[int, torch.SymInt]
+) -> Union[int, torch.SymInt]: ...
 
 
 @overload
-def get_positive_dim(dim: Sequence[int], dim_size: int) -> Tuple[int, ...]: ...
+def get_positive_dim(
+    dim: Sequence[Union[int, torch.SymInt]], dim_size: Union[int, torch.SymInt]
+) -> Tuple[Union[int, torch.SymInt], ...]: ...
 
 
 def get_positive_dim(
-    dim: Union[int, Sequence[int]], dim_size: int
-) -> Union[int, Tuple[int, ...]]:
+    dim: Union[int, torch.SymInt, Sequence[Union[int, torch.SymInt]]],
+    dim_size: Union[int, torch.SymInt],
+) -> Union[int, torch.SymInt, Tuple[Union[int, torch.SymInt], ...]]:
     """
-    Given an integer number or tuple that represents dimension(s) in the array,
+    Given an integer/SymInt number or tuple that represents dimension(s) in the array,
     transform it to a positive integer dim if it's negative.
     Otherwise, truncate it to the dimension size
 
     Args:
-        dim (Union[int, Sequence[int]]): A integer or Sequence of integers that represent dimension(s) in an array.
-        dim_size (int): The size of the dimension in the array.
+        dim (Union[int, torch.SymInt, Sequence[Union[int, torch.SymInt]]]):
+            A integer/SymInt or Sequence of integer/SymInt values that represent
+            dimension(s) in an array.
+        dim_size (Union[int, torch.SymInt]): The size of the dimension in the array.
 
     Returns:
-        A positive integer or tuple of integers that represent the same dimension as the given dim.
+        A positive integer/SymInt or tuple of integer/SymInt values that represent
+        the same dimension as the given dim.
     """
 
-    def positive_dim(d: int) -> int:
-        if d < 0:
-            return d % dim_size
+    def positive_dim(d: Union[int, torch.SymInt]) -> Union[int, torch.SymInt]:
+        if isinstance(d, torch.SymInt) or isinstance(dim_size, torch.SymInt):
+            return torch.sym_ite(d < 0, d % dim_size, torch.sym_min(d, dim_size))
         else:
-            return min(d, dim_size)
+            if d < 0:
+                return d % dim_size
+            else:
+                return min(d, dim_size)
 
     return (
         positive_dim(dim)
-        if isinstance(dim, int)
+        if isinstance(dim, (int, torch.SymInt))
         else tuple(positive_dim(d) for d in dim)
     )
 
