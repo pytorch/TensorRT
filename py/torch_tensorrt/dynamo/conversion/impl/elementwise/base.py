@@ -3,7 +3,6 @@ import operator
 import warnings
 from typing import Any, Callable, Optional, Union
 
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -19,6 +18,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     to_torch,
 )
 from torch_tensorrt.dynamo.types import TRTElementWiseOp, TRTTensor
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -133,10 +134,16 @@ def convert_binary_elementwise(
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 
+    # Match PyTorch's actual elementwise dtype rules, which use the weak
+    # ZeroDim promotion rule (0-dim fp32 * Nd fp16 -> fp16, not fp32).
+    # torch.promote_types is the strong rule and gives the wrong answer
+    # whenever one operand is a 0-dim tensor of a higher-precision dtype.
+    lhs_torch_dtype = _enums.dtype._from(lhs_val.dtype).to(torch.dtype)
+    rhs_torch_dtype = _enums.dtype._from(rhs_val.dtype).to(torch.dtype)
     promoted_type = _enums.dtype._from(
-        torch.promote_types(
-            _enums.dtype._from(lhs_val.dtype).to(torch.dtype),
-            _enums.dtype._from(rhs_val.dtype).to(torch.dtype),
+        torch.result_type(
+            torch.empty([1] * len(lhs_val.shape), dtype=lhs_torch_dtype),
+            torch.empty([1] * len(rhs_val.shape), dtype=rhs_torch_dtype),
         )
     )
     trt_promoted_type = promoted_type.to(trt.DataType)

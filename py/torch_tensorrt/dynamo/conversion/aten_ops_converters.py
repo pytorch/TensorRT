@@ -6,7 +6,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
-from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
@@ -27,6 +26,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+
+from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -597,8 +598,10 @@ def index_has_bool_indices(
 # case and is checked first via HIGH priority.
 @dynamo_tensorrt_converter(
     torch.ops.aten.index.Tensor,
-    capability_validator=lambda node, settings: index_dtype_validator(node, settings)
-    and not index_has_bool_indices(node, settings),
+    capability_validator=lambda node, settings: (
+        index_dtype_validator(node, settings)
+        and not index_has_bool_indices(node, settings)
+    ),
     priority=ConverterPriority.HIGH,
     supports_dynamic_shapes=True,
     requires_output_allocator=False,
@@ -629,9 +632,11 @@ def aten_ops_index(
 # output shapes, so an output allocator is required.
 @dynamo_tensorrt_converter(
     torch.ops.aten.index.Tensor,
-    capability_validator=lambda node, settings: index_dtype_validator(node, settings)
-    and index_nonbool_validator(node, settings)
-    and index_has_bool_indices(node, settings),
+    capability_validator=lambda node, settings: (
+        index_dtype_validator(node, settings)
+        and index_nonbool_validator(node, settings)
+        and index_has_bool_indices(node, settings)
+    ),
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
@@ -1154,9 +1159,11 @@ def aten_ops_index_put_accumulate(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
-    capability_validator=lambda node, settings: index_dtype_validator(node, settings)
-    and index_nonbool_validator(node, settings)
-    and not args_bounds_check(node.args, 3, False),
+    capability_validator=lambda node, settings: (
+        index_dtype_validator(node, settings)
+        and index_nonbool_validator(node, settings)
+        and not args_bounds_check(node.args, 3, False)
+    ),
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
@@ -1368,8 +1375,8 @@ def to_copy_dtype_validator(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.clone.default,
-    capability_validator=lambda node, settings: not is_only_operator_on_placeholder(
-        node, settings
+    capability_validator=lambda node, settings: (
+        not is_only_operator_on_placeholder(node, settings)
     ),
     supports_dynamic_shapes=True,
 )
@@ -3578,14 +3585,14 @@ def aten_ops_copy(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    src = args[1]
+    dest, src = args[0], args[1]
     return impl.cast.to_copy(
         ctx,
         target,
         SourceIR.ATEN,
         name,
         src,
-        src.dtype,
+        dest.dtype,
         force_layer=True,
     )
 
