@@ -185,7 +185,6 @@ class TestSDPA(DispatchTestCase):
             [q, k, v],
             rtol=1e-2,
             atol=test_atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=use_decompose,
         )
@@ -229,7 +228,6 @@ class TestSDPA(DispatchTestCase):
             [q, k, v],
             rtol=1e-2,
             atol=1e-2,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=False,
         )
@@ -287,7 +285,6 @@ class TestSDPA(DispatchTestCase):
             [q, k, v, mask],
             rtol=1e-2,
             atol=1e-2,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=use_decompose,
         )
@@ -341,7 +338,6 @@ class TestSDPA(DispatchTestCase):
             [q, k, v, mask],
             rtol=1e-2,
             atol=test_atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=use_decompose,
         )
@@ -395,7 +391,6 @@ class TestSDPA(DispatchTestCase):
             [q, k, v],
             rtol=1e-2,
             atol=1e-2,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=use_decompose,
         )
@@ -486,7 +481,6 @@ class TestFlashAttention(DispatchTestCase):
             [q, k, v],
             rtol=1e-2,
             atol=atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=use_decompose,
         )
@@ -529,7 +523,6 @@ class TestFlashAttention(DispatchTestCase):
             [q, k, v],
             rtol=1e-2,
             atol=atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=False,
         )
@@ -586,7 +579,6 @@ class TestFlashAttention(DispatchTestCase):
             [q, k, v],
             rtol=1e-2,
             atol=atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=use_decompose,
         )
@@ -671,7 +663,6 @@ class TestEfficientAttention(DispatchTestCase):
             [q, k, v],
             rtol=1e-2,
             atol=atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=True,
         )
@@ -719,7 +710,6 @@ class TestEfficientAttention(DispatchTestCase):
             [q, k, v, bias],
             rtol=1e-2,
             atol=atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=False,
             attn_bias_is_causal=False,
@@ -761,7 +751,6 @@ class TestEfficientAttention(DispatchTestCase):
             [q, k, v, bias],
             rtol=1e-2,
             atol=atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=False,
             attn_bias_is_causal=False,
@@ -802,7 +791,6 @@ class TestEfficientAttention(DispatchTestCase):
             [q, k, v, bias],
             rtol=1e-2,
             atol=atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=False,
             attn_bias_is_causal=False,
@@ -844,7 +832,6 @@ class TestEfficientAttention(DispatchTestCase):
             [q, k, v, bias],
             rtol=1e-2,
             atol=atol,
-            precision=dtype,
             enable_passes=True,
             decompose_attention=False,
             attn_bias_is_causal=True,
