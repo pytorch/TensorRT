@@ -9,7 +9,7 @@
  * format produced by
  *   py/torch_tensorrt/executorch/serialization.py::serialize_engine_info()
  * which maps 1-to-1 to the std::vector<std::string> accepted by
- *   core/runtime/TRTEngine::TRTEngine(std::vector<std::string>).
+ *   core/runtime/executorch/ETRTEngine::ETRTEngine(std::vector<std::string>).
  */
 #pragma once
 

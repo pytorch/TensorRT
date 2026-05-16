@@ -59,14 +59,24 @@ config_setting(
 
 cc_library(
     name = "tensorrt_executorch_backend",
-    srcs = ["TensorRTBackend.cpp"],
-    hdrs = ["TensorRTBackend.h"],
+    srcs = [
+        "ETRTEngine.cpp",
+        "TensorRTBackend.cpp",
+    ],
+    hdrs = [
+        "ETRTEngine.h",
+        "TensorRTBackend.h",
+    ],
     # Build the TensorRT backend as a static library. The final application
     # links this target together with the ExecuTorch runtime it was compiled
     # against, avoiding any runtime plugin/dlopen dependency.
+    #
+    # NOTE: deps are deliberately minimal — no //core/runtime:runtime_base
+    # or //core/util:prelude, both of which transitively pull libtorch and
+    # would defeat the goal of a libtorch-free .pte runtime. ETRTEngine
+    # is the slim self-contained alternative to core::runtime::TRTEngine
+    # for the ExecuTorch path.
     deps = [
-        "//core/runtime:runtime_base",
-        "//core/util:prelude",
         "@executorch//:executorch_headers",
     ] + select({
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],

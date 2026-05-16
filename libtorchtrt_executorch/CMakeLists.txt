@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 get_filename_component(_torchtrt_packaged_root "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/core/runtime/runtime.cpp" AND EXISTS "${_torchtrt_packaged_root}/include/torch_tensorrt/core/runtime/runtime.h")
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/core/runtime/executorch/ETRTEngine.cpp" AND EXISTS "${_torchtrt_packaged_root}/include/torch_tensorrt/core/runtime/executorch/ETRTEngine.h")
     set(_torchtrt_source_root "${CMAKE_CURRENT_LIST_DIR}")
     set(_torchtrt_include_root "${_torchtrt_packaged_root}/include/torch_tensorrt")
 else()
@@ -24,46 +24,18 @@ list(APPEND CMAKE_MODULE_PATH "${_torchtrt_source_root}/cmake/Modules")
 find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 
-if(NOT Torch_DIR)
-    set(_torchtrt_python_executable "")
-    if(DEFINED PYTHON_EXECUTABLE AND EXISTS "${PYTHON_EXECUTABLE}")
-        set(_torchtrt_python_executable "${PYTHON_EXECUTABLE}")
-    else()
-        find_package(Python3 COMPONENTS Interpreter QUIET)
-        if(Python3_Interpreter_FOUND)
-            set(_torchtrt_python_executable "${Python3_EXECUTABLE}")
-        endif()
-    endif()
-
-    if(_torchtrt_python_executable)
-        execute_process(
-            COMMAND "${_torchtrt_python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)"
-            RESULT_VARIABLE _torchtrt_torch_prefix_result
-            OUTPUT_VARIABLE _torchtrt_torch_prefix
-            ERROR_QUIET
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        if(_torchtrt_torch_prefix_result EQUAL 0 AND _torchtrt_torch_prefix)
-            list(APPEND CMAKE_PREFIX_PATH "${_torchtrt_torch_prefix}")
-        endif()
-    endif()
-endif()
-
-find_package(Torch REQUIRED)
 find_package(Threads REQUIRED)
 
+# The ExecuTorch backend uses only TensorRTBackend.cpp + ETRTEngine.cpp.
+# It does NOT pull in any of the JIT/AOTI runtime files (TRTEngine.cpp,
+# runtime.cpp, runtime_utils.cpp, DeviceList.cpp, Platform.cpp,
+# RTDevice.cpp, TRTEngineProfiler.cpp, core/util/{Exception,trt_util}.cpp,
+# core/util/logging/TorchTRTLogger.cpp), which are libtorch-dependent.
+# Keeping this archive minimal lets it link into binaries that do not also
+# link libtorch (i.e. portable ExecuTorch runners).
 set(_torchtrt_executorch_sources
     "${_torchtrt_executorch_backend_source}"
-    "${_torchtrt_source_root}/core/runtime/DeviceList.cpp"
-    "${_torchtrt_source_root}/core/runtime/Platform.cpp"
-    "${_torchtrt_source_root}/core/runtime/RTDevice.cpp"
-    "${_torchtrt_source_root}/core/runtime/TRTEngine.cpp"
-    "${_torchtrt_source_root}/core/runtime/TRTEngineProfiler.cpp"
-    "${_torchtrt_source_root}/core/runtime/runtime.cpp"
-    "${_torchtrt_source_root}/core/runtime/runtime_utils.cpp"
-    "${_torchtrt_source_root}/core/util/Exception.cpp"
-    "${_torchtrt_source_root}/core/util/trt_util.cpp"
-    "${_torchtrt_source_root}/core/util/logging/TorchTRTLogger.cpp"
+    "${_torchtrt_source_root}/core/runtime/executorch/ETRTEngine.cpp"
 )
 
 add_library(executorch_trt_backend STATIC ${_torchtrt_executorch_sources})
@@ -84,7 +56,6 @@ target_include_directories(executorch_trt_backend
 set(_torchtrt_executorch_link_libraries
     CUDA::cudart
     TensorRT::nvinfer
-    torch
     Threads::Threads
 )
 
@@ -132,6 +103,13 @@ if(MSVC)
         INTERFACE
             executorch_trt_backend
             ${_torchtrt_executorch_link_libraries}
+    )
+    # Force MSVC to pull in every object from the static archive so the
+    # backend's static-registration globals run at startup. Mirrors the
+    # GNU `--whole-archive` flag used in the non-MSVC branch below.
+    target_link_options(torchtrt_executorch_backend
+        INTERFACE
+            "/WHOLEARCHIVE:$<TARGET_FILE_NAME:executorch_trt_backend>"
     )
 else()
     target_link_libraries(torchtrt_executorch_backend

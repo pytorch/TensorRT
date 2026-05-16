@@ -138,16 +138,6 @@ filegroup(
     srcs = [
         "LICENSE",
         "cmake/Modules/FindTensorRT.cmake",
-        "//core/runtime:DeviceList.cpp",
-        "//core/runtime:Platform.cpp",
-        "//core/runtime:RTDevice.cpp",
-        "//core/runtime:TRTEngine.cpp",
-        "//core/runtime:TRTEngineProfiler.cpp",
-        "//core/runtime:runtime.cpp",
-        "//core/runtime:runtime_utils.cpp",
-        "//core/util:Exception.cpp",
-        "//core/util:trt_util.cpp",
-        "//core/util/logging:TorchTRTLogger.cpp",
     ],
 )
 
@@ -162,6 +152,7 @@ pkg_tar(
 filegroup(
     name = "executorch_backend_source_package_files",
     srcs = [
+        "//core/runtime/executorch:ETRTEngine.cpp",
         "//core/runtime/executorch:TensorRTBackend.cpp",
     ],
 )
@@ -177,6 +168,7 @@ pkg_tar(
 filegroup(
     name = "executorch_include_package_files",
     srcs = [
+        "//core/runtime/executorch:ETRTEngine.h",
         "//core/runtime/executorch:TensorRTBackend.h",
     ],
 )
