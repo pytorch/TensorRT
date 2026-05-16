@@ -65,8 +65,6 @@ cc_library(
     # links this target together with the ExecuTorch runtime it was compiled
     # against, avoiding any runtime plugin/dlopen dependency.
     deps = [
-        "//core/runtime:runtime_base",
-        "//core/util:prelude",
         "@executorch//:executorch_headers",
     ] + select({
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],

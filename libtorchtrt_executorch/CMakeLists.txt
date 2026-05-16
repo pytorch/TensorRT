@@ -7,66 +7,22 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-get_filename_component(_torchtrt_packaged_root "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/core/runtime/runtime.cpp" AND EXISTS "${_torchtrt_packaged_root}/include/torch_tensorrt/core/runtime/runtime.h")
-    set(_torchtrt_source_root "${CMAKE_CURRENT_LIST_DIR}")
-    set(_torchtrt_include_root "${_torchtrt_packaged_root}/include/torch_tensorrt")
-else()
-    get_filename_component(_torchtrt_source_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
-    set(_torchtrt_include_root "${_torchtrt_source_root}")
-endif()
-
-set(_torchtrt_executorch_backend_source "${_torchtrt_source_root}/core/runtime/executorch/TensorRTBackend.cpp")
-set(_torchtrt_executorch_backend_include_dir "${_torchtrt_source_root}/core/runtime/executorch")
+# Locate the in-tree TensorRTBackend.cpp source.  This file lives under
+# core/runtime/executorch/ in the source tree and is the only source we
+# need to build for the libtorch-free ExecuTorch backend.
+get_filename_component(_torchtrt_source_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+set(_torchtrt_executorch_backend_source
+    "${_torchtrt_source_root}/core/runtime/executorch/TensorRTBackend.cpp")
+set(_torchtrt_executorch_backend_include_dir
+    "${_torchtrt_source_root}/core/runtime/executorch")
 
 list(APPEND CMAKE_MODULE_PATH "${_torchtrt_source_root}/cmake/Modules")
 
 find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
-
-if(NOT Torch_DIR)
-    set(_torchtrt_python_executable "")
-    if(DEFINED PYTHON_EXECUTABLE AND EXISTS "${PYTHON_EXECUTABLE}")
-        set(_torchtrt_python_executable "${PYTHON_EXECUTABLE}")
-    else()
-        find_package(Python3 COMPONENTS Interpreter QUIET)
-        if(Python3_Interpreter_FOUND)
-            set(_torchtrt_python_executable "${Python3_EXECUTABLE}")
-        endif()
-    endif()
-
-    if(_torchtrt_python_executable)
-        execute_process(
-            COMMAND "${_torchtrt_python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)"
-            RESULT_VARIABLE _torchtrt_torch_prefix_result
-            OUTPUT_VARIABLE _torchtrt_torch_prefix
-            ERROR_QUIET
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        if(_torchtrt_torch_prefix_result EQUAL 0 AND _torchtrt_torch_prefix)
-            list(APPEND CMAKE_PREFIX_PATH "${_torchtrt_torch_prefix}")
-        endif()
-    endif()
-endif()
-
-find_package(Torch REQUIRED)
 find_package(Threads REQUIRED)
 
-set(_torchtrt_executorch_sources
-    "${_torchtrt_executorch_backend_source}"
-    "${_torchtrt_source_root}/core/runtime/DeviceList.cpp"
-    "${_torchtrt_source_root}/core/runtime/Platform.cpp"
-    "${_torchtrt_source_root}/core/runtime/RTDevice.cpp"
-    "${_torchtrt_source_root}/core/runtime/TRTEngine.cpp"
-    "${_torchtrt_source_root}/core/runtime/TRTEngineProfiler.cpp"
-    "${_torchtrt_source_root}/core/runtime/runtime.cpp"
-    "${_torchtrt_source_root}/core/runtime/runtime_utils.cpp"
-    "${_torchtrt_source_root}/core/util/Exception.cpp"
-    "${_torchtrt_source_root}/core/util/trt_util.cpp"
-    "${_torchtrt_source_root}/core/util/logging/TorchTRTLogger.cpp"
-)
-
-add_library(executorch_trt_backend STATIC ${_torchtrt_executorch_sources})
+add_library(executorch_trt_backend STATIC "${_torchtrt_executorch_backend_source}")
 set_target_properties(executorch_trt_backend
     PROPERTIES
         OUTPUT_NAME "executorch_trt_backend"
@@ -75,16 +31,14 @@ set_target_properties(executorch_trt_backend
 
 target_include_directories(executorch_trt_backend
     PUBLIC
-        "${_torchtrt_include_root}"
-    PRIVATE
         "${_torchtrt_source_root}"
+    PRIVATE
         "${_torchtrt_executorch_backend_include_dir}"
 )
 
 set(_torchtrt_executorch_link_libraries
     CUDA::cudart
     TensorRT::nvinfer
-    torch
     Threads::Threads
 )
 
@@ -112,10 +66,6 @@ elseif(DEFINED EXECUTORCH_ROOT AND EXISTS "${EXECUTORCH_ROOT}/runtime")
     list(APPEND _torchtrt_executorch_link_libraries "${EXECUTORCH_CORE_LIBRARY}")
 else()
     message(FATAL_ERROR "Add ExecuTorch before the Torch-TensorRT ExecuTorch backend or set EXECUTORCH_ROOT to an ExecuTorch source tree")
-endif()
-
-if(NOT WIN32)
-    list(APPEND _torchtrt_executorch_link_libraries stdc++fs)
 endif()
 
 target_link_libraries(executorch_trt_backend
