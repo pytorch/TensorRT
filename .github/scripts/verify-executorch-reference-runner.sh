@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 set +x
 
 # Verifies the documented end-user flow for the ExecuTorch reference runner:
@@ -7,7 +8,7 @@ set +x
 #   2. Provide an ExecuTorch source checkout with EXECUTORCH_SOURCE_DIR.
 #   3. This script exports a small Torch-TensorRT ExecuTorch .pte model,
 #      unpacks libtorchtrt.tar.gz, configures the packaged CMake runner,
-#      builds my_runner, and runs one inference.
+#      builds example_executorch_runner, and runs one inference.
 #
 # Required:
 #   EXECUTORCH_SOURCE_DIR=/path/to/executorch
@@ -271,25 +272,30 @@ fi
 
 tar -xzf "${tarball}" -C "${verify_root}"
 
-# Check the release tarball contract used by the README: libtorchtrt_executorch
-# must be a top-level source package, separate from torch_tensorrt/.
+# Check the release tarball contract used by the README.
 tar_entries="${verify_root}/libtorchtrt_tar_entries.txt"
 tar -tf "${tarball}" > "${tar_entries}"
-grep -qx "libtorchtrt_executorch/CMakeLists.txt" "${tar_entries}"
-grep -qx "libtorchtrt_executorch/examples/executorch_reference_runner/CMakeLists.txt" "${tar_entries}"
-grep -qx "torch_tensorrt/BUILD" "${tar_entries}"
 
-if grep -q "^torch_tensorrt/libtorchtrt_executorch/" "${tar_entries}"; then
-  echo "libtorchtrt_executorch must be a top-level tar entry, not nested under torch_tensorrt/" >&2
-  exit 1
-fi
+require_tar_entry() {
+  local entry="$1"
 
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${verify_root}/libtorchtrt_executorch"
+  if ! grep -qx "${entry}" "${tar_entries}"; then
+    echo "libtorchtrt.tar.gz is missing expected entry: ${entry}" >&2
+    exit 1
+  fi
+}
+
+require_tar_entry "torch_tensorrt/src/torch_tensorrt/executorch/CMakeLists.txt"
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt"
+require_tar_entry "torch_tensorrt/BUILD"
+
+export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
+export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
 
 # Configure the example exactly as an end user would after unpacking
 # libtorchtrt.tar.gz.
 cmake_args=(
-  -S "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/examples/executorch_reference_runner"
+  -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner"
   -B "${verify_root}/build-executorch-reference-runner"
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}"
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}"
@@ -303,23 +309,24 @@ fi
 cmake "${cmake_args[@]}"
 
 cmake --build "${verify_root}/build-executorch-reference-runner" \
-  --target my_runner \
+  --target example_executorch_runner \
   -j"${MAX_JOBS:-$(nproc)}"
 
 runner_log="${verify_root}/my_runner.log"
+runner_path="${verify_root}/build-executorch-reference-runner/example_executorch_runner"
 if command -v ldd >/dev/null 2>&1 &&
-  ldd "${verify_root}/build-executorch-reference-runner/my_runner" |
+  ldd "${runner_path}" |
     grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
-  echo "my_runner links PyTorch/libtorch shared libraries" >&2
+  echo "example_executorch_runner links PyTorch/libtorch shared libraries" >&2
   exit 1
 fi
 
-"${verify_root}/build-executorch-reference-runner/my_runner" \
+"${runner_path}" \
   --model_path="${model_path}" \
   --num_runs=1 2>&1 | tee "${runner_log}"
 
-# The sample model is x + 1, and my_runner fills inputs with 1.0f, so the
-# output sample should contain 2.0000.
+# The sample model is x + 1, and the reference runner fills inputs with 1.0f,
+# so the output sample should contain 2.0000.
 grep -q "Inference completed" "${runner_log}"
 grep -q "output\\[0\\] shape=" "${runner_log}"
 grep -Eq "first [0-9]+ values:.* 2\\.0000" "${runner_log}"
