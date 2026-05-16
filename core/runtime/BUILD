@@ -66,6 +66,21 @@ config_setting(
 # ExecuTorch TensorRT backend without causing a duplicate-registration
 # crash when libtorchtrt.so is also loaded in the same process.
 cc_library(
+    name = "tensorrt_binding_names",
+    hdrs = [
+        "TensorRTBindingNames.h",
+    ],
+    deps = select({
+        ":jetpack": ["@tensorrt_l4t//:nvinfer"],
+        ":rtx_win": ["@tensorrt_rtx_win//:nvinfer"],
+        ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }),
+)
+
+cc_library(
     name = "runtime_base",
     srcs = [
         "DeviceList.cpp",
@@ -80,6 +95,7 @@ cc_library(
     hdrs = [
         "Platform.h",
         "RTDevice.h",
+        "TensorRTBindingNames.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
         "runtime.h",
@@ -89,6 +105,7 @@ cc_library(
         "-lstdc++fs",
     ],
     deps = [
+        ":tensorrt_binding_names",
         "//core/plugins:torch_tensorrt_plugins",
         "//core/util:prelude",
     ] + if_torch_nccl(["@torch_nccl//:nccl_headers"]) + select({
@@ -118,6 +135,7 @@ cc_library(
     hdrs = [
         "Platform.h",
         "RTDevice.h",
+        "TensorRTBindingNames.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
         "runtime.h",
@@ -133,6 +151,7 @@ filegroup(
     srcs = [
         "Platform.h",
         "RTDevice.h",
+        "TensorRTBindingNames.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
         "runtime.h",
@@ -149,6 +168,13 @@ pkg_tar(
 pkg_files(
     name = "include_pkg_files",
     srcs = [":include_files"],
+    prefix = "include/torch_tensorrt/core/runtime/",
+    visibility = ["//visibility:public"],
+)
+
+pkg_files(
+    name = "binding_names_include_pkg_files",
+    srcs = ["TensorRTBindingNames.h"],
     prefix = "include/torch_tensorrt/core/runtime/",
     visibility = ["//visibility:public"],
 )

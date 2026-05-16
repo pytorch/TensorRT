@@ -15,6 +15,7 @@ set(CXX_SRCS
 
 set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TensorRTBindingNames.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.h"
@@ -29,6 +30,7 @@ target_sources(${lib_name}
 target_include_directories(${lib_name}
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/cpp/include>"
 )
 
 target_link_libraries(${lib_name}

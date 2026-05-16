@@ -4,16 +4,26 @@ project(my_runner LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(_default_torch_tensorrt_root "${CMAKE_CURRENT_LIST_DIR}/../..")
 set(_default_project_root "${CMAKE_CURRENT_LIST_DIR}/../../..")
+set(_default_torchtrt_executorch_source_dir
+    "${_default_torch_tensorrt_root}/src/torch_tensorrt/executorch"
+)
+if(NOT EXISTS "${_default_torchtrt_executorch_source_dir}/CMakeLists.txt")
+  set(_default_torchtrt_executorch_source_dir
+      "${_default_torch_tensorrt_root}/cpp/src/torch_tensorrt/executorch"
+  )
+endif()
+
 set(EXECUTORCH_SOURCE_DIR
     "${_default_project_root}/executorch"
     CACHE PATH
     "Path to the ExecuTorch source tree"
 )
 set(TORCHTRT_EXECUTORCH_SOURCE_DIR
-    "${_default_project_root}/libtorchtrt_executorch"
+    "${_default_torchtrt_executorch_source_dir}"
     CACHE PATH
-    "Path to the unpacked libtorchtrt_executorch source package"
+    "Path to the Torch-TensorRT ExecuTorch backend source directory"
 )
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
@@ -32,19 +42,19 @@ if(NOT EXISTS "${EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
 endif()
 
 if(NOT TORCHTRT_EXECUTORCH_SOURCE_DIR)
-  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR is empty. Set it to the unpacked libtorchtrt_executorch source package")
+  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR is empty. Set it to torch_tensorrt/src/torch_tensorrt/executorch")
 endif()
 
 if(NOT EXISTS "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
-  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR must point to the unpacked libtorchtrt_executorch source package with a CMakeLists.txt: ${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
+  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR must point to the Torch-TensorRT ExecuTorch backend source directory with a CMakeLists.txt: ${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
 endif()
 
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/executorch")
-add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/libtorchtrt_executorch")
+add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_tensorrt_executorch")
 
-add_executable(my_runner main.cpp)
+add_executable(example_executorch_runner main.cpp)
 target_link_libraries(
-  my_runner
+  example_executorch_runner
   PRIVATE
     executorch
     executorch::backends

@@ -25,34 +25,49 @@ A normal reference runner build does not need separate steps for
 `libexecutorch_core.a` and `libexecutorch_trt_backend.a`. The runner CMake adds
 both ExecuTorch and the Torch-TensorRT ExecuTorch source package, and linking
 `torchtrt::executorch_backend` makes the backend archive a dependency of
-`my_runner`.
+`example_executorch_runner`.
+
+The `libtorchtrt.tar.gz` package also includes a prebuilt reference runner:
+
+```text
+torch_tensorrt/bin/example_executorch_runner
+```
 
 ```bash
-# get the executorch source code
-git clone https://github.com/pytorch/executorch.git
+# Get the ExecuTorch source code. Set EXECUTORCH_REF to a branch or tag;
+# leave it unset for the latest main.
+EXECUTORCH_REF="${EXECUTORCH_REF:-main}"
+case "${EXECUTORCH_REF}" in
+  latest|latest-main|latest_main|"latest main")
+    EXECUTORCH_REF="main"
+    ;;
+esac
+git clone --depth 1 --branch "${EXECUTORCH_REF}" --recurse-submodules --shallow-submodules \
+  https://github.com/pytorch/executorch.git executorch
+
 # download the libtorchtrt.tar.gz
 tar xvf libtorchtrt.tar.gz
 
-export EXECUTORCH_SOURCE_DIR=/path/to/executorch
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${PWD}/libtorchtrt_executorch"
+export EXECUTORCH_SOURCE_DIR="${PWD}/executorch"
+# tarball untared path
+export TORCH_TENSORRT_ROOT="${PWD}/torch_tensorrt"
+export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
 export TensorRT_ROOT=/path/to/extracted/TensorRT
-export CMAKE_PREFIX_PATH=$(python -c "import torch; print(torch.utils.cmake_prefix_path)")
 export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
-cmake -S "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/examples/executorch_reference_runner" \
+cmake -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner" \
   -B build-executorch-reference-runner \
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}" \
-  -DTensorRT_ROOT="${TensorRT_ROOT}" \
-  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+  -DTensorRT_ROOT="${TensorRT_ROOT}"
 
-cmake --build build-executorch-reference-runner --target my_runner -j
+cmake --build build-executorch-reference-runner --target example_executorch_runner -j
 ```
 
 Expected artifact:
 
 ```text
-build-executorch-reference-runner/my_runner
+build-executorch-reference-runner/example_executorch_runner
 ```
 
 The build also creates the executorch core and tensorrt backend archive as a dependency:
@@ -67,7 +82,7 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 Run the reference runner against a Torch-TensorRT compiled ExecuTorch model:
 
 ```bash
-./build-executorch-reference-runner/my_runner --model_path=/path/to/model.pte --num_runs=1
+./build-executorch-reference-runner/example_executorch_runner --model_path=/path/to/model.pte --num_runs=1
 ```
 
 The runner demonstrates this C++ loading sequence:
