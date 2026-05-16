@@ -4385,9 +4385,6 @@ dependencies = [
     { name = "packaging", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "psutil", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "tensorrt", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tensorrt-cu13", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tensorrt-cu13-bindings", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tensorrt-cu13-libs", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "typing-extensions", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
@@ -4454,9 +4451,6 @@ requires-dist = [
     { name = "packaging", specifier = ">=23" },
     { name = "psutil" },
     { name = "tensorrt", specifier = ">=10.16.1,<10.17.0" },
-    { name = "tensorrt-cu13", specifier = ">=10.16.1,<10.17.0" },
-    { name = "tensorrt-cu13-bindings", specifier = ">=10.16.1,<10.17.0" },
-    { name = "tensorrt-cu13-libs", specifier = ">=10.16.1,<10.17.0" },
     { name = "torch", specifier = ">=2.13.0.dev0,<2.14.0", index = "https://download.pytorch.org/whl/nightly/cu130" },
     { name = "typing-extensions", specifier = ">=4.7.0" },
 ]
