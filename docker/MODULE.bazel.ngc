@@ -27,6 +27,8 @@ local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl"
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 
+local_executorch = use_repo_rule("//toolchains:local_executorch.bzl", "local_executorch")
+
 torch_nccl_detect = use_repo_rule("//toolchains/torch_nccl:defs.bzl", "torch_nccl_detect")
 
 torch_nccl_detect(name = "torch_nccl")
@@ -61,6 +63,10 @@ new_local_repository(
     path = "/usr/local/lib/python3.12/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
+
+# Detect ExecuTorch from EXECUTORCH_ROOT / EXECUTORCH_SOURCE_DIR, the active
+# Python environment, or a nearby source checkout.
+local_executorch(name = "executorch")
 
 
 # This is a workaround (WAR), not a functional Bazel repository.
