@@ -7,7 +7,7 @@
  * C++ inference runner for .pte files compiled with Torch-TensorRT.
  *
  * Usage:
- *   my_runner --model_path=model.pte [--num_runs=1]
+ *   example_executorch_runner --model_path=model.pte [--num_runs=1]
  *
  * The runner fills all inputs with ones, runs inference, and prints output
  * shape and sample values.

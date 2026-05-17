@@ -344,7 +344,12 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
         os.system(
             "tar -xzf "
             + dir_path
-            + "/../bazel-bin/libtorchtrt.tar.gz --strip-components=1 -C "
+            + "/../bazel-bin/libtorchtrt.tar.gz "
+            + "--exclude='torch_tensorrt/src' "
+            + "--exclude='torch_tensorrt/src/*' "
+            + "--exclude='torch_tensorrt/examples' "
+            + "--exclude='torch_tensorrt/examples/*' "
+            + "--strip-components=1 -C "
             + dir_path
             + "/torch_tensorrt"
         )
@@ -690,6 +695,7 @@ if not (PY_ONLY or NO_TS):
                     dir_path + "torch_tensorrt/csrc",
                     dir_path + "torch_tensorrt/include",
                     dir_path + "/../",
+                    dir_path + "/../cpp/include",
                     "/usr/local/cuda",
                 ]
                 + (
@@ -760,6 +766,7 @@ if not (PY_ONLY or NO_TS):
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
+                "include/torch_tensorrt/executorch/*.h",
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/conversion/*.h",
                 "include/torch_tensorrt/core/conversion/conversionctx/*.h",
@@ -789,6 +796,7 @@ elif NO_TS:
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
+                "include/torch_tensorrt/executorch/*.h",
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/runtime/*.h",
                 "lib/*",
@@ -829,7 +837,6 @@ def get_x86_64_requirements(base_requirements):
     else:
         requirements = requirements + [
             "torch>=2.13.0.dev,<2.14.0",
-            "executorch>=1.2.0",
         ]
         if USE_TRT_RTX:
             return requirements + [
@@ -837,6 +844,7 @@ def get_x86_64_requirements(base_requirements):
             ]
         else:
             requirements = requirements + [
+                "executorch>=1.2.0",
                 "tensorrt>=10.16.1,<10.17.0",
             ]
             cuda_version = torch.version.cuda

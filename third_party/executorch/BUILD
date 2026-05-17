@@ -13,11 +13,18 @@ cc_library(
     hdrs = glob(
         [
             "runtime/**/*.h",
+            "runtime/backend/**/*.h",
             "extension/**/*.h",
         ],
         allow_empty = True,
     ),
     include_prefix = "executorch",
+    includes = [
+        "runtime/core/portable_type/c10",
+    ],
+    defines = [
+        "C10_USING_CUSTOM_GENERATED_MACROS",
+    ],
 )
 
 # ExecuTorch runtime carrier — provides register_backend and related symbols.
@@ -45,6 +52,5 @@ cc_library(
     deps = [
         ":executorch_core",
         ":executorch_headers",
-        "@libtorch",
     ],
 )

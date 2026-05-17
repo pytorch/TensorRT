@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 set +x
 
 # Verifies the documented end-user flow for the ExecuTorch reference runner:
@@ -7,7 +8,7 @@ set +x
 #   2. Provide an ExecuTorch source checkout with EXECUTORCH_SOURCE_DIR.
 #   3. This script exports a small Torch-TensorRT ExecuTorch .pte model,
 #      unpacks libtorchtrt.tar.gz, configures the packaged CMake runner,
-#      builds my_runner, and runs one inference.
+#      builds example_executorch_runner, and runs one inference.
 #
 # Required:
 #   EXECUTORCH_SOURCE_DIR=/path/to/executorch
@@ -183,9 +184,9 @@ elif [[ ! -f "${TensorRT_ROOT}/include/NvInfer.h" ]]; then
   exit 1
 fi
 
-# torch_tensorrt and the native runner both need TensorRT/PyTorch shared
-# libraries on the runtime path. Set this before importing torch_tensorrt or
-# exporting the .pte model.
+# torch_tensorrt needs TensorRT/PyTorch shared libraries while exporting the
+# .pte model. The native C++ runner below must not rely on libtorch.
+original_ld_library_path="${LD_LIBRARY_PATH:-}"
 torch_lib_dir="$("${python_executable}" - <<'PY'
 import os
 import torch
@@ -225,39 +226,79 @@ then
 fi
 
 model_path="${verify_root}/model.pte"
-"${python_executable}" examples/torchtrt_executorch_example/export_static_shape.py --model_path="${model_path}"
+"${python_executable}" - "${model_path}" <<'PY'
+import importlib.util
+import runpy
+import sys
+from pathlib import Path
+
+model_path = sys.argv[1]
+repo_root = Path.cwd()
+
+# Use the installed package for native extensions and the in-tree ExecuTorch
+# route for the serializer/backend under test.
+import torch_tensorrt  # noqa: F401
+
+
+def overlay_module(name: str, path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load {name} from {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+
+
+overlay_module(
+    "torch_tensorrt.executorch.serialization",
+    repo_root / "py/torch_tensorrt/executorch/serialization.py",
+)
+overlay_module(
+    "torch_tensorrt.executorch.backend",
+    repo_root / "py/torch_tensorrt/executorch/backend.py",
+)
+
+export_script = repo_root / "examples/torchtrt_executorch_example/export_static_shape.py"
+sys.argv = [str(export_script), "--model_path", model_path]
+runpy.run_path(str(export_script), run_name="__main__")
+PY
 test -f "${model_path}"
+
+if [[ -n "${TensorRT_ROOT:-}" && -d "${TensorRT_ROOT}/lib" ]]; then
+  export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${original_ld_library_path:+:${original_ld_library_path}}"
+else
+  export LD_LIBRARY_PATH="${original_ld_library_path}"
+fi
 
 tar -xzf "${tarball}" -C "${verify_root}"
 
-# Check the release tarball contract used by the README: libtorchtrt_executorch
-# must be a top-level source package, separate from torch_tensorrt/.
+# Check the release tarball contract used by the README.
 tar_entries="${verify_root}/libtorchtrt_tar_entries.txt"
 tar -tf "${tarball}" > "${tar_entries}"
-grep -qx "libtorchtrt_executorch/CMakeLists.txt" "${tar_entries}"
-grep -qx "libtorchtrt_executorch/examples/executorch_reference_runner/CMakeLists.txt" "${tar_entries}"
-grep -qx "torch_tensorrt/BUILD" "${tar_entries}"
 
-if grep -q "^torch_tensorrt/libtorchtrt_executorch/" "${tar_entries}"; then
-  echo "libtorchtrt_executorch must be a top-level tar entry, not nested under torch_tensorrt/" >&2
-  exit 1
-fi
+require_tar_entry() {
+  local entry="$1"
 
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${verify_root}/libtorchtrt_executorch"
+  if ! grep -qx "${entry}" "${tar_entries}"; then
+    echo "libtorchtrt.tar.gz is missing expected entry: ${entry}" >&2
+    exit 1
+  fi
+}
 
-if [[ -z "${CMAKE_PREFIX_PATH:-}" ]]; then
-  CMAKE_PREFIX_PATH="$("${python_executable}" -c "import torch; print(torch.utils.cmake_prefix_path)")"
-  export CMAKE_PREFIX_PATH
-fi
+require_tar_entry "torch_tensorrt/src/torch_tensorrt/executorch/CMakeLists.txt"
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt"
+require_tar_entry "torch_tensorrt/BUILD"
+
+export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
+export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
 
 # Configure the example exactly as an end user would after unpacking
 # libtorchtrt.tar.gz.
 cmake_args=(
-  -S "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/examples/executorch_reference_runner"
+  -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner"
   -B "${verify_root}/build-executorch-reference-runner"
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}"
   -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}"
-  -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
   -DPYTHON_EXECUTABLE="${python_executable}"
 )
 
@@ -268,16 +309,24 @@ fi
 cmake "${cmake_args[@]}"
 
 cmake --build "${verify_root}/build-executorch-reference-runner" \
-  --target my_runner \
+  --target example_executorch_runner \
   -j"${MAX_JOBS:-$(nproc)}"
 
 runner_log="${verify_root}/my_runner.log"
-"${verify_root}/build-executorch-reference-runner/my_runner" \
+runner_path="${verify_root}/build-executorch-reference-runner/example_executorch_runner"
+if command -v ldd >/dev/null 2>&1 &&
+  ldd "${runner_path}" |
+    grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
+  echo "example_executorch_runner links PyTorch/libtorch shared libraries" >&2
+  exit 1
+fi
+
+"${runner_path}" \
   --model_path="${model_path}" \
   --num_runs=1 2>&1 | tee "${runner_log}"
 
-# The sample model is x + 1, and my_runner fills inputs with 1.0f, so the
-# output sample should contain 2.0000.
+# The sample model is x + 1, and the reference runner fills inputs with 1.0f,
+# so the output sample should contain 2.0000.
 grep -q "Inference completed" "${runner_log}"
 grep -q "output\\[0\\] shape=" "${runner_log}"
 grep -Eq "first [0-9]+ values:.* 2\\.0000" "${runner_log}"

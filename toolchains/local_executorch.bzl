@@ -2,12 +2,32 @@
 
 Discovery order:
   1. EXECUTORCH_ROOT env var  — absolute path to the ExecuTorch source/package directory
-  2. VIRTUAL_ENV env var      — virtualenv / uv venv ($VIRTUAL_ENV/bin/python3)
-  3. CONDA_PREFIX env var     — conda environment ($CONDA_PREFIX/bin/python3)
-  4. .venv/bin/python3 relative to the workspace root (uv / virtualenv default)
-  5. venv/bin/python3 relative to the workspace root
-  6. python3 / python on PATH
+  2. EXECUTORCH_SOURCE_DIR    — CMake-facing alias for the ExecuTorch source directory
+  3. Adjacent source checkout — ../executorch or ../../executorch from the workspace root
+  4. VIRTUAL_ENV env var      — virtualenv / uv venv ($VIRTUAL_ENV/bin/python3)
+  5. CONDA_PREFIX env var     — conda environment ($CONDA_PREFIX/bin/python3)
+  6. .venv/bin/python3 relative to the workspace root (uv / virtualenv default)
+  7. venv/bin/python3 relative to the workspace root
+  8. python3 / python on PATH
 """
+
+def _has_required_headers(et_dir):
+    return et_dir.get_child("runtime/backend/interface.h").exists or et_dir.get_child(
+        "include/executorch/runtime/backend/interface.h",
+    ).exists
+
+def _find_source_checkout(ctx):
+    """Return a nearby ExecuTorch source checkout with backend headers, or None."""
+    ws = ctx.workspace_root
+    candidates = [
+        ws.get_child("executorch"),
+        ws.dirname.get_child("executorch"),
+        ws.dirname.dirname.get_child("executorch"),
+    ]
+    for candidate in candidates:
+        if _has_required_headers(candidate):
+            return candidate
+    return None
 
 def _find_python(ctx):
     """Return a path to a Python interpreter that has executorch importable, or None."""
@@ -43,14 +63,22 @@ def _local_executorch_impl(ctx):
     # 1. Env-var override (takes priority over auto-detection).
     #    setup.py sets this when building via pip's isolated build environment.
     et_dir_str = ctx.os.environ.get("EXECUTORCH_ROOT", "").strip()
+    if not et_dir_str:
+        et_dir_str = ctx.os.environ.get("EXECUTORCH_SOURCE_DIR", "").strip()
+
+    if not et_dir_str:
+        source_checkout = _find_source_checkout(ctx)
+        if source_checkout:
+            et_dir_str = str(source_checkout)
 
     if not et_dir_str:
         python = _find_python(ctx)
         if not python:
             fail(
                 "Cannot locate a Python interpreter that has executorch installed. " +
-                "Either activate the project venv, or set EXECUTORCH_ROOT to the " +
-                "executorch package directory (e.g. .venv/lib/pythonX.Y/site-packages/executorch).",
+                "Either keep an ExecuTorch source checkout next to this repository, " +
+                "activate the project venv, or set EXECUTORCH_ROOT/EXECUTORCH_SOURCE_DIR " +
+                "to the ExecuTorch source/package directory.",
             )
         result = ctx.execute(
             [python, "-c", "import executorch, os; print(os.path.realpath(next(iter(executorch.__path__))))"],
@@ -60,7 +88,10 @@ def _local_executorch_impl(ctx):
         et_dir_str = result.stdout.strip()
 
     if not et_dir_str:
-        fail("EXECUTORCH_ROOT is empty. Set it or ensure executorch is installed in the active Python.")
+        fail(
+            "EXECUTORCH_ROOT/EXECUTORCH_SOURCE_DIR is empty. Set one of them " +
+            "or ensure executorch is installed in the active Python.",
+        )
 
     et_dir = ctx.path(et_dir_str)
 
@@ -71,7 +102,16 @@ def _local_executorch_impl(ctx):
         fail(
             "executorch at '" + et_dir_str + "' is missing headers. " +
             "Expected include/executorch/ (wheel) or runtime/ (source). " +
-            "Install a full executorch package or set EXECUTORCH_ROOT correctly.",
+            "Install a full executorch package or set EXECUTORCH_ROOT/EXECUTORCH_SOURCE_DIR correctly.",
+        )
+    if not _has_required_headers(et_dir):
+        fail(
+            "executorch at '" + et_dir_str + "' is missing runtime/backend/interface.h, " +
+            "which is required by the TensorRT ExecuTorch backend. The active Python " +
+            "package may be an incomplete namespace/wheel layout. Set " +
+            "EXECUTORCH_ROOT=/path/to/executorch or " +
+            "EXECUTORCH_SOURCE_DIR=/path/to/executorch, or place an ExecuTorch " +
+            "source checkout at ../executorch or ../../executorch.",
         )
 
     # Normalize to source layout so the static BUILD file always works.
@@ -121,6 +161,7 @@ local_executorch = repository_rule(
     implementation = _local_executorch_impl,
     environ = [
         "EXECUTORCH_ROOT",
+        "EXECUTORCH_SOURCE_DIR",
         "VIRTUAL_ENV",
         "CONDA_PREFIX",
     ],

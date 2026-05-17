@@ -1,25 +1,39 @@
-import struct
-
 import pytest
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import SERIALIZATION_LEN
-from torch_tensorrt.executorch.serialization import serialize_engine_info
+from torch_tensorrt.executorch.serialization import (
+    HEADER_SIZE,
+    TENSORRT_MAGIC,
+    TensorRTBlobMetadata,
+    TensorRTIOBinding,
+    deserialize_engine,
+    serialize_engine,
+)
 
 
 @pytest.mark.unit
-def test_serialize_engine_info_pads_and_encodes_entries():
-    assert SERIALIZATION_LEN > 0
+def test_serialize_engine_writes_tr01_blob():
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[
+            TensorRTIOBinding(name="x", is_input=True),
+            TensorRTIOBinding(name="y", is_input=False),
+        ],
+        device_id=1,
+        hardware_compatible=True,
+    )
 
-    blob = serialize_engine_info(["alpha", b"\x00\x01"])
+    blob = serialize_engine(b"engine-bytes", metadata)
 
-    count = struct.unpack_from("<I", blob, 0)[0]
-    assert count == SERIALIZATION_LEN
+    assert blob[:4] == TENSORRT_MAGIC
+    assert len(blob) > HEADER_SIZE
 
-    first_len = struct.unpack_from("<I", blob, 4)[0]
-    assert blob[8 : 8 + first_len] == b"alpha"
+    engine, parsed = deserialize_engine(blob)
+    assert engine == b"engine-bytes"
+    assert parsed.device_id == 1
+    assert parsed.hardware_compatible is True
+    assert [b.name for b in parsed.io_bindings] == ["x", "y"]
+    assert [b.is_input for b in parsed.io_bindings] == [True, False]
 
 
 @pytest.mark.unit
-def test_serialize_engine_info_handles_none_entries():
-    blob = serialize_engine_info(["alpha", None])
-    count = struct.unpack_from("<I", blob, 0)[0]
-    assert count == SERIALIZATION_LEN
+def test_deserialize_engine_rejects_bad_magic():
+    with pytest.raises(ValueError, match="Invalid magic"):
+        deserialize_engine(b"NOPE" + b"\x00" * (HEADER_SIZE - 4))

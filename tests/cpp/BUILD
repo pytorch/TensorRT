@@ -61,6 +61,14 @@ test_suite(
     ],
 )
 
+test_suite(
+    name = "executorch_backend_tests",
+    tests = [
+        "//tests/cpp/executorch:test_executorch_binding_names",
+        "//tests/cpp/executorch:test_executorch_blob_header",
+    ],
+)
+
 cc_test(
     name = "test_default_input_types",
     srcs = ["test_default_input_types.cpp"],

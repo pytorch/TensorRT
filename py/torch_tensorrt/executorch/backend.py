@@ -1,4 +1,4 @@
-# ExecuTorch TensorRT backend: serialize engine to same blob format as TRT runtime.
+# ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
 import base64
 from typing import Any, List, final
@@ -10,10 +10,22 @@ from executorch.exir.backend.backend_details import (
 )
 from torch.export.exported_program import ExportedProgram
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+    DEVICE_IDX,
     ENGINE_IDX,
+    HW_COMPATIBLE_IDX,
+    INPUT_BINDING_NAMES_IDX,
+    OUTPUT_BINDING_NAMES_IDX,
     REQUIRES_OUTPUT_ALLOCATOR_IDX,
+    SERIALIZED_METADATA_IDX,
+    TARGET_PLATFORM_IDX,
 )
-from torch_tensorrt.executorch.serialization import serialize_engine_info
+from torch_tensorrt.executorch.serialization import (
+    TensorRTBlobMetadata,
+    TensorRTIOBinding,
+    serialize_engine,
+)
+
+_BINDING_DELIM = "%"
 
 
 def _schema_name(target: Any) -> str:
@@ -93,9 +105,10 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
 
 
 def _validate_engine_info(engine_info: List[Any]) -> None:
-    if not engine_info:
+    if len(engine_info) <= ENGINE_IDX:
         raise RuntimeError(
-            "TensorRT ExecuTorch backend received empty engine serialization info."
+            "TensorRT ExecuTorch backend received incomplete engine "
+            "serialization info."
         )
     if (
         len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
@@ -107,14 +120,38 @@ def _validate_engine_info(engine_info: List[Any]) -> None:
         )
 
 
+def _split_binding_names(value: Any) -> List[str]:
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    return [name for name in str(value or "").split(_BINDING_DELIM) if name]
+
+
+def _parse_device_id(value: Any) -> int:
+    parts = str(value or "").split(_BINDING_DELIM)
+    try:
+        return int(parts[0])
+    except (IndexError, ValueError):
+        return 0
+
+
+def _get_str(engine_info: List[Any], index: int, default: str = "") -> str:
+    if index < 0 or index >= len(engine_info):
+        return default
+    value = engine_info[index]
+    if value is None:
+        return default
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 @final
 class TensorRTBackend(BackendDetails):  # type: ignore[misc]
-    """Backend that serializes TensorRT engine to the same blob format as the TRT runtime.
+    """Backend that serializes TensorRT engines for the native ExecuTorch runtime.
 
     The partition contains a single execute_engine node; we extract the engine
-    and metadata and encode them as a vector of strings (same layout as
-    core/runtime/runtime.h SerializedInfoIndex) so the same blob works for
-    both ExecuTorch and non-ExecuTorch TRT runtime.
+    and metadata and encode them as a standalone TR01 blob. The C++ runtime
+    backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.
     """
 
     @staticmethod
@@ -138,7 +175,22 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
                 ) from exc
         elif not isinstance(serialized_engine, (bytes, bytearray)):
             engine_info[ENGINE_IDX] = bytes(serialized_engine)
-        if len(engine_info) > 7 and isinstance(engine_info[7], bytes):
-            engine_info[7] = engine_info[7].decode("utf-8", errors="replace")
-        blob = serialize_engine_info(engine_info)
+        input_names = _split_binding_names(
+            _get_str(engine_info, INPUT_BINDING_NAMES_IDX)
+        )
+        output_names = _split_binding_names(
+            _get_str(engine_info, OUTPUT_BINDING_NAMES_IDX)
+        )
+        io_bindings = [
+            TensorRTIOBinding(name=name, is_input=True) for name in input_names
+        ] + [TensorRTIOBinding(name=name, is_input=False) for name in output_names]
+
+        metadata = TensorRTBlobMetadata(
+            io_bindings=io_bindings,
+            hardware_compatible=_get_str(engine_info, HW_COMPATIBLE_IDX) == "1",
+            device_id=_parse_device_id(engine_info[DEVICE_IDX]),
+            serialized_metadata=_get_str(engine_info, SERIALIZED_METADATA_IDX),
+            target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
+        )
+        blob = serialize_engine(bytes(engine_info[ENGINE_IDX]), metadata)
         return PreprocessResult(processed_bytes=blob)
