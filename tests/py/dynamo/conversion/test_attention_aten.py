@@ -451,12 +451,23 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             ),
             (
                 (4, 8, 1, 64),
-                (4, 8, 4, 64),
-                (4, 8, 4, 64),
-                (1, 1, 4),
+                (4, 8, 8, 64),
+                (4, 8, 8, 64),
+                # attn_bias needs to match query @ key.transpose(-2, -1), and seq_k>=8 for kernel layout constraint to the FP16
+                (4, 8, 1, 8),
                 False,
                 None,
                 torch.float16,
+                0.0,
+            ),  # decoder-style single-token attention
+            (
+                (4, 8, 1, 64),
+                (4, 8, 4, 64),
+                (4, 8, 4, 64),
+                (4, 8, 1, 4),  # need to match query @ key.transpose(-2, -1)
+                False,
+                2.0,
+                torch.float32,
                 0.0,
             ),  # decoder-style single-token attention
         ]
@@ -563,12 +574,23 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             ),
             (
                 (4, 8, 1, 64),
-                (4, 8, 4, 64),
-                (4, 8, 4, 64),
-                (1, 1, 4),
+                (4, 8, 8, 64),
+                (4, 8, 8, 64),
+                # attn_bias needs to match query @ key.transpose(-2, -1), and seq_k>=8 for kernel layout constraint to the FP16
+                (4, 8, 1, 8),
                 False,
                 None,
                 torch.float16,
+                0.0,
+            ),  # decoder-style single-token attention
+            (
+                (4, 8, 1, 64),
+                (4, 8, 4, 64),
+                (4, 8, 4, 64),
+                (4, 8, 1, 4),  # need to match query @ key.transpose(-2, -1)
+                False,
+                2.0,
+                torch.float32,
                 0.0,
             ),  # decoder-style single-token attention
         ]
