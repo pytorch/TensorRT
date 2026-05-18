@@ -1,4 +1,5 @@
 # type: ignore
+import copy
 import importlib
 import platform
 import unittest
@@ -18,6 +19,16 @@ if importlib.util.find_spec("timm"):
     import timm
 
 assertions = unittest.TestCase()
+
+
+def _disable_input_quantizers(quant_cfg):
+    quant_cfg_entries = quant_cfg["quant_cfg"]
+    if isinstance(quant_cfg_entries, list):
+        quant_cfg_entries.append(
+            {"quantizer_name": "*input_quantizer", "enable": False}
+        )
+    else:
+        quant_cfg_entries["*input_quantizer"] = {"enable": False}
 
 
 @pytest.mark.unit
@@ -487,10 +498,10 @@ def test_base_int8_dynamic_shape(ir, dtype):
     input_tensor = torch.randn(batch_size, 3, 224, 224, dtype=dtype).cuda()
     model = SimpleNetwork().eval().cuda().to(dtype)
 
-    quant_cfg = mtq.INT8_DEFAULT_CFG
+    quant_cfg = copy.deepcopy(mtq.INT8_DEFAULT_CFG)
     # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
     if torchtrt.tensorrt_package_name == "tensorrt_rtx":
-        quant_cfg["quant_cfg"]["*input_quantizer"] = {"enable": False}
+        _disable_input_quantizers(quant_cfg)
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
 
     # model has INT8 qdq nodes at this point
