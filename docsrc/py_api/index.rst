@@ -13,6 +13,7 @@ Core
    dynamo
    logging
    runtime
+   kernels
    ../cli/torchtrtc
    ../indices/supported_ops
 
