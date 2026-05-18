@@ -109,6 +109,10 @@ quantization = [
     "nvidia-modelopt[hf]>=0.43.0; python_version > '3.9' and python_version < '3.13'",
 ]
 
+# Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
+# which compiles user-supplied CUDA C++ kernels via NVRTC.
+kernels = ["cuda-python"]
+
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
 Documentation = "https://pytorch.org/tensorrt"
