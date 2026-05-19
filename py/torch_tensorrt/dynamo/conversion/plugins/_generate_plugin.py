@@ -72,6 +72,25 @@ def _generate_plugin(plugin_name: str) -> None:
     # retrieve the corresponding torch operation using the passed in string
     torch_op = getattr(getattr(torch.ops, namespace), name)
 
+    # Positional indices of tensor inputs marked as mutated in the schema
+    # (Tensor(aN!) ... -> ...). These are candidates for in-place QDP outputs
+    # via `TensorDesc.aliased()` — the actual alias map (output_idx -> input_idx)
+    # is determined at fake-run time by checking output-to-input identity, since
+    # torch.library does not stamp aliasing onto the return alias_info.
+    _schema = torch_op._schemas[""]
+    _tensor_arg_positions = [
+        i
+        for i, a in enumerate(_schema.arguments)
+        if a.type.isSubtypeOf(torch._C.TensorType.get())
+    ]
+    _mutated_tensor_arg_positions = {
+        _tensor_arg_positions.index(i)
+        for i, a in enumerate(_schema.arguments)
+        if a.type.isSubtypeOf(torch._C.TensorType.get())
+        and a.alias_info is not None
+        and a.alias_info.is_write
+    }
+
     # helper function that generates the required signature based on the torch operation
     def generate_signature(
         torch_op: Callable[[Any], Any],
@@ -187,6 +206,18 @@ def _generate_plugin(plugin_name: str) -> None:
         # a tuple; single-output ops return a bare Tensor.
         outputs_list = list(output) if isinstance(output, (tuple, list)) else [output]
 
+        # Build output_idx -> input_idx alias map. An output is aliased to a
+        # mutated input when both (a) the input is declared mutates_args in the
+        # schema and (b) the fake kernel returned that exact tensor by identity.
+        # The schema gate prevents accidental aliasing when a fake kernel
+        # incidentally returns an input (e.g. an identity op without mutation).
+        alias_map: dict[int, int] = {}
+        for out_idx, fake_out in enumerate(outputs_list):
+            for in_idx in _mutated_tensor_arg_positions:
+                if in_idx < len(fake_args) and fake_out is fake_args[in_idx]:
+                    alias_map[out_idx] = in_idx
+                    break
+
         input_node_expr = list(
             itertools.chain.from_iterable(
                 [sym.node.expr for sym in syms_arg] for syms_arg in syms_args
@@ -208,6 +239,13 @@ def _generate_plugin(plugin_name: str) -> None:
 
         out_descs = []
         for out_idx, fake_out in enumerate(outputs_list):
+            # In-place output: tell TRT this output shares its buffer with the
+            # mutated input. `aliased()` carries the input's shape/dtype so we
+            # don't rebuild the descriptor from the symbolic expressions.
+            if out_idx in alias_map:
+                out_descs.append(tensor_args[alias_map[out_idx]].aliased())
+                continue
+
             shape_calc_fns: list[Any] = [None] * fake_out.ndim
             for i in range(fake_out.ndim):
                 out_dim = fake_out.shape[i]
@@ -274,12 +312,23 @@ def _generate_plugin(plugin_name: str) -> None:
 
         dest_tensors = [torch.as_tensor(o, device="cuda") for o in outputs]
 
+        # Outputs declared `.aliased()` share storage with their input — the
+        # mutation already lands in the destination buffer, so copying onto it
+        # would either be a no-op self-copy or, worse, clobber the in-place
+        # result if the eager kernel returned a fresh tensor.
+        aliased_outputs = {
+            i for i, o in enumerate(outputs) if o.get_aliased() is not None
+        }
+
         stream = torch.cuda.ExternalStream(stream)
         with torch.cuda.stream(stream):
             out_tensors = torch_op(*in_tensors, *non_tensor_args, **torch_kwargs)
             if isinstance(out_tensors, torch.Tensor):
                 out_tensors = (out_tensors,)
-            [d.copy_(o) for (d, o) in zip(dest_tensors, out_tensors)]
+            for i, (d, o) in enumerate(zip(dest_tensors, out_tensors)):
+                if i in aliased_outputs:
+                    continue
+                d.copy_(o)
 
     plugin_impl_func = f"""
 {plugin_impl_signature}

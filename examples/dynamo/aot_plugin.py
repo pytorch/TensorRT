@@ -34,9 +34,10 @@ from typing import Tuple, Union
 import tensorrt as trt
 import tensorrt.plugin as trtp
 import torch
-import torch_tensorrt
 import triton
 import triton.language as tl
+
+import torch_tensorrt
 
 trt_logger = trt.Logger(trt.Logger.VERBOSE)
 
@@ -51,7 +52,14 @@ trt_logger = trt.Logger(trt.Logger.VERBOSE)
 
 
 @triton.jit
-def add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):
+def add_one_kernel(x_ptr, y_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
+    # Arg order matters for the AOT path: TRT launches the embedded PTX with
+    # arguments in (input_ptrs, output_ptrs, extra_args) order — inputs first,
+    # then outputs, then anything from ``extra_args`` in ``@trtp.aot_impl``.
+    # If this kernel declared ``(x_ptr, n_elements, y_ptr, ...)`` then TRT
+    # would feed the output pointer into ``n_elements`` and ``n_elements``
+    # into ``y_ptr`` at launch, which is a wild pointer dereference (engine
+    # builds fine, ``enqueueV3`` returns -1 and the process segfaults).
     pid = tl.program_id(0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
@@ -59,6 +67,23 @@ def add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):
     x = tl.load(x_ptr + offsets, mask=mask)
     output = x + 1
     tl.store(y_ptr + offsets, output, mask=mask)
+
+
+@triton.jit
+def add_one_inplace_kernel(x_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
+    # Distinct kernel for the aliased-I/O variant. The plugin descriptor
+    # declares its output as ``X.aliased()`` — at runtime TRT passes a
+    # *single* pointer for the aliased I/O pair (the shared buffer), not two.
+    # If we re-used ``add_one_kernel`` here, TRT would supply: pointer,
+    # n_elements, padding... and the kernel's ``y_ptr`` slot would absorb
+    # ``n_elements`` while ``n_elements`` would read the padding zero — the
+    # mask would be all-false and the kernel would do nothing.
+    pid = tl.program_id(0)
+    block_start = pid * BLOCK_SIZE
+    offsets = block_start + tl.arange(0, BLOCK_SIZE)
+    mask = offsets < n_elements
+    x = tl.load(x_ptr + offsets, mask=mask)
+    tl.store(x_ptr + offsets, x + 1, mask=mask)
 
 
 # %%
@@ -77,7 +102,7 @@ def add_one(X: torch.Tensor) -> torch.Tensor:
     Y = torch.empty_like(X)
     BLOCK_SIZE = 256
     grid = lambda meta: (triton.cdiv(X.numel(), meta["BLOCK_SIZE"]),)
-    add_one_kernel[grid](X, X.numel(), Y, BLOCK_SIZE=BLOCK_SIZE)
+    add_one_kernel[grid](X, Y, X.numel(), BLOCK_SIZE=BLOCK_SIZE)
     return Y
 
 
@@ -148,8 +173,8 @@ def add_plugin_aot_impl(
         fn=add_one_kernel,
         signature={
             "x_ptr": f"*{type_str}",
-            "n_elements": "i32",
             "y_ptr": f"*{type_str}",
+            "n_elements": "i32",
         },
         constexprs={
             "BLOCK_SIZE": block_size,
@@ -167,10 +192,24 @@ def add_plugin_aot_impl(
     launch_params.shared_mem = compiled_kernel.metadata.shared  # bytes of shared mem
 
     # ``extra_args`` are scalar arguments appended to the kernel's argument list at
-    # launch. Here ``n_elements`` is passed as a 32-bit symbolic integer so TRT
+    # launch. ``n_elements`` is passed as a 32-bit symbolic integer so TRT
     # evaluates it from the actual tensor size at runtime.
-    extra_args = trtp.SymIntExprs(1)
+    #
+    # Triton >= 3.x always emits two trailing ``.param .u64 .ptr`` slots in
+    # the compiled PTX for ``global_scratch`` and ``profile_scratch`` — even
+    # when their sizes (``compiled_kernel.metadata.global_scratch_size`` /
+    # ``profile_scratch_size``) are 0. Triton's own runtime allocates
+    # zero-sized scratch buffers and passes those pointers at launch; TRT's
+    # AOT plugin path doesn't know about them and would otherwise leave the
+    # two trailing slots filled with stale register state — symptom:
+    # ``Failed to enqueue status -1`` and a segfault on the first call.
+    # We pad ``extra_args`` with four ``SymInt32(0)`` (two per u64 slot) so
+    # the kernel sees null pointers for both scratch params; since their
+    # sizes are 0 the kernel never dereferences them.
+    extra_args = trtp.SymIntExprs(1 + 4)
     extra_args[0] = trtp.SymInt32(N)
+    for _i in range(1, 5):
+        extra_args[_i] = trtp.SymInt32(0)
 
     return (
         compiled_kernel.metadata.name,  # kernel function name in PTX
@@ -202,6 +241,123 @@ torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
 
 
 # %%
+# In-place variant: aliased plugin I/O
+# -----------------------------------------
+#
+# This second registration shows the same kernel exposed as an *in-place* plugin —
+# the engine mutates the input buffer directly instead of allocating a separate
+# output. Useful for KV-cache updates and any pattern where only a small slice of
+# a large state changes per call.
+#
+# Three things change vs. ``my::add_one`` above:
+#
+# 1. ``mutates_args=("X",)`` on the torch op. This is the load-bearing signal —
+#    it tells the QDP descriptor in ``_generate_plugin.py`` that input ``X`` is
+#    a candidate for aliasing, and it also tells PyTorch's autograd and
+#    functionalization machinery that the op has side effects on ``X``.
+#
+# 2. The registered fake returns ``X`` by identity (``return X``). Combined with
+#    the schema's ``mutates_args``, this is what makes the descriptor emit
+#    ``X.aliased()`` (see ``_generate_plugin._generic_plugin_desc``) instead of
+#    building a fresh output ``TensorDesc``.
+#
+# 3. The descriptor itself uses ``X.aliased()``. ``aliased()`` returns a
+#    ``TensorDesc`` that shares its data buffer with ``X`` — TRT will route the
+#    same pointer to both the input and output binding at runtime.
+#
+# The eager torch impl has to mutate ``X`` itself (so the semantics match what
+# the engine will do) and return ``X.clone()``. ``torch.library`` forbids
+# returning an input by identity from a custom op, hence the clone.
+#
+# Note on the AOT kernel: we re-use ``add_one_kernel`` unchanged. Its signature
+# takes two pointers (``x_ptr``, ``y_ptr``). With aliased I/O declared, TRT
+# passes the same buffer for both — the kernel reads from ``x_ptr`` and writes
+# to ``y_ptr``, which is the same memory, so the effect is in-place.
+
+
+@torch.library.custom_op("my::add_one_inplace", mutates_args=("X",))  # type: ignore[misc]
+def add_one_inplace(X: torch.Tensor) -> torch.Tensor:
+    assert X.is_cuda
+    BLOCK_SIZE = 256
+    grid = lambda meta: (triton.cdiv(X.numel(), meta["BLOCK_SIZE"]),)
+    add_one_inplace_kernel[grid](X, X.numel(), BLOCK_SIZE=BLOCK_SIZE)
+    # Must not return X by identity — torch.library's no-alias constraint
+    # rejects that. The TRT path doesn't observe this clone (aliasing is
+    # declared at the descriptor level), it's purely for the eager impl.
+    return X.clone()
+
+
+@torch.library.register_fake("my::add_one_inplace")
+def _(X: torch.Tensor) -> torch.Tensor:
+    # Identity return is the secondary signal the descriptor uses to detect
+    # aliasing. Combined with ``mutates_args=("X",)`` above, this is what
+    # makes ``_generic_plugin_desc`` emit ``X.aliased()`` for the output.
+    return X
+
+
+@trtp.register("my::add_one_inplace")
+def add_one_inplace_desc(X: trtp.TensorDesc) -> Tuple[trtp.TensorDesc]:
+    # ``aliased()`` is the QDP API that declares output-shares-storage-with-input.
+    # Engine build will fail with "PreviewFeature::kALIASED_PLUGIN_IO_10_03 not
+    # enabled" unless the build config enables that preview feature; the
+    # converter wires this on for you when it sees a non-empty aliased_map.
+    return X.aliased()
+
+
+@trtp.aot_impl("my::add_one_inplace")
+def add_one_inplace_aot_impl(
+    X: trtp.TensorDesc, outputs: Tuple[trtp.TensorDesc], tactic: int
+) -> Tuple[
+    Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
+]:
+    type_str = "fp32" if X.dtype == trt.float32 else "fp16"
+
+    block_size = 256
+    # Single-pointer signature — see the comment on ``add_one_inplace_kernel``.
+    src = triton.compiler.ASTSource(
+        fn=add_one_inplace_kernel,
+        signature={
+            "x_ptr": f"*{type_str}",
+            "n_elements": "i32",
+        },
+        constexprs={
+            "BLOCK_SIZE": block_size,
+        },
+    )
+    compiled_kernel = triton.compile(src)
+
+    N = X.shape_expr.numel()
+    launch_params = trtp.KernelLaunchParams()
+    launch_params.grid_x = trtp.cdiv(N, block_size)
+    launch_params.block_x = compiled_kernel.metadata.num_warps * 32
+    launch_params.shared_mem = compiled_kernel.metadata.shared
+
+    # See the matching note on the non-in-place ``add_plugin_aot_impl``:
+    # Triton 3.x emits two trailing ``.param .u64 .ptr`` slots for the
+    # global/profile scratch buffers, and TRT's AOT path needs them zeroed
+    # explicitly via ``extra_args`` so the kernel doesn't read stale state.
+    extra_args = trtp.SymIntExprs(1 + 4)
+    extra_args[0] = trtp.SymInt32(N)
+    for _i in range(1, 5):
+        extra_args[_i] = trtp.SymInt32(0)
+
+    return (
+        compiled_kernel.metadata.name,
+        compiled_kernel.asm["ptx"],
+        launch_params,
+        extra_args,
+    )
+
+
+torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
+    "my::add_one_inplace",
+    supports_dynamic_shapes=False,
+    requires_output_allocator=False,
+    use_aot_if_available=True,
+)
+
+
+# %%
 # Step 6: Compile and Run
 # -----------------------------------------
 #
@@ -217,6 +373,15 @@ class MyModel(torch.nn.Module):
     def forward(self, X: torch.Tensor) -> torch.Tensor:
         res = torch.ops.my.add_one.default(X)
         return res
+
+
+class MyInplaceModel(torch.nn.Module):
+    """Drives the in-place plugin. The op mutates ``X`` in place; the returned
+    tensor carries the post-mutation value (a clone, only to satisfy
+    torch.library's no-alias rule)."""
+
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        return torch.ops.my.add_one_inplace.default(X)
 
 
 if __name__ == "__main__":
@@ -246,3 +411,64 @@ if __name__ == "__main__":
                 assert torch.allclose(res, my_model(m)), "Results do not match!"
 
     print("Inference successful!")
+
+    # %%
+    # In-place plugin demo
+    # ---------------------
+    #
+    # The standard "compile once, run many times" comparison pattern doesn't
+    # work for an in-place op because each call mutates the input — running
+    # eager and TRT on the same buffer double-applies the mutation. We work
+    # off a base tensor and clone for each call instead.
+    #
+    # Three things to verify, beyond "it ran":
+    # 1. The compiled module contains a TRT engine (not a PyTorch fallback —
+    #    a regression here would silently pass on value because the eager
+    #    kernel mutates the input the same way).
+    # 2. The engine's return value matches the expected post-mutation tensor.
+    # 3. The user's input buffer was mutated in place by the engine — the
+    #    actual reason to use aliased plugin I/O in the first place.
+
+    print("\nIn-place plugin demo:")
+    inplace_model = MyInplaceModel().to("cuda").eval()
+    base = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
+    expected_post = base + 1
+
+    model_trt_inplace = torch_tensorrt.compile(
+        inplace_model,
+        inputs=[base.clone()],
+        min_block_size=1,
+        immutable_weights=True,
+    )
+
+    from torch_tensorrt.dynamo.runtime import (
+        PythonTorchTensorRTModule,
+        TorchTensorRTModule,
+    )
+
+    engine_submodules = [
+        m
+        for _, m in model_trt_inplace.named_modules()
+        if isinstance(m, (PythonTorchTensorRTModule, TorchTensorRTModule))
+    ]
+    assert engine_submodules, (
+        "Expected a TRT engine submodule for the in-place plugin path, but the"
+        " compiled module is pure PyTorch — check that the un-functionalize"
+        " lowering pass restored the mutating op before partitioning. Graph:\n"
+        f"{model_trt_inplace.graph}"
+    )
+    print(f"  TRT engine submodule(s) present: {len(engine_submodules)}")
+
+    with torch.no_grad():
+        trt_input = base.clone()
+        trt_out = model_trt_inplace(trt_input)
+        assert torch.allclose(trt_out, expected_post), "TRT output mismatch"
+        assert torch.allclose(trt_input, expected_post), (
+            "Engine did not mutate the input buffer — aliased plugin I/O is"
+            " not active. Check that PreviewFeature.ALIASED_PLUGIN_IO_10_03"
+            " was enabled and that the descriptor emitted X.aliased()."
+        )
+
+    print("  Output matches expected post-mutation value.")
+    print("  Input buffer was mutated in place by the TRT engine.")
+    print("In-place inference successful!")
