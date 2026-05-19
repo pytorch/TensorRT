@@ -25,6 +25,7 @@
 #include "core/runtime/Platform.h"
 #include "core/runtime/RTDevice.h"
 #include "core/runtime/TRTEngine.h"
+#include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 
 namespace torch_tensorrt {
@@ -47,22 +48,33 @@ namespace {
 // ---------------------------------------------------------------------------
 // Blob deserialization
 //
-// Wire format written by
-//   py/torch_tensorrt/executorch/serialization.py::serialize_engine_info()
+// Two wire formats are accepted; we discriminate by the first 4 bytes:
 //
-//   [uint32_t count (LE)]
-//   for each of `count` entries:
-//     [uint32_t len (LE)] [uint8_t data[len]]
+//   TR01 envelope (current — see py/torch_tensorrt/executorch/serialization.py)
+//     0   4   Magic b"TR01"
+//     4   4   Metadata offset (LE uint32)
+//     8   4   Metadata size (LE uint32)
+//    12   4   Engine offset (LE uint32, 16-byte aligned)
+//    16   8   Engine size (LE uint64; supports >4 GB engines)
+//    24   8   Reserved (1 byte schema version + 7 bytes padding)
+//    32+      Metadata: legacy length-prefixed vector<string> with the
+//             ENGINE_IDX slot blanked
+//    eng_off  Raw engine bytes (16-byte aligned for mmap / DMA / SIMD)
 //
-// The resulting vector<string> is passed directly to
+//   Legacy vector<string> (pre-TR01 blobs):
+//    [uint32_t count (LE)]
+//    for each of `count` entries:
+//      [uint32_t len (LE)] [uint8_t data[len]]
+//
+// Both shapes resolve to a std::vector<std::string> in the layout described by
+// SerializedInfoIndex in core/runtime/runtime.h, which is then passed to
 //   core::runtime::TRTEngine(std::vector<std::string> serialized_info)
-// which expects the 11-element list defined by SerializedInfoIndex in
-//   core/runtime/runtime.h
 // ---------------------------------------------------------------------------
-std::vector<std::string> deserialize_engine_info(const void* data, size_t size) {
-  const uint8_t* ptr = static_cast<const uint8_t*>(data);
-  const uint8_t* const end = ptr + size;
+static constexpr char kTensorRTMagic[4] = {'T', 'R', '0', '1'};
+static constexpr size_t kTensorRTHeaderSize = 32;
+static constexpr size_t kTensorRTEngineAlignment = 16;
 
+static std::vector<std::string> deserialize_vector_of_strings(const uint8_t* ptr, const uint8_t* end) {
   if (ptr + sizeof(uint32_t) > end) {
     return {};
   }
@@ -90,6 +102,54 @@ std::vector<std::string> deserialize_engine_info(const void* data, size_t size) 
   }
 
   return result;
+}
+
+std::vector<std::string> deserialize_engine_info(const void* data, size_t size) {
+  const uint8_t* bytes = static_cast<const uint8_t*>(data);
+
+  // Legacy path: blob too small for a TR01 header, or doesn't start with the
+  // magic bytes. Fall back to the unwrapped vector<string> format that
+  // pre-TR01 blobs use.
+  if (size < kTensorRTHeaderSize || std::memcmp(bytes, kTensorRTMagic, sizeof(kTensorRTMagic)) != 0) {
+    return deserialize_vector_of_strings(bytes, bytes + size);
+  }
+
+  uint32_t meta_off = 0;
+  uint32_t meta_size = 0;
+  uint32_t eng_off = 0;
+  uint64_t eng_size = 0;
+  std::memcpy(&meta_off, bytes + 4, sizeof(meta_off));
+  std::memcpy(&meta_size, bytes + 8, sizeof(meta_size));
+  std::memcpy(&eng_off, bytes + 12, sizeof(eng_off));
+  std::memcpy(&eng_size, bytes + 16, sizeof(eng_size));
+
+  // Bounds + alignment checks. A malformed or truncated blob returns an
+  // empty vector so the caller's existing "len != SERIALIZATION_LEN" check
+  // fires with a clean error instead of reading past the end.
+  if (eng_off % kTensorRTEngineAlignment != 0) {
+    return {};
+  }
+  if (meta_off < kTensorRTHeaderSize) {
+    return {};
+  }
+  if (static_cast<size_t>(meta_off) + meta_size < meta_off || static_cast<size_t>(meta_off) + meta_size > size) {
+    return {};
+  }
+  if (eng_off + eng_size < eng_off || eng_off + eng_size > size) {
+    return {};
+  }
+  if (static_cast<size_t>(meta_off) + meta_size > eng_off) {
+    return {}; // metadata overlaps engine
+  }
+
+  std::vector<std::string> info = deserialize_vector_of_strings(bytes + meta_off, bytes + meta_off + meta_size);
+  if (info.size() <= static_cast<size_t>(core::runtime::ENGINE_IDX)) {
+    return {};
+  }
+  // Re-inject the engine bytes at ENGINE_IDX so the rest of the runtime
+  // sees the same vector<string> shape it always has.
+  info[core::runtime::ENGINE_IDX].assign(reinterpret_cast<const char*>(bytes + eng_off), static_cast<size_t>(eng_size));
+  return info;
 }
 
 // ---------------------------------------------------------------------------
