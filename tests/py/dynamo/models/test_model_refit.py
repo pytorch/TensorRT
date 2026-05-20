@@ -42,8 +42,8 @@ if importlib.util.find_spec("torchvision"):
 )
 @pytest.mark.unit
 def test_mapping():
-    model = models.resnet18(pretrained=False).eval().to("cuda")
-    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(weights=None).eval().to("cuda")
+    model2 = models.resnet18(weights=None).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     trt_input = [
         torchtrt.Input(i.shape, dtype=torch.float, format=torch.contiguous_format)

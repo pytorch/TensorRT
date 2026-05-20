@@ -64,7 +64,7 @@ class TestHashFunction(TestCase):
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_reexport_is_equal(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        pyt_model = models.resnet18(weights=None).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
         batch = torch.export.Dim("batch", min=1, max=200)
 
@@ -104,7 +104,7 @@ class TestHashFunction(TestCase):
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_input_shape_change_is_not_equal(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        pyt_model = models.resnet18(weights=None).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
         batch = torch.export.Dim("batch", min=1, max=200)
 
@@ -144,7 +144,7 @@ class TestHashFunction(TestCase):
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_engine_settings_is_not_equal(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        pyt_model = models.resnet18(weights=None).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
         batch = torch.export.Dim("batch", min=1, max=200)
 
