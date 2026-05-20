@@ -713,9 +713,11 @@ def save(
 
                 - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes
                   parameter takes precedence.
-        kwargs: Additional format-specific kwargs. ``partitioners=`` is only used
-                with ``output_format="executorch"``; otherwise it is ignored with
-                a warning.
+        kwargs: Additional format-specific kwargs. ``partitioners=`` and
+                ``compile_specs=`` are only used with ``output_format="executorch"``;
+                otherwise they are ignored with a warning. Pass
+                ``compile_specs=[CompileSpec("target_device", b"cuda:<i>")]`` to
+                override the default target device (``cuda:0``).
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -741,6 +743,7 @@ def save(
         raise ValueError("kwargs should not include None.")
 
     executorch_partitioners = kwargs.pop("partitioners", None)
+    executorch_compile_specs = kwargs.pop("compile_specs", None)
 
     def _all_are_input_objects(obj: Any) -> bool:
         """Recursively check if all elements in nested collections are Input objects."""
@@ -850,6 +853,11 @@ def save(
             "partitioners= is only used with output_format='executorch' and will be "
             f"ignored for output_format='{output_format}'."
         )
+    if executorch_compile_specs and output_format != "executorch":
+        logger.warning(
+            "compile_specs= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
@@ -916,6 +924,7 @@ def save(
                     module,
                     file_path,
                     partitioners=executorch_partitioners,
+                    compile_specs=executorch_compile_specs,
                 )
             else:
                 raise RuntimeError(
@@ -979,6 +988,7 @@ def save(
                         exp_program,
                         file_path,
                         partitioners=executorch_partitioners,
+                        compile_specs=executorch_compile_specs,
                     )
                 else:
                     raise RuntimeError(
@@ -1063,6 +1073,7 @@ def save(
                         exp_program,
                         file_path,
                         partitioners=executorch_partitioners,
+                        compile_specs=executorch_compile_specs,
                     )
                 else:
                     raise RuntimeError(
@@ -1236,7 +1247,19 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "partitioners must be a list or tuple when using "
             "output_format='executorch'"
         )
-    partitioners = [TensorRTPartitioner()] + list(extra_partitioners)
+    # Forward any caller-provided compile_specs to TensorRTPartitioner so users
+    # can override the default target_device ("cuda:0") by passing e.g.
+    # `compile_specs=[CompileSpec("target_device", b"cuda:1")]` to save().
+    # When omitted, TensorRTPartitioner auto-appends the cuda:0 default.
+    executorch_compile_specs = kwargs.get("compile_specs") or []
+    if not isinstance(executorch_compile_specs, (list, tuple)):
+        raise TypeError(
+            "compile_specs must be a list or tuple when using "
+            "output_format='executorch'"
+        )
+    partitioners = [
+        TensorRTPartitioner(compile_specs=list(executorch_compile_specs))
+    ] + list(extra_partitioners)
 
     engine_count = _count_executorch_engine_nodes(exp_program)
     if engine_count > 1:
