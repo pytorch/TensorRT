@@ -437,23 +437,19 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for input_name in self.input_names
         }
 
-        # Engines containing QDP plugins with aliased I/O (declared via
-        # ``TensorDesc.aliased()`` and built with the
-        # ``ALIASED_PLUGIN_IO_10_03`` preview feature) expect the output
-        # binding for an aliased output and its corresponding input binding
-        # to point at the same buffer at runtime. ``create_output_tensors``
-        # otherwise allocates a fresh output buffer, which both breaks the
-        # in-place semantics (user's input is not mutated) and produces
-        # unspecified output values. Query the engine once at setup so the
-        # forward pass can reuse the user's input tensor for any aliased
-        # output. ``get_aliased_input_tensor`` returns the input tensor's
-        # name when aliased, ``None`` otherwise.
-        self.aliased_output_to_input = {}
+        # For QDP plugins with aliased I/O, the output binding must share the
+        # input binding's buffer at runtime; otherwise the in-place mutation is
+        # lost. Resolve the alias mapping to (output_idx -> input_idx) once so
+        # the forward path can rebind without per-call name lookups.
+        self.aliased_output_idx_to_input_idx: Dict[int, int] = {}
         if hasattr(self.engine, "get_aliased_input_tensor"):
-            for output_name in self.output_names:
+            input_name_to_idx = {n: i for i, n in enumerate(self.input_names)}
+            for out_idx, output_name in enumerate(self.output_names):
                 aliased_input_name = self.engine.get_aliased_input_tensor(output_name)
                 if aliased_input_name:
-                    self.aliased_output_to_input[output_name] = aliased_input_name
+                    self.aliased_output_idx_to_input_idx[out_idx] = input_name_to_idx[
+                        aliased_input_name
+                    ]
 
     def _setup_runtime_config(self) -> None:
         """Create a RuntimeConfig with runtime cache for TensorRT-RTX.
@@ -746,21 +742,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         )
                     outputs = self.create_output_tensors()
 
-                    # Aliased outputs (QDP in-place plugins) must share the
-                    # input's storage rather than the freshly-allocated
-                    # buffer ``create_output_tensors`` produced. Swap the
-                    # corresponding entry in ``outputs`` to point at the
-                    # user's input tensor so the in-place mutation surfaces
-                    # back to the caller and so ``set_tensor_address`` below
-                    # binds the same buffer to both bindings.
-                    if self.aliased_output_to_input:
-                        input_by_name = dict(zip(self.input_names, contiguous_inputs))
-                        for o, output_name in enumerate(self.output_names):
-                            aliased_input_name = self.aliased_output_to_input.get(
-                                output_name
-                            )
-                            if aliased_input_name is not None:
-                                outputs[o] = input_by_name[aliased_input_name]
+                    # Rebind aliased outputs to their paired input buffer so
+                    # the in-place mutation lands in the caller's tensor.
+                    for (
+                        out_idx,
+                        in_idx,
+                    ) in self.aliased_output_idx_to_input_idx.items():
+                        outputs[out_idx] = contiguous_inputs[in_idx]
 
                 for o, output_name in enumerate(self.output_names):
                     if need_cudagraphs_record:

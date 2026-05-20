@@ -13,9 +13,6 @@ import torch_tensorrt
 def add_one_inplace(X: torch.Tensor) -> torch.Tensor:
     assert X.is_cuda
     X.add_(1)
-    # torch.library forbids returning an input directly; clone to satisfy the
-    # no-alias constraint while still letting the registered fake (which
-    # returns X by identity) signal aliasing for the TRT plugin descriptor.
     return X.clone()
 
 
@@ -39,11 +36,10 @@ if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
     "QDP Plugin is not available",
 )
 class TestInplacePlugin(unittest.TestCase):
-    """The standard DispatchTestCase.run_test passes the same input tensor to
-    eager and TRT, which double-applies the mutation for in-place ops. Use a
-    bespoke flow with cloned inputs and verify both that the output matches the
-    expected post-mutation value AND that the input buffer was mutated in
-    place."""
+    """In-place ops mutate their input, so DispatchTestCase.run_test (which
+    feeds the same tensor to eager and TRT) double-applies the mutation. We
+    use cloned inputs and check both the return value and the in-place write.
+    """
 
     @parameterized.expand(
         [
@@ -73,11 +69,9 @@ class TestInplacePlugin(unittest.TestCase):
             immutable_weights=True,
         )
 
-        # Guard against regressing to PyTorch fallback: if the un-functionalize
-        # pass stops restoring the mutating op, the partitioner finds 0
-        # supported ops and the "compiled" module is just PyTorch eager — the
-        # test would still pass on value because the eager op mutates the
-        # input itself, masking the real failure.
+        # Guard against a silent fallback to pure-PyTorch: the eager op
+        # already mutates the input, so output-only checks pass even when no
+        # TRT engine was built.
         from torch_tensorrt.dynamo.runtime import (
             PythonTorchTensorRTModule,
             TorchTensorRTModule,
@@ -96,9 +90,8 @@ class TestInplacePlugin(unittest.TestCase):
 
         trt_out = compiled(trt_input)
         torch.testing.assert_close(trt_out, expected_post, rtol=1e-5, atol=1e-5)
-        # The whole point of aliased plugin I/O is that the input buffer is
-        # mutated in place by the engine. If the engine had allocated a fresh
-        # output buffer, `trt_input` would still hold the pre-call values.
+        # Aliased plugin I/O is only active if the engine mutated trt_input;
+        # a fresh-output engine would leave it at its pre-call values.
         torch.testing.assert_close(trt_input, expected_post, rtol=1e-5, atol=1e-5)
 
 

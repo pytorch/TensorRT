@@ -53,25 +53,12 @@ _PYTHON_SCALAR_TO_NUMPY_DTYPE = {
 
 
 def _patch_trtp_scalar_attr_roundtrip() -> None:
-    """Patch ``tensorrt.plugin``'s scalar-attribute reconstruction.
-
-    ``_TemplatePluginCreator.create_plugin`` rebuilds a Python scalar attr via
-    ``attr_type_annot(f.data)`` (e.g. ``float(f.data)``). The serialize path
-    stores Python scalars as ``np.array([value])`` (1-d size-1) and TRT's
-    C++ PluginField construction further promotes any input ndarray to 1-d,
-    so ``f.data`` is always 1-d on read. ``float(np.array([0.2]))`` raises
-    "only 0-dimensional arrays can be converted to Python scalars", which
-    surfaces as a converter failure on any plugin that declares scalar attrs
-    via ``@trtp.register`` (e.g. ``b: float, a: int``).
-
-    PluginField data is also immutable on the Python side, so we can't fix
-    the shape before the unpatched code reads it. Instead: route around the
-    broken ``attr_type_annot(f.data)`` line by temporarily promoting the
-    scalar annotation to ``npt.NDArray[<corresponding dtype>]`` — that
-    branches into ``.astype()``, which handles 1-d arrays fine — then
-    restore the annotation and unwrap the resulting 1-d arrays back to the
-    Python scalar types the descriptor/impl expects. Applied once, no-op if
-    the upstream bindings are ever fixed.
+    """Work around ``_TemplatePluginCreator.create_plugin`` calling
+    ``float(np.array([v]))`` on scalar plugin attrs and crashing because
+    ``f.data`` is always 1-d after the C++ PluginField round-trip. We
+    temporarily promote the annotation to ``npt.NDArray[dtype]``, run the
+    upstream path, then unwrap back to the declared Python scalar type.
+    Idempotent; no-op once upstream ships a fix.
     """
     try:
         from tensorrt_bindings.plugin import _lib as _trtp_lib
@@ -114,8 +101,6 @@ def _patch_trtp_scalar_attr_roundtrip() -> None:
 
         saved_annotations = {n: desc.input_attrs[n] for n in scalar_attrs}
         for n, ann in scalar_attrs.items():
-            # mypy reads ``npt.NDArray[X]`` as a static type form, but X here
-            # is a runtime value pulled from the dtype lookup table.
             desc.input_attrs[n] = npt.NDArray[_PYTHON_SCALAR_TO_NUMPY_DTYPE[ann]]  # type: ignore[valid-type]
         try:
             plg = orig_create_plugin(self, name, namespace, fc, phase, qpcr)
@@ -123,10 +108,6 @@ def _patch_trtp_scalar_attr_roundtrip() -> None:
             for n, ann in saved_annotations.items():
                 desc.input_attrs[n] = ann
 
-        # Unwrap the 1-d size-1 ndarrays the promoted path produced back to
-        # the Python scalar types the descriptor's annotations declared, so
-        # the user's `@trtp.register` / `@trtp.impl` bodies receive what
-        # they signed up for.
         for n, ann in scalar_attrs.items():
             value = plg.attrs.get(n)
             if isinstance(value, np.ndarray) and value.size == 1:
@@ -136,9 +117,6 @@ def _patch_trtp_scalar_attr_roundtrip() -> None:
 
     creator_cls.create_plugin = _patched_create_plugin
     creator_cls._torch_trt_scalar_patched = True
-
-
-_patch_trtp_scalar_attr_roundtrip()
 
 
 def _is_numpy_attr_annotation(annotation: Any) -> bool:
@@ -188,6 +166,8 @@ def _generate_plugin_converter(
         )
     from tensorrt.plugin._lib import QDP_REGISTRY
 
+    _patch_trtp_scalar_attr_roundtrip()
+
     torch_target = getattr(getattr(torch.ops, namespace), op_name)
     overload_str = overload if overload else ""
     overload_name = overload_str if overload else "default"
@@ -196,7 +176,14 @@ def _generate_plugin_converter(
         f"Could not find a tensorrt plugin registered for op {namespace}::{op_name},"
         " unable to generate converter"
     )
-    torch_schema = torch_target._schemas[overload_str]
+    torch_schema = torch_overload._schema
+
+    schema_declares_mutation = any(
+        arg.alias_info is not None
+        and arg.alias_info.is_write
+        and arg.type.isSubtypeOf(torch._C.TensorType.get())
+        for arg in torch_schema.arguments
+    )
 
     use_aot_plugin = use_aot_if_available
 
@@ -257,30 +244,18 @@ def _generate_plugin_converter(
         )
         layer.name = f"[{target}]-[{name}]"
 
-        # The QDP plugin populates `aliased_map` (output_idx -> input_idx, with
-        # -1 meaning no alias) during `add_plugin` when TRT invokes the
-        # descriptor's `get_output_data_types`. Any non-negative entry means
-        # the engine build needs the aliased plugin I/O preview feature
-        # enabled. `plugin(*args)` itself is just a creation closure — the
-        # populated `aliased_map` lives on the layer's `plugin` attribute.
-        # JIT plugins: `layer.plugin` returns the Python `_TemplateJITPlugin`
-        # instance, whose `aliased_map` (output_idx -> input_idx, -1 means
-        # none) is populated when TRT invokes the descriptor during
-        # `add_plugin`. AOT plugins: `layer.plugin` returns a bare
-        # `trt.IPluginV3` C++ wrapper that doesn't expose the Python
-        # attribute. We read the JIT map when we can, and otherwise enable
-        # the aliased-I/O preview feature unconditionally for AOT — it's
-        # dormant in TRT when no plugin actually declares `.aliased()`, so
-        # this only adds the flag (which is needed when aliasing *is*
-        # declared) without changing semantics when it isn't.
+        # JIT path: layer.plugin is the Python `_TemplateJITPlugin` whose
+        # `aliased_map` is populated by TRT during `add_plugin`.
+        # AOT path: layer.plugin is a C++ wrapper that does not expose the
+        # map, so fall back to the op schema's mutation declaration — the
+        # same signal `_generate_plugin` uses to emit `.aliased()`.
         layer_plugin = getattr(layer, "plugin", None)
         aliased_map = getattr(layer_plugin, "aliased_map", None)
         if aliased_map and any(v != -1 for v in aliased_map.values()):
             ctx.requires_aliased_plugin_io = True
-        elif use_aot_plugin:
+        elif schema_declares_mutation:
             ctx.requires_aliased_plugin_io = True
-        # Single-output ops expect a bare ITensor; multi-output ops expect a
-        # tuple so the downstream ``getitem`` converter can unpack it.
+
         num_outputs = len(torch_schema.returns)
         if num_outputs == 1:
             return layer.get_output(0)
