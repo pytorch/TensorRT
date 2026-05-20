@@ -2,6 +2,7 @@
 import importlib
 import platform
 import unittest
+from random import weibullvariate
 from typing import Optional
 
 import pytest
@@ -30,7 +31,7 @@ if importlib.util.find_spec("transformers"):
     "torchvision is not installed",
 )
 def test_resnet18(ir):
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(weights=None).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
     compile_spec = {
@@ -111,7 +112,7 @@ def test_resnet18_multiprocess(ir):
     "torchvision is not installed",
 )
 def test_resnet18_cpu_offload(ir):
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(weights=None).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
     compile_spec = {
@@ -157,7 +158,7 @@ def test_resnet18_cpu_offload(ir):
     "Windows cu130 has access violation issue with this test case, skip it for now",
 )
 def test_resnet18_torch_exec_ops(ir):
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(weights=None).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
     compile_spec = {
@@ -398,7 +399,7 @@ def test_bert_base_uncased_cpu_offload(ir):
     "torchvision is not installed",
 )
 def test_resnet18_half(ir):
-    model = models.resnet18(pretrained=True).eval().to("cuda").half()
+    model = models.resnet18(weights=None).eval().to("cuda").half()
     input = torch.randn((1, 3, 224, 224)).to("cuda").half()
 
     compile_spec = {
