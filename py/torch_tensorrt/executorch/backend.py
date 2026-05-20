@@ -1,8 +1,9 @@
 # ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
-import base64
 from typing import Any, List, final
 
+import torch
+import torch.fx
 from executorch.exir.backend.backend_details import (
     BackendDetails,
     CompileSpec,
@@ -74,7 +75,56 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
     name = _schema_name(node.target)
 
     if name == "tensorrt::no_op_placeholder_for_execute_engine":
-        return list(node.args[1:])
+        engine_info = list(node.args[1:])
+        # ENGINE_IDX slot is either a `get_attr` FX node (when this runs
+        # before constant-lifting) or a `placeholder` FX node (after
+        # ExecuTorch's lifter rewrote the get_attr into a graph input
+        # referencing the buffer). Resolve both shapes to the raw uint8
+        # tensor so the rest of the backend can stay engine-format
+        # agnostic.
+        engine_slot = engine_info[ENGINE_IDX]
+        if isinstance(engine_slot, torch.fx.Node):
+            engine_tensor = None
+            if engine_slot.op == "get_attr":
+                engine_tensor = getattr(gm, engine_slot.target, None)
+            elif engine_slot.op == "placeholder":
+                # The lifter mangles the placeholder name (e.g.
+                # "b__trt_engine_0" with a "b_" buffer prefix). The
+                # canonical attribute target lives in
+                # graph_signature.input_specs[i].target.
+                target = engine_slot.target
+                sig = getattr(edge_program, "graph_signature", None)
+                if sig is not None:
+                    for ispec in sig.input_specs:
+                        arg = getattr(ispec, "arg", None)
+                        if (
+                            arg is not None
+                            and getattr(arg, "name", None) == engine_slot.name
+                        ):
+                            target = ispec.target or target
+                            break
+                state_dict = getattr(edge_program, "state_dict", {}) or {}
+                constants = getattr(edge_program, "constants", {}) or {}
+                # Explicit None-check: `state_dict.get(target) or ...`
+                # would call `bool(tensor)`, which raises
+                # "Boolean value of Tensor with more than one element
+                # is ambiguous" for any multi-element engine tensor.
+                engine_tensor = state_dict.get(target)
+                if engine_tensor is None:
+                    engine_tensor = constants.get(target)
+            else:
+                raise RuntimeError(
+                    f"no_op_placeholder node '{node.name}': unexpected engine "
+                    f"slot op '{engine_slot.op}' (target={engine_slot.target})"
+                )
+            if engine_tensor is None:
+                raise RuntimeError(
+                    f"no_op_placeholder node '{node.name}': engine slot "
+                    f"'{engine_slot.target}' (op={engine_slot.op}) did not "
+                    f"resolve to a tensor in gm, state_dict, or constants"
+                )
+            engine_info[ENGINE_IDX] = engine_tensor
+        return engine_info
 
     engine_node = node.args[1]
     if engine_node.op == "get_attr":
@@ -163,16 +213,17 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         engine_info = list(engine_info)
         _validate_engine_info(engine_info)
         serialized_engine = engine_info[ENGINE_IDX]
-        if isinstance(serialized_engine, str):
-            try:
-                engine_info[ENGINE_IDX] = base64.b64decode(
-                    serialized_engine.encode("utf-8")
-                )
-            except Exception as exc:
-                raise RuntimeError(
-                    "TensorRT ExecuTorch backend failed to decode the serialized "
-                    "engine payload."
-                ) from exc
+        if isinstance(serialized_engine, torch.Tensor):
+            # Single copy out of the underlying storage. The prior
+            # `.numpy().tobytes()` path allocated a fresh bytes buffer
+            # on top of the numpy view, which for a >2 GB engine
+            # roughly doubled peak memory at this step. `.cpu()` and
+            # `.contiguous()` are no-ops when already host-side and
+            # contiguous (the common case for the uint8 buffer this
+            # backend produces).
+            engine_info[ENGINE_IDX] = bytes(
+                serialized_engine.cpu().contiguous().untyped_storage()
+            )
         elif not isinstance(serialized_engine, (bytes, bytearray)):
             engine_info[ENGINE_IDX] = bytes(serialized_engine)
         input_names = _split_binding_names(
