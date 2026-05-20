@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Collection, Optional, Set, Tuple, Union
 
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
@@ -16,6 +15,7 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_MAX_DEPTH_OF_REDUCTION,
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
     CACHE_BUILT_ENGINES,
+    CONSTANT_DUPLICATION,
     CPU_MEMORY_BUDGET,
     DECOMPOSE_ATTENTION,
     DISABLE_TF32,
@@ -58,6 +58,8 @@ from torch_tensorrt.dynamo._defaults import (
     WORKSPACE_SIZE,
     default_device,
 )
+
+import tensorrt as trt
 
 
 @dataclass
@@ -121,6 +123,7 @@ class CompilationSettings:
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        constant_duplication (bool): Whether to enable the constant duplication lowering pass. When True, constant subgraphs with multiple users are cloned per-user and constant folding is re-run, allowing each consumer to fold its own private copy. Useful when a shared constant chain (e.g. ``reshape(weight)``) prevents downstream folding into each consumer. Default: False.
     """
 
     workspace_size: int = WORKSPACE_SIZE
@@ -184,6 +187,7 @@ class CompilationSettings:
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
     decompose_attention: bool = DECOMPOSE_ATTENTION
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
+    constant_duplication: bool = CONSTANT_DUPLICATION
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (

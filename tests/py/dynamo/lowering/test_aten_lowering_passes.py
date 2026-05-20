@@ -382,5 +382,241 @@ class TestRewriteEfficientAttention(TestCase):
         torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-2, atol=1e-2)
 
 
+class TestConstantDuplication(TestCase):
+    def _make_shared_constant_module(self):
+        """Module where ``reshape(weight) -> permute`` feeds two distinct matmuls.
+
+        The intermediate ``permute`` is a constant subgraph with two users, the
+        case ``constant_duplication`` is designed for.
+        """
+
+        class SharedConstantSubgraph(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_parameter("weight", torch.nn.Parameter(torch.randn(8, 4)))
+
+            def forward(self, x, y):
+                w = self.weight.reshape(4, 8)
+                w = w.permute(1, 0)
+                return x @ w + y @ w
+
+        return SharedConstantSubgraph()
+
+    def test_constant_duplication_pass_clones_shared_subgraph(self):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.lowering.passes.constant_duplication import (
+            _compute_constant_nodes,
+            _get_impure_targets,
+            constant_duplication,
+        )
+
+        model = self._make_shared_constant_module().cuda().eval()
+        inputs = (torch.randn(3, 8).cuda(), torch.randn(3, 8).cuda())
+        ep = torch.export.export(model, inputs)
+        gm = ep.module()
+
+        before = _compute_constant_nodes(gm, _get_impure_targets())
+        shared = [n for n in before if len(n.users) > 1]
+        # Sanity: the test fixture must actually have a shared constant.
+        self.assertGreater(
+            len(shared),
+            0,
+            msg="Test fixture has no shared constant subgraph to duplicate.",
+        )
+
+        gm = constant_duplication(gm, CompilationSettings(constant_duplication=True))
+
+        after = _compute_constant_nodes(gm, _get_impure_targets())
+        remaining_shared = [n for n in after if len(n.users) > 1]
+        self.assertEqual(
+            len(remaining_shared),
+            0,
+            msg=(
+                "After constant_duplication, no constant node should still have "
+                f"multiple users; found: {remaining_shared}"
+            ),
+        )
+
+    def test_constant_duplication_end_to_end(self):
+        model = self._make_shared_constant_module().cuda().eval()
+        inputs = (torch.randn(3, 8).cuda(), torch.randn(3, 8).cuda())
+        pytorch_out = model(*inputs)
+        ep = torch.export.export(model, inputs)
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs,
+            min_block_size=1,
+            constant_duplication=True,
+        )
+        trt_out = trt_module(*inputs)
+        torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-3, atol=1e-3)
+
+    def test_constant_duplication_nested_constants_no_resharing(self):
+        """Regression: when a constant subgraph has *multiple* multi-user
+        constant nodes (e.g. a shared weight W feeding two shared intermediates
+        r2 and r1_t), the clones produced for the outer candidate must
+        themselves be classified as constants so the inner candidate's
+        duplication does not re-share them.
+
+        We run only the duplication step (no trailing ``constant_fold``) so the
+        invariant is checked directly on the post-duplication graph: every
+        constant node has exactly one user.
+        """
+        from torch_tensorrt.dynamo.lowering.passes.constant_duplication import (
+            _clone_constant_subgraph,
+            _compute_constant_nodes,
+            _get_impure_targets,
+        )
+
+        class ChainedSharedConstants(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.w = torch.nn.Parameter(torch.randn(16, 16))
+
+            def forward(self, x, y, p, q):
+                # ``self.w`` has two reshape users → multi-user.
+                # ``r1_t`` has two matmul users → multi-user.
+                # ``r2`` has two matmul users → multi-user.
+                r1 = self.w.reshape(8, 32)
+                r1_t = r1.t()  # (32, 8)
+                r2 = self.w.reshape(32, 8)  # (32, 8)
+                return x @ r1_t + y @ r1_t + p @ r2 + q @ r2
+
+        model = ChainedSharedConstants().cuda().eval()
+        inputs = (
+            torch.randn(2, 32).cuda(),
+            torch.randn(2, 32).cuda(),
+            torch.randn(2, 32).cuda(),
+            torch.randn(2, 32).cuda(),
+        )
+        gm = torch.export.export(model, inputs).module()
+
+        constant_nodes = _compute_constant_nodes(gm, _get_impure_targets())
+        candidates = [
+            n for n in list(gm.graph.nodes) if n in constant_nodes and len(n.users) > 1
+        ]
+        # Sanity: the fixture must contain a nested chain of multi-user
+        # constants for this regression to be meaningful.
+        self.assertGreaterEqual(
+            len(candidates),
+            2,
+            msg=f"Test fixture has no nested multi-user constants: {candidates}",
+        )
+
+        for node in candidates:
+            users = list(node.users.keys())
+            for user in users[1:]:
+                memo = {}
+                new_root = _clone_constant_subgraph(
+                    gm, node, user, constant_nodes, memo
+                )
+                user.replace_input_with(node, new_root)
+
+        # Re-classify and verify no constant node ended up multi-user. Without
+        # the fix, an outer-candidate clone (e.g. ``w_dup0``) is reused as-is
+        # by an inner candidate's duplication and ends up with 2 users.
+        post = _compute_constant_nodes(gm, _get_impure_targets())
+        leftovers = [n for n in post if len(n.users) > 1]
+        self.assertEqual(
+            len(leftovers),
+            0,
+            msg=(
+                "Duplication step left these constants multi-user "
+                f"(should be impossible): {[(n.name, len(n.users)) for n in leftovers]}"
+            ),
+        )
+
+    def test_constant_duplication_many_consumers(self):
+        """A constant subgraph with N > 2 consumers should produce N - 1 clones
+        (one extra chain per additional consumer), each carrying the original's
+        shape / dtype metadata.
+        """
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.lowering.passes.constant_duplication import (
+            _compute_constant_nodes,
+            _get_impure_targets,
+            constant_duplication,
+        )
+
+        N_CONSUMERS = 5
+
+        class ManyConsumer(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.randn(8, 4))
+
+            def forward(self, *xs):
+                w = self.weight.reshape(4, 8).permute(1, 0)
+                return sum(x @ w for x in xs)
+
+        model = ManyConsumer().cuda().eval()
+        inputs = tuple(torch.randn(3, 8).cuda() for _ in range(N_CONSUMERS))
+        gm = torch.export.export(model, inputs).module()
+
+        # Snapshot the multi-user constant and its shape before the pass so we
+        # can compare against the clones.
+        before = _compute_constant_nodes(gm, _get_impure_targets())
+        shared = [n for n in before if len(n.users) == N_CONSUMERS]
+        self.assertEqual(
+            len(shared),
+            1,
+            msg=f"Expected exactly one {N_CONSUMERS}-user constant, got {shared}",
+        )
+        original = shared[0]
+        original_shape = tuple(original.meta["val"].shape)
+        original_dtype = original.meta["val"].dtype
+
+        gm = constant_duplication(gm, CompilationSettings(constant_duplication=True))
+
+        # After the pass + internal constant_fold, each consumer's matmul
+        # should consume an independent frozen constant of the right shape.
+        matmul_nodes = [
+            n
+            for n in gm.graph.nodes
+            if n.op == "call_function" and n.target is torch.ops.aten.matmul.default
+        ]
+        self.assertEqual(
+            len(matmul_nodes),
+            N_CONSUMERS,
+            msg=f"Expected {N_CONSUMERS} matmuls, got {len(matmul_nodes)}",
+        )
+
+        seen_constants = set()
+        for mm in matmul_nodes:
+            const_input = mm.args[1]
+            self.assertEqual(
+                const_input.op,
+                "get_attr",
+                msg=(
+                    f"Matmul {mm.name} should consume a get_attr after folding, "
+                    f"got {const_input.op}={const_input.target}"
+                ),
+            )
+            self.assertEqual(tuple(const_input.meta["val"].shape), original_shape)
+            self.assertEqual(const_input.meta["val"].dtype, original_dtype)
+            self.assertNotIn(
+                const_input.target,
+                seen_constants,
+                msg="Each matmul should consume its own private frozen constant",
+            )
+            seen_constants.add(const_input.target)
+
+    def test_constant_duplication_disabled_is_noop(self):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.lowering.passes.constant_duplication import (
+            constant_duplication,
+        )
+
+        model = self._make_shared_constant_module().cuda().eval()
+        inputs = (torch.randn(3, 8).cuda(), torch.randn(3, 8).cuda())
+        ep = torch.export.export(model, inputs)
+        gm = ep.module()
+
+        node_count_before = sum(1 for _ in gm.graph.nodes)
+        gm = constant_duplication(gm, CompilationSettings(constant_duplication=False))
+        node_count_after = sum(1 for _ in gm.graph.nodes)
+        self.assertEqual(node_count_before, node_count_after)
+
+
 if __name__ == "__main__":
     run_tests()
