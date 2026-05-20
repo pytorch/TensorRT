@@ -4,6 +4,7 @@ import sys
 import unittest
 
 import pytest
+import tensorrt as trt
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
@@ -20,8 +21,6 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 assertions = unittest.TestCase()
 
@@ -43,8 +42,8 @@ if importlib.util.find_spec("torchvision"):
 )
 @pytest.mark.unit
 def test_mapping():
-    model = models.resnet18(pretrained=False).eval().to("cuda")
-    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(weights=None).eval().to("cuda")
+    model2 = models.resnet18(weights=None).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     trt_input = [
         torchtrt.Input(i.shape, dtype=torch.float, format=torch.contiguous_format)

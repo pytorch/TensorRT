@@ -80,7 +80,7 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     def test_compile_weight_stripped_engine(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        pyt_model = models.resnet18(weights=None).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
 
         settings = {
