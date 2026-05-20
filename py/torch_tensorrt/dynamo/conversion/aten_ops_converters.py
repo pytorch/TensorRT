@@ -4238,31 +4238,11 @@ def aten_ops_scaled_dot_product_efficient_attention(
 def scaled_dot_product_cudnn_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    if args_bounds_check(node.args, 4, False):
-        _LOGGER.debug("compute_log_sumexp is not yet supported.")
-        return False
-
     if args_bounds_check(node.args, 7, False):
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
 
-    query_shape, key_shape, value_shape = None, None, None
-    if "val" in node.args[0].meta:
-        query_shape = node.args[0].meta["val"].size()
-    if "val" in node.args[1].meta:
-        key_shape = node.args[1].meta["val"].size()
-    if "val" in node.args[2].meta:
-        value_shape = node.args[2].meta["val"].size()
-    if (
-        query_shape != key_shape
-        or query_shape != value_shape
-        or key_shape != value_shape
-    ):
-        _LOGGER.debug(
-            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
-        )
-        return False
-    return True
+    return scaled_dot_product_efficient_attention_validator(node, settings)
 
 
 @dynamo_tensorrt_converter(
