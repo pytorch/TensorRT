@@ -7,8 +7,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
 import torch.distributed as dist
-import torch_tensorrt
 from torch.nn import Module
+
+import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -436,6 +437,20 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for input_name in self.input_names
         }
 
+        # For QDP plugins with aliased I/O, the output binding must share the
+        # input binding's buffer at runtime; otherwise the in-place mutation is
+        # lost. Resolve the alias mapping to (output_idx -> input_idx) once so
+        # the forward path can rebind without per-call name lookups.
+        self.aliased_output_idx_to_input_idx: Dict[int, int] = {}
+        if hasattr(self.engine, "get_aliased_input_tensor"):
+            input_name_to_idx = {n: i for i, n in enumerate(self.input_names)}
+            for out_idx, output_name in enumerate(self.output_names):
+                aliased_input_name = self.engine.get_aliased_input_tensor(output_name)
+                if aliased_input_name:
+                    self.aliased_output_idx_to_input_idx[out_idx] = input_name_to_idx[
+                        aliased_input_name
+                    ]
+
     def _setup_runtime_config(self) -> None:
         """Create a RuntimeConfig with runtime cache for TensorRT-RTX.
 
@@ -726,6 +741,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
                     outputs = self.create_output_tensors()
+
+                    # Rebind aliased outputs to their paired input buffer so
+                    # the in-place mutation lands in the caller's tensor.
+                    for (
+                        out_idx,
+                        in_idx,
+                    ) in self.aliased_output_idx_to_input_idx.items():
+                        outputs[out_idx] = contiguous_inputs[in_idx]
 
                 for o, output_name in enumerate(self.output_names):
                     if need_cudagraphs_record:
