@@ -747,14 +747,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self._caller_stream = torch.cuda.current_stream()
-                if (
-                    self._engine_stream == torch.cuda.default_stream()
-                    or self._engine_stream is None
-                ):
-                    self._engine_stream = torch.cuda.Stream()
-
-                self._engine_stream.wait_stream(self._caller_stream)
+                if caller_on_default:
+                    self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
                     if self.cudagraphs_enabled:
@@ -781,7 +775,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     else:
                         self.context.execute_async_v3(self._engine_stream.cuda_stream)
 
-                self._caller_stream.wait_stream(self._engine_stream)
+                if caller_on_default:
+                    self._caller_stream.wait_stream(self._engine_stream)
 
             # When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first execution or when shape is changed.
             if self.use_pre_allocated_outputs and (
@@ -841,21 +836,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self._caller_stream = torch.cuda.current_stream()
-                if (
-                    self._engine_stream == torch.cuda.default_stream()
-                    or self._engine_stream is None
-                ):
-                    self._engine_stream = torch.cuda.Stream()
-
-                self._engine_stream.wait_stream(self._caller_stream)
+                if caller_on_default:
+                    self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
                     self.context.execute_async_v3(
                         self._engine_stream.cuda_stream
                     )  # The OutputAllocator is called by execute_async_v3()
 
-                self._caller_stream.wait_stream(self._engine_stream)
+                if caller_on_default:
+                    self._caller_stream.wait_stream(self._engine_stream)
 
             with (
                 torch.autograd.profiler.record_function(
@@ -947,6 +937,36 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         tensor.to(device) for tensor in contiguous_inputs
                     ]
                     logger.warning(f"Moved all input Tensors to cuda:{device_id}")
+
+            current_device = (
+                contiguous_inputs[0].device
+                if contiguous_inputs and contiguous_inputs[0].is_cuda
+                else torch.device("cuda", torch.cuda.current_device())
+            )
+            default_stream = torch.cuda.default_stream(current_device)
+            previous_caller_stream = self._caller_stream
+            previous_engine_stream = self._engine_stream
+            self._caller_stream = torch.cuda.current_stream(current_device)
+            caller_on_default = self._caller_stream == default_stream
+            if caller_on_default:
+                # Refresh on first call or after the previous call ran on the caller's
+                # non-default stream (which is no longer current).
+                if (
+                    previous_engine_stream is None
+                    or previous_engine_stream == default_stream
+                    or previous_engine_stream == previous_caller_stream
+                ):
+                    self._engine_stream = torch.cuda.Stream(current_device)
+            else:
+                # Honor caller's non-default stream so its scheduling choice (e.g. SM
+                # partitioning via a CUDA Green Context) is preserved end to end.
+                self._engine_stream = self._caller_stream
+            if (
+                self.cudagraphs_enabled
+                and self._engine_stream != previous_engine_stream
+            ):
+                # Captured CUDA graph was recorded against the old stream.
+                self.runtime_states.context_changed = True
 
             if self.requires_output_allocator:  # engine requires OA
                 if self.cudagraphs_enabled:

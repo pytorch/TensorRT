@@ -243,6 +243,28 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
     bool shape_changed = _validate_shapes(inputs, compiled_engine);
 
+    auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
+    auto default_stream = c10::cuda::getDefaultCUDAStream(current_device_id);
+    auto previous_caller_stream = compiled_engine->caller_stream;
+    auto previous_engine_stream = compiled_engine->engine_stream;
+    compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
+    bool caller_on_default = (compiled_engine->caller_stream == default_stream);
+    if (caller_on_default) {
+      // Refresh on first call or after the previous call ran on the caller's
+      // non-default stream (which is no longer current).
+      if (previous_engine_stream == default_stream || previous_engine_stream == previous_caller_stream) {
+        compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+      }
+    } else {
+      // Honor caller's non-default stream so its scheduling choice (e.g. SM
+      // partitioning via a CUDA Green Context) is preserved end to end.
+      compiled_engine->engine_stream = compiled_engine->caller_stream;
+    }
+    if (cudagraphs_enabled && compiled_engine->engine_stream != previous_engine_stream) {
+      // Captured CUDA graph was recorded against the old stream; force re-record.
+      compiled_engine->runtime_states.context_changed = true;
+    }
+
     // Whether cudagraphs needs to record the graph on this pass
     auto result = compiled_engine->runtime_states.set_runtime_states(
         cudagraphs_enabled, compiled_engine->use_pre_allocated_outputs, shape_changed);
@@ -310,19 +332,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
     }
 
-    auto current_device_id = -1;
-    if (inputs.size() > 0) {
-      current_device_id = inputs[0].device().index(); // Done this way to avoid a call to cudart
-    } else if (outputs.size() > 0) {
-      current_device_id = outputs[0].device().index(); // Done this way to avoid a call to cudart
-    }
-
-    compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
-    if (compiled_engine->engine_stream == c10::cuda::getDefaultCUDAStream(current_device_id)) {
-      // Create a new stream if the engine stream is the default stream
-      compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
-    }
-
     compiled_engine->record_active_input_tensor_stream_usage(
         cudagraphs_enabled ? compiled_engine->caller_stream : compiled_engine->engine_stream);
 
@@ -335,10 +344,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
       }
 
-      // Block engine stream until results are available on caller stream
-      at::cuda::CUDAEvent caller_exec_complete;
-      caller_exec_complete.record(compiled_engine->caller_stream);
-      caller_exec_complete.block(compiled_engine->engine_stream);
+      if (caller_on_default) {
+        // Block engine stream until results are available on caller stream
+        at::cuda::CUDAEvent caller_exec_complete;
+        caller_exec_complete.record(compiled_engine->caller_stream);
+        caller_exec_complete.block(compiled_engine->engine_stream);
+      }
 
       if (!cudagraphs_enabled) {
         // Direct execution uses the caller buffers directly
@@ -371,10 +382,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine);
     }
 
-    // Block caller stream until engine execution is complete
-    at::cuda::CUDAEvent trt_exec_complete;
-    trt_exec_complete.record(compiled_engine->engine_stream);
-    trt_exec_complete.block(compiled_engine->caller_stream);
+    if (caller_on_default) {
+      // Block caller stream until engine execution is complete
+      at::cuda::CUDAEvent trt_exec_complete;
+      trt_exec_complete.record(compiled_engine->engine_stream);
+      trt_exec_complete.block(compiled_engine->caller_stream);
+    }
 
     if (cudagraphs_enabled) {
       // If in CUDAGraph mode, copy persistent staging outputs to returned tensors on the caller stream.
@@ -421,17 +434,22 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       create_output_allocator(compiled_engine);
     }
 
-    auto current_device_id = -1;
-    if (inputs.size() > 0) {
-      current_device_id = inputs[0].device().index(); // Done this way to avoid a call to cudart
-    } else {
-      current_device_id = at::cuda::current_device();
-    }
-
+    auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
+    auto default_stream = c10::cuda::getDefaultCUDAStream(current_device_id);
+    auto previous_caller_stream = compiled_engine->caller_stream;
+    auto previous_engine_stream = compiled_engine->engine_stream;
     compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
-    if (compiled_engine->engine_stream == c10::cuda::getDefaultCUDAStream(current_device_id)) {
-      // Create a new stream if the engine stream is the default stream
-      compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+    bool caller_on_default = (compiled_engine->caller_stream == default_stream);
+    if (caller_on_default) {
+      // Refresh on first call or after the previous call ran on the caller's
+      // non-default stream (which is no longer current).
+      if (previous_engine_stream == default_stream || previous_engine_stream == previous_caller_stream) {
+        compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+      }
+    } else {
+      // Honor caller's non-default stream so its scheduling choice (e.g. SM
+      // partitioning via a CUDA Green Context) is preserved end to end.
+      compiled_engine->engine_stream = compiled_engine->caller_stream;
     }
 
     compiled_engine->record_active_input_tensor_stream_usage(compiled_engine->engine_stream);
@@ -445,10 +463,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
       }
 
-      // Block engine stream until results are available on caller stream
-      at::cuda::CUDAEvent caller_exec_complete;
-      caller_exec_complete.record(compiled_engine->caller_stream);
-      caller_exec_complete.block(compiled_engine->engine_stream);
+      if (caller_on_default) {
+        // Block engine stream until results are available on caller stream
+        at::cuda::CUDAEvent caller_exec_complete;
+        caller_exec_complete.record(compiled_engine->caller_stream);
+        caller_exec_complete.block(compiled_engine->engine_stream);
+      }
 
       // Direct execution uses the caller buffers directly
       compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
@@ -457,10 +477,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     compiled_engine->clear_active_input_tensors();
 
-    // Block caller stream until engine execution is complete
-    at::cuda::CUDAEvent trt_exec_complete;
-    trt_exec_complete.record(compiled_engine->engine_stream);
-    trt_exec_complete.block(compiled_engine->caller_stream);
+    if (caller_on_default) {
+      // Block caller stream until engine execution is complete
+      at::cuda::CUDAEvent trt_exec_complete;
+      trt_exec_complete.record(compiled_engine->engine_stream);
+      trt_exec_complete.block(compiled_engine->caller_stream);
+    }
 
     std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
     if (compiled_engine->profile_execution) {
