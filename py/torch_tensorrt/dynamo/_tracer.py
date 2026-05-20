@@ -19,6 +19,7 @@ def trace(
     *,
     arg_inputs: Optional[Tuple[Any, ...]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
+    dynamic_shapes: Optional[Any] = None,
     **kwargs: Any,
 ) -> torch.export.ExportedProgram:
     """Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT
@@ -65,7 +66,7 @@ def trace(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -73,9 +74,11 @@ def trace(
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)
     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
-    # Constructing dynamic shape list as a nested dict
-    dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs)
-    dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
+    if dynamic_shapes is None:
+        # Auto-inferred dims are independent per input; pass dynamic_shapes
+        # explicitly to share a Dim across inputs.
+        dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs)
+        dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
     exp_program = export(
         mod,
         tuple(torch_arg_inputs),

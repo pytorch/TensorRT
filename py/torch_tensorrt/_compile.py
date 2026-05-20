@@ -6,7 +6,18 @@ import logging
 import platform
 import warnings
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 
 import torch
 from torch_tensorrt._enums import dtype
@@ -183,6 +194,7 @@ def compile(
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[Dict[str, Any]] = None,
     enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
+    dynamic_shapes: Optional[Any] = None,
     **kwargs: Any,
 ) -> (
     torch.nn.Module | torch.jit.ScriptModule | torch.fx.GraphModule | Callable[..., Any]
@@ -218,6 +230,14 @@ def compile(
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
+        dynamic_shapes (Any): Optional ``dynamic_shapes`` dict (or list / nested
+            structure) forwarded to ``torch.export.export``. Supply this to share a
+            ``Dim`` across multiple inputs (e.g. when ``input_ids`` and ``attention_mask``
+            must have the same batch size at runtime). When omitted, dynamic shapes are
+            auto-inferred from per-input ``min_shape``/``max_shape`` and **each input gets
+            its own independent symbol** -- which fails ``torch.export``'s constraint
+            check for models that broadcast across these axes. Only consulted when
+            ``module`` is an ``nn.Module`` (ignored for ``ExportedProgram``).
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
 
     Returns:
@@ -288,7 +308,7 @@ def compile(
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
-        if arg_inputs is None and inputs is None:
+        if arg_inputs is None and inputs is None and not kwarg_inputs:
             raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
         elif arg_inputs is not None and inputs is not None:
@@ -303,8 +323,10 @@ def compile(
 
         from torch_tensorrt.dynamo.utils import prepare_inputs
 
-        if not isinstance(arg_inputs, collections.abc.Sequence):
-            arg_inputs = [arg_inputs]  # type: ignore
+        if arg_inputs is None:
+            arg_inputs = []
+        elif not isinstance(arg_inputs, collections.abc.Sequence):
+            arg_inputs = [arg_inputs]
 
         torchtrt_arg_inputs = prepare_inputs(arg_inputs)
         torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
@@ -316,6 +338,7 @@ def compile(
                 module,
                 torchtrt_arg_inputs,
                 kwarg_inputs=torchtrt_kwarg_inputs,
+                dynamic_shapes=dynamic_shapes,
                 **kwargs,
             )
         trt_graph_module = dynamo_compile(
