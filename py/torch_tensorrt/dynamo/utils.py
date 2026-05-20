@@ -24,12 +24,9 @@ import psutil
 import sympy
 import tensorrt as trt
 import torch
-from torch._subclasses.fake_tensor import FakeTensor
-from torch._subclasses.fake_tensor import FakeScriptObject
+from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._sympy.numbers import int_oo
-
-from packaging import version
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -39,6 +36,8 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
+
+from packaging import version
 
 from .types import TRTDataType
 
@@ -105,7 +104,7 @@ COMPLEX_TO_REAL_DTYPE: Dict[torch.dtype, torch.dtype] = {
     torch.complex128: torch.float64,
 }
 
-COMPLEX_DTYPES: frozenset = frozenset(COMPLEX_TO_REAL_DTYPE)
+COMPLEX_DTYPES: frozenset[torch.dtype] = frozenset(COMPLEX_TO_REAL_DTYPE)
 
 
 def unified_dtype_converter(
@@ -438,9 +437,16 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
     return any(isinstance(dim, torch.SymInt) for dim in tensor)
 
 
-def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional[int]]:
-    """
-    This function returns the min, max, opt values of a symbolic integer.
+def extract_var_range_info(
+    symbolic_integer: torch.SymInt,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+) -> Dict[str, Optional[int]]:
+    """Return ``{min, max, opt}`` for a symbolic integer.
+
+    ``user_symbol_bounds`` (read-only ``{sym: (min, max)}``) is consulted only
+    when the exporter's upper is unbounded; finite exporter bounds always win.
+    The lower is intersected with the exporter's so the 0/1 specialization
+    survives even if the user passes ``min_shape=0``.
     """
     node = symbolic_integer.node
     expr = node.expr
@@ -467,13 +473,40 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional
         or expr.xreplace(var_to_val_map)
     )
     assert var_range, var_val
-    min_val, max_val = (
-        int(var_range.lower),
-        int(var_range.upper) if var_range.upper != int_oo else None,
-    )
+
+    # ``var_to_range`` returns ``int_oo`` for unbounded; ``bound_sympy`` (used
+    # for composite exprs like ``s0+s1``) returns ``sympy.oo`` instead. They
+    # are distinct objects -- check both, else ``int(sympy.oo)`` raises.
+    def _bound_to_int_or_none(value: Any) -> Optional[int]:
+        if value is int_oo or value is -int_oo:
+            return None
+        if value == sympy.oo or value == -sympy.oo:
+            return None
+        try:
+            return int(value)
+        except (TypeError, OverflowError, AttributeError):
+            return None
+
+    min_val_opt = _bound_to_int_or_none(var_range.lower)
+    max_val = _bound_to_int_or_none(var_range.upper)
+    # Unbounded lower shouldn't happen for tensor dims; fall back to 1.
+    min_val = min_val_opt if min_val_opt is not None else 1
 
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
+
+    # Fill missing exporter upper from user bounds; intersect lower so
+    # ShapeEnv's 0/1 specialization is preserved.
+    if (
+        max_val is None
+        and user_symbol_bounds
+        and isinstance(expr, sympy.Symbol)
+        and expr in user_symbol_bounds
+    ):
+        user_min, user_max = user_symbol_bounds[expr]
+        min_val = max(min_val, int(user_min))
+        max_val = int(user_max)
+
     min_max_opt: Dict[str, Optional[int]] = {}
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val

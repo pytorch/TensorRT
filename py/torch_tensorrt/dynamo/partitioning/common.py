@@ -1,10 +1,10 @@
 import logging
 from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
+import sympy
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
-
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import (
     COMPLEX_TO_REAL_DTYPE,
@@ -20,11 +20,14 @@ def construct_dynamic_input(
     input_dtype: torch.dtype,
     name: str = "",
     is_shape_tensor: bool = False,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
 ) -> Input:
     """
     Constructs a torch_tensorrt.Input based on a symbolic input
     Args:
         input_shape: A symbolic shape / regular shape of a tensor (which can have a  mix of SymInt nodes and static values)
+        user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
+            :func:`extract_var_range_info` to fill unbounded exporter uppers.
     Returns:
         A dynamic shaped torch_tensorrt.Input which has the properties of the symbolic shaped input.
     """
@@ -33,7 +36,9 @@ def construct_dynamic_input(
     max_shape = []
     for d, dim in enumerate(input_shape):
         if isinstance(dim, torch.SymInt):
-            min_max_opt = extract_var_range_info(dim)
+            min_max_opt = extract_var_range_info(
+                dim, user_symbol_bounds=user_symbol_bounds
+            )
             unwrapped_min_max_opt: Dict[str, int] = {}
             if "min" not in min_max_opt or min_max_opt["min"] is None:
                 logger.warning(
@@ -85,9 +90,12 @@ def get_input(
     dtype: torch.dtype,
     name: str = "",
     is_shape_tensor: bool = False,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
 ) -> Input:
     """
-    Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs
+    Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs.
+
+    ``user_symbol_bounds`` is forwarded to :func:`construct_dynamic_input`.
     """
     if dtype in COMPLEX_TO_REAL_DTYPE:
         real_dtype = COMPLEX_TO_REAL_DTYPE[dtype]
@@ -106,6 +114,7 @@ def get_input(
             dtype,
             name=name,
             is_shape_tensor=is_shape_tensor,
+            user_symbol_bounds=user_symbol_bounds,
         )
     else:
         return Input(
@@ -113,12 +122,17 @@ def get_input(
         )
 
 
-def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
+def construct_submodule_inputs(
+    module: torch.fx.GraphModule,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+) -> Sequence[Input]:
     """
     Construct torch_tensorrt Inputs based on the module inputs.
     The module inputs will have meta data which has the shape and dtype info
     Args:
         module: Input FX GraphModule
+        user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
+            :func:`get_input` to fill unbounded exporter uppers.
     Returns:
         Sequence of torch_tensorrt.Input's representing inputs to given module
     """
@@ -134,7 +148,12 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                     if isinstance(input_meta, (FakeTensor, torch.Tensor)):
                         input_shape = input_meta.size()
                         torchtrt_inputs.append(
-                            get_input(input_shape, input_meta.dtype, name=input.name)
+                            get_input(
+                                input_shape,
+                                input_meta.dtype,
+                                name=input.name,
+                                user_symbol_bounds=user_symbol_bounds,
+                            )
                         )
                     elif isinstance(input_meta, torch.SymInt):
                         # Assuming sym_integers | shape inputs always have torch.int64 dtype
@@ -144,6 +163,7 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                                 torch.int64,
                                 name=input.name,
                                 is_shape_tensor=True,
+                                user_symbol_bounds=user_symbol_bounds,
                             )
                         )
                     elif isinstance(input_meta, torch.SymFloat):
@@ -153,6 +173,7 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                                 torch.float32,
                                 name=input.name,
                                 is_shape_tensor=False,  # Only SymInt inputs are treated as shape tensors
+                                user_symbol_bounds=user_symbol_bounds,
                             )
                         )
                     else:
@@ -164,7 +185,12 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                     input_meta = input.meta["tensor_meta"]
                     input_shape = input_meta.shape
                     torchtrt_inputs.append(
-                        get_input(input_shape, input_meta.dtype, name=input.name)
+                        get_input(
+                            input_shape,
+                            input_meta.dtype,
+                            name=input.name,
+                            user_symbol_bounds=user_symbol_bounds,
+                        )
                     )
                 else:
                     raise AssertionError(
