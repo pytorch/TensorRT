@@ -1,5 +1,6 @@
 from torch_tensorrt.distributed._distributed import (  # noqa: F401
     distributed_context,
+    is_distributed_caching_enabled,
     set_distributed_mode,
 )
 from torch_tensorrt.distributed._nccl_utils import (  # noqa: F401

@@ -205,3 +205,28 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
             seen.add(id(engine))
             if getattr(engine, "requires_native_multidevice", False):
                 engine.set_group_name(group_name)
+
+
+def is_distributed_caching_enabled(
+    is_engine_caching_supported: bool,
+    cache_built_engines: bool,
+    reuse_cached_engines: bool,
+) -> bool:
+    """Check if distributed engine cache coordination should be used.
+
+    Returns True when all conditions are met:
+      - Engine caching is supported (cache exists, refit available, mutable weights)
+      - User enabled both cache_built_engines and reuse_cached_engines
+      - Running in a distributed environment with world_size > 1
+
+    When True, only one rank builds the TRT engine and caches it.
+    Other ranks wait and load from the shared DiskEngineCache.
+    """
+    return (
+        is_engine_caching_supported
+        and cache_built_engines
+        and reuse_cached_engines
+        and dist.is_available()
+        and dist.is_initialized()
+        and dist.get_world_size() > 1
+    )
