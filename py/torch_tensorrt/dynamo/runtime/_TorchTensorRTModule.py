@@ -126,10 +126,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.settings = copy.deepcopy(settings)
         self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
-        self.engine: Any = None
-        self._use_python_runtime = settings.use_python_runtime
-
-        self.execute_engine_op: Any = None
+        self.engine = None
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
         self.symbolic_shape_expressions = symbolic_shape_expressions
@@ -275,17 +272,15 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is not None:
             return
 
-        if self._use_python_runtime:
+        if ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+        else:
             from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
-            self.engine = TRTEngine(
+            self.engine = TRTEngine(  # type: ignore[assignment]
                 self._pack_engine_info(),
                 profile_execution=self.profiling_enabled,
             )
-            self.execute_engine_op = torch.ops.tensorrt.execute_engine_python
-        else:
-            self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
-            self.execute_engine_op = torch.ops.tensorrt.execute_engine
 
         # requires_native_multidevice is set by the C++ constructor from the serialized REQUIRES_NATIVE_MULTIDEVICE_IDX field.
         if self.engine.requires_native_multidevice:
@@ -380,28 +375,18 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.weight_name_map = metadata["weight_name_map"]
             self.symbolic_shape_expressions = metadata["inout_symexprs"]
 
-            # Re-resolve the runtime now that we have the loaded settings: the
-            # original __init__ kwarg may have been False, but a saved engine
-            # can still pin use_python_runtime=True via the settings blob.
-            self._use_python_runtime = (
-                getattr(self.settings, "use_python_runtime", False)
-                or not ENABLED_FEATURES.torch_tensorrt_runtime
-            )
-            if self._use_python_runtime:
+            if ENABLED_FEATURES.torch_tensorrt_runtime:
+                self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
+            else:
                 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
-                self.engine = TRTEngine(serialized_engine_info)
-                self.execute_engine_op = torch.ops.tensorrt.execute_engine_python
-            else:
-                self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
-                self.execute_engine_op = torch.ops.tensorrt.execute_engine
+                self.engine = TRTEngine(serialized_engine_info)  # type: ignore[assignment]
 
             self.engine.set_output_tensors_as_unowned(
                 metadata["output_tensors_are_unowned"]
             )
         else:
             self.engine = None
-            self.execute_engine_op = None
             self.settings = CompilationSettings()
             self.hardware_compatible = False
 
@@ -454,12 +439,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             else:
                 input_tensors.append(torch.tensor(i).cuda())
 
-        if self.execute_engine_op is None:
-            raise RuntimeError(
-                "execute_engine op has not been bound. Call setup_engine() first."
-            )
-
-        outputs = self.execute_engine_op(input_tensors, self.engine)
+        outputs = torch.ops.tensorrt.execute_engine(input_tensors, self.engine)
         if len(outputs) == 1:
             return outputs[0]
 
