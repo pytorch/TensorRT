@@ -135,7 +135,7 @@ def post_lowering(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
     fake_mode = torch._export.utils._detect_fake_mode_from_gm(gm)
-    fake_tensor_updater = FakeTensorUpdater(gm.graph)
+    fake_tensor_updater = FakeTensorUpdater(gm)
     gm = ATEN_POST_LOWERING_PASSES(gm, settings)
     if fake_mode is not None:
         fake_tensor_updater.incremental_update(fake_mode)
