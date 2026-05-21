@@ -41,7 +41,6 @@ curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelis
     && mv bazelisk-linux-${BAZEL_PLATFORM} /usr/bin/bazel \
     && chmod +x /usr/bin/bazel
 
-source .github/scripts/setup-executorch-ci.sh || exit 1
 
 pip uninstall -y torch torchvision
 
