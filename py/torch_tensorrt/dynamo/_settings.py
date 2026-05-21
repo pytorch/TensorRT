@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
     CACHE_BUILT_ENGINES,
     CPU_MEMORY_BUDGET,
+    CUDA_GRAPH_STRATEGY,
     DECOMPOSE_ATTENTION,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -98,6 +99,7 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
         runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. The cache is loaded on engine setup and saved on module cleanup. Uses file locking for concurrent access safety. Not used for standard TensorRT.
         dynamic_shapes_kernel_specialization_strategy (str): Strategy for compiling shape-specialized kernels at runtime for dynamic shapes (TensorRT-RTX only). Options: "lazy" (compile in background, use fallback until ready), "eager" (compile immediately, blocking), "none" (always use fallback kernels). Default: "lazy".
+        cuda_graph_strategy (str): Strategy for CUDA graph capture/replay (TensorRT-RTX only). Options: "disabled" (no native CUDA graphs, uses manual capture if cudagraphs mode is enabled), "whole_graph_capture" (TRT-RTX handles CUDA graph capture internally). When set to "whole_graph_capture", the manual torch CUDA graph capture/replay in forward() is bypassed. Default: "disabled".
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
@@ -153,6 +155,7 @@ class CompilationSettings:
     dynamic_shapes_kernel_specialization_strategy: str = (
         DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY
     )
+    cuda_graph_strategy: str = CUDA_GRAPH_STRATEGY
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
