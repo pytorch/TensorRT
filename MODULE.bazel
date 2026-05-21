@@ -9,6 +9,7 @@ bazel_dep(name = "platforms", version = "0.0.11")
 bazel_dep(name = "rules_cc", version = "0.1.1")
 bazel_dep(name = "rules_python", version = "1.3.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
@@ -36,6 +37,14 @@ new_git_repository(
     # latest commit in release/1.3 branch
     commit = "6118688a095fd9697224f5cad72ce42db641c9cd",
     recursive_init_submodules = True,
+    patch_cmds = [
+        "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
+        "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec ln -s ../{} executorch/ \\;",
+    ],
+    patch_cmds_win = [
+        "Get-ChildItem -Recurse -Include BUILD,BUILD.bazel | Where-Object { $_.DirectoryName -ne (Get-Location).Path } | Remove-Item -Force",
+        "New-Item -ItemType Directory executorch | Out-Null; Get-ChildItem -Force | Where-Object { $_.Name -notin @('executorch','BUILD','BUILD.bazel','REPO.bazel') } | Copy-Item -Destination executorch -Recurse -Force",
+    ],
     remote = "https://github.com/pytorch/executorch.git",
 )
 

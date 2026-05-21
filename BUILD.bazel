@@ -125,9 +125,9 @@ pkg_tar(
 
 genrule(
     name = "executorch_core_archive",
-    srcs = ["@executorch//:libexecutorch_core.a"],
+    srcs = ["@executorch//:executorch_core"],
     outs = ["libexecutorch_core.a"],
-    cmd = "cp $(location @executorch//:libexecutorch_core.a) $@",
+    cmd = "cp $(location @executorch//:executorch_core) $@",
 )
 
 genrule(
