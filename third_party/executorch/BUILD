@@ -19,10 +19,15 @@ command -v cmake >/dev/null 2>&1 || {
   echo "cmake is required to build @executorch//:libexecutorch_core.a" >&2
   exit 1
 }
-src_dir="$$(dirname "$(location CMakeLists.txt)")"
+src_dir="$$(cd "$$(dirname "$(location CMakeLists.txt)")" && pwd)"
+source_parent="$(@D)/executorch_source"
+cmake_src_dir="$$source_parent/executorch"
 build_dir="$(@D)/executorch_cmake"
-rm -rf "$$build_dir"
-cmake -S "$$src_dir" -B "$$build_dir" \
+rm -rf "$$build_dir" "$$source_parent"
+mkdir -p "$$cmake_src_dir"
+cp -a "$$src_dir/." "$$cmake_src_dir/"
+find "$$cmake_src_dir" -name .git -prune -exec rm -rf {} +
+cmake -S "$$cmake_src_dir" -B "$$build_dir" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
   -DBUILD_TESTING=OFF \

@@ -99,6 +99,8 @@ RELEASE = False
 CI_BUILD = False
 USE_TRT_RTX = False
 
+EXECUTORCH_REQUIREMENT = "executorch>=1.2.0"
+
 
 if "--use-rtx" in sys.argv:
     USE_TRT_RTX = True
@@ -843,7 +845,7 @@ def get_x86_64_requirements(base_requirements):
 
     if IS_DLFW_CI:
         return requirements + [
-            "executorch>=1.2.0",
+            EXECUTORCH_REQUIREMENT,
         ]
     else:
         requirements = requirements + [
@@ -855,7 +857,7 @@ def get_x86_64_requirements(base_requirements):
             ]
         else:
             requirements = requirements + [
-                "executorch>=1.2.0",
+                EXECUTORCH_REQUIREMENT,
                 "tensorrt>=10.16.1,<10.17.0",
             ]
             cuda_version = torch.version.cuda
