@@ -210,6 +210,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._output_buffers: List[torch.Tensor] = []
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
+        self._owned_pool_stream: Optional[torch.cuda.Stream] = None
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self.shape_key: Optional[str] = None
         self._empty_tensor_placeholder: Optional[torch.Tensor] = None
@@ -269,6 +270,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._output_buffers = []
         self._caller_stream = None
         self._engine_stream = None
+        self._owned_pool_stream = None
         self.cudagraph = None
         self.shape_key = None
         self._empty_tensor_placeholder = None
@@ -350,6 +352,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         device_info = parse_device_info(self.serialized_device_info)
         self.target_device_id = device_info["id"]
+        self._target_device = torch.device("cuda", self.target_device_id)
+        self._default_stream = torch.cuda.default_stream(self._target_device)
         # Serialized major/minor/name only — not ``_CudaDeviceProperties`` — so deepcopy/refit
         # can copy the owning ``GraphModule`` without pickle errors.
         self.target_device_properties = SimpleNamespace(
@@ -675,9 +679,59 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
     # --- execution ---
 
+    def _prepare_streams(self, contiguous_inputs: List[torch.Tensor]) -> bool:
+        """Pick the engine stream relative to the caller's current stream.
+
+        If the caller is on the default stream we keep the legacy behavior of
+        running the engine on a dedicated pool stream (and synchronising via
+        wait_stream).  If the caller is on a non-default stream (e.g. a stream
+        attached to a CUDA Green Context) we honor it by reusing the caller's
+        stream for the engine, so the caller's scheduling choice (e.g. SM
+        partitioning) is preserved end to end and no wait_stream sync is
+        needed.
+
+        Returns ``caller_on_default`` so call sites can gate the wait_stream
+        pair on it.  Also flips ``runtime_states.context_changed`` whenever
+        the engine stream changes while CUDA graphs are enabled so the
+        current invocation re-records the graph against the new stream.
+        Call sites MUST invoke this before ``runtime_states.set_runtime_states``
+        because that call consumes and resets ``context_changed``.
+        """
+        current_device = (
+            contiguous_inputs[0].device
+            if contiguous_inputs and contiguous_inputs[0].is_cuda
+            else self._target_device
+        )
+        default_stream = self._default_stream
+        previous_engine_stream = self._engine_stream
+        self._caller_stream = torch.cuda.current_stream(current_device)
+        caller_on_default = self._caller_stream == default_stream
+        if caller_on_default:
+            if self._owned_pool_stream is None:
+                self._owned_pool_stream = torch.cuda.Stream(self._target_device)
+            self._engine_stream = self._owned_pool_stream
+        else:
+            # Honor caller's non-default stream so its scheduling choice (e.g.
+            # SM partitioning via a CUDA Green Context) is preserved end to
+            # end.
+            self._engine_stream = self._caller_stream
+        if (
+            torch_tensorrt.runtime.get_cudagraphs_mode()
+            and self._engine_stream != previous_engine_stream
+        ):
+            # Captured CUDA graph was recorded against the old stream.
+            self.runtime_states.context_changed = True
+        return caller_on_default
+
     def _execute_standard(
         self, contiguous_inputs: List[torch.Tensor]
     ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+        # Pick the engine stream BEFORE set_runtime_states so that any
+        # stream-identity change observed this call flips
+        # runtime_states.context_changed in time to trigger same-call
+        # cudagraph recapture (set_runtime_states consumes and resets the
+        # flag).
+        caller_on_default = self._prepare_streams(contiguous_inputs)
         shape_changed = self.validate_input_shapes(contiguous_inputs)
         (
             need_cudagraphs_record,
@@ -734,14 +788,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                     self.context.set_tensor_address(output_name, outputs[o].data_ptr())
 
         with self._profile_section("TRTEngine:TensorRTRuntime"):
-            self._caller_stream = torch.cuda.current_stream()
-            if (
-                self._engine_stream == torch.cuda.default_stream()
-                or self._engine_stream is None
-            ):
-                self._engine_stream = torch.cuda.Stream()
-
-            self._engine_stream.wait_stream(self._caller_stream)
+            if caller_on_default:
+                self._engine_stream.wait_stream(self._caller_stream)
             with torch.cuda.stream(self._engine_stream):
                 if self.resource_allocation_strategy:
                     self._dynamic_workspace = torch.empty(
@@ -770,7 +818,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 else:
                     self.context.execute_async_v3(self._engine_stream.cuda_stream)
 
-            self._caller_stream.wait_stream(self._engine_stream)
+            if caller_on_default:
+                self._caller_stream.wait_stream(self._engine_stream)
 
         if self.use_pre_allocated_outputs and (
             self.output_tensors_are_unowned
@@ -809,18 +858,15 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                         f"Failed to set output allocator for {output_name}"
                     )
 
-        with self._profile_section("TRTEngine:TensorRTRuntime"):
-            self._caller_stream = torch.cuda.current_stream()
-            if (
-                self._engine_stream == torch.cuda.default_stream()
-                or self._engine_stream is None
-            ):
-                self._engine_stream = torch.cuda.Stream()
+        caller_on_default = self._prepare_streams(contiguous_inputs)
 
-            self._engine_stream.wait_stream(self._caller_stream)
+        with self._profile_section("TRTEngine:TensorRTRuntime"):
+            if caller_on_default:
+                self._engine_stream.wait_stream(self._caller_stream)
             with torch.cuda.stream(self._engine_stream):
                 self.context.execute_async_v3(self._engine_stream.cuda_stream)
-            self._caller_stream.wait_stream(self._engine_stream)
+            if caller_on_default:
+                self._caller_stream.wait_stream(self._engine_stream)
 
         outputs = []
         assert self.output_allocator is not None
