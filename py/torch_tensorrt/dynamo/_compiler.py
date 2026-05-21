@@ -898,10 +898,10 @@ def _build_user_symbol_bounds(
     fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
 
     Validates against finite exporter bounds: ``user_max > exp_max`` and
-    ``user_min < exp_min`` raise (TRT will reject those shapes at runtime);
-    a strict subset warns (engine profile widens to the exporter); the
-    ``user_min=1, exp_min=2`` case warns only -- it's PyTorch's 0/1
-    specialization artifact, not a user error.
+    ``user_min < exp_min`` raise (TRT would reject those shapes at runtime);
+    a strict subset narrows the engine profile to the user's bounds (info
+    log only); the ``user_min=1, exp_min=2`` case warns -- it's PyTorch's
+    0/1 specialization artifact, not a user error.
     """
     name_to_node = {n.name: n for n in gm.graph.nodes if n.op == "placeholder"}
     placeholders = [name_to_node[name] for name in graph_signature.user_inputs]
@@ -1022,18 +1022,17 @@ def _build_user_symbol_bounds(
                     f"below {exp_min} at runtime.{hint}"
                 )
 
-            # Strict subset: engine profile widens to the exporter.
-            logger.warning(
-                "%s Input bounds are a subset of the exporter's range; "
-                "TRT engine profile will use the wider [%d, %d]."
-                " Re-export with Dim('%s', min=%d, max=%d) for a "
-                "narrower profile.",
+            # Strict subset: engine profile narrows to the user's bounds
+            # (applied in ``extract_var_range_info``). Not a warning -- the
+            # user got exactly what they asked for.
+            logger.info(
+                "%s Narrowing engine profile to user bounds [%d, %d] "
+                "(exporter range was [%d, %d]).",
                 mismatch,
-                exp_min,
-                exp_max,
-                expr,
                 user_min,
                 user_max,
+                exp_min,
+                exp_max,
             )
 
     return user_symbol_bounds
