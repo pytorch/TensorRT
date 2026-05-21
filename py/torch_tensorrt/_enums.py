@@ -1402,7 +1402,8 @@ class Platform(Enum):
         return Platform.UNKNOWN
 
     def __str__(self) -> str:
-        return str(self.name)
+        # Make it compatible with C++ runtime
+        return self.name.lower()
 
     @needs_torch_tensorrt_runtime  # type: ignore
     def _to_serialized_rt_platform(self) -> str:

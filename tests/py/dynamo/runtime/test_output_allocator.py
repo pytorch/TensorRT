@@ -3,7 +3,6 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt
-from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
@@ -48,13 +47,7 @@ class DDSModel2(torch.nn.Module):
     "TensorRT RTX does not support nonzero which are required for this test",
 )
 class TestOutputAllocatorStaticModel(TestCase):
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
+    def test_cudagraphs_and_output_allocator(self):
         model = StaticModel().eval().cuda()
         inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
         compiled_model = torch_tensorrt.compile(
@@ -62,7 +55,6 @@ class TestOutputAllocatorStaticModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
 
         ref_out = model(*inputs)
@@ -89,13 +81,7 @@ class TestOutputAllocatorStaticModel(TestCase):
             msg="Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_default(self, _, use_python_runtime):
+    def test_default(self):
         """
         Static models use standard execution with cudagraphs=False by default.
         """
@@ -106,7 +92,6 @@ class TestOutputAllocatorStaticModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
         standard_out = compiled_model(*inputs)
         ref_out = model(*inputs)
@@ -118,13 +103,7 @@ class TestOutputAllocatorStaticModel(TestCase):
             msg="Default standard execution (cudagraphs=False) outputs don't match with the original model.",
         )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_combination_of_cg_and_oa(self, _, use_python_runtime):
+    def test_combination_of_cg_and_oa(self):
         model = StaticModel().eval().cuda()
         inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
         compiled_model = torch_tensorrt.compile(
@@ -132,7 +111,6 @@ class TestOutputAllocatorStaticModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
 
         with pytest.raises(
@@ -161,13 +139,7 @@ class TestOutputAllocatorStaticModel(TestCase):
     "TensorRT RTX does not support nonzero which are required for this test",
 )
 class TestOutputAllocatorDDSModel(TestCase):
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
+    def test_cudagraphs_and_output_allocator(self):
         model = DDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -175,7 +147,6 @@ class TestOutputAllocatorDDSModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
 
         with pytest.raises(
@@ -199,13 +170,7 @@ class TestOutputAllocatorDDSModel(TestCase):
             msg="Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_default(self, _, use_python_runtime):
+    def test_default(self):
         """
         DDS models use OutputAllocator by default.
         """
@@ -216,7 +181,6 @@ class TestOutputAllocatorDDSModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
         oa_out = compiled_model(*inputs)
         ref_out = model(*inputs)
@@ -228,13 +192,7 @@ class TestOutputAllocatorDDSModel(TestCase):
             msg="Default Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_combination_of_cg_and_oa(self, _, use_python_runtime):
+    def test_combination_of_cg_and_oa(self):
         model = DDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -242,7 +200,6 @@ class TestOutputAllocatorDDSModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
 
         with pytest.raises(
@@ -275,13 +232,7 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
     The DDSOpWithReductionOpModel is a model that contains DDS op + reduction op.
     """
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
+    def test_cudagraphs_and_output_allocator(self):
         model = DDSOpWithReductionOpModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -289,7 +240,6 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
 
         with pytest.raises(
@@ -313,13 +263,7 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
             msg="Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_default(self, _, use_python_runtime):
+    def test_default(self):
         """
         The DDSOpWithReductionOpModel is a model that contains nonzero op + reduction op, in which nonzero op requires output allocator.
         """
@@ -330,7 +274,6 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
         oa_out = compiled_model(*inputs)
         ref_out = model(*inputs)
@@ -342,13 +285,7 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
             msg="Default Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_combination_of_cg_and_oa(self, _, use_python_runtime):
+    def test_combination_of_cg_and_oa(self):
         model = DDSOpWithReductionOpModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -356,7 +293,6 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
         )
 
         with pytest.raises(
@@ -385,13 +321,7 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
     "TensorRT RTX does not support nonzero which are required for this test",
 )
 class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
+    def test_cudagraphs_and_output_allocator(self):
         model = DDSModel2().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -399,7 +329,6 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
             torch_executed_ops={"torch.ops.aten.abs.default"},
         )
 
@@ -424,13 +353,7 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
             msg="Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_default(self, _, use_python_runtime):
+    def test_default(self):
         """
         Use Output Allocator by default.
         """
@@ -441,7 +364,6 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
             torch_executed_ops={"torch.ops.aten.abs.default"},
         )
         oa_out = compiled_model(*inputs)
@@ -454,13 +376,7 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
             msg="Default Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @parameterized.expand(
-        [
-            ("python_runtime", True),
-            ("cpp_runtime", False),
-        ]
-    )
-    def test_combination_of_cg_and_oa(self, _, use_python_runtime):
+    def test_combination_of_cg_and_oa(self):
         model = DDSModel2().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -468,7 +384,6 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=use_python_runtime,
             torch_executed_ops={"torch.ops.aten.abs.default"},
         )
 

@@ -27,13 +27,20 @@ Functions
 
 .. autofunction:: enable_output_allocator
 
+Runtime backend
+---------------
+
+Execution uses the C++ runtime engine when it is installed in the build; otherwise the
+Python runtime engine is used. There is no separate process-wide backend switch
+in ``torch_tensorrt.runtime``.
+
 Classes
 ---------
 
 .. autoclass:: TorchTensorRTModule
    :members:
    :special-members: __init__
+   :show-inheritance:
 
-.. autoclass:: PythonTorchTensorRTModule
-   :members:
-   :special-members: __init__
+   Single runtime module for TensorRT engines. Dispatches to the C++ or Python execution
+   implementation depending on whether the C++ extension is available. See :ref:`python_runtime`.

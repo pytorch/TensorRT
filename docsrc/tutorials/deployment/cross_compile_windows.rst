@@ -26,7 +26,6 @@ Requirements
 The following features are **disabled** during cross-compilation (they are not
 available in the Windows TRT runtime or require OS-specific binaries):
 
-* Python runtime (``use_python_runtime`` is forced to ``False``)
 * Lazy engine initialization (``lazy_engine_init`` is forced to ``False``)
 * Engine caching (``cache_built_engines`` / ``reuse_cached_engines`` disabled)
 
