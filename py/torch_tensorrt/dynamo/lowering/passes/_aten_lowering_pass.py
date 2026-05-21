@@ -3,6 +3,7 @@ import operator
 from typing import Any, Callable, Optional, Sequence, Union
 
 import torch
+
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
@@ -23,6 +24,7 @@ from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .rule_based_autocast import rule_based_autocast
+from .unfunctionalize_qdp_inplace import unfunctionalize_qdp_inplace
 
 pre_lowering_pass_list = [
     remove_detach,
@@ -31,6 +33,10 @@ pre_lowering_pass_list = [
 ]
 
 post_lowering_pass_list = [
+    # Must run before remove_num_users_is_0_nodes and any pass that walks the
+    # converter registry, so the underlying mutating op is restored ahead of
+    # partitioning and the QDP `.aliased()` descriptor can take effect.
+    unfunctionalize_qdp_inplace,
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
     constant_fold,
