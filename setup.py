@@ -246,6 +246,10 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=rtx")
         print("TensorRT RTX build")
 
+    if IS_DLFW_CI:
+        cmd.append("--config=dlfw")
+        print("DLFW build")
+
     if IS_JETPACK:
         cmd.append("--config=jetpack")
         print("Jetpack build")
@@ -600,6 +604,9 @@ if _FX_FE_AVAIL:
     )
 
 package_data = {}
+executorch_header_package_data = (
+    [] if IS_DLFW_CI else ["include/torch_tensorrt/executorch/*.h"]
+)
 
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (
@@ -766,7 +773,7 @@ if not (PY_ONLY or NO_TS):
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
-                "include/torch_tensorrt/executorch/*.h",
+                *executorch_header_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/conversion/*.h",
                 "include/torch_tensorrt/core/conversion/conversionctx/*.h",
@@ -796,7 +803,7 @@ elif NO_TS:
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
-                "include/torch_tensorrt/executorch/*.h",
+                *executorch_header_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/runtime/*.h",
                 "lib/*",
@@ -833,7 +840,9 @@ def get_x86_64_requirements(base_requirements):
     requirements = base_requirements + ["numpy"]
 
     if IS_DLFW_CI:
-        return requirements
+        return requirements + [
+            "executorch>=1.2.0",
+        ]
     else:
         requirements = requirements + [
             "torch>=2.13.0.dev,<2.14.0",
