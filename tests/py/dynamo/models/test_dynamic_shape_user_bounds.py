@@ -301,9 +301,9 @@ def test_build_user_symbol_bounds_no_warning_on_matching_bounds(caplog):
 
 
 @pytest.mark.unit
-def test_build_user_symbol_bounds_warns_on_subset_input(caplog):
-    """Strict-subset Input warns: engine profile is silently widened to the
-    exporter's range, which the user should know about."""
+def test_build_user_symbol_bounds_narrows_to_user_on_subset(caplog):
+    """Strict-subset Input narrows the engine profile to the user's bounds.
+    No warning -- the user got exactly what they asked for; just an info log."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(10, 8, device="cuda")
@@ -322,16 +322,28 @@ def test_build_user_symbol_bounds_warns_on_subset_input(caplog):
 
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
-        _build_user_symbol_bounds(ep.module(), [subset_input], {})
+    with caplog.at_level(logging.INFO, logger="torch_tensorrt.dynamo._compiler"):
+        bounds = _build_user_symbol_bounds(ep.module(), [subset_input], {})
 
+    # No warning -- subset is a valid, intended narrowing.
     warning_messages = [
         rec.message for rec in caplog.records if rec.levelno >= logging.WARNING
     ]
-    assert warning_messages
-    msg = "\n".join(warning_messages)
-    assert "subset" in msg or "wider" in msg
-    assert "re-export" in msg or "Re-export" in msg
+    assert not warning_messages, f"unexpected warnings: {warning_messages}"
+
+    # Narrowing must surface as an info log so users can see what envelope
+    # their engine actually has.
+    info_messages = [
+        rec.message for rec in caplog.records if rec.levelno == logging.INFO
+    ]
+    assert any("Narrowing engine profile" in m for m in info_messages), info_messages
+
+    # And the engine-side resolution must actually narrow to (12, 18).
+    _, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
+    assert sym_dim is not None
+    info = extract_var_range_info(sym_dim, user_symbol_bounds=bounds)
+    assert info["min"] == 12, info
+    assert info["max"] == 18, info
 
 
 @pytest.mark.unit

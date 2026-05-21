@@ -465,17 +465,19 @@ def extract_var_range_info(
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
 
-    # Fill missing exporter upper from user bounds; intersect lower so
-    # ShapeEnv's 0/1 specialization is preserved.
+    # Apply user bounds whenever present. ``_build_user_symbol_bounds`` already
+    # rejects user ranges that exceed the exporter, so the only cases reaching
+    # here are: Dim.DYNAMIC (max_val is None), strict subset, or the 1->2
+    # specialization. Clamp defensively in case validation was skipped (no
+    # ShapeEnv access path).
     if (
-        max_val is None
-        and user_symbol_bounds
+        user_symbol_bounds
         and isinstance(expr, sympy.Symbol)
         and expr in user_symbol_bounds
     ):
         user_min, user_max = user_symbol_bounds[expr]
         min_val = max(min_val, int(user_min))
-        max_val = int(user_max)
+        max_val = int(user_max) if max_val is None else min(max_val, int(user_max))
 
     min_max_opt: Dict[str, Optional[int]] = {}
     min_max_opt["min"] = min_val
