@@ -65,10 +65,12 @@ if [[ ! "${short_drive}" =~ ^[A-Za-z]:$ ]]; then
   exit 1
 fi
 
-SHORT_CONDA_DRIVE="${short_drive}" CONDA_ENV_PARENT_WIN="${conda_env_parent_win}" powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '
+MSYS2_ARG_CONV_EXCL="*" MSYS2_ENV_CONV_EXCL="CONDA_ENV_PARENT_WIN" SHORT_CONDA_DRIVE="${short_drive}" CONDA_ENV_PARENT_WIN="${conda_env_parent_win}" powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '
 $ErrorActionPreference = "Stop"
 $drive = $env:SHORT_CONDA_DRIVE
 $target = $env:CONDA_ENV_PARENT_WIN
+$target = $target -replace "^[\\/]+(?=[A-Za-z]:[\\/])", ""
+Write-Host "Mapping Conda env parent path: $target"
 if (-not (Test-Path -LiteralPath $target -PathType Container)) {
   throw "Conda env parent path not found: $target"
 }
