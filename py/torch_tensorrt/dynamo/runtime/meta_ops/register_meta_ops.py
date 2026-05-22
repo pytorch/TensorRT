@@ -304,7 +304,7 @@ class FakeTRTEngine:
         pass
 
 
-@torch.library.custom_op(  # type: ignore
+@torch.library.custom_op(  # type: ignore[misc]
     "tensorrt::no_op_placeholder_for_execute_engine", mutates_args=()
 )
 def no_op_placeholder_for_execute_engine(

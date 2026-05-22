@@ -119,7 +119,6 @@ def compile_model(
         "prefer_deferred_runtime_asserts_over_guards": True,
         "truncate_double": True,
         "min_block_size": 1,
-        "use_python_runtime": True,
         "immutable_weights": False,
         "offload_module_to_cpu": args.low_vram_mode,
     }

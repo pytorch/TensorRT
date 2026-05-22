@@ -10,14 +10,8 @@ infrastructure for inference.
 Dynamo Runtime (Primary Path)
 -------------------------------
 
-Two runtime backends are available. The backend is selected via the
-``use_python_runtime`` compilation setting.
-
-C++ Runtime (default)
-^^^^^^^^^^^^^^^^^^^^^^^
-
-The C++ runtime is more performant, fully serializable, and supports advanced features
-like CUDAGraphs and multi-device safety.
+The Dynamo runtime is fully serializable and supports advanced features like
+CUDAGraphs and multi-device safety.
 
 TensorRT engines are stored as ``torch.classes.tensorrt.Engine`` — a C++ TorchBind
 class that holds the serialized engine bytes plus metadata:
@@ -41,14 +35,6 @@ This op pops inputs and the engine off the PyTorch dispatcher stack, runs the te
 through TensorRT, and pushes output tensors back. The compiled ``torch.fx.Graph``
 stores engine objects as attributes, making the whole module portable.
 
-Python Runtime
-^^^^^^^^^^^^^^^
-
-The Python runtime uses TensorRT's Python API directly for inference. It is useful when
-a C++ build is not available (e.g. in some CI environments) and is simpler to instrument
-for debugging. It does not support serialization to ``ExportedProgram``; the compiled
-graph is Python-only.
-
 Serialization Options
 ----------------------
 
@@ -59,7 +45,7 @@ The default serialization path for the Dynamo AOT workflow. The compiled
 ``torch.fx.GraphModule`` is wrapped in a
 `torch.export.ExportedProgram <https://docs.pytorch.org/docs/stable/user_guide/torch_compiler/export.html>`_
 container. TensorRT engines are stored as tensor attributes in the package; PyTrees
-capture input/output structure. Requires the C++ runtime and supports Python execution.
+capture input/output structure.
 
 .. code-block:: python
 

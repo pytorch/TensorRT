@@ -73,9 +73,6 @@ class CompilationSettings:
         version_compatible (bool): Provide version forward-compatibility for engine plan files
         optimization_level (Optional[int]): Builder optimization 0-5, higher levels imply longer build time,
             searching for more optimization options. TRT defaults to 3
-        use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
-            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
-            argument as None
         truncate_double (bool): Whether to truncate float64 TRT engine inputs or weights to float32
         use_fast_partitioner (bool): Whether to use the fast or global graph partitioning system
         enable_experimental_decompositions (bool): Whether to enable all core aten decompositions
@@ -121,6 +118,7 @@ class CompilationSettings:
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        use_python_runtime (bool): Force the pure-Python TensorRT runtime (``TRTEngine`` + ``tensorrt::execute_engine_python``). When ``False`` (default) the C++ runtime is used if available and the Python runtime is used as a fallback otherwise.
     """
 
     workspace_size: int = WORKSPACE_SIZE
@@ -130,7 +128,6 @@ class CompilationSettings:
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS
     version_compatible: bool = VERSION_COMPATIBLE
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL
-    use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME
     truncate_double: bool = TRUNCATE_DOUBLE
     use_fast_partitioner: bool = USE_FAST_PARTITIONER
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS
@@ -184,6 +181,7 @@ class CompilationSettings:
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
     decompose_attention: bool = DECOMPOSE_ATTENTION
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
+    use_python_runtime: bool = USE_PYTHON_RUNTIME
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (

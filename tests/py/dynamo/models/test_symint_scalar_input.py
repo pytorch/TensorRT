@@ -20,8 +20,8 @@ assertions = unittest.TestCase()
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("use_python_runtime", [True, False])
-def test_symint_from_size_used_in_reshape(use_python_runtime):
+@pytest.mark.parametrize("runtime_backend", ["python", "cpp"])
+def test_symint_from_size_used_in_reshape(runtime_backend):
     """
     Test that a SymInt derived from tensor.size(0) can be used in reshape
     when it becomes a scalar placeholder input to the TRT subgraph.
@@ -48,7 +48,6 @@ def test_symint_from_size_used_in_reshape(use_python_runtime):
     compile_spec = {
         "min_block_size": 1,
         "pass_through_build_failures": True,
-        "use_python_runtime": use_python_runtime,
     }
 
     trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
@@ -59,15 +58,15 @@ def test_symint_from_size_used_in_reshape(use_python_runtime):
     cos_sim = cosine_similarity(output_ref, output_trt)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        msg=f"SymInt reshape test (python_runtime={use_python_runtime}) failed. Cosine sim: {cos_sim}",
+        msg=f"SymInt reshape test (runtime_backend={runtime_backend}) failed. Cosine sim: {cos_sim}",
     )
 
     torch._dynamo.reset()
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("use_python_runtime", [True, False])
-def test_scalar_tensor_input(use_python_runtime):
+@pytest.mark.parametrize("runtime_backend", ["python", "cpp"])
+def test_scalar_tensor_input(runtime_backend):
     """
     Test that a 0-dim scalar tensor input (e.g., cache_length) is handled
     correctly during symbolic shape extraction and TRT compilation.
@@ -85,7 +84,6 @@ def test_scalar_tensor_input(use_python_runtime):
     compile_spec = {
         "min_block_size": 1,
         "pass_through_build_failures": True,
-        "use_python_runtime": use_python_runtime,
     }
 
     trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
@@ -96,15 +94,15 @@ def test_scalar_tensor_input(use_python_runtime):
     cos_sim = cosine_similarity(output_ref, output_trt)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        msg=f"Scalar tensor input test (python_runtime={use_python_runtime}) failed. Cosine sim: {cos_sim}",
+        msg=f"Scalar tensor input test (runtime_backend={runtime_backend}) failed. Cosine sim: {cos_sim}",
     )
 
     torch._dynamo.reset()
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("use_python_runtime", [True, False])
-def test_symint_with_index_and_reshape(use_python_runtime):
+@pytest.mark.parametrize("runtime_backend", ["python", "cpp"])
+def test_symint_with_index_and_reshape(runtime_backend):
     """
     Full reproduction of issue #4107 pattern: symbolic size from int64 tensor,
     used with index operation and reshape.
@@ -138,7 +136,6 @@ def test_symint_with_index_and_reshape(use_python_runtime):
         "min_block_size": 1,
         "truncate_double": True,
         "pass_through_build_failures": True,
-        "use_python_runtime": use_python_runtime,
     }
 
     trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
@@ -149,15 +146,15 @@ def test_symint_with_index_and_reshape(use_python_runtime):
     cos_sim = cosine_similarity(output_ref, output_trt)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        msg=f"Issue 4107 repro test (python_runtime={use_python_runtime}) failed. Cosine sim: {cos_sim}",
+        msg=f"Issue 4107 repro test (runtime_backend={runtime_backend}) failed. Cosine sim: {cos_sim}",
     )
 
     torch._dynamo.reset()
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("use_python_runtime", [True, False])
-def test_symint_with_different_batch_sizes(use_python_runtime):
+@pytest.mark.parametrize("runtime_backend", ["python", "cpp"])
+def test_symint_with_different_batch_sizes(runtime_backend):
     """
     Test that after compilation with a SymInt scalar input, the model
     produces correct results with different batch sizes.
@@ -179,7 +176,6 @@ def test_symint_with_different_batch_sizes(use_python_runtime):
     compile_spec = {
         "min_block_size": 1,
         "pass_through_build_failures": True,
-        "use_python_runtime": use_python_runtime,
     }
 
     trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
@@ -194,7 +190,7 @@ def test_symint_with_different_batch_sizes(use_python_runtime):
         cos_sim = cosine_similarity(output_ref, output_trt)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"Varying batch size test (python_runtime={use_python_runtime}) failed at B={batch_size}. Cosine sim: {cos_sim}",
+            msg=f"Varying batch size test (runtime_backend={runtime_backend}) failed at B={batch_size}. Cosine sim: {cos_sim}",
         )
 
     torch._dynamo.reset()

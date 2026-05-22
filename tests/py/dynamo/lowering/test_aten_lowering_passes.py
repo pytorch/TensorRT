@@ -271,7 +271,7 @@ class TestRemoveSymIntNodes(TestCase):
         trt_module = torch.compile(
             model,
             backend="tensorrt",
-            options={"use_python_runtime": False, "min_block_size": 1},
+            options={"min_block_size": 1},
         )
         out = trt_module(inputs)
         # if the model can be successfully compiled, we regard the test as passed
