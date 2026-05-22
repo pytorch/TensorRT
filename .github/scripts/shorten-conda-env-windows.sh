@@ -17,10 +17,31 @@ if ! command -v cygpath >/dev/null 2>&1; then
   exit 1
 fi
 
+to_windows_path() {
+  local path="${1//\\//}"
+
+  if [[ "${path}" =~ ^[A-Za-z]:/ ]]; then
+    printf "%s\n" "${path//\//\\}"
+  else
+    cygpath -w "${path}"
+  fi
+}
+
+to_bash_path() {
+  local path="${1//\\//}"
+
+  if [[ "${path}" =~ ^([A-Za-z]):(/.*)?$ ]]; then
+    printf "/%s%s\n" "${BASH_REMATCH[1],,}" "${BASH_REMATCH[2]}"
+  else
+    printf "%s\n" "${path}"
+  fi
+}
+
 conda_env="${CONDA_ENV%/}"
-conda_env_name="$(basename "${conda_env}")"
-conda_env_parent="$(dirname "${conda_env}")"
-conda_env_parent_win="$(cygpath -w "${conda_env_parent}")"
+conda_env_bash="$(to_bash_path "${conda_env}")"
+conda_env_name="$(basename "${conda_env_bash}")"
+conda_env_parent="$(dirname "${conda_env_bash}")"
+conda_env_parent_win="$(to_windows_path "${conda_env_parent}")"
 
 if [[ -n "${SHORT_CONDA_DRIVE:-}" ]]; then
   short_drive="${SHORT_CONDA_DRIVE%:}:"
@@ -44,21 +65,27 @@ if [[ ! "${short_drive}" =~ ^[A-Za-z]:$ ]]; then
   exit 1
 fi
 
-cmd //c "subst ${short_drive} /D >NUL 2>NUL || exit /B 0"
-cmd //c "subst ${short_drive} \"${conda_env_parent_win}\""
+MSYS2_ARG_CONV_EXCL='*' cmd.exe /D /S /C "subst ${short_drive} /D >NUL 2>NUL || exit /B 0"
+MSYS2_ARG_CONV_EXCL='*' cmd.exe /D /S /C "subst ${short_drive} \"${conda_env_parent_win}\""
 
 short_conda_env="${short_drive}/${conda_env_name}"
+short_conda_run="conda run --no-capture-output -p ${short_conda_env}"
 
 {
   echo "CONDA_ENV=${short_conda_env}"
-  echo "CONDA_RUN=conda run --no-capture-output -p ${short_conda_env}"
+  echo "CONDA_RUN=${short_conda_run}"
 } >> "${GITHUB_ENV}"
 
-if [[ -n "${BUILD_ENV_FILE:-}" && -f "${BUILD_ENV_FILE}" ]]; then
+build_env_file="${BUILD_ENV_FILE:-}"
+if [[ -n "${build_env_file}" ]]; then
+  build_env_file="$(to_bash_path "${build_env_file}")"
+fi
+
+if [[ -n "${build_env_file}" && -f "${build_env_file}" ]]; then
   {
-    echo "CONDA_ENV=${short_conda_env}"
-    echo "CONDA_RUN=conda run --no-capture-output -p ${short_conda_env}"
-  } >> "${BUILD_ENV_FILE}"
+    printf "export CONDA_ENV=%q\n" "${short_conda_env}"
+    printf "export CONDA_RUN=%q\n" "${short_conda_run}"
+  } >> "${build_env_file}"
 fi
 
 echo "Mapped ${conda_env_parent_win} to ${short_drive}"
