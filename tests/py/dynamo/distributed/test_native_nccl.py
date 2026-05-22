@@ -1241,7 +1241,7 @@ class TestPythonRuntimePickle(unittest.TestCase):
             dist.destroy_process_group()
 
     def _compile_small_model(self) -> Any:
-        """Return a compiled PythonTorchTensorRTModule instance."""
+        """Return a compiled module backed by a Python ``TRTEngine``."""
         import torch_tensorrt
 
         class LinearModel(nn.Module):
@@ -1263,33 +1263,40 @@ class TestPythonRuntimePickle(unittest.TestCase):
             _ = trt_model(inp)  # trigger compilation
         return trt_model
 
-    def test_nccl_comm_absent_after_pickle(self) -> None:
-        """__getstate__ must exclude _nccl_comm from the pickled state."""
-        import pickle
+    @classmethod
+    def _find_python_trt_engine(cls, obj: Any) -> Any:
+        """Walk a compiled module and return the Python ``TRTEngine`` instance.
 
+        With the unified runtime, the wrapping ``TorchTensorRTModule`` is the
+        same regardless of backend; ``use_python_runtime=True`` causes its
+        ``.engine`` attribute to be a Python ``TRTEngine`` (vs the C++
+        ``torch.classes.tensorrt.Engine`` otherwise).
+        """
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        if isinstance(obj, TorchTensorRTModule) and isinstance(obj.engine, TRTEngine):
+            return obj.engine
+        for child in obj.children() if isinstance(obj, nn.Module) else []:
+            result = cls._find_python_trt_engine(child)
+            if result is not None:
+                return result
+        return None
+
+    def test_nccl_comm_absent_after_pickle(self) -> None:
+        """__getstate__ must not carry the live NCCL comm pointer."""
         trt_model = self._compile_small_model()
 
-        # Locate the underlying PythonTorchTensorRTModule
-        def find_module(obj: Any) -> Any:
-            from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
-                PythonTorchTensorRTModule,
-            )
+        engine = self._find_python_trt_engine(trt_model)
+        if engine is None:
+            self.skipTest("Could not locate Python TRTEngine in compiled model")
 
-            if isinstance(obj, PythonTorchTensorRTModule):
-                return obj
-            for child in obj.children() if isinstance(obj, nn.Module) else []:
-                result = find_module(child)
-                if result is not None:
-                    return result
-            return None
-
-        module = find_module(trt_model)
-        if module is None:
-            self.skipTest(
-                "Could not locate PythonTorchTensorRTModule in compiled model"
-            )
-
-        state = module.__getstate__()
+        # TRTEngine.__getstate__ returns (serialized_info, "TRTEngine"); the
+        # NCCL comm is intentionally not part of that payload (it's a non-
+        # picklable C pointer rebound lazily on the next forward pass).
+        state = engine.__getstate__()
         self.assertNotIn(
             "_nccl_comm",
             state,
@@ -1302,26 +1309,11 @@ class TestPythonRuntimePickle(unittest.TestCase):
 
         trt_model = self._compile_small_model()
 
-        def find_module(obj: Any) -> Any:
-            from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
-                PythonTorchTensorRTModule,
-            )
+        engine = self._find_python_trt_engine(trt_model)
+        if engine is None:
+            self.skipTest("Could not locate Python TRTEngine in compiled model")
 
-            if isinstance(obj, PythonTorchTensorRTModule):
-                return obj
-            for child in obj.children() if isinstance(obj, nn.Module) else []:
-                result = find_module(child)
-                if result is not None:
-                    return result
-            return None
-
-        module = find_module(trt_model)
-        if module is None:
-            self.skipTest(
-                "Could not locate PythonTorchTensorRTModule in compiled model"
-            )
-
-        data = pickle.dumps(module)
+        data = pickle.dumps(engine)
         restored = pickle.loads(data)
         self.assertIsNone(
             restored._nccl_comm,
