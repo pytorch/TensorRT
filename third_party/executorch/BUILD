@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "CMakeLists.txt",
+    "executorch/CMakeLists.txt",
 ])
 
 # The ExecuTorch external repository is source-layout only. Keep this BUILD
@@ -13,7 +14,7 @@ exports_files([
 filegroup(
     name = "executorch_sources",
     srcs = glob(
-        ["**"],
+        ["executorch/**"],
         exclude = [".git/**"],
     ),
 )
@@ -35,7 +36,6 @@ cmake(
     lib_source = ":executorch_sources",
     out_include_dir = "",
     out_static_libs = ["libexecutorch_core.a"],
-    working_directory = "executorch",
     targets = ["executorch_core"],
 )
 

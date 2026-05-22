@@ -91,7 +91,7 @@ jobs:
 
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
-        executorch_cmake_location="$(bazel query @executorch//:CMakeLists.txt --output=location)"
+        executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         # this is to verify the end user's workflow
