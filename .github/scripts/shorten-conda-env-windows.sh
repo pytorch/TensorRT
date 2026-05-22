@@ -65,8 +65,19 @@ if [[ ! "${short_drive}" =~ ^[A-Za-z]:$ ]]; then
   exit 1
 fi
 
-MSYS2_ARG_CONV_EXCL='*' cmd.exe /D /S /C "subst ${short_drive} /D >NUL 2>NUL || exit /B 0"
-MSYS2_ARG_CONV_EXCL='*' cmd.exe /D /S /C "subst ${short_drive} \"${conda_env_parent_win}\""
+SHORT_CONDA_DRIVE="${short_drive}" CONDA_ENV_PARENT_WIN="${conda_env_parent_win}" powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '
+$ErrorActionPreference = "Stop"
+$drive = $env:SHORT_CONDA_DRIVE
+$target = $env:CONDA_ENV_PARENT_WIN
+if (-not (Test-Path -LiteralPath $target -PathType Container)) {
+  throw "Conda env parent path not found: $target"
+}
+& subst.exe $drive /D 2>$null
+& subst.exe $drive $target
+if ($LASTEXITCODE -ne 0) {
+  throw "subst failed to map $drive to $target"
+}
+'
 
 short_conda_env="${short_drive}/${conda_env_name}"
 short_conda_run="conda run --no-capture-output -p ${short_conda_env}"
