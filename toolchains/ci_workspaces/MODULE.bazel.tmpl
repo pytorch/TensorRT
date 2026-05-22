@@ -166,7 +166,7 @@ new_git_repository(
     recursive_init_submodules = True,
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
-        "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec ln -s ../{} executorch/ \\;",
+        "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",
     ],
     patch_cmds_win = [
         "Get-ChildItem -Recurse -Include BUILD,BUILD.bazel | Where-Object { $_.DirectoryName -ne (Get-Location).Path } | Remove-Item -Force",
