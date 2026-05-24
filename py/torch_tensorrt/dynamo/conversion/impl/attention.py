@@ -436,11 +436,10 @@ def scaled_dot_product_efficient_attention(
         and isinstance(key.shape[1], int)
         and key.shape[1] > 0
     ):
-        shape_layer = ctx.net.add_shape(key)
-        shape_layer.name = name + "_key_shape"
         shuffle = ctx.net.add_shuffle(scaled_query)
-        shuffle.set_input(1, shape_layer.get_output(0))
-        shuffle.name = name + "_fix_head_dim"
+        shuffle.name = name + "_fix_query_num_heads"
+        shuffle.zero_is_placeholder = True
+        shuffle.reshape_dims = (0, key.shape[1], 0, 0)
         scaled_query = shuffle.get_output(0)
 
     mask_tensor = None

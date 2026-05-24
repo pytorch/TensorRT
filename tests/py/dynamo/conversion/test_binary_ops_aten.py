@@ -252,6 +252,25 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.randn(2, 2, dtype=torch.bfloat16)]
         self.run_test(m, inputs)
 
+    def test_elementwise_mul_zerodim_fp32_against_fp16_tensor(self):
+        # Regression for pytorch/TensorRT#4265: a 0-dim fp32 scalar (e.g.
+        # an nn.Parameter holding `torch.tensor(1.0)`) multiplied with an
+        # Nd fp16 tensor must produce fp16 (PyTorch's weak-ZeroDim rule),
+        # not fp32 from torch.promote_types. The previous strong-promotion
+        # path forced fp32 through downstream ops and broke the next
+        # type-strict layer (here MatMul) with `A=Float, B=Half`.
+        class ZeroDimMulThenMatmul(nn.Module):
+            def forward(self, alpha_0d_fp32, x_fp16, weight_fp16):
+                scaled = alpha_0d_fp32 * x_fp16
+                return torch.matmul(scaled, weight_fp16)
+
+        inputs = [
+            torch.tensor(1.0, dtype=torch.float32),
+            torch.randn(2, 4, 8, dtype=torch.float16),
+            torch.randn(8, 8, dtype=torch.float16),
+        ]
+        self.run_test(ZeroDimMulThenMatmul(), inputs, use_dynamo_tracer=True)
+
 
 if __name__ == "__main__":
     run_tests()
