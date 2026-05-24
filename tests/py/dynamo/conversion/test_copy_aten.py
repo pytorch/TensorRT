@@ -88,6 +88,30 @@ class TestCopyConverter(DispatchTestCase):
             input_specs,
         )
 
+    def test_copy_mixed_dtype_dest_fp32_src_fp16(self):
+        # Regression for pytorch/TensorRT#4265: aten.copy(self, src) returns a
+        # tensor with self's dtype (src is implicitly cast). The previous
+        # converter cast to src.dtype, so an fp16 update flowed into the
+        # downstream fp32 scatter (produced by lowering slice-assignment)
+        # and TRT IScatterLayer rejected the build with
+        # `input Float / updates Half`.
+        class IndexAssignMixedDtype(nn.Module):
+            def forward(self, dest_fp32, src_fp16):
+                out = dest_fp32.clone()
+                out[..., :2] = src_fp16
+                return out
+
+        inputs = [
+            torch.randn(2, 3, 5, dtype=torch.float32),
+            torch.randn(2, 3, 2, dtype=torch.float16),
+        ]
+        self.run_test(
+            IndexAssignMixedDtype(),
+            inputs,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
