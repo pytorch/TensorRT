@@ -79,7 +79,7 @@ cc_library(
         "TRTEngineProfiler.h",
         "runtime.h",
     ],
-    copts = if_torch_nccl(["-DUSE_C10D_NCCL"]),
+    defines = if_torch_nccl(["USE_C10D_NCCL"]),
     linkopts = [
         "-lstdc++fs",
     ],
