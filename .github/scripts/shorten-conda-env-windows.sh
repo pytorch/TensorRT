@@ -37,6 +37,19 @@ to_bash_path() {
   fi
 }
 
+find_unused_drive() {
+  local drive
+
+  for drive in T S R Q P O N M L K J I H G F E D; do
+    if [[ ! -e "/${drive,,}" ]]; then
+      printf "%s:\n" "${drive}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 conda_env="${CONDA_ENV%/}"
 conda_env_bash="$(to_bash_path "${conda_env}")"
 conda_env_name="$(basename "${conda_env_bash}")"
@@ -45,17 +58,7 @@ conda_env_parent_win="$(to_windows_path "${conda_env_parent}")"
 
 if [[ -n "${SHORT_CONDA_DRIVE:-}" ]]; then
   short_drive="${SHORT_CONDA_DRIVE%:}:"
-else
-  short_drive=""
-  for drive in T S R Q P O N M L K J I H G F E D; do
-    if [[ ! -e "/${drive,,}" ]]; then
-      short_drive="${drive}:"
-      break
-    fi
-  done
-fi
-
-if [[ -z "${short_drive}" ]]; then
+elif ! short_drive="$(find_unused_drive)"; then
   echo "::error::Could not find an unused drive letter for the Conda env path"
   exit 1
 fi
