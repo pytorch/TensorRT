@@ -855,7 +855,7 @@ def _insert_complex_io_adapters(
       Outputs: insert view_as_complex before the output node for each originally-complex
                output that comes from a TRT block.
 
-    Leverages metadata that was captued when the complex rewriter pass was run
+    Leverages metadata that was captured when the complex rewriter pass was run
     """
     complex_input_names = gm.meta.get("complex_input_names", [])
     complex_input_dtypes = gm.meta.get("complex_input_dtypes", {})
