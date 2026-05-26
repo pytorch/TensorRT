@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../_static/documentation_options.js?v=2ffc0672"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -614,8 +614,6 @@ subgraph compilations are complete.</p></li>
 the engine. Upgrade TRT or rebuild with <code class="docutils literal notranslate"><span class="pre">version_compatible=True</span></code>.</p></li>
 <li><p>The GPU compute capability is lower than on the build machine. Rebuild with
 <code class="docutils literal notranslate"><span class="pre">hardware_compatible=True</span></code> (requires Ampere or newer).</p></li>
-<li><p>The <code class="docutils literal notranslate"><span class="pre">.ep</span></code> file was generated with <code class="docutils literal notranslate"><span class="pre">use_python_runtime=True</span></code> which is not
-serializable. Rebuild with the default C++ runtime.</p></li>
 </ul>
 </div></blockquote>
 <p><strong>Shape mismatch at runtime / “Invalid input shape”</strong></p>
@@ -646,9 +644,9 @@ kernel specialization.</p></li>
 <div><p>The model contains data-dependent-shape ops (<code class="docutils literal notranslate"><span class="pre">nonzero</span></code>, <code class="docutils literal notranslate"><span class="pre">unique</span></code>,
 <code class="docutils literal notranslate"><span class="pre">masked_select</span></code>, etc.) which require TRT’s output allocator.</p>
 <ul class="simple">
-<li><p>Use <code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code> (<code class="docutils literal notranslate"><span class="pre">use_python_runtime=True</span></code>) — it
-activates the dynamic output allocator automatically via
-<code class="docutils literal notranslate"><span class="pre">requires_output_allocator=True</span></code>.</p></li>
+<li><p>Use <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.runtime.TorchTensorRTModule</span></code> (or a compiled graph that wraps it)
+with <code class="docutils literal notranslate"><span class="pre">requires_output_allocator=True</span></code> so the runtime can use TRT’s output allocator
+when the engine needs dynamic output allocation.</p></li>
 <li><p>See <a class="reference internal" href="../tutorials/runtime_opt/cuda_graphs.html#cuda-graphs"><span class="std std-ref">CUDAGraphs and the Output Allocator</span></a> for <code class="docutils literal notranslate"><span class="pre">DynamicOutputAllocator</span></code> details.</p></li>
 </ul>
 </div></blockquote>

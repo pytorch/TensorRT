@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../_static/documentation_options.js?v=2ffc0672"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -600,8 +600,8 @@ For each TRT subgraph the runtime:</p>
 </section>
 <section id="graph-storage">
 <h3>Graph Storage<a class="headerlink" href="#graph-storage" title="Link to this heading">#</a></h3>
-<p>Each runtime module (both C++ <code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> and Python
-<code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code>) stores a <code class="docutils literal notranslate"><span class="pre">cudaGraphExec_t</span></code> instance. When
+<p><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> (C++ or Python execution path) may record a CUDA graph for
+engine execution when CUDA graphs are enabled at runtime. When
 <code class="docutils literal notranslate"><span class="pre">use_cuda_graph=True</span></code> is set at compile time the runtime records one graph
 per engine for the first input shape encountered.</p>
 <p>For <code class="docutils literal notranslate"><span class="pre">ir=&quot;torch_compile&quot;</span></code> (JIT path), guard-triggered recompilation provides

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../../../_static/documentation_options.js?v=2ffc0672"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -468,6 +468,8 @@ document.write(`
 
 
 <li class="toctree-l3"><a class="reference internal" href="nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -497,7 +499,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python vs C++ runtime</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -592,7 +594,7 @@ document.write(`
   <section id="Compiling-Stable-Diffusion-model-using-the-torch.compile-backend">
 <h1>Compiling Stable Diffusion model using the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend<a class="headerlink" href="#Compiling-Stable-Diffusion-model-using-the-torch.compile-backend" title="Link to this heading">#</a></h1>
 <p>This interactive script is intended as a sample of the Torch-TensorRT workflow with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> on a Stable Diffusion model. A sample output is featured below:</p>
-<p><img alt="ae086a7a7dd0498d925c51f5fd3a76a9" class="no-scaled-link" src="file://tutorials/images/majestic_castle.png" style="width: 512px; height: 512px;" /></p>
+<p><img alt="d2908c475a424d66a14c9cd9ad379673" class="no-scaled-link" src="file://tutorials/images/majestic_castle.png" style="width: 512px; height: 512px;" /></p>
 <section id="Imports-and-Model-Definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#Imports-and-Model-Definition" title="Link to this heading">#</a></h2>
 <div class="nbinput nblast docutils container">

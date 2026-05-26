@@ -89,6 +89,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="Compilation is an expensive operation as it involves many graph transformations, translations a...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_refit_engine_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_refit_engine_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Refitting Torch-TensorRT Programs with New Weights</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="Cross runtime compilation for windows example =================================================...">
 
 .. only:: html
@@ -118,23 +135,6 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Compiling BERT using the torch.compile backend</div>
-    </div>
-
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer" tooltip="Compilation is an expensive operation as it involves many graph transformations, translations a...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_refit_engine_example_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_refit_engine_example.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Refitting Torch-TensorRT Programs with New Weights</div>
     </div>
 
 
@@ -412,6 +412,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="cuda_kernel_op compiles your CUDA C++ source internally with NVRTC. When you already have PTX i...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_ptx_op_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_ptx_op.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="Basic example on how to use the hierarchical adjacency partitioner function and manually compil...">
 
 .. only:: html
@@ -582,6 +599,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="cuda_kernel_op is the single entry point for exposing a hand-written CUDA C++ kernel to both Py...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_cuda_kernel_op_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_cuda_kernel_op.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Custom Kernels via torch_tensorrt.kernels.cuda_kernel_op</div>
+    </div>
+
+
+.. raw:: html
+
     </div>
 
 
@@ -591,9 +625,9 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
    /tutorials/_rendered_examples/dynamo/dynamic_memory_allocation
    /tutorials/_rendered_examples/dynamo/debugger_example
+   /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/cross_runtime_compilation_for_windows
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
-   /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/torch_compile_gpt2
    /tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
@@ -610,6 +644,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/converter_overloading
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example
    /tutorials/_rendered_examples/dynamo/aot_plugin
+   /tutorials/_rendered_examples/dynamo/ptx_op
    /tutorials/_rendered_examples/dynamo/hierarchical_partitioner_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/weight_streaming_example
@@ -620,6 +655,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/llama2_flashinfer_rmsnorm
    /tutorials/_rendered_examples/dynamo/torch_export_3d_rope
    /tutorials/_rendered_examples/dynamo/custom_kernel_plugins
+   /tutorials/_rendered_examples/dynamo/cuda_kernel_op
 
 
 .. only:: html

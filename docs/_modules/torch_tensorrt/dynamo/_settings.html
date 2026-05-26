@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../../../_static/documentation_options.js?v=2ffc0672"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -551,9 +551,6 @@ document.write(`
 <span class="sd">        version_compatible (bool): Provide version forward-compatibility for engine plan files</span>
 <span class="sd">        optimization_level (Optional[int]): Builder optimization 0-5, higher levels imply longer build time,</span>
 <span class="sd">            searching for more optimization options. TRT defaults to 3</span>
-<span class="sd">        use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime</span>
-<span class="sd">            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the</span>
-<span class="sd">            argument as None</span>
 <span class="sd">        truncate_double (bool): Whether to truncate float64 TRT engine inputs or weights to float32</span>
 <span class="sd">        use_fast_partitioner (bool): Whether to use the fast or global graph partitioning system</span>
 <span class="sd">        enable_experimental_decompositions (bool): Whether to enable all core aten decompositions</span>
@@ -599,6 +596,7 @@ document.write(`
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines</span>
 <span class="sd">        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
+<span class="sd">        use_python_runtime (bool): Force the pure-Python TensorRT runtime (``TRTEngine`` + ``tensorrt::execute_engine_python``). When ``False`` (default) the C++ runtime is used if available and the Python runtime is used as a fallback otherwise.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">WORKSPACE_SIZE</span>
@@ -608,7 +606,6 @@ document.write(`
     <span class="n">max_aux_streams</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">MAX_AUX_STREAMS</span>
     <span class="n">version_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">VERSION_COMPATIBLE</span>
     <span class="n">optimization_level</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">OPTIMIZATION_LEVEL</span>
-    <span class="n">use_python_runtime</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">USE_PYTHON_RUNTIME</span>
     <span class="n">truncate_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">TRUNCATE_DOUBLE</span>
     <span class="n">use_fast_partitioner</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_FAST_PARTITIONER</span>
     <span class="n">enable_experimental_decompositions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span>
@@ -662,6 +659,7 @@ document.write(`
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DECOMPOSE_ATTENTION</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ATTN_BIAS_IS_CAUSAL</span>
+    <span class="n">use_python_runtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_PYTHON_RUNTIME</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>

@@ -93,8 +93,8 @@ Subsequent inference launches the instantiated graph instead of calling
 Graph Storage
 ^^^^^^^^^^^^^
 
-Each runtime module (both C++ ``TorchTensorRTModule`` and Python
-``PythonTorchTensorRTModule``) stores a ``cudaGraphExec_t`` instance. When
+``TorchTensorRTModule`` (C++ or Python execution path) may record a CUDA graph for
+engine execution when CUDA graphs are enabled at runtime. When
 ``use_cuda_graph=True`` is set at compile time the runtime records one graph
 per engine for the first input shape encountered.
 

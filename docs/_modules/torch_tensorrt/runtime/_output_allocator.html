@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../../../_static/documentation_options.js?v=2ffc0672"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -478,7 +478,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">,</span>
 <span class="p">)</span>
@@ -500,9 +500,7 @@ document.write(`
             <span class="n">rt_mods</span> <span class="o">=</span> <span class="p">[]</span>
 
             <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">rt_mod</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
-                <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">in</span> <span class="n">name</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-                    <span class="n">rt_mod</span><span class="p">,</span> <span class="p">(</span><span class="n">PythonTorchTensorRTModule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">)</span>
-                <span class="p">):</span>
+                <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">in</span> <span class="n">name</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rt_mod</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
                     <span class="n">rt_mods</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rt_mod</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">rt_mods</span> <span class="o">=</span> <span class="n">rt_mods</span>
