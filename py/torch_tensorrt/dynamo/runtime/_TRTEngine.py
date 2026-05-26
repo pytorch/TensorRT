@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import copy
 import logging
+import os
 import pickle
 import tempfile
 from contextlib import nullcontext
@@ -55,6 +56,16 @@ from torch_tensorrt.runtime._utils import (
 import tensorrt as trt  # isort: skip
 
 logger = logging.getLogger(__name__)
+
+
+def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
+    """Map strategy string to TRT enum. Only meaningful on TensorRT-RTX builds."""
+    return {
+        "lazy": trt.DynamicShapesKernelSpecializationStrategy.LAZY,
+        "eager": trt.DynamicShapesKernelSpecializationStrategy.EAGER,
+        "none": trt.DynamicShapesKernelSpecializationStrategy.NONE,
+    }.get(strategy_str, trt.DynamicShapesKernelSpecializationStrategy.LAZY)
+
 
 # ---------------------------------------------------------------------------
 # TRT I/O helpers
@@ -219,7 +230,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
         self.resource_allocation_strategy = 0
-        self._runtime_config = None
+        # TensorRT-RTX runtime cache state. ``runtime_cache_path`` is filled in
+        # by ``_load_serialized_info`` once compilation settings are available;
+        # ``runtime_config`` and ``runtime_cache`` are populated by
+        # ``_setup_runtime_config`` on RTX builds. Initialized to ``None`` here
+        # so the destructor can safely save the cache even if ``_setup_engine``
+        # never runs.
+        self.runtime_config: Any = None
+        self.runtime_cache: Any = None
         # NCCL communicator is bound lazily on the first forward pass for
         # engines compiled with native multi-device collective layers.
         self._nccl_comm: Optional[Any] = None
@@ -228,6 +246,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._setup_engine()
 
     def __del__(self) -> None:
+        # Persist the TensorRT-RTX runtime cache before tearing the engine
+        # down; no-op when ``runtime_cache`` was never populated.
+        try:
+            self._save_runtime_cache()
+        except Exception:
+            pass
         self.reset_captured_graph()
 
     def __deepcopy__(self, memo: dict[int, Any]) -> "TRTEngine":
@@ -279,7 +303,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
         self.resource_allocation_strategy = 0
-        self._runtime_config = None
+        # See ``__init__`` for the rationale: pre-init these so a destructor
+        # firing on a partially-loaded engine never trips an ``AttributeError``.
+        self.runtime_config = None
+        self.runtime_cache = None
         # NCCL communicators cannot be pickled; rebind lazily on the next
         # forward pass via setup_nccl_comm().
         self._nccl_comm = None
@@ -344,6 +371,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         metadata = self.decode_metadata(self.serialized_metadata)
         self.settings = metadata.get("settings", CompilationSettings())
+        # Path used by ``_load_runtime_cache`` / ``_save_runtime_cache`` on
+        # TensorRT-RTX. Always set so non-RTX engines also expose it.
+        self.runtime_cache_path = self.settings.runtime_cache_path
         self.weight_name_map = metadata.get("weight_name_map")
         self.symbolic_shape_expressions = metadata.get("inout_symexprs")
         self.output_tensors_are_unowned = metadata.get(
@@ -375,6 +405,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.reset_captured_graph()
 
     def _create_execution_context(self) -> trt.IExecutionContext:
+        # On TensorRT-RTX builds the allocation strategy lives on the
+        # ``IRuntimeConfig`` (set by ``_setup_runtime_config``), so once the
+        # runtime config is built we route context creation through it. The
+        # first call from ``_setup_engine`` precedes ``_setup_runtime_config``
+        # and falls through to the strategy-based path below.
+        if (
+            ENABLED_FEATURES.tensorrt_rtx
+            and getattr(self, "runtime_config", None) is not None
+        ):
+            context = self.cuda_engine.create_execution_context(self.runtime_config)
+            assert context is not None, "Failed to create execution context"
+            return context
         strategy = trt.ExecutionContextAllocationStrategy.STATIC
         if self.resource_allocation_strategy:
             strategy = trt.ExecutionContextAllocationStrategy.USER_MANAGED
@@ -417,6 +459,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 )
                 dist.barrier()
 
+        # On TensorRT-RTX, build the IRuntimeConfig (with runtime cache and
+        # dynamic-shape kernel specialization strategy) and rebuild the
+        # execution context so it picks them up. The NCCL barrier above runs
+        # against the initial strategy-based context.
+        if ENABLED_FEATURES.tensorrt_rtx:
+            self._setup_runtime_config()
+            self.context = self._create_execution_context()
+
         if not self.in_binding_names and not self.out_binding_names:
             input_names: List[str] = []
             output_names: List[str] = []
@@ -452,6 +502,75 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         }
         if self.requires_output_allocator:
             self.create_output_allocator()
+
+    # --- TensorRT-RTX runtime cache / dynamic shapes strategy ---
+
+    def _setup_runtime_config(self) -> None:
+        """Build an ``IRuntimeConfig`` with runtime cache and dynamic-shape strategy.
+
+        The runtime cache stores JIT compilation results so kernel/graph
+        compilation is not repeated across inference runs. The dynamic-shape
+        kernel specialization strategy controls how the JIT compiles
+        shape-specialized kernels (``lazy``, ``eager``, or ``none``).
+        """
+        self.runtime_config = self.cuda_engine.create_runtime_config()
+        alloc_strategy = trt.ExecutionContextAllocationStrategy.STATIC
+        if self.resource_allocation_strategy:
+            alloc_strategy = trt.ExecutionContextAllocationStrategy.USER_MANAGED
+        self.runtime_config.set_execution_context_allocation_strategy(alloc_strategy)
+        self.runtime_config.dynamic_shapes_kernel_specialization_strategy = (
+            _get_dynamic_shapes_kernel_strategy(
+                self.settings.dynamic_shapes_kernel_specialization_strategy
+            )
+        )
+        logger.info(
+            "Dynamic shapes kernel specialization strategy: "
+            f"{self.settings.dynamic_shapes_kernel_specialization_strategy}"
+        )
+        self.runtime_cache = self.runtime_config.create_runtime_cache()
+        self._load_runtime_cache()
+        self.runtime_config.set_runtime_cache(self.runtime_cache)
+        logger.info("TensorRT-RTX runtime cache configured")
+
+    def _load_runtime_cache(self) -> None:
+        """Load runtime cache from disk if it exists (with a shared file lock)."""
+        if self.runtime_cache is None:
+            return
+        if not os.path.isfile(self.runtime_cache_path):
+            logger.debug(f"No existing runtime cache at {self.runtime_cache_path}")
+            return
+        try:
+            from filelock import FileLock
+
+            lock = FileLock(self.runtime_cache_path + ".lock")
+            with lock.acquire(timeout=10):
+                with open(self.runtime_cache_path, "rb") as f:
+                    data = f.read()
+            if data:
+                self.runtime_cache.deserialize(data)
+                logger.info(f"Loaded runtime cache from {self.runtime_cache_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load runtime cache: {e}")
+
+    def _save_runtime_cache(self) -> None:
+        """Save runtime cache to disk (with an exclusive file lock)."""
+        if getattr(self, "runtime_cache", None) is None:
+            return
+        try:
+            host_mem = self.runtime_cache.serialize()
+            if host_mem is None:
+                return
+            os.makedirs(os.path.dirname(self.runtime_cache_path), exist_ok=True)
+
+            from filelock import FileLock
+
+            lock = FileLock(self.runtime_cache_path + ".lock")
+            with lock.acquire(timeout=10):
+                with open(self.runtime_cache_path, "wb") as f:
+                    f.write(memoryview(host_mem))
+            logger.info(f"Saved runtime cache to {self.runtime_cache_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save runtime cache: {e}")
 
     # --- distributed / NCCL ---
 
