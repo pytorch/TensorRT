@@ -1,5 +1,11 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+
+bool_flag(
+    name = "package_executorch",
+    build_setting_default = True,
+)
 
 config_setting(
     name = "windows",
@@ -36,6 +42,13 @@ config_setting(
     ],
     flag_values = {
         "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "no_package_executorch",
+    flag_values = {
+        ":package_executorch": "false",
     },
 )
 
@@ -112,9 +125,9 @@ pkg_tar(
 
 genrule(
     name = "executorch_core_archive",
-    srcs = ["@executorch//:libexecutorch_core.a"],
+    srcs = ["@executorch//:executorch_core"],
     outs = ["libexecutorch_core.a"],
-    cmd = "cp $(location @executorch//:libexecutorch_core.a) $@",
+    cmd = "cp $(location @executorch//:executorch_core) $@",
 )
 
 genrule(
@@ -199,10 +212,11 @@ pkg_tar(
 pkg_tar(
     name = "bin",
     srcs = ["//cpp/bin/torchtrtc"] + select({
-        ":rtx_win": [],
-        ":windows": [],
         ":jetpack": [],
+        ":no_package_executorch": [],
+        ":rtx_win": [],
         ":rtx_x86_64": [],
+        ":windows": [],
         "//conditions:default": [
             "//examples/executorch_reference_runner:example_executorch_runner",
         ],
@@ -241,10 +255,11 @@ pkg_tar(
         ":include_core",
         ":lib",
     ] + select({
-        ":rtx_win": [],
-        ":windows": [],
         ":jetpack": [],
+        ":no_package_executorch": [],
+        ":rtx_win": [],
         ":rtx_x86_64": [],
+        ":windows": [],
         "//conditions:default": [
             ":executorch_source_package",
             ":include_executorch",
