@@ -9,7 +9,7 @@ deployment of AI models on NVIDIA RTX GPUs across desktops, laptops, and
 workstations.
 
 TensorRT for RTX is a drop-in replacement for NVIDIA TensorRT in applications
-targeting NVIDIA RTX GPUs from Turing through Blackwell generations. It
+targeting NVIDIA RTX GPUs (Turing or newer). It
 introduces a Just-In-Time (JIT) optimizer in the runtime that compiles
 improved inference engines directly on the end-user's RTX-accelerated PC in
 under 30 seconds. This eliminates the need for lengthy pre-compilation steps
@@ -27,7 +27,7 @@ Precompiled Binaries
 Dependencies
 ~~~~~~~~~~~~~~
 
-You need to have CUDA, PyTorch, and an NVIDIA RTX GPU (Turing through Blackwell)
+You need to have CUDA, PyTorch, and an NVIDIA RTX GPU (Turing or newer)
 to use Torch-TensorRT for RTX.
 
     * https://developer.nvidia.com/cuda
@@ -56,14 +56,6 @@ CUDA version):
 .. code-block:: sh
 
     python -m pip install --pre torch torch_tensorrt_rtx --extra-index-url https://download.pytorch.org/whl/nightly/cu130
-
-.. note::
-
-   Both the stable and nightly ``torch_tensorrt_rtx`` wheels bundle
-   ``tensorrt_rtx`` and its CUDA libs as dependencies — no manual
-   TensorRT-RTX tarball download or ``LD_LIBRARY_PATH`` setup is required
-   when installing via pip. The manual tarball flow is only needed when
-   compiling from source (see below).
 
 
 Import Test
@@ -196,10 +188,7 @@ Then build and install the wheel:
 
 .. code-block:: sh
 
-    # Either flag below works; pick one.
-    python setup.py bdist_wheel --use-rtx
-    # equivalently:
-    USE_TRT_RTX=true python setup.py bdist_wheel
+    USE_TRT_RTX=true python -m pip wheel . --no-deps -w dist/
 
     # Note: the wheel filename uses underscores, not hyphens, and contains 'rtx'.
     python -m pip install dist/torch_tensorrt_rtx-*.whl
