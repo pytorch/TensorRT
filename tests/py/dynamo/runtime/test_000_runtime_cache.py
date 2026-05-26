@@ -90,7 +90,7 @@ class TestRuntimeCacheSetup(TestCase):
     def test_runtime_cache_path_default(self):
         compiled, _ = _compile_simple()
         engine = _find_python_trt_engine(compiled)
-        self.assertEqual(engine.runtime_cache_path, RUNTIME_CACHE_PATH)
+        self.assertEqual(engine.settings.runtime_cache_path, RUNTIME_CACHE_PATH)
 
     def test_runtime_cache_path_custom(self):
         cache_dir = tempfile.mkdtemp()
@@ -98,7 +98,7 @@ class TestRuntimeCacheSetup(TestCase):
             custom_path = os.path.join(cache_dir, "my_cache.bin")
             compiled, _ = _compile_simple(runtime_cache_path=custom_path)
             engine = _find_python_trt_engine(compiled)
-            self.assertEqual(engine.runtime_cache_path, custom_path)
+            self.assertEqual(engine.settings.runtime_cache_path, custom_path)
         finally:
             shutil.rmtree(cache_dir, ignore_errors=True)
 
