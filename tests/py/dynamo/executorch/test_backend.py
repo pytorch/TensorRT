@@ -1,10 +1,10 @@
-import base64
 from types import SimpleNamespace
 
 import pytest
 
 executorch = pytest.importorskip("executorch.exir")
 
+import torch  # noqa: E402
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
     DEVICE_IDX,
     ENGINE_IDX,
@@ -44,9 +44,14 @@ def _make_edge_program(*nodes):
     )
 
 
+def _engine_tensor(payload: bytes) -> torch.Tensor:
+    return torch.frombuffer(bytearray(payload), dtype=torch.uint8)
+
+
 @pytest.mark.unit
 def test_get_engine_info_rejects_multiple_engine_nodes():
     engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine")
     edge_program = _make_edge_program(
         _make_placeholder_node(*engine_info),
         _make_placeholder_node(*engine_info),
@@ -59,7 +64,7 @@ def test_get_engine_info_rejects_multiple_engine_nodes():
 @pytest.mark.unit
 def test_preprocess_rejects_output_allocator():
     engine_info = [""] * SERIALIZATION_LEN
-    engine_info[ENGINE_IDX] = base64.b64encode(b"engine").decode("utf-8")
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine")
     engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = "1"
     edge_program = _make_edge_program(_make_placeholder_node(*engine_info))
 
@@ -70,7 +75,7 @@ def test_preprocess_rejects_output_allocator():
 @pytest.mark.unit
 def test_preprocess_serializes_engine_blob():
     engine_info = [""] * SERIALIZATION_LEN
-    engine_info[ENGINE_IDX] = base64.b64encode(b"engine-bytes").decode("utf-8")
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine-bytes")
     engine_info[DEVICE_IDX] = "2%8%0%0%GPU"
     engine_info[INPUT_BINDING_NAMES_IDX] = "x"
     engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"

@@ -1129,14 +1129,18 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
     """Replace execute_engine nodes with no_op_placeholder_for_execute_engine.
 
     ExecuTorch's to_edge_transform_and_lower runs ExportPass subclasses that
-    dispatch through the C++ schema validator.  The validator rejects the
+    dispatch through the C++ schema validator. The validator rejects the
     ScriptObject engine arg (it arrives as a CustomObjArgument placeholder
-    rather than a real FakeScriptObject).  Converting each execute_engine node
+    rather than a real FakeScriptObject). Converting each execute_engine node
     to no_op_placeholder_for_execute_engine (which carries all engine info as
     plain strings) avoids the ScriptObject entirely so the passes succeed.
-    """
-    import base64
 
+    The TRT engine bytes are stored as a ``torch.uint8`` buffer on the graph
+    module and referenced from the no_op call via a ``get_attr`` FX node. This
+    keeps the engine out of the FX-emitted Python source: CPython's tokenizer
+    cannot parse string literals larger than ~2 GB, so an inline base64 string
+    breaks ``gm.recompile()`` for any engine whose payload exceeds that limit.
+    """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         ENGINE_IDX,
         SERIALIZATION_LEN,
@@ -1154,7 +1158,7 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
     if not nodes_to_replace:
         return exp_program
 
-    for node in nodes_to_replace:
+    for engine_idx_in_graph, node in enumerate(nodes_to_replace):
         inputs_arg = node.args[0]
         engine_node = node.args[1]
 
@@ -1186,17 +1190,60 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
         _validate_executorch_engine_info(engine_info, node_name=node.name)
         # Ensure the engine bytes slot is a base64 string (no_op takes str args).
         engine_bytes = engine_info[ENGINE_IDX]
-        if isinstance(engine_bytes, (bytes, bytearray)):
-            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+        if isinstance(engine_bytes, str):
+            # `_get_engine_info_from_state` returns the engine as a
+            # base64-encoded `str` when the engine arrived through the
+            # serialized TRT runtime round-trip path. Decode back to raw
+            # bytes so it can land in a uint8 buffer below.
+            import base64
 
-        engine_info_strs = [
+            engine_bytes = base64.b64decode(engine_bytes)
+        elif not isinstance(engine_bytes, (bytes, bytearray)):
+            engine_bytes = bytes(engine_bytes)
+        # Store engine payload as a uint8 buffer + get_attr ref. FX emits a
+        # name reference instead of an inline literal, sidestepping the
+        # tokenizer's >2 GB string-literal limit.
+        engine_tensor = torch.frombuffer(bytearray(engine_bytes), dtype=torch.uint8)
+        # Use FX's unique-attr-name helper so re-export passes (which may
+        # invoke this rewriter multiple times on the same `gm`) don't
+        # silently overwrite earlier engine buffers.
+        from torch.fx.experimental.const_fold import (
+            get_unique_attr_name_in_module,
+        )
+
+        buffer_name = get_unique_attr_name_in_module(gm, "_trt_engine_0")
+        gm.register_buffer(buffer_name, engine_tensor, persistent=True)
+        exp_program.state_dict[buffer_name] = engine_tensor
+
+        str_args = [
             str(x) if x is not None else "" for x in engine_info[:SERIALIZATION_LEN]
         ]
+        # Build a FakeTensor mirror so downstream FX passes (FakeTensorProp,
+        # ExecuTorch lowering, export-serde) that read `node.meta["val"]`
+        # on the `get_attr` reference don't `KeyError`. Must reuse the
+        # graph's existing FakeTensorMode — creating a fresh one would
+        # fail downstream with "fake mode from input 0 doesn't match
+        # mode from input 1" the moment any pass mixes the two.
+        from torch._guards import detect_fake_mode
+
+        fake_mode = detect_fake_mode(
+            [n.meta["val"] for n in gm.graph.nodes if "val" in n.meta]
+        )
+        fake_engine = (
+            fake_mode.from_tensor(engine_tensor)
+            if fake_mode is not None
+            else engine_tensor
+        )
         with gm.graph.inserting_before(node):
-            no_op_node = gm.graph.call_function(
-                no_op,
-                (inputs_arg, *engine_info_strs),
+            engine_attr_node = gm.graph.get_attr(buffer_name)
+            engine_attr_node.meta["val"] = fake_engine
+            no_op_args = (
+                inputs_arg,
+                *str_args[:ENGINE_IDX],
+                engine_attr_node,
+                *str_args[ENGINE_IDX + 1 :],
             )
+            no_op_node = gm.graph.call_function(no_op, no_op_args)
             no_op_node.meta["val"] = node.meta.get("val")
 
         node.replace_all_uses_with(no_op_node)
@@ -1205,6 +1252,16 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
         # Erase the engine get_attr node if it is now unused.
         if engine_node.op == "get_attr" and not engine_node.users:
             gm.graph.erase_node(engine_node)
+            # Also drop the now-orphan attribute from the module so the
+            # original engine bytes aren't double-serialized into state_dict
+            # alongside the new uint8 buffer. Use FX's dotted-path helper
+            # so nested-target attrs (e.g. `submod.engine`) are deleted
+            # correctly — plain `delattr(gm, "a.b")` only works on
+            # top-level names.
+            from torch.fx.graph_module import _del_attr, _has_attr
+
+            if _has_attr(gm, engine_node.target):
+                _del_attr(gm, engine_node.target)
 
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
