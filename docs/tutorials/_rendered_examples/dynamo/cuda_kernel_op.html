@@ -1,0 +1,1176 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Custom Kernels via torch_tensorrt.kernels.cuda_kernel_op &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/nbsphinx-code-cells.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=91105b53"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/dynamo/cuda_kernel_op';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op" href="ptx_op.html" />
+    <link rel="prev" title="Using Custom Kernels with NVRTC in TensorRT AOT Plugins" href="nvrtc_aot_plugin.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../huggingface/index.html">HuggingFace Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../huggingface/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_compile_stable_diffusion.html">Example: Compiling Stable Diffusion with torch.compile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_export_flux_dev.html">Example: Compiling FLUX.1-dev with the dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mutable_torchtrt_module_example.html">Example: Mutable Torch TensorRT Module</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../extensibility/index.html">Extensibility</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/converters/index.html">Converters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/converter_registry.html">Converter Registry Internals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/impl_subpackage.html">The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library</a></li>
+<li class="toctree-l3"><a class="reference internal" href="auto_generate_converters.html">Example: Auto-generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="converter_overloading.html">Example: Overloading Converters with Custom Converters</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/subgraph_builder.html">SubgraphBuilder — Cursor-Based FX Node Insertion</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../../extensibility/plugins/index.html">Plugins</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/plugins/plugins.html">Plugin System</a></li>
+<li class="toctree-l3"><a class="reference internal" href="auto_generate_plugins.html">Example: Auto-generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="custom_kernel_plugins.html">Example: Using Custom Kernels within TensorRT Engines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="aot_plugin.html">Automatically Generate a TensorRT AOT Plugin</a></li>
+
+
+
+
+
+
+<li class="toctree-l3"><a class="reference internal" href="nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../resource_memory/index.html">Resource &amp; Memory Management</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/resource_management.html">Resource Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/engine_cache.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="engine_caching_example.html">Example: Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="engine_caching_bert_example.html">Example: Engine Caching (BERT)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="weight_streaming_example.html">Example: Weight Streaming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dynamic_memory_allocation.html">Example: Dynamic Memory Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="low_cpu_memory_compilation.html">Example: Low CPU Memory Compilation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../compilation_analysis/index.html">Compilation &amp; Graph Analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/trace.html">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/dryrun.html">Dryrun Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hierarchical_partitioner_example.html">Example: Hierarchical Partitioner</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../weight_refit/index.html">Weight Refitting &amp; LoRA</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../weight_refit/refit.html">Refitting TensorRT Engines with Updated Weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="refit_engine_example.html">Example: Refitting Programs with New Weights</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../runtime_opt/index.html">Runtime Optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python vs C++ runtime</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/distributed_inference.html">Distributed Inference</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../complex_numerics/index.html">Complex Numerics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../complex_numerics/complex_tensors.html">Complex Tensor Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_export_3d_rope.html">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../distributed_inference/index.html">Example: Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/test_multinode_nccl.html">Usage</a></li>
+
+
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/tensor_parallel_simple_example_mn.html">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/test_multinode_export_save_load.html">Usage</a></li>
+
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../advanced_usage.html" class="nav-link">Advanced Usage</a></li>
+    
+    
+    <li class="breadcrumb-item"><i class="fa-solid fa-ellipsis"></i></li>
+    
+    
+    <li class="breadcrumb-item"><a href="../../extensibility/plugins/index.html" class="nav-link">Plugins</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Custom...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="Custom-Kernels-via-torch_tensorrt.kernels.cuda_kernel_op">
+<h1>Custom Kernels via <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.kernels.cuda_kernel_op</span></code><a class="headerlink" href="#Custom-Kernels-via-torch_tensorrt.kernels.cuda_kernel_op" title="Link to this heading">#</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">cuda_kernel_op</span></code> is the single entry point for exposing a hand-written CUDA C++ kernel to both PyTorch eager and the Torch-TensorRT compile path.</p>
+<p>You describe the kernel with a :class:<code class="docutils literal notranslate"><span class="pre">KernelSpec</span></code> dataclass (inputs, outputs, extras, launch geometry) and the framework derives the meta function, the eager CUDA launch, the TensorRT AOT implementation, and the PyTorch op schema. When your kernel doesn’t fit the declarative DSL — e.g. the output shape is not a simple <code class="docutils literal notranslate"><span class="pre">SameAs</span></code> / <code class="docutils literal notranslate"><span class="pre">ReduceDims</span></code> of an input — pass <code class="docutils literal notranslate"><span class="pre">meta_fn=</span></code> / <code class="docutils literal notranslate"><span class="pre">eager_fn=</span></code> / <code class="docutils literal notranslate"><span class="pre">aot_fn=</span></code> keyword arguments and the corresponding <code class="docutils literal notranslate"><span class="pre">KernelSpec</span></code> fields become optional.</p>
+<p>Calling-convention contract (every kernel must follow this argument order):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>::
+</pre></div>
+</div>
+<blockquote>
+<div><p>(input_ptrs…, scalar_inputs…, extras…, output_ptrs…)</p>
+</div></blockquote>
+<p>This example walks through:</p>
+<ol class="arabic simple">
+<li><p><strong>Elementwise — single tensor input</strong> (<code class="docutils literal notranslate"><span class="pre">sigmoid</span></code>)</p></li>
+<li><p><strong>Elementwise — multiple tensor inputs</strong> (<code class="docutils literal notranslate"><span class="pre">add</span></code>)</p></li>
+<li><p><strong>Elementwise — with a runtime scalar input</strong> (<code class="docutils literal notranslate"><span class="pre">scale</span></code> by <code class="docutils literal notranslate"><span class="pre">alpha</span></code>)</p></li>
+<li><p><strong>Elementwise — N-D launch geometry</strong> (2-D <code class="docutils literal notranslate"><span class="pre">relu</span></code>)</p></li>
+<li><p><strong>Reduction</strong> (<code class="docutils literal notranslate"><span class="pre">row_sum</span></code> along the last axis)</p></li>
+<li><p><strong>Override path — shape-changing kernel</strong> (<code class="docutils literal notranslate"><span class="pre">repeat2</span></code> doubles each element)</p></li>
+<li><p><strong>Multi-output kernel</strong> (<code class="docutils literal notranslate"><span class="pre">sin_cos</span></code> returns both <code class="docutils literal notranslate"><span class="pre">sin(x)</span></code> and <code class="docutils literal notranslate"><span class="pre">cos(x)</span></code>)</p></li>
+</ol>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import cuda.core  # noqa: F401
+import tensorrt.plugin as trtp
+import torch
+from cuda.core import Device as _Device
+from cuda.core import LaunchConfig as _LaunchConfig
+from cuda.core import Program as _Program
+from cuda.core import ProgramOptions as _ProgramOptions
+from cuda.core import launch as _cuda_launch
+
+import torch_tensorrt
+import torch_tensorrt.kernels as ttk
+
+# ---------------------------------------------------------------------------
+# Case 1: Elementwise(flat) — single tensor input
+# ---------------------------------------------------------------------------
+# The simplest case: one thread per output element, 1-D launch over the
+# flattened output. Output shape == input shape (``SameAs(0)``).
+#
+# Schema cheatsheet:
+#   - SameAs(&quot;x&quot;)       output has the same shape and dtype as input ``x``
+#                       (an integer index into the tensor-only input list is
+#                       also accepted, but names survive input reordering)
+#   - Numel(&quot;x&quot;)        pass ``x.numel()`` to the kernel as an int extra
+#   - Elementwise(flat) 1-D launch over the flattened output; any input rank
+#                       works (the kernel just sees a contiguous buffer).
+
+CU_SIGMOID = &quot;&quot;&quot;
+extern &quot;C&quot; __global__ void my_sigmoid(
+        const float* __restrict__ x, int n, float* __restrict__ y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i &lt; n) y[i] = 1.0f / (1.0f + __expf(-x[i]));
+}
+&quot;&quot;&quot;
+
+ttk.cuda_kernel_op(
+    &quot;kern_ex::sigmoid&quot;,
+    ttk.KernelSpec(
+        kernel_source=CU_SIGMOID,
+        kernel_name=&quot;my_sigmoid&quot;,
+        inputs=[ttk.InputDecl(&quot;x&quot;)],
+        outputs=[ttk.OutputDecl(&quot;y&quot;, shape=ttk.SameAs(&quot;x&quot;))],
+        extras=[ttk.Numel(&quot;x&quot;)],
+        geometry=ttk.Elementwise(block=(256,), layout=&quot;flat&quot;),
+    ),
+    supports_dynamic_shapes=True,
+)
+
+
+# ---------------------------------------------------------------------------
+# Case 2: Elementwise(flat) — multiple tensor inputs
+# ---------------------------------------------------------------------------
+# Same flat geometry, but the kernel takes two input pointers. Multiple
+# inputs work fine as long as they line up with the output (here all the
+# same shape). The extras still come from a single named input — ``Numel(&quot;a&quot;)``
+# resolves to ``a.numel()`` and is passed as an int after the input pointers.
+
+CU_ADD = &quot;&quot;&quot;
+extern &quot;C&quot; __global__ void my_add(
+        const float* a, const float* b, int n, float* c) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i &lt; n) c[i] = a[i] + b[i];
+}
+&quot;&quot;&quot;
+
+ttk.cuda_kernel_op(
+    &quot;kern_ex::add&quot;,
+    ttk.KernelSpec(
+        kernel_source=CU_ADD,
+        kernel_name=&quot;my_add&quot;,
+        inputs=[ttk.InputDecl(&quot;a&quot;), ttk.InputDecl(&quot;b&quot;)],
+        outputs=[ttk.OutputDecl(&quot;c&quot;, shape=ttk.SameAs(&quot;a&quot;))],
+        extras=[ttk.Numel(&quot;a&quot;)],
+        geometry=ttk.Elementwise(block=(256,), layout=&quot;flat&quot;),
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Case 3: ``ScalarInput`` — pass a runtime float / int / bool by value
+# ---------------------------------------------------------------------------
+# Use ``ScalarInput(&quot;alpha&quot;, float)`` when your kernel needs a scalar that can
+# vary per call (e.g. a leaky-relu slope, dropout probability, scale factor).
+# The scalar lands in the kernel signature *between* the tensor pointers and
+# the extras, in source order.
+#
+# Scalars are represented as TensorRT plugin attributes during compilation and
+# forwarded by value to the CUDA kernel.
+
+CU_SCALE = &quot;&quot;&quot;
+extern &quot;C&quot; __global__ void my_scale(
+        const float* x, float alpha, int n, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i &lt; n) y[i] = alpha * x[i];
+}
+&quot;&quot;&quot;
+
+ttk.cuda_kernel_op(
+    &quot;kern_ex::scale&quot;,
+    ttk.KernelSpec(
+        kernel_source=CU_SCALE,
+        kernel_name=&quot;my_scale&quot;,
+        inputs=[ttk.InputDecl(&quot;x&quot;), ttk.ScalarInput(&quot;alpha&quot;, float)],
+        # Naming the source input is especially handy here: ``SameAs(&quot;x&quot;)``
+        # stays correct even though a non-tensor ``ScalarInput`` sits between
+        # the tensors in declaration order.
+        outputs=[ttk.OutputDecl(&quot;y&quot;, shape=ttk.SameAs(&quot;x&quot;))],
+        extras=[ttk.Numel(&quot;x&quot;)],
+        geometry=ttk.Elementwise(block=(256,), layout=&quot;flat&quot;),
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Case 4: Elementwise(layout=&quot;nd&quot;) — N-D launch geometry
+# ---------------------------------------------------------------------------
+# Use ``layout=&quot;nd&quot;`` when the kernel indexes the output via 2-D / 3-D thread
+# coordinates rather than a flat index — e.g. for innermost-axis coalescing
+# or per-row block parallelism. Mapping convention:
+#
+#   block[0]   -&gt; innermost (last) output axis  -&gt; grid_x / block_x
+#   block[1]   -&gt; next-innermost                -&gt; grid_y / block_y
+#   leading axes beyond ``len(block)`` fold into grid_z
+#
+# Here we declare ``DimSize(&quot;x&quot;, 0)`` and ``DimSize(&quot;x&quot;, 1)`` so the kernel
+# receives ``H`` and ``W`` directly instead of having to back them out of
+# ``numel``.
+
+CU_RELU_2D = &quot;&quot;&quot;
+extern &quot;C&quot; __global__ void my_relu_2d(
+        const float* x, int H, int W, float* y) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;  // innermost
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    if (i &gt;= H || j &gt;= W) return;
+    float v = x[i * W + j];
+    y[i * W + j] = v &gt; 0.f ? v : 0.f;
+}
+&quot;&quot;&quot;
+
+ttk.cuda_kernel_op(
+    &quot;kern_ex::relu_2d&quot;,
+    ttk.KernelSpec(
+        kernel_source=CU_RELU_2D,
+        kernel_name=&quot;my_relu_2d&quot;,
+        inputs=[ttk.InputDecl(&quot;x&quot;)],
+        outputs=[ttk.OutputDecl(&quot;y&quot;, shape=ttk.SameAs(&quot;x&quot;))],
+        extras=[ttk.DimSize(&quot;x&quot;, 0), ttk.DimSize(&quot;x&quot;, 1)],  # H, W
+        geometry=ttk.Elementwise(block=(16, 16), layout=&quot;nd&quot;),
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Case 5: Reduction — one block per output element
+# ---------------------------------------------------------------------------
+# Use ``Reduction(reduce_dims=...)`` when the output has fewer dims than the
+# input because some axes are collapsed. Output shape is described with
+# ``ReduceDims(input_idx, dims, keepdim=...)``. The grid is sized to the
+# number of non-reduced rows; threads in each block cooperate across the
+# reduction axes.
+#
+# The kernel below assumes ``block_size == 256`` (matching the Reduction
+# spec) because it uses a fixed-size shared-memory buffer.
+
+CU_ROW_SUM = &quot;&quot;&quot;
+extern &quot;C&quot; __global__ void my_row_sum(
+        const float* x, int D, float* y) {
+    int row = blockIdx.x;
+    const float* xr = x + row * D;
+    float s = 0.f;
+    for (int j = threadIdx.x; j &lt; D; j += blockDim.x) s += xr[j];
+    __shared__ float sbuf[256];
+    sbuf[threadIdx.x] = s;
+    __syncthreads();
+    for (int step = blockDim.x &gt;&gt; 1; step &gt; 0; step &gt;&gt;= 1) {
+        if (threadIdx.x &lt; step) sbuf[threadIdx.x] += sbuf[threadIdx.x + step];
+        __syncthreads();
+    }
+    if (threadIdx.x == 0) y[row] = sbuf[0];
+}
+&quot;&quot;&quot;
+
+ttk.cuda_kernel_op(
+    &quot;kern_ex::row_sum&quot;,
+    ttk.KernelSpec(
+        kernel_source=CU_ROW_SUM,
+        kernel_name=&quot;my_row_sum&quot;,
+        inputs=[ttk.InputDecl(&quot;x&quot;)],
+        outputs=[ttk.OutputDecl(&quot;y&quot;, shape=ttk.ReduceDims(&quot;x&quot;, (-1,)))],
+        extras=[ttk.DimSize(&quot;x&quot;, -1)],
+        geometry=ttk.Reduction(reduce_dims=(-1,), block_size=256),
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Case 6: Override path — shape-changing kernel
+# ---------------------------------------------------------------------------
+# ``repeat2`` duplicates each element: ``y[2*i] = y[2*i + 1] = x[i]``. The
+# output shape ``(2 * n,)`` is not expressible as ``SameAs`` or
+# ``ReduceDims``, so the declarative DSL doesn&#39;t cover it. Instead, pass
+# ``meta_fn`` / ``eager_fn`` / ``aot_fn`` directly — the corresponding
+# ``KernelSpec`` fields (``outputs``, ``geometry``) drop out.
+
+CU_REPEAT2 = &quot;&quot;&quot;
+extern &quot;C&quot; __global__ void repeat2_kernel(
+        const float* __restrict__ x, const int n, float* __restrict__ y) {
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i &lt; n) {
+        const float v = x[i];
+        y[2 * i] = v;
+        y[2 * i + 1] = v;
+    }
+}
+&quot;&quot;&quot;
+
+_repeat2_device = _Device()
+_repeat2_device.set_current()
+_repeat2_opts = _ProgramOptions(
+    std=&quot;c++17&quot;,
+    arch=f&quot;sm_{_repeat2_device.arch}&quot;,
+    include_path=[&quot;/usr/local/cuda/include&quot;],
+)
+_repeat2_kernel = (
+    _Program(CU_REPEAT2, code_type=&quot;c++&quot;, options=_repeat2_opts)
+    .compile(&quot;ptx&quot;, name_expressions=(&quot;repeat2_kernel&quot;,))
+    .get_kernel(&quot;repeat2_kernel&quot;)
+)
+
+
+class _PTStream:
+    def __cuda_stream__(self):
+        return (0, torch.cuda.current_stream().cuda_stream)
+
+
+def _repeat2_meta(x: torch.Tensor) -&gt; torch.Tensor:
+    return torch.empty((x.numel() * 2,), device=x.device, dtype=x.dtype)
+
+
+def _repeat2_eager(x: torch.Tensor) -&gt; torch.Tensor:
+    flat = x.contiguous().view(-1)
+    n = int(flat.numel())
+    y = torch.empty((n * 2,), device=x.device, dtype=x.dtype)
+    block = 256
+    grid = max(1, (n + block - 1) // block)
+    _cuda_launch(
+        _repeat2_device.create_stream(_PTStream()),
+        _LaunchConfig(grid=(grid,), block=(block,)),
+        _repeat2_kernel,
+        flat.data_ptr(),
+        n,
+        y.data_ptr(),
+    )
+    return y
+
+
+def _repeat2_aot(inputs, outputs, tactic):
+    n = inputs[0].shape_expr.numel()
+    params = trtp.KernelLaunchParams()
+    params.grid_x = trtp.cdiv(n, 256)
+    params.block_x = 256
+    params.shared_mem = 0
+    extra = trtp.SymIntExprs(1)
+    extra[0] = trtp.SymInt32(n)
+    return params, extra
+
+
+ttk.cuda_kernel_op(
+    &quot;kern_ex::repeat2&quot;,
+    ttk.KernelSpec(
+        kernel_source=CU_REPEAT2,
+        kernel_name=&quot;repeat2_kernel&quot;,
+        inputs=[ttk.InputDecl(&quot;x&quot;)],
+        # outputs / geometry omitted — supplied via overrides below.
+    ),
+    meta_fn=_repeat2_meta,
+    eager_fn=_repeat2_eager,
+    aot_fn=_repeat2_aot,
+    supports_dynamic_shapes=True,
+)
+
+
+# ---------------------------------------------------------------------------
+# Case 7: Multi-output kernel — one launch produces two outputs
+# ---------------------------------------------------------------------------
+# A single kernel can emit any number of outputs by listing them in
+# ``outputs=[OutputDecl(...), OutputDecl(...), ...]``. Output pointers are
+# appended to the kernel argument list in declaration order, matching the
+# calling-convention contract.
+#
+# The op&#39;s torch schema is auto-derived as ``-&gt; (Tensor, Tensor)`` so callers
+# unpack with ``s, c = torch.ops.kern_ex.sin_cos(x)``. Each output gets its
+# own ``OutputDecl.shape`` — here both are ``SameAs(&quot;x&quot;)`` because sin/cos
+# are elementwise — but you can mix ``SameAs`` and ``ReduceDims`` freely for
+# multi-output kernels with different output shapes (e.g. mean + variance
+# from a single reduction pass).
+
+CU_SIN_COS = &quot;&quot;&quot;
+extern &quot;C&quot; __global__ void my_sin_cos(
+        const float* __restrict__ x, int n,
+        float* __restrict__ s, float* __restrict__ c) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i &lt; n) {
+        s[i] = __sinf(x[i]);
+        c[i] = __cosf(x[i]);
+    }
+}
+&quot;&quot;&quot;
+
+ttk.cuda_kernel_op(
+    &quot;kern_ex::sin_cos&quot;,
+    ttk.KernelSpec(
+        kernel_source=CU_SIN_COS,
+        kernel_name=&quot;my_sin_cos&quot;,
+        inputs=[ttk.InputDecl(&quot;x&quot;)],
+        outputs=[
+            ttk.OutputDecl(&quot;s&quot;, shape=ttk.SameAs(&quot;x&quot;)),
+            ttk.OutputDecl(&quot;c&quot;, shape=ttk.SameAs(&quot;x&quot;)),
+        ],
+        extras=[ttk.Numel(&quot;x&quot;)],
+        geometry=ttk.Elementwise(block=(256,), layout=&quot;flat&quot;),
+    ),
+    supports_dynamic_shapes=True,
+)
+
+
+# ---------------------------------------------------------------------------
+# Per-case Modules
+# ---------------------------------------------------------------------------
+
+
+class SigmoidModel(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:
+        return torch.ops.kern_ex.sigmoid(x)
+
+
+class AddModel(torch.nn.Module):
+    def forward(self, a: torch.Tensor, b: torch.Tensor) -&gt; torch.Tensor:
+        return torch.ops.kern_ex.add(a, b)
+
+
+class ScaleModel(torch.nn.Module):
+    def __init__(self, alpha: float) -&gt; None:
+        super().__init__()
+        self.alpha = alpha
+
+    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:
+        return torch.ops.kern_ex.scale(x, self.alpha)
+
+
+class Relu2DModel(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:
+        return torch.ops.kern_ex.relu_2d(x)
+
+
+class RowSumModel(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:
+        return torch.ops.kern_ex.row_sum(x)
+
+
+class Repeat2Model(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:
+        return torch.ops.kern_ex.repeat2(x)
+
+
+class SinCosModel(torch.nn.Module):
+    def forward(self, x: torch.Tensor):
+        # Multi-output ops return a tuple; the caller unpacks it.
+        return torch.ops.kern_ex.sin_cos(x)
+
+
+# ---------------------------------------------------------------------------
+# Drive each case: eager + (where applicable) Torch-TensorRT compile
+# ---------------------------------------------------------------------------
+
+
+def _allclose(out, ref) -&gt; bool:
+    &quot;&quot;&quot;Compare a (possibly multi-output) result tuple against a reference.&quot;&quot;&quot;
+    if isinstance(out, (tuple, list)):
+        return all(torch.allclose(o, r, atol=1e-2, rtol=1e-2) for o, r in zip(out, ref))
+    return torch.allclose(out, ref, atol=1e-2, rtol=1e-2)
+
+
+def _run(name, model, inputs, ref, *, compile_trt=True):
+    eager_out = model(*inputs)
+    print(f&quot;[{name}] eager matches reference:&quot;, _allclose(eager_out, ref))
+    if not compile_trt:
+        print(f&quot;[{name}] TRT compile skipped (see case docstring)&quot;)
+        return
+    trt_model = torch_tensorrt.compile(
+        model,
+        inputs=list(inputs),
+        enabled_precisions={torch.float32},
+        min_block_size=1,
+    )
+    with torch.no_grad():
+        for _ in range(5):
+            out = trt_model(*inputs)
+            assert _allclose(out, ref), f&quot;{name}: mismatch&quot;
+    print(f&quot;[{name}] TRT compile + run successful&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    # Case 1: sigmoid (Elementwise flat, single input)
+    x = torch.randn(4, 128, device=&quot;cuda&quot;, dtype=torch.float32)
+    _run(&quot;sigmoid&quot;, SigmoidModel().cuda().eval(), (x,), torch.sigmoid(x))
+
+    # Case 2: add (Elementwise flat, two inputs)
+    a = torch.randn(256, device=&quot;cuda&quot;, dtype=torch.float32)
+    b = torch.randn(256, device=&quot;cuda&quot;, dtype=torch.float32)
+    _run(&quot;add&quot;, AddModel().cuda().eval(), (a, b), a + b)
+
+    # Case 3: scale (ScalarInput)
+    alpha = 2.5
+    _run(
+        &quot;scale&quot;,
+        ScaleModel(alpha).cuda().eval(),
+        (x,),
+        alpha * x,
+    )
+
+    # Case 4: relu_2d (Elementwise nd, 2-D block)
+    x2d = torch.randn(33, 47, device=&quot;cuda&quot;, dtype=torch.float32)
+    _run(&quot;relu_2d&quot;, Relu2DModel().cuda().eval(), (x2d,), torch.relu(x2d))
+
+    # Case 5: row_sum (Reduction along last axis)
+    xr = torch.randn(8, 256, device=&quot;cuda&quot;, dtype=torch.float32)
+    _run(&quot;row_sum&quot;, RowSumModel().cuda().eval(), (xr,), xr.sum(-1))
+
+    # Case 6: repeat2 (override path — shape-changing kernel)
+    xrep = torch.randn(1024, device=&quot;cuda&quot;, dtype=torch.float32)
+    _run(
+        &quot;repeat2&quot;,
+        Repeat2Model().cuda().eval(),
+        (xrep,),
+        torch.repeat_interleave(xrep, 2, dim=0),
+    )
+
+    # Case 7: sin_cos (multi-output — single kernel emits two tensors)
+    xsc = torch.randn(7, 31, device=&quot;cuda&quot;, dtype=torch.float32)
+    _run(
+        &quot;sin_cos&quot;,
+        SinCosModel().cuda().eval(),
+        (xsc,),
+        (torch.sin(xsc), torch.cos(xsc)),
+    )
+</pre></div>
+</div>
+</div>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nvrtc_aot_plugin.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="ptx_op.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Pre-compiled PTX kernels via <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.kernels.ptx_op</span></code></p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/dynamo/cuda_kernel_op.ipynb">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../_sources/tutorials/_rendered_examples/dynamo/cuda_kernel_op.ipynb.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

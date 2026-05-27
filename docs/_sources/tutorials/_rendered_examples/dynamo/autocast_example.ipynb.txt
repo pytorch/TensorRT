@@ -69,7 +69,7 @@
       },
       "outputs": [],
       "source": [
-        "trt_autocast_mod = torch_tensorrt.compile(\n    ep.module(),\n    arg_inputs=inputs,\n    min_block_size=1,\n    use_python_runtime=True,\n    enable_autocast=True,\n    autocast_low_precision_type=torch.bfloat16,\n    autocast_excluded_nodes={\"^conv1$\", \"relu\"},\n    autocast_excluded_ops={\"torch.ops.aten.flatten.using_ints\"},\n    autocast_max_output_threshold=512,\n    autocast_max_depth_of_reduction=None,\n    autocast_calibration_dataloader=calibration_dataloader,\n)\n\nautocast_outs = trt_autocast_mod(*inputs)"
+        "trt_autocast_mod = torch_tensorrt.compile(\n    ep.module(),\n    arg_inputs=inputs,\n    min_block_size=1,\n    enable_autocast=True,\n    autocast_low_precision_type=torch.bfloat16,\n    autocast_excluded_nodes={\"^conv1$\", \"relu\"},\n    autocast_excluded_ops={\"torch.ops.aten.flatten.using_ints\"},\n    autocast_max_output_threshold=512,\n    autocast_max_depth_of_reduction=None,\n    autocast_calibration_dataloader=calibration_dataloader,\n)\n\nautocast_outs = trt_autocast_mod(*inputs)"
       ]
     },
     {

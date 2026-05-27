@@ -15,6 +15,20 @@ from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner
 from torch_tensorrt.executorch.backend import TensorRTBackend
 from torch_tensorrt.executorch.operator_support import TensorRTOperatorSupport
 
+# Key recognized by ExecuTorch's PropagateDevicePass that tags delegate I/O
+# TensorSpecs with the target device, which is then serialized into the
+# .pte's extra_tensor_info.device_type field.
+#
+# Prefer the canonical constant when ExecuTorch exposes it (will fail loudly
+# at import time if the key is renamed upstream) and fall back to the inlined
+# string for older ExecuTorch revisions that don't yet ship the constant.
+try:
+    from executorch.exir.passes.propagate_device_pass import (
+        TARGET_DEVICE_COMPILE_SPEC_KEY as _TARGET_DEVICE_COMPILE_SPEC_KEY,
+    )
+except ImportError:
+    _TARGET_DEVICE_COMPILE_SPEC_KEY = "target_device"
+
 
 class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
     """Partitions the graph for TensorRT delegation.
@@ -22,6 +36,12 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
     Only nodes that are torch.ops.tensorrt.execute_engine are supported;
     each such node becomes its own partition so the backend can serialize
     the engine to the same format as the TRT runtime.
+
+    If `compile_specs` does not already contain a ``target_device`` entry,
+    one defaulting to ``cuda:0`` is auto-appended (mirroring CudaPartitioner).
+    Callers targeting a non-default GPU should pre-populate
+    ``compile_specs`` with the desired ``CompileSpec("target_device",
+    b"cuda:<index>")`` to override the default.
     """
 
     def __init__(
@@ -29,7 +49,17 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
         compile_specs: Optional[List[CompileSpec]] = None,
     ) -> None:
         super().__init__()
-        self.compile_specs = compile_specs or []
+        self.compile_specs = list(compile_specs) if compile_specs else []
+        # Mirror CudaPartitioner: emit a target_device CompileSpec so that
+        # ExecuTorch's PropagateDevicePass tags delegate I/O TensorSpecs with
+        # the correct device, which is then serialized into the .pte's
+        # extra_tensor_info.device_type field.
+        if not any(
+            s.key == _TARGET_DEVICE_COMPILE_SPEC_KEY for s in self.compile_specs
+        ):
+            self.compile_specs.append(
+                CompileSpec(_TARGET_DEVICE_COMPILE_SPEC_KEY, b"cuda:0")
+            )
         self.delegation_spec = DelegationSpec(
             backend_id=TensorRTBackend.__name__,
             compile_specs=self.compile_specs,

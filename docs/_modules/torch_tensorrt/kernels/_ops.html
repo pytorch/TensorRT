@@ -1,0 +1,721 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>torch_tensorrt.kernels._ops &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=91105b53"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/torch_tensorrt/kernels/_ops';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">torch_tensor...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for torch_tensorrt.kernels._ops</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Public entry points for ``torch_tensorrt.kernels``.</span>
+
+<span class="sd">Two functions, two paths into the same registration funnel:</span>
+
+<span class="sd">* :func:`cuda_kernel_op` — declarative entry for CUDA C++ source. Reads</span>
+<span class="sd">  a :class:`KernelSpec` and derives meta / eager / aot / schema, with</span>
+<span class="sd">  override keyword arguments for cases outside the DSL.</span>
+<span class="sd">* :func:`ptx_op` — escape hatch for pre-compiled PTX bytes (Triton output,</span>
+<span class="sd">  cached NVRTC artifact). User supplies meta / eager / aot directly.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConverterPriority</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels</span><span class="w"> </span><span class="kn">import</span> <span class="n">_derive</span><span class="p">,</span> <span class="n">_validation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._cuda_python_spec</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">CudaPythonSpec</span><span class="p">,</span>
+    <span class="n">_default_cuda_include_paths</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._dsl</span><span class="w"> </span><span class="kn">import</span> <span class="n">KernelSpec</span><span class="p">,</span> <span class="n">ScalarInput</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="cuda_kernel_op">
+<a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.cuda_kernel_op">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cuda_kernel_op</span><span class="p">(</span>
+    <span class="n">op_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">spec</span><span class="p">:</span> <span class="n">KernelSpec</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">meta_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">eager_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">aot_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">schema</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">supports_dynamic_shapes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">priority</span><span class="p">:</span> <span class="n">ConverterPriority</span> <span class="o">=</span> <span class="n">ConverterPriority</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span>
+    <span class="n">capability_validator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register a CUDA kernel as a TensorRT QDP plugin end-to-end.</span>
+
+<span class="sd">    Two paths share one entry point:</span>
+
+<span class="sd">    * **Declarative** — pass a fully-populated :class:`KernelSpec` and the</span>
+<span class="sd">      meta fn, eager fn, AOT fn, and PyTorch schema are all derived for you.</span>
+<span class="sd">      Covers Elementwise / Reduction kernels out of the box.</span>
+<span class="sd">    * **Override** — pass any of ``meta_fn`` / ``eager_fn`` / ``aot_fn`` /</span>
+<span class="sd">      ``schema`` as keyword arguments and the corresponding ``KernelSpec``</span>
+<span class="sd">      fields become optional. Use this for shape-changing kernels,</span>
+<span class="sd">      multi-output kernels, or anything outside the declarative DSL.</span>
+
+<span class="sd">    Override rules (validated at registration time):</span>
+
+<span class="sd">    * ``meta_fn`` provided → ``spec.outputs`` may be omitted.</span>
+<span class="sd">    * ``eager_fn`` and ``aot_fn`` both provided → ``spec.geometry`` may be omitted.</span>
+<span class="sd">    * ``schema`` provided → falls back to inferring from ``spec.inputs`` /</span>
+<span class="sd">      ``spec.outputs`` if both exist, else from ``meta_fn`` type hints.</span>
+
+<span class="sd">    The kernel must follow the calling convention</span>
+<span class="sd">    ``(input_ptrs..., scalar_inputs..., extras..., output_ptrs...)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">qdp_plugin</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;TensorRT QDP plugins are not available. &quot;</span>
+            <span class="s2">&quot;Requires TensorRT &gt;= 10.7.0 (and not 10.14.x).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Late import to avoid circular imports and keep the decorator cheap.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_cuda_python_plugin</span>
+
+    <span class="n">_validation</span><span class="o">.</span><span class="n">_validate_spec</span><span class="p">(</span>
+        <span class="n">spec</span><span class="p">,</span>
+        <span class="n">has_meta_fn</span><span class="o">=</span><span class="n">meta_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">has_eager_fn</span><span class="o">=</span><span class="n">eager_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">has_aot_fn</span><span class="o">=</span><span class="n">aot_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Module-qualified call so tests can monkeypatch ``_derive._compile_kernel``.</span>
+    <span class="n">ptx</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">kernel_obj</span> <span class="o">=</span> <span class="n">_derive</span><span class="o">.</span><span class="n">_compile_kernel</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+
+    <span class="n">final_meta</span> <span class="o">=</span> <span class="n">meta_fn</span> <span class="k">if</span> <span class="n">meta_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_derive</span><span class="o">.</span><span class="n">_make_meta_fn</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+    <span class="n">final_eager</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">eager_fn</span>
+        <span class="k">if</span> <span class="n">eager_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">_derive</span><span class="o">.</span><span class="n">_make_eager_fn</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">kernel_obj</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">final_aot</span> <span class="o">=</span> <span class="n">aot_fn</span> <span class="k">if</span> <span class="n">aot_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_derive</span><span class="o">.</span><span class="n">_make_aot_fn</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">schema</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">final_schema</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">schema</span>
+    <span class="k">elif</span> <span class="n">spec</span><span class="o">.</span><span class="n">inputs</span> <span class="ow">and</span> <span class="n">spec</span><span class="o">.</span><span class="n">outputs</span><span class="p">:</span>
+        <span class="n">final_schema</span> <span class="o">=</span> <span class="n">_derive</span><span class="o">.</span><span class="n">_build_schema</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Let register_cuda_python_plugin fall back to _infer_schema(meta_fn).</span>
+        <span class="n">final_schema</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">cuda_spec</span> <span class="o">=</span> <span class="n">CudaPythonSpec</span><span class="p">(</span>
+        <span class="n">kernel_source</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">kernel_source</span><span class="p">,</span>
+        <span class="n">kernel_name</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">kernel_name</span><span class="p">,</span>
+        <span class="n">aot_fn</span><span class="o">=</span><span class="n">final_aot</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">final_eager</span><span class="p">,</span>
+        <span class="n">include_paths</span><span class="o">=</span><span class="p">(</span>
+            <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">include_paths</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">spec</span><span class="o">.</span><span class="n">include_paths</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">_default_cuda_include_paths</span><span class="p">()</span>
+        <span class="p">),</span>
+        <span class="n">compile_std</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">compile_std</span><span class="p">,</span>
+        <span class="n">arch_override</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">arch_override</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># A user-supplied aot_fn takes ownership of the AOT path; only the</span>
+    <span class="c1"># auto-derived path needs the ScalarInput → JIT fallback because QDP</span>
+    <span class="c1"># AOT extras don&#39;t currently support runtime float / bool scalars.</span>
+    <span class="k">if</span> <span class="n">aot_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">use_aot</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">use_aot</span> <span class="o">=</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_spec</span><span class="p">,</span> <span class="n">ScalarInput</span><span class="p">)</span> <span class="k">for</span> <span class="n">input_spec</span> <span class="ow">in</span> <span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">inputs</span> <span class="ow">or</span> <span class="p">[])</span>
+        <span class="p">)</span>
+
+    <span class="n">register_cuda_python_plugin</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="o">=</span><span class="n">op_name</span><span class="p">,</span>
+        <span class="n">spec</span><span class="o">=</span><span class="n">cuda_spec</span><span class="p">,</span>
+        <span class="n">meta_fn</span><span class="o">=</span><span class="n">final_meta</span><span class="p">,</span>
+        <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="n">supports_dynamic_shapes</span><span class="p">,</span>
+        <span class="n">requires_output_allocator</span><span class="o">=</span><span class="n">requires_output_allocator</span><span class="p">,</span>
+        <span class="n">priority</span><span class="o">=</span><span class="n">priority</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">capability_validator</span><span class="p">,</span>
+        <span class="n">register_torch_op</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">schema</span><span class="o">=</span><span class="n">final_schema</span><span class="p">,</span>
+        <span class="n">precompiled_ptx</span><span class="o">=</span><span class="n">ptx</span><span class="p">,</span>
+        <span class="n">use_aot_if_available</span><span class="o">=</span><span class="n">use_aot</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;cuda_kernel_op &#39;</span><span class="si">%s</span><span class="s2">&#39; registered (schema: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">op_name</span><span class="p">,</span> <span class="n">final_schema</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ptx_op">
+<a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.ptx_op">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">ptx_op</span><span class="p">(</span>
+    <span class="n">op_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">ptx</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
+    <span class="n">kernel_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">meta_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">eager_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">aot_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">supports_dynamic_shapes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">priority</span><span class="p">:</span> <span class="n">ConverterPriority</span> <span class="o">=</span> <span class="n">ConverterPriority</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span>
+    <span class="n">capability_validator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">schema</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register a pre-compiled PTX kernel as a TensorRT QDP plugin.</span>
+
+<span class="sd">    Use this when the PTX comes from an external compiler (Triton, a cached</span>
+<span class="sd">    NVRTC output, etc.) and NVRTC compilation should be skipped.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">qdp_plugin</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;TensorRT QDP plugins are not available. &quot;</span>
+            <span class="s2">&quot;Requires TensorRT &gt;= 10.7.0 (and not 10.14.x).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_cuda_python_plugin</span>
+
+    <span class="n">spec</span> <span class="o">=</span> <span class="n">CudaPythonSpec</span><span class="p">(</span>
+        <span class="n">kernel_source</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">kernel_name</span><span class="o">=</span><span class="n">kernel_name</span><span class="p">,</span>
+        <span class="n">aot_fn</span><span class="o">=</span><span class="n">aot_fn</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">register_cuda_python_plugin</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="o">=</span><span class="n">op_name</span><span class="p">,</span>
+        <span class="n">spec</span><span class="o">=</span><span class="n">spec</span><span class="p">,</span>
+        <span class="n">meta_fn</span><span class="o">=</span><span class="n">meta_fn</span><span class="p">,</span>
+        <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="n">supports_dynamic_shapes</span><span class="p">,</span>
+        <span class="n">requires_output_allocator</span><span class="o">=</span><span class="n">requires_output_allocator</span><span class="p">,</span>
+        <span class="n">priority</span><span class="o">=</span><span class="n">priority</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">capability_validator</span><span class="p">,</span>
+        <span class="n">register_torch_op</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">schema</span><span class="o">=</span><span class="n">schema</span><span class="p">,</span>
+        <span class="n">precompiled_ptx</span><span class="o">=</span><span class="n">ptx</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

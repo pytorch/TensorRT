@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../../../_static/documentation_options.js?v=91105b53"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -468,6 +468,8 @@ document.write(`
 
 
 <li class="toctree-l3"><a class="reference internal" href="nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -497,7 +499,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python vs C++ runtime</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -601,7 +603,7 @@ document.write(`
 in terms of PyTorch ops that are supported in Torch-TensorRT or a converter (see: <a class="reference external" href="https://pytorch.org/TensorRT/contributors/dynamo_converters.html">Writing converters for the Dynamo frontend</a>) - which defines the operator in terms of TensorRT operators.</p>
 <p>In some cases there isn’t a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or TensorRT cannot support it natively.</p>
 <p>For these cases, it is possible to use a TensorRT plugin to replace the operator <strong>inside</strong> the TensorRT engine, thereby avoiding the performance and resource overhead from a graph break. For the sake of demonstration, consider the operation circular padding. Circular padding is useful for ops like circular convolution in deep learning. The following image denotes how the original image (red) is circular padded once (green) and twice (blue):</p>
-<p><img alt="8d369f5c231543bfa862351710773e12" class="no-scaled-link" src="file://tutorials/images/circ_pad_example.png" style="width: 512px; height: 512px;" /></p>
+<p><img alt="464462bf94974e6184b4809352e6afb5" class="no-scaled-link" src="file://tutorials/images/circ_pad_example.png" style="width: 512px; height: 512px;" /></p>
 <section id="Writing-Custom-Operators-in-PyTorch">
 <h2>Writing Custom Operators in PyTorch<a class="headerlink" href="#Writing-Custom-Operators-in-PyTorch" title="Link to this heading">#</a></h2>
 <p>Assume for whatever reason we would like to use a custom implementation of circular padding. In this case as implemented using a kernel written in <a class="reference external" href="https://openai.com/index/triton">OpenAI Triton</a></p>
@@ -855,7 +857,7 @@ The following nodes are currently set to run in Torch:
 Node: torch.ops.torchtrt_ex.triton_circular_pad.default, with layer location: __/triton_circular_pad
 Note: Some of the above nodes may be supported, but were not included in a TRT graph by the partitioner
 
-Compiled with: CompilationSettings(workspace_size=0, min_block_size=1, torch_executed_ops=set(), pass_through_build_failures=False, max_aux_streams=None, version_compatible=False, optimization_level=None, use_python_runtime=False, truncate_double=False, use_fast_partitioner=True, enable_experimental_decompositions=False, device=Device(type=DeviceType.GPU, gpu_id=0), require_full_compilation=False, disable_tf32=False, sparse_weights=False, refit=False, engine_capability=&lt;EngineCapability.STANDARD: 1&gt;, num_avg_timing_iters=1, dla_sram_size=1048576, dla_local_dram_size=1073741824, dla_global_dram_size=536870912, dryrun=True, hardware_compatible=False)
+Compiled with: CompilationSettings(workspace_size=0, min_block_size=1, torch_executed_ops=set(), pass_through_build_failures=False, max_aux_streams=None, version_compatible=False, optimization_level=None, truncate_double=False, use_fast_partitioner=True, enable_experimental_decompositions=False, device=Device(type=DeviceType.GPU, gpu_id=0), require_full_compilation=False, disable_tf32=False, sparse_weights=False, refit=False, engine_capability=&lt;EngineCapability.STANDARD: 1&gt;, num_avg_timing_iters=1, dla_sram_size=1048576, dla_local_dram_size=1073741824, dla_global_dram_size=536870912, dryrun=True, hardware_compatible=False)
 
   Graph Structure:
 
@@ -1163,7 +1165,7 @@ def circular_padding_converter(
 
 The graph consists of 2 Total Operators, of which 2 operators are supported, 100.0% coverage
 
-Compiled with: CompilationSettings(workspace_size=0, min_block_size=1, torch_executed_ops=set(), pass_through_build_failures=False, max_aux_streams=None, version_compatible=False, optimization_level=None, use_python_runtime=False, truncate_double=False, use_fast_partitioner=True, enable_experimental_decompositions=False, device=Device(type=DeviceType.GPU, gpu_id=0), require_full_compilation=False, disable_tf32=False, sparse_weights=False, refit=False, engine_capability=&lt;EngineCapability.STANDARD: 1&gt;, num_avg_timing_iters=1, dla_sram_size=1048576, dla_local_dram_size=1073741824, dla_global_dram_size=536870912, dryrun=False, hardware_compatible=False)
+Compiled with: CompilationSettings(workspace_size=0, min_block_size=1, torch_executed_ops=set(), pass_through_build_failures=False, max_aux_streams=None, version_compatible=False, optimization_level=None, truncate_double=False, use_fast_partitioner=True, enable_experimental_decompositions=False, device=Device(type=DeviceType.GPU, gpu_id=0), require_full_compilation=False, disable_tf32=False, sparse_weights=False, refit=False, engine_capability=&lt;EngineCapability.STANDARD: 1&gt;, num_avg_timing_iters=1, dla_sram_size=1048576, dla_local_dram_size=1073741824, dla_global_dram_size=536870912, dryrun=False, hardware_compatible=False)
 
   Graph Structure:
 

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../../../_static/documentation_options.js?v=91105b53"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -495,6 +495,7 @@ document.write(`
     <span class="n">OutputSpec</span><span class="p">,</span>
     <span class="n">TensorArgument</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENGINE_IDX</span><span class="p">,</span> <span class="n">NAME_IDX</span>
 
 
@@ -950,6 +951,8 @@ document.write(`
             <span class="k">continue</span>
         <span class="c1"># Get the TRT submodule</span>
         <span class="n">trt_module</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">_use_python_runtime</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Python runtime is not supported for serialization&quot;</span><span class="p">)</span>
 
         <span class="c1"># Ensure the trt module node in the main graph (gm) has inputs</span>
         <span class="n">trt_module_node</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">name</span><span class="p">]</span>
@@ -968,16 +971,12 @@ document.write(`
                 <span class="n">engine_info</span> <span class="o">=</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
                 <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
                 <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
-                <span class="c1"># insert the no_placeholder node in the graph which should be replaced to the actual execute_engine node while load in the windows</span>
                 <span class="n">trt_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
                     <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">no_op_placeholder_for_execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
                     <span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="n">engine_info</span><span class="p">),</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="c1"># for the normal workflow: use the execute_engine node</span>
                 <span class="n">engine_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span>
-                <span class="c1"># TODO: THROWS SOME WARNING ABOUT A LACK OF UNDERLYING REFERENCE TO THE OWNING GRAPH MODULE</span>
-                <span class="c1"># SAYS THERES 3 OPTIONS, SUBMODULE, PARAMETER, OR BUFFER, BUFFER SEEMS THE BEST BUT I THINK ITS KEYED TO TENSORS</span>
                 <span class="nb">setattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_name</span><span class="p">,</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
                 <span class="n">engine_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">engine_name</span><span class="p">)</span>
 
@@ -985,13 +984,9 @@ document.write(`
                     <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
                     <span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">),</span>
                 <span class="p">)</span>
-                <span class="c1"># meta[&quot;val&quot;] should be a lighter version of a tensor. For eg: it should be a FakeTensor (with output shape and dtype properties)</span>
-                <span class="c1"># Lighter version of a custom_obj is not defined clearly. meta[&quot;val&quot;] does not have any type expectations but</span>
-                <span class="c1"># for custom object nodes, it should be CustomObjArgument</span>
                 <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
                     <span class="n">name</span><span class="o">=</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
                 <span class="p">)</span>
-            <span class="c1"># set trt_node.meta with trt_module_node.meta</span>
             <span class="k">assert</span> <span class="n">num_outputs</span> <span class="o">&gt;</span> <span class="mi">0</span>
             <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
 
@@ -1036,7 +1031,12 @@ document.write(`
             <span class="n">packed_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span>
                 <span class="n">engine_bytes</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
             <span class="p">)</span>
-            <span class="n">trt_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">packed_engine_info</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
+                <span class="n">trt_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">packed_engine_info</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
+
+                <span class="n">trt_engine</span> <span class="o">=</span> <span class="n">TRTEngine</span><span class="p">(</span><span class="n">packed_engine_info</span><span class="p">)</span>
             <span class="nb">setattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_name</span><span class="p">,</span> <span class="n">trt_engine</span><span class="p">)</span>
             <span class="n">engine_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">engine_name</span><span class="p">)</span>
 

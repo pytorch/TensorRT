@@ -23,6 +23,11 @@ Directories
 
    dir_cpp_include_torch_tensorrt.rst
 
+.. toctree::
+   :maxdepth: 5
+
+   dir_cpp_include_torch_tensorrt_executorch.rst
+
 Files
 *****
 
@@ -36,6 +41,21 @@ Files
    :maxdepth: 5
 
    file_cpp_include_torch_tensorrt_macros.h.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   file_cpp_include_torch_tensorrt_executorch_TensorRTBindingNames.h.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   file_cpp_include_torch_tensorrt_executorch_TensorRTBlobHeader.h.rst
 
 .. toctree::
    :maxdepth: 5

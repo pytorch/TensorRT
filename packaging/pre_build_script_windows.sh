@@ -1,6 +1,6 @@
 set -x
 
-pip install -U numpy packaging pyyaml setuptools wheel fmt
+python -m pip install -U numpy packaging pyyaml setuptools wheel fmt
 
 choco install bazelisk -y
 
@@ -20,12 +20,13 @@ fi
 TORCH=$(grep "^torch>" py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 
-# Install all the dependencies required for Torch-TensorRT
-pip uninstall -y torch torchvision
-pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
+# The workflow installs torch before this script runs. Avoid uninstalling and
+# force-reinstalling it here: with the shortened Windows conda prefix, pip can
+# rediscover a half-removed torch dist-info through the original C:\ path.
+python -m pip install --pre "${TORCH}" --index-url "${INDEX_URL}" || exit 1
 
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
-export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__))" | sed -e 's#\\#\/#g')"
+export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__).replace('\\\\', '/'))")" || exit 1
 
 # tried with conda install -c conda-forge fmt -y, but build still failed in windows with the following error:
 # C:\actions-runner\_work\_temp\conda_environment_18042354682\lib\site-packages\torch\include\torch/csrc/utils/python_arg_parser.h(42): fatal error C1083: Cannot open include file: 'fmt/format.h': No such file or directory

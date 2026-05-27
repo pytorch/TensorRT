@@ -167,6 +167,10 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ inputs.architecture }}
+      - name: Shorten Conda environment path
+        if: inputs.architecture == 'x64'
+        run: |
+          bash "${REPOSITORY}/.github/scripts/shorten-conda-env-windows.sh"
       - name: Install XPU support package
         if: ${{ matrix.gpu_arch_type == 'xpu' }}
         env:

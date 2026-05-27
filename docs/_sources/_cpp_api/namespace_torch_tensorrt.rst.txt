@@ -17,6 +17,8 @@ Namespaces
 ----------
 
 
+- :ref:`namespace_torch_tensorrt__executorch_backend`
+
 - :ref:`namespace_torch_tensorrt__logging`
 
 - :ref:`namespace_torch_tensorrt__torchscript`

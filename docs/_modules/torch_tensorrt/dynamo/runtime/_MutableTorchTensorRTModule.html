@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../../../../_static/documentation_options.js?v=91105b53"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -554,7 +554,6 @@ document.write(`
         <span class="n">pytorch_model</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Device</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DEVICE</span><span class="p">,</span>
-        <span class="n">use_python_runtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_PYTHON_RUNTIME</span><span class="p">,</span>
         <span class="n">immutable_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">strict</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">prefer_deferred_runtime_asserts_over_guards</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -590,7 +589,6 @@ document.write(`
 <span class="sd">            max_aux_stream (Optional[int]): Maximum streams in the engine</span>
 <span class="sd">            version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)</span>
 <span class="sd">            optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.</span>
-<span class="sd">            use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization</span>
 <span class="sd">            use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance</span>
 <span class="sd">            enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">            dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
@@ -628,7 +626,6 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">prefer_deferred_runtime_asserts_over_guards</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">prefer_deferred_runtime_asserts_over_guards</span>
         <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">use_python_runtime</span> <span class="o">=</span> <span class="n">use_python_runtime</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">trt_device</span> <span class="o">=</span> <span class="n">to_torch_tensorrt_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
         <span class="k">assert</span> <span class="p">(</span>
             <span class="ow">not</span> <span class="n">immutable_weights</span>
@@ -857,7 +854,6 @@ document.write(`
             <span class="n">arg_inputs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">,</span>
             <span class="n">kwarg_inputs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="p">,</span>
             <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-            <span class="n">use_python_runtime</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">use_python_runtime</span><span class="p">,</span>
             <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;offload_module_to_cpu&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
@@ -1195,9 +1191,6 @@ document.write(`
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Cast the object back to MutableTorchTensorRTModule to save</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="ow">not</span> <span class="n">module</span><span class="o">.</span><span class="n">use_python_runtime</span>
-        <span class="p">),</span> <span class="s2">&quot;Python runtime does not support serialization. Save failed.&quot;</span>
         <span class="n">module</span><span class="o">.</span><span class="n">init_finished</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="n">module</span><span class="o">.</span><span class="vm">__class__</span> <span class="o">=</span> <span class="n">MutableTorchTensorRTModule</span>
         <span class="n">exp_program</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">exp_program</span>

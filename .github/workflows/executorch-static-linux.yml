@@ -15,10 +15,6 @@ on:
         description: 'Reference to checkout, defaults to ""'
         default: ""
         type: string
-      executorch-ref:
-        description: "ExecuTorch branch or tag to checkout; defaults to latest main"
-        default: "main"
-        type: string
       test-infra-repository:
         description: "Test infra repository to use"
         default: "pytorch/test-infra"
@@ -73,10 +69,6 @@ jobs:
       fail-on-empty: false
       script: |
         set -euo pipefail
-        export EXECUTORCH_ROOT="${RUNNER_TEMP}/executorch"
-        export EXECUTORCH_REF="${{ inputs.executorch-ref }}"
-        source .github/scripts/setup-executorch-ci.sh || exit 1
-       
         BAZELISK_VERSION="1.26.0"
         case "$(uname -m)" in
           aarch64|arm64)
@@ -99,6 +91,9 @@ jobs:
 
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
+        executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
+        export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
+        export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         # this is to verify the end user's workflow
         python -m pip install pyyaml
         .github/scripts/verify-executorch-reference-runner.sh

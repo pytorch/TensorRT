@@ -108,7 +108,6 @@ inference in ``distributed_context`` for safe NCCL lifecycle management:
         dynamic=True,
         options={
             "use_distributed_mode_trace": True,
-            "use_python_runtime": False,
             "min_block_size": 1,
         },
     )
@@ -630,7 +629,6 @@ Compilation Settings for Distributed Workloads
        **Auto-enabled** for ``torch.compile`` when ``dist.is_initialized()`` and
        ``world_size > 1`` — no explicit flag needed. Must be set manually when using
        ``torch_tensorrt.dynamo.compile()`` directly (e.g. AOT export workflows).
-   * - ``use_python_runtime``
      - ``None`` (auto)
      - ``False`` (C++ runtime) is recommended for production. The C++ runtime handles
        NCCL via TRT's native ``DistCollective`` layers. The Python runtime uses

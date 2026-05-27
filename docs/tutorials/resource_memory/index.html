@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=3f6f4c4b"></script>
+    <script src="../../_static/documentation_options.js?v=91105b53"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -59,7 +59,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Resource Management" href="resource_management.html" />
-    <link rel="prev" title="Using Custom Kernels with NVRTC in TensorRT AOT Plugins" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html" />
+    <link rel="prev" title="Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op" href="../_rendered_examples/dynamo/ptx_op.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -465,6 +465,8 @@ document.write(`
 
 
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -494,7 +496,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../runtime_opt/python_runtime.html">Python Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_opt/python_runtime.html">Python vs C++ runtime</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -611,12 +613,12 @@ dynamic memory allocation, and low-CPU-memory compilation.</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html"
+       href="../_rendered_examples/dynamo/ptx_op.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</p>
+        <p class="prev-next-title">Pre-compiled PTX kernels via <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.kernels.ptx_op</span></code></p>
       </div>
     </a>
     <a class="right-next"
