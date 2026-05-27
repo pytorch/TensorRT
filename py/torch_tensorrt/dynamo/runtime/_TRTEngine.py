@@ -45,6 +45,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     deserialize_binding_names,
     parse_device_info,
 )
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
     _is_switch_required,
@@ -487,6 +488,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             dtype._from(self.cuda_engine.get_tensor_dtype(output_name)).to(torch.dtype)
             for output_name in self.out_binding_names
         ]
+        self.input_shapes = [
+            self.cuda_engine.get_tensor_shape(input_name)
+            for input_name in self.in_binding_names
+        ]
         self.output_shapes = [
             self.cuda_engine.get_tensor_shape(output_name)
             for output_name in self.out_binding_names
@@ -578,17 +583,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
         """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe.
 
-        Non-RTX builds always return True (existing behavior). On RTX,
-        capture is unsafe when the TRT-RTX context cannot be stream-captured
-        (e.g. due to runtime allocation or data-dependent shapes) or when
-        the dynamic-shape strategy is ``"lazy"`` -- a later lazy-compiled
-        specialized kernel would invalidate the captured graph.
+        On RTX, unsafe when the TRT-RTX context is not stream-capturable, or
+        when ``"lazy"`` kernel specialization can still fire (dynamic inputs).
         """
         if not ENABLED_FEATURES.tensorrt_rtx:
             return True
+        has_dynamic_input = any(DYNAMIC_DIM in shape for shape in self.input_shapes)
         not_capturable = (
             not self.context.is_stream_capturable(stream.cuda_stream),
-            self.settings.dynamic_shapes_kernel_specialization_strategy == "lazy",
+            (
+                self.settings.dynamic_shapes_kernel_specialization_strategy == "lazy"
+                and has_dynamic_input
+            ),
         )
         return not any(not_capturable)
 
