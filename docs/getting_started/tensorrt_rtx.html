@@ -601,19 +601,19 @@ pip<span class="w"> </span>install<span class="w"> </span>pyyaml<span class="w">
 <section id="install-tensorrt-rtx-tarball">
 <h3>Install TensorRT-RTX Tarball<a class="headerlink" href="#install-tensorrt-rtx-tarball" title="Link to this heading">#</a></h3>
 <p>TensorRT-RTX tarball can be downloaded from <a class="reference external" href="https://developer.nvidia.com/tensorrt-rtx">https://developer.nvidia.com/tensorrt-rtx</a>.
-Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.4.0.76</strong>.</p>
+Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.5.0.114</strong>.</p>
 <p>Once downloaded:</p>
 <p><strong>In Linux:</strong></p>
 <p>Make sure you add the lib path to the <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> environment variable.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.4.0.76</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.4.0.76/lib:<span class="nv">$LD_LIBRARY_PATH</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.5.0.114</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.5.0.114/lib:<span class="nv">$LD_LIBRARY_PATH</span>
 <span class="nb">echo</span><span class="w"> </span><span class="nv">$LD_LIBRARY_PATH</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
 <p><strong>In Windows:</strong></p>
 <p>Make sure you add the lib path to the Windows system variable <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.4.0.76</span>
-<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.4.0.76\lib&quot;</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.5.0.114</span>
+<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.5.0.114\lib&quot;</span>
 <span class="nb">echo</span><span class="w"> </span>%PATH%<span class="w"> </span><span class="p">|</span><span class="w"> </span>findstr<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>

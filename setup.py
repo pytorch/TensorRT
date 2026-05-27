@@ -853,7 +853,7 @@ def get_x86_64_requirements(base_requirements):
         ]
         if USE_TRT_RTX:
             return requirements + [
-                "tensorrt_rtx>=1.4.0.76",
+                "tensorrt_rtx>=1.5.0.114",
             ]
         else:
             requirements = requirements + [

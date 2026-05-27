@@ -134,7 +134,7 @@ Install TensorRT-RTX Tarball
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 TensorRT-RTX tarball can be downloaded from https://developer.nvidia.com/tensorrt-rtx.
-Currently, Torch-TensorRT uses TensorRT-RTX version **1.4.0.76**.
+Currently, Torch-TensorRT uses TensorRT-RTX version **1.5.0.114**.
 
 Once downloaded:
 
@@ -144,8 +144,8 @@ Make sure you add the lib path to the ``LD_LIBRARY_PATH`` environment variable.
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.4.0.76
-    export LD_LIBRARY_PATH=/your_local_download_path/TensorRT-RTX-1.4.0.76/lib:$LD_LIBRARY_PATH
+    # If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.5.0.114
+    export LD_LIBRARY_PATH=/your_local_download_path/TensorRT-RTX-1.5.0.114/lib:$LD_LIBRARY_PATH
     echo $LD_LIBRARY_PATH | grep TensorRT-RTX
 
 **In Windows:**
@@ -154,8 +154,8 @@ Make sure you add the lib path to the Windows system variable ``PATH``.
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.4.0.76
-    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.4.0.76\lib"
+    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.5.0.114
+    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.5.0.114\lib"
     echo %PATH% | findstr TensorRT-RTX
 
 Install TensorRT-RTX Wheel
