@@ -175,10 +175,10 @@ def _refit_single_trt_engine_with_gm(
             constant_mapping_with_type = {}
 
             for constant_name, val in constant_mapping.items():
-                np_weight_type = val.dtype
-                val_tensor = torch.from_numpy(val).cuda()
-                trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
-                torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
+                weight_dtype = val.dtype
+                val_tensor = val.cuda()
+                trt_dtype = dtype._from(weight_dtype).to(trt.DataType)
+                torch_dtype = dtype._from(weight_dtype).to(torch.dtype)
                 constant_mapping_with_type[constant_name] = (
                     val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
                     trt_dtype,
