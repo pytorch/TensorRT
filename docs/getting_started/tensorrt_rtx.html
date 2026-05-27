@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Torch-TensorRT-RTX &#8212; Torch-TensorRT</title>
+    <title>Torch-TensorRT for RTX &#8212; Torch-TensorRT</title>
   
   
   
@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=91105b53"></script>
+    <script src="../_static/documentation_options.js?v=a46c5103"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -433,7 +433,7 @@ document.write(`
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="jetpack.html">Torch-TensorRT in JetPack</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">Torch-TensorRT-RTX</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Torch-TensorRT for RTX</a></li>
 </ul>
 </div>
 </nav></div>
@@ -474,7 +474,7 @@ document.write(`
     
     <li class="breadcrumb-item"><a href="installation.html" class="nav-link">Installation</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page">Torch-TensorRT-RTX</li>
+    <li class="breadcrumb-item active" aria-current="page">Torch-Tensor...</li>
   </ul>
 </nav>
 </div>
@@ -491,208 +491,216 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="torch-tensorrt-rtx">
-<span id="id1"></span><h1>Torch-TensorRT-RTX<a class="headerlink" href="#torch-tensorrt-rtx" title="Link to this heading">#</a></h1>
-<section id="overview">
-<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
-<section id="tensorrt-rtx">
-<h3>TensorRT-RTX<a class="headerlink" href="#tensorrt-rtx" title="Link to this heading">#</a></h3>
-<p>TensorRT for RTX builds on the proven performance of the NVIDIA TensorRT inference library, and simplifies the deployment of AI models on NVIDIA RTX GPUs across desktops, laptops, and workstations.</p>
-<p>TensorRT for RTX is a drop-in replacement for NVIDIA TensorRT in applications targeting NVIDIA RTX GPUs from Turing through Blackwell generations. It introduces a Just-In-Time (JIT) optimizer in the runtime that compiles improved inference engines directly on the end-user’s RTX-accelerated PC in under 30 seconds. This eliminates the need for lengthy pre-compilation steps and enables rapid engine generation, improved application portability, and cutting-edge inference performance.</p>
-<p>For detailed information about TensorRT-RTX, refer to:</p>
-<ul class="simple">
-<li><p><a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt-rtx/latest/index.html">TensorRT-RTX Documentation</a></p></li>
+  <section id="torch-tensorrt-for-rtx">
+<span id="torch-tensorrt-rtx"></span><h1>Torch-TensorRT for RTX<a class="headerlink" href="#torch-tensorrt-for-rtx" title="Link to this heading">#</a></h1>
+<p>Torch-TensorRT supports TensorRT for RTX, which builds on the proven
+performance of the NVIDIA TensorRT inference library, and simplifies the
+deployment of AI models on NVIDIA RTX GPUs across desktops, laptops, and
+workstations.</p>
+<p>TensorRT for RTX is a drop-in replacement for NVIDIA TensorRT in applications
+targeting NVIDIA RTX GPUs (Turing or newer). It
+introduces a Just-In-Time (JIT) optimizer in the runtime that compiles
+improved inference engines directly on the end-user’s RTX-accelerated PC in
+under 30 seconds. This eliminates the need for lengthy pre-compilation steps
+and enables rapid engine generation, improved application portability, and
+cutting-edge inference performance.</p>
+<p>Currently, Torch-TensorRT only supports TensorRT-RTX for experimental purposes;
+Torch-TensorRT by default uses standard TensorRT during the build and run. For
+detailed information about TensorRT-RTX itself, see the
+<a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt-rtx/latest/index.html">TensorRT-RTX documentation</a>.</p>
+<section id="precompiled-binaries">
+<h2>Precompiled Binaries<a class="headerlink" href="#precompiled-binaries" title="Link to this heading">#</a></h2>
+<section id="dependencies">
+<h3>Dependencies<a class="headerlink" href="#dependencies" title="Link to this heading">#</a></h3>
+<p>You need to have CUDA, PyTorch, and an NVIDIA RTX GPU (Turing or newer)
+to use Torch-TensorRT for RTX.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="https://developer.nvidia.com/cuda">https://developer.nvidia.com/cuda</a></p></li>
+<li><p><a class="reference external" href="https://pytorch.org">https://pytorch.org</a></p></li>
 </ul>
-<p>Currently, Torch-TensorRT only supports TensorRT-RTX for experimental purposes.
-Torch-TensorRT by default uses standard TensorRT during the build and run.</p>
-<p>To use TensorRT-RTX:</p>
-<ul class="simple">
-<li><p>Build the wheel with the <code class="docutils literal notranslate"><span class="pre">--use-rtx</span></code> flag or set <code class="docutils literal notranslate"><span class="pre">USE_TRT_RTX=true</span></code>.</p></li>
-<li><p>During runtime, set the <code class="docutils literal notranslate"><span class="pre">USE_TRT_RTX=true</span></code> environment variable to invoke TensorRT-RTX.</p></li>
-</ul>
+</div></blockquote>
 </section>
+<section id="installing-torch-tensorrt-for-rtx">
+<h3>Installing Torch-TensorRT for RTX<a class="headerlink" href="#installing-torch-tensorrt-for-rtx" title="Link to this heading">#</a></h3>
+<p>You can install the python package using</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torch-tensorrt-rtx
+</pre></div>
+</div>
+<p>Packages are uploaded for Linux on x86 and Windows.</p>
 </section>
-<section id="prerequisites">
-<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
-<section id="clone-the-repository">
-<h3>Clone the Repository<a class="headerlink" href="#clone-the-repository" title="Link to this heading">#</a></h3>
-<p>First, clone the Torch-TensorRT repository:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/pytorch/TensorRT.git
-<span class="nb">cd</span><span class="w"> </span>TensorRT
+<section id="installing-nightly-builds">
+<h3>Installing Nightly Builds<a class="headerlink" href="#installing-nightly-builds" title="Link to this heading">#</a></h3>
+<p>Torch-TensorRT for RTX distributes nightlies targeting the PyTorch nightly.
+These can be installed from the PyTorch nightly package index (separated by
+CUDA version):</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>torch<span class="w"> </span>torch_tensorrt_rtx<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu130
 </pre></div>
 </div>
 </section>
-<section id="install-system-dependencies">
-<h3>Install System Dependencies<a class="headerlink" href="#install-system-dependencies" title="Link to this heading">#</a></h3>
-<p><strong>In Linux:</strong></p>
-<p>Install Python development headers (required for building Python extensions):</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># For Python 3.12 (adjust version number based on your Python version)</span>
-sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>python3.12-dev
-</pre></div>
-</div>
-</section>
-<section id="install-cuda-toolkit">
-<h3>Install CUDA Toolkit<a class="headerlink" href="#install-cuda-toolkit" title="Link to this heading">#</a></h3>
-<p>Download and install the CUDA Toolkit from the <a class="reference external" href="https://developer.nvidia.com/cuda-downloads">NVIDIA Developer website</a>. Also download the Nvidia driver if necessary.
-_Note: If you are on Windows, but in Linux via WSL, you do not need to install drivers in Linux. WSL will automatically use the drivers installed in Windows._</p>
-<p><strong>Important:</strong> Check the required CUDA version in the <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel">MODULE.bazel</a> file. You must install the exact CUDA toolkit version specified there (for example, at the time of writing, CUDA 13.0 is required).</p>
-<p>After installation, set the <code class="docutils literal notranslate"><span class="pre">CUDA_HOME</span></code> environment variable:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda
-<span class="c1"># Add this to your ~/.bashrc or ~/.zshrc to make it persistent</span>
-</pre></div>
-</div>
-</section>
-<section id="install-python-dependencies">
-<h3>Install Python Dependencies<a class="headerlink" href="#install-python-dependencies" title="Link to this heading">#</a></h3>
-<p><strong>It is strongly recommended to use a virtual environment</strong> to avoid conflicts with system packages:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install venv</span>
-apt<span class="w"> </span>install<span class="w"> </span>python3.12-venv
-
-<span class="c1"># Create a virtual environment</span>
-python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
-
-<span class="c1"># Activate the virtual environment</span>
-<span class="nb">source</span><span class="w"> </span>.venv/bin/activate<span class="w">  </span><span class="c1"># On Linux/Mac</span>
-<span class="c1"># OR on Windows:</span>
-<span class="c1"># .venv\Scripts\activate</span>
-</pre></div>
-</div>
-<p>Before building, install the required Python packages:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install setuptools (provides distutils)</span>
-pip<span class="w"> </span>install<span class="w"> </span>setuptools
-
-<span class="c1"># Install PyTorch</span>
-<span class="c1"># Note: If you are building Torch-TensorRT at tip-of-tree, you need to install the latest PyTorch nightly build rather than the stable release. See below for details.</span>
-<span class="c1"># Do not &#39;pip install torch torchvision&#39; which will install the stable release of PyTorch, only install the nightly build.</span>
-<span class="c1"># See below for details.</span>
-
-<span class="c1"># Install PyTorch nightly build (check CUDA version in MODULE.bazel)</span>
-<span class="c1"># Replace cuXXX with your CUDA version (e.g., cu130 for CUDA 13.0)</span>
-pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>torch<span class="w"> </span>torchvision<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cuXXX
-
-<span class="c1"># Install additional build dependencies</span>
-pip<span class="w"> </span>install<span class="w"> </span>pyyaml<span class="w"> </span>numpy
+<section id="import-test">
+<h3>Import Test<a class="headerlink" href="#import-test" title="Link to this heading">#</a></h3>
+<p>After installation, verify the import succeeds:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch_tensorrt; print(torch_tensorrt.__version__)&quot;</span>
 </pre></div>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The PyTorch version requirement is defined in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/pyproject.toml">pyproject.toml</a> (build requirements) and <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/setup.py">setup.py</a> (runtime requirements). If you encounter version-related errors during installation, refer to these files for the exact version constraints.</p>
-</div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Remember to activate the virtual environment (<code class="docutils literal notranslate"><span class="pre">source</span> <span class="pre">.venv/bin/activate</span></code>) whenever you work with this project or run the build commands.</p>
+<p>The Python import path is <code class="docutils literal notranslate"><span class="pre">torch_tensorrt</span></code> regardless of which flavor of
+TensorRT (<code class="docutils literal notranslate"><span class="pre">tensorrt</span></code> or <code class="docutils literal notranslate"><span class="pre">tensorrt_rtx</span></code>) is installed (the flavor is determined
+by the wheel name: <code class="docutils literal notranslate"><span class="pre">torch-tensorrt</span></code> vs. <code class="docutils literal notranslate"><span class="pre">torch-tensorrt-rtx</span></code>).</p>
 </div>
 </section>
-<section id="install-bazel">
-<h3>Install Bazel<a class="headerlink" href="#install-bazel" title="Link to this heading">#</a></h3>
-<p>Bazel is required to build the wheel with TensorRT-RTX.</p>
-<p><strong>In Linux:</strong></p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-L<span class="w"> </span>https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-amd64<span class="w"> </span><span class="se">\</span>
-<span class="w"> </span>-o<span class="w"> </span>bazelisk<span class="w"> </span><span class="se">\</span>
-<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>mv<span class="w"> </span>bazelisk<span class="w"> </span>/usr/bin/bazel<span class="w"> </span><span class="se">\</span>
-<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>chmod<span class="w"> </span>+x<span class="w"> </span>/usr/bin/bazel
-</pre></div>
-</div>
-<p><strong>In Windows:</strong></p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>choco<span class="w"> </span>install<span class="w"> </span>bazelisk<span class="w"> </span>-y
+</section>
+<section id="example-rtx-only-features">
+<h2>Example: RTX-Only Features<a class="headerlink" href="#example-rtx-only-features" title="Link to this heading">#</a></h2>
+<p>The following minimal example compiles a toy convolutional model with dynamic
+input shapes and demonstrates two TensorRT-RTX-only <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code>
+keyword arguments:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">runtime_cache_path</span></code> — path to an on-disk cache of JIT-compiled engines.
+The cache is populated on first use and reloaded on subsequent runs, so
+repeated invocations of the same compiled module skips JIT compilation. The
+default is a file under the system temp directory; set this to a persistent
+path (e.g. somewhere under your project) to share the cache across runs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dynamic_shapes_kernel_specialization_strategy</span></code> — controls how TensorRT-RTX
+specializes kernels for the current runtime shape. Accepts <code class="docutils literal notranslate"><span class="pre">&quot;lazy&quot;</span></code>
+(default; use a generic fallback kernel while a shape-specialized kernel
+compiles asynchronously), <code class="docutils literal notranslate"><span class="pre">&quot;eager&quot;</span></code> (block on the current shape until the
+specialized kernel is ready), or <code class="docutils literal notranslate"><span class="pre">&quot;none&quot;</span></code> (always use the generic kernel).</p></li>
+</ul>
+<p>Both keyword arguments are silently ignored on standard-TensorRT builds; they
+only take effect when the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt_rtx</span></code> wheel is installed.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ToyConv</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">relu</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">ToyConv</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+        <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+        <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+        <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">]</span>
+
+<span class="n">compiled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">},</span>
+    <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="c1"># RTX-only: persist JIT-compiled engines across runs.</span>
+    <span class="n">runtime_cache_path</span><span class="o">=</span><span class="s2">&quot;/tmp/my_rtx_cache.bin&quot;</span><span class="p">,</span>
+    <span class="c1"># RTX-only: &quot;lazy&quot; | &quot;eager&quot; | &quot;none&quot;.</span>
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="o">=</span><span class="s2">&quot;eager&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">out</span> <span class="o">=</span> <span class="n">compiled</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
-<section id="install-tensorrt-rtx-tarball">
-<h3>Install TensorRT-RTX Tarball<a class="headerlink" href="#install-tensorrt-rtx-tarball" title="Link to this heading">#</a></h3>
-<p>TensorRT-RTX tarball can be downloaded from <a class="reference external" href="https://developer.nvidia.com/tensorrt-rtx">https://developer.nvidia.com/tensorrt-rtx</a>.
-Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.4.0.76</strong>.</p>
+<section id="compiling-from-source">
+<h2>Compiling From Source<a class="headerlink" href="#compiling-from-source" title="Link to this heading">#</a></h2>
+<p>The standard build prerequisites (Bazel, CUDA, Python, PyTorch nightly) are
+unchanged for the TensorRT-RTX build — see <a class="reference internal" href="installation.html#installing-deps"><span class="std std-ref">Dependencies</span></a> in the main
+installation guide for those. Only the RTX-specific deltas are listed below.</p>
+<section id="rtx-specific-dependencies">
+<h3>RTX-Specific Dependencies<a class="headerlink" href="#rtx-specific-dependencies" title="Link to this heading">#</a></h3>
+<p>Download the TensorRT-RTX tarball from <a class="reference external" href="https://developer.nvidia.com/tensorrt-rtx">https://developer.nvidia.com/tensorrt-rtx</a>.
+Torch-TensorRT currently uses TensorRT-RTX version <strong>1.4.0.76</strong>.</p>
 <p>Once downloaded:</p>
-<p><strong>In Linux:</strong></p>
-<p>Make sure you add the lib path to the <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> environment variable.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.4.0.76</span>
+<p><strong>On Linux</strong>, add the tarball <code class="docutils literal notranslate"><span class="pre">lib</span></code> directory to <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is extracted in /your_local_download_path/TensorRT-RTX-1.4.0.76</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.4.0.76/lib:<span class="nv">$LD_LIBRARY_PATH</span>
-<span class="nb">echo</span><span class="w"> </span><span class="nv">$LD_LIBRARY_PATH</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
-<p><strong>In Windows:</strong></p>
-<p>Make sure you add the lib path to the Windows system variable <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.4.0.76</span>
-<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.4.0.76\lib&quot;</span>
-<span class="nb">echo</span><span class="w"> </span>%PATH%<span class="w"> </span><span class="p">|</span><span class="w"> </span>findstr<span class="w"> </span>TensorRT-RTX
+<p><strong>On Windows</strong>, add the tarball <code class="docutils literal notranslate"><span class="pre">lib</span></code> directory to the system <code class="docutils literal notranslate"><span class="pre">PATH</span></code>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span>%PATH%<span class="p">;</span>C:<span class="se">\y</span>our_local_download_path<span class="se">\T</span>ensorRT-RTX-1.4.0.76<span class="se">\l</span>ib
 </pre></div>
 </div>
 </section>
-<section id="install-tensorrt-rtx-wheel">
-<h3>Install TensorRT-RTX Wheel<a class="headerlink" href="#install-tensorrt-rtx-wheel" title="Link to this heading">#</a></h3>
-<p><cite>tensorrt_rtx</cite> wheel is published on PyPI.
-During <cite>torch_tensorrt_rtx</cite> wheel installation,
-it will automatically install the <cite>tensorrt_rtx</cite> wheel.</p>
-</section>
-</section>
-<section id="build-torch-tensorrt-with-tensorrt-rtx">
-<h2>Build Torch-TensorRT with TensorRT-RTX<a class="headerlink" href="#build-torch-tensorrt-with-tensorrt-rtx" title="Link to this heading">#</a></h2>
-<section id="build-locally-with-tensorrt-rtx">
-<h3>Build Locally with TensorRT-RTX<a class="headerlink" href="#build-locally-with-tensorrt-rtx" title="Link to this heading">#</a></h3>
-<p>Before building, ensure you have completed all the prerequisite steps above, including:</p>
-<ul class="simple">
-<li><p>Cloning the repository</p></li>
-<li><p>Installing Python dependencies (setuptools, torch, pyyaml, numpy)</p></li>
-<li><p>Setting CUDA_HOME environment variable</p></li>
-<li><p>Installing the correct CUDA toolkit version</p></li>
-<li><p>Installing Python development headers</p></li>
-<li><p>Installing Bazel</p></li>
-</ul>
-<p>Then build the wheel:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If you have previously built with standard TensorRT, make sure to clean the build environment,</span>
-<span class="c1"># otherwise it will use the existing .so built with standard TensorRT, which is not compatible with TensorRT-RTX.</span>
-python<span class="w"> </span>setup.py<span class="w"> </span>clean
+<section id="building-the-wheel">
+<h3>Building the Wheel<a class="headerlink" href="#building-the-wheel" title="Link to this heading">#</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you have previously built with standard TensorRT in this tree, clean the
+build environment first — otherwise <code class="docutils literal notranslate"><span class="pre">bdist_wheel</span></code> will reuse the existing
+<code class="docutils literal notranslate"><span class="pre">.so</span></code> built against standard TensorRT, which is not compatible with
+TensorRT-RTX.</p>
+</div>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>setup.py<span class="w"> </span>clean
 bazel<span class="w"> </span>clean<span class="w"> </span>--expunge
-<span class="c1"># Remove everything under build directory</span>
 rm<span class="w"> </span>-rf<span class="w"> </span>build/*
+</pre></div>
+</div>
+<p>Then build and install the wheel:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">USE_TRT_RTX</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>wheel<span class="w"> </span>.<span class="w"> </span>--no-deps<span class="w"> </span>-w<span class="w"> </span>dist/
 
-<span class="c1"># Build wheel with TensorRT-RTX</span>
-python<span class="w"> </span>setup.py<span class="w"> </span>bdist_wheel<span class="w"> </span>--use-rtx
-
-<span class="c1"># Install the wheel (note: the wheel filename uses underscores, not hyphens, and should contain the word &#39;rtx&#39;)</span>
+<span class="c1"># Note: the wheel filename uses underscores, not hyphens, and contains &#39;rtx&#39;.</span>
 python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dist/torch_tensorrt_rtx-*.whl
 </pre></div>
 </div>
 </section>
-</section>
-<section id="quick-start">
-<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">#</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">dynamo</span><span class="o">/</span><span class="n">torch_compile_resnet_example</span><span class="o">.</span><span class="n">py</span>
-</pre></div>
-</div>
 </section>
 <section id="troubleshooting">
 <h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">#</a></h2>
 <section id="common-issues">
 <h3>Common Issues<a class="headerlink" href="#common-issues" title="Link to this heading">#</a></h3>
 <p><strong>Missing distutils module</strong></p>
-<p>If you encounter <code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'distutils'</span></code>, install setuptools:</p>
+<p>If you encounter <code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'distutils'</span></code>, install
+setuptools:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>setuptools
 </pre></div>
 </div>
 <p><strong>Missing CUDA_HOME environment variable</strong></p>
-<p>If you encounter <code class="docutils literal notranslate"><span class="pre">OSError:</span> <span class="pre">CUDA_HOME</span> <span class="pre">environment</span> <span class="pre">variable</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">set</span></code>, set the CUDA_HOME path:</p>
+<p>If you encounter <code class="docutils literal notranslate"><span class="pre">OSError:</span> <span class="pre">CUDA_HOME</span> <span class="pre">environment</span> <span class="pre">variable</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">set</span></code>, set
+the <code class="docutils literal notranslate"><span class="pre">CUDA_HOME</span></code> path:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda
 </pre></div>
 </div>
 <p><strong>CUDA version mismatch</strong></p>
-<p>If you encounter errors about CUDA paths not existing (e.g., <code class="docutils literal notranslate"><span class="pre">/usr/local/cuda-X.Y/</span> <span class="pre">does</span> <span class="pre">not</span> <span class="pre">exist</span></code>), ensure you have the correct CUDA version installed. Check the required version in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel">MODULE.bazel</a>. You may need to:</p>
+<p>If you encounter errors about CUDA paths not existing (e.g.,
+<code class="docutils literal notranslate"><span class="pre">/usr/local/cuda-X.Y/</span> <span class="pre">does</span> <span class="pre">not</span> <span class="pre">exist</span></code>), ensure you have the correct CUDA
+version installed. Check the required version in
+<a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel">MODULE.bazel</a>.
+You may need to:</p>
 <ol class="arabic simple">
 <li><p>Update your NVIDIA drivers</p></li>
-<li><p>Download and install the specific CUDA toolkit version required by MODULE.bazel</p></li>
+<li><p>Download and install the specific CUDA toolkit version required by <code class="docutils literal notranslate"><span class="pre">MODULE.bazel</span></code></p></li>
 <li><p>Clean and rebuild after installing the correct version</p></li>
 </ol>
 <p><strong>PyTorch version mismatch</strong></p>
-<p>If you encounter an error like <code class="docutils literal notranslate"><span class="pre">ERROR:</span> <span class="pre">No</span> <span class="pre">matching</span> <span class="pre">distribution</span> <span class="pre">found</span> <span class="pre">for</span> <span class="pre">torch&lt;X.Y.Z,&gt;=X.Y.Z.dev</span></code> (for example, <code class="docutils literal notranslate"><span class="pre">torch&lt;2.11.0,&gt;=2.10.0.dev</span></code>), you need to install a compatible PyTorch nightly version.</p>
-<p>First, check the exact version constraint in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/pyproject.toml">pyproject.toml</a>, then install with that constraint:</p>
+<p>If you encounter an error like
+<code class="docutils literal notranslate"><span class="pre">ERROR:</span> <span class="pre">No</span> <span class="pre">matching</span> <span class="pre">distribution</span> <span class="pre">found</span> <span class="pre">for</span> <span class="pre">torch&lt;X.Y.Z,&gt;=X.Y.Z.dev</span></code> (for
+example, <code class="docutils literal notranslate"><span class="pre">torch&lt;2.11.0,&gt;=2.10.0.dev</span></code>), install a compatible PyTorch nightly.
+First check the exact version constraint in
+<a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/pyproject.toml">pyproject.toml</a>,
+then install with that constraint:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: if pyproject.toml requires torch&gt;=2.12.0.dev,&lt;2.13.0</span>
 <span class="c1"># and MODULE.bazel specifies CUDA 13.0 (cu130):</span>
 pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s2">&quot;torch&gt;=2.12.0.dev,&lt;2.13.0&quot;</span><span class="w"> </span>torchvision<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu130
 </pre></div>
 </div>
-<p>Replace the version constraint and CUDA version (cuXXX) according to your project’s requirements.</p>
+<p>Replace the version constraint and CUDA version (cuXXX) according to your
+project’s requirements.</p>
 <p><strong>Missing Python development headers</strong></p>
-<p>If you encounter <code class="docutils literal notranslate"><span class="pre">fatal</span> <span class="pre">error:</span> <span class="pre">Python.h:</span> <span class="pre">No</span> <span class="pre">such</span> <span class="pre">file</span> <span class="pre">or</span> <span class="pre">directory</span></code>, install the Python development package:</p>
+<p>If you encounter <code class="docutils literal notranslate"><span class="pre">fatal</span> <span class="pre">error:</span> <span class="pre">Python.h:</span> <span class="pre">No</span> <span class="pre">such</span> <span class="pre">file</span> <span class="pre">or</span> <span class="pre">directory</span></code>, install
+the Python development package:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># For Python 3.12 (adjust version based on your Python)</span>
 sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>python3.12-dev
 </pre></div>
@@ -700,9 +708,9 @@ sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> <
 </section>
 <section id="verifying-tensorrt-rtx-linkage">
 <h3>Verifying TensorRT-RTX Linkage<a class="headerlink" href="#verifying-tensorrt-rtx-linkage" title="Link to this heading">#</a></h3>
-<p>If you encounter load or link errors, check if <cite>tensorrt_rtx</cite> is linked correctly.
-If not, clean up the environment and rebuild.</p>
-<p><strong>In Linux:</strong></p>
+<p>If you encounter load or link errors, check that <code class="docutils literal notranslate"><span class="pre">tensorrt_rtx</span></code> is linked
+correctly. If not, clean the environment and rebuild.</p>
+<p><strong>Linux:</strong></p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Ensure only tensorrt_rtx is installed (no standard tensorrt wheels)</span>
 python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>tensorrt
 
@@ -713,7 +721,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 ldd<span class="w"> </span><span class="nv">$trt_install_path</span>/lib/libtorchtrt.so
 </pre></div>
 </div>
-<p><strong>In Windows:</strong></p>
+<p><strong>Windows:</strong></p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check if tensorrt_rtx_1_0.dll is linked, and libnvinfer.dll is NOT</span>
 <span class="nb">cd</span><span class="w"> </span>py/torch_tensorrt
 dumpbin<span class="w"> </span>/DEPENDENTS<span class="w"> </span>torchtrt.dll
@@ -769,25 +777,19 @@ dumpbin<span class="w"> </span>/DEPENDENTS<span class="w"> </span>torchtrt.dll
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a><ul class="visible nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tensorrt-rtx">TensorRT-RTX</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#precompiled-binaries">Precompiled Binaries</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#dependencies">Dependencies</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#installing-torch-tensorrt-for-rtx">Installing Torch-TensorRT for RTX</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#installing-nightly-builds">Installing Nightly Builds</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#import-test">Import Test</a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a><ul class="visible nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#clone-the-repository">Clone the Repository</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#install-system-dependencies">Install System Dependencies</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#install-cuda-toolkit">Install CUDA Toolkit</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#install-python-dependencies">Install Python Dependencies</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#install-bazel">Install Bazel</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#install-tensorrt-rtx-tarball">Install TensorRT-RTX Tarball</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#install-tensorrt-rtx-wheel">Install TensorRT-RTX Wheel</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example-rtx-only-features">Example: RTX-Only Features</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compiling-from-source">Compiling From Source</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#rtx-specific-dependencies">RTX-Specific Dependencies</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#building-the-wheel">Building the Wheel</a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#build-torch-tensorrt-with-tensorrt-rtx">Build Torch-TensorRT with TensorRT-RTX</a><ul class="visible nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#build-locally-with-tensorrt-rtx">Build Locally with TensorRT-RTX</a></li>
-</ul>
-</li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quick-start">Quick Start</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#troubleshooting">Troubleshooting</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#common-issues">Common Issues</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#verifying-tensorrt-rtx-linkage">Verifying TensorRT-RTX Linkage</a></li>
