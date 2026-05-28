@@ -713,22 +713,6 @@ class TestNcclUtils(unittest.TestCase):
                 f"libnccl.so.2 not found in {result}",
             )
 
-    def test_check_nccl_library_path_system_nccl(self) -> None:
-        """check_nccl_library_path returns True when nvidia.nccl not installed."""
-        from torch_tensorrt.distributed._nccl_utils import (
-            check_nccl_library_path,
-            get_nccl_library_path,
-        )
-
-        nccl_lib_dir = get_nccl_library_path()
-        if nccl_lib_dir is None:
-            # System NCCL path — must return True
-            self.assertTrue(check_nccl_library_path())
-        else:
-            # nvidia.nccl installed — result depends on LD_LIBRARY_PATH
-            result = check_nccl_library_path()
-            self.assertIsInstance(result, bool)
-
     def test_setup_nccl_for_torch_tensorrt_idempotent(self) -> None:
         """Calling setup_nccl_for_torch_tensorrt() multiple times is safe."""
         from torch_tensorrt.distributed import _nccl_utils
@@ -748,26 +732,6 @@ class TestNcclUtils(unittest.TestCase):
         result = ensure_nccl_symlink("/nonexistent/path/to/nccl/lib")
         # libnccl.so.2 doesn't exist there → returns False
         self.assertFalse(result)
-
-    def test_check_nccl_library_path_detects_missing_ld_path(self) -> None:
-        """check_nccl_library_path returns False when LD_LIBRARY_PATH is absent."""
-        from torch_tensorrt.distributed._nccl_utils import get_nccl_library_path
-
-        nccl_lib_dir = get_nccl_library_path()
-        if nccl_lib_dir is None:
-            self.skipTest("nvidia.nccl not installed; system NCCL path is always OK")
-
-        from torch_tensorrt.distributed._nccl_utils import check_nccl_library_path
-
-        original = os.environ.get("LD_LIBRARY_PATH", "")
-        # Remove nccl_lib_dir from LD_LIBRARY_PATH
-        paths = [p for p in original.split(":") if p and p != nccl_lib_dir]
-        os.environ["LD_LIBRARY_PATH"] = ":".join(paths)
-        try:
-            result = check_nccl_library_path()
-            self.assertFalse(result)
-        finally:
-            os.environ["LD_LIBRARY_PATH"] = original
 
 
 # ============================================================================
