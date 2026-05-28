@@ -5,8 +5,8 @@ import json
 import sys
 
 RELEASE_CUDA_VERSION = {
-    "wheel": ["cu130"],
-    "tarball": ["cu130"],
+    "wheel": ["cu130", "cu132"],
+    "tarball": ["cu130", "cu132"],
 }
 RELEASE_PYTHON_VERSION = {
     "wheel": ["3.10", "3.11", "3.12", "3.13"],

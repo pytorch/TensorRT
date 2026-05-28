@@ -6,12 +6,12 @@ non-causal masking, bool/float/broadcast mask shapes, decode-phase attention
 
 Known limitations
 -----------------------------------------------------
-  TensorRT 10.x (resolved in TRT 11.0) and TensorRT-RTX-1.4:
+  TensorRT 10.x (resolved in TRT 11.0) and TensorRT-RTX:
   For TensorRT 10.x, large causal sequences of k/v (seq >= 512, is_causal=True) in FP16/BF16
     IAttentionLayer produces ~80% element mismatch at long sequences. Thus, we use FP32 for
     the scale factor. If you want to use the accurate dtype, please set `decompose_attention=True`
-    or upgrade to TRT 11.0 or later. TODO: @Evan to verify the version of TensorRT-RTX that
-    resolves this bug.
+    or upgrade to TRT 11.0 or later. TODO: @Evan to verify whether TensorRT-RTX 1.5 resolves
+    this bug.
 
   PyTorch 2.12.0 (resolved in PyTorch 2.13.0):
     PyTorch 2.12.0's core_aten decomposition expands scaled_dot_product_attention
