@@ -212,16 +212,22 @@ class TRTInterpreter(torch.fx.Interpreter):
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
         if lower_precision == LowerPrecision.FP16:
-            builder_config.set_flag(trt.BuilderFlag.FP16)
+            fp16_flag = getattr(trt.BuilderFlag, "FP16", None)
+            if fp16_flag is not None:
+                builder_config.set_flag(fp16_flag)
 
         if lower_precision == LowerPrecision.INT8:
-            builder_config.set_flag(trt.BuilderFlag.INT8)
+            int8_flag = getattr(trt.BuilderFlag, "INT8", None)
+            if int8_flag is not None:
+                builder_config.set_flag(int8_flag)
 
         if sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
 
         if strict_type_constraints:
-            builder_config.set_flag(trt.BuilderFlag.STRICT_TYPES)
+            strict_types_flag = getattr(trt.BuilderFlag, "STRICT_TYPES", None)
+            if strict_types_flag is not None:
+                builder_config.set_flag(strict_types_flag)
 
         if self.optimization_profiles:
             for optimization_profile in self.optimization_profiles:

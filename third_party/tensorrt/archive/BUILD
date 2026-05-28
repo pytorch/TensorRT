@@ -1,3 +1,4 @@
+load("@//third_party/tensorrt/local:path_helpers.bzl", "one_of")
 load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -38,7 +39,10 @@ cc_library(
 cc_import(
     name = "nvinfer_lib",
     shared_library = select({
-        ":windows": "bin/nvinfer_10.dll",
+        ":windows": one_of([
+            "bin/nvinfer_11.dll",
+            "bin/nvinfer_10.dll",
+        ]),
         "//conditions:default": "lib/libnvinfer.so",
     }),
     visibility = ["//visibility:private"],
@@ -47,7 +51,10 @@ cc_import(
 cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
-        ":windows": "lib/nvinfer_10.lib",
+        ":windows": one_of([
+            "lib/nvinfer_11.lib",
+            "lib/nvinfer_10.lib",
+        ]),
         "//conditions:default": "lib/libnvinfer_static.a",
     }),
     visibility = ["//visibility:private"],
@@ -199,7 +206,10 @@ cc_library(
 cc_library(
     name = "nvinferplugin",
     srcs = select({
-        ":windows": ["lib/nvinfer_plugin_10.lib"],
+        ":windows": [one_of([
+            "lib/nvinfer_plugin_11.lib",
+            "lib/nvinfer_plugin_10.lib",
+        ])],
         "//conditions:default": ["lib/libnvinfer_plugin.so"],
     }),
     hdrs = glob(

@@ -93,7 +93,10 @@ cc_import(
     static_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer_static.a",
         ":ci_rhel_x86_64_linux": "lib/libnvinfer_static.a",
-        ":windows": "lib/nvinfer_10.lib",
+        ":windows": one_of([
+            "lib/nvinfer_11.lib",
+            "lib/nvinfer_10.lib",
+        ]),
         "//conditions:default": one_of([
             "lib/libnvinfer_static.a",
             "lib/x86_64-linux-gnu/libnvinfer_static.a",
@@ -107,7 +110,10 @@ cc_import(
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer.so",
         ":ci_rhel_x86_64_linux": "lib/libnvinfer.so",
-        ":windows": "bin/nvinfer_10.dll",
+        ":windows": one_of([
+            "bin/nvinfer_11.dll",
+            "bin/nvinfer_10.dll",
+        ]),
         "//conditions:default": one_of([
             "lib/libnvinfer.so",
             "lib/x86_64-linux-gnu/libnvinfer.so",
@@ -388,7 +394,10 @@ cc_library(
     srcs = select({
         ":aarch64_linux": ["lib/aarch64-linux-gnu/libnvinfer_plugin.so"],
         ":ci_rhel_x86_64_linux": ["lib/libnvinfer_plugin.so"],
-        ":windows": ["lib/nvinfer_plugin_10.lib"],
+        ":windows": [one_of([
+            "lib/nvinfer_plugin_11.lib",
+            "lib/nvinfer_plugin_10.lib",
+        ])],
         "//conditions:default": [one_of([
             "lib/libnvinfer_plugin.so",
             "lib/x86_64-linux-gnu/libnvinfer_plugin.so",
