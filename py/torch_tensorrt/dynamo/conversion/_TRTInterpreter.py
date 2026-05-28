@@ -290,9 +290,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if self.compilation_settings.strip_engine_weights:
                 builder_config.set_flag(trt.BuilderFlag.STRIP_PLAN)
 
-        strict_types_flag = getattr(trt.BuilderFlag, "STRICT_TYPES", None)
-        if strict_type_constraints and strict_types_flag is not None:
-            builder_config.set_flag(strict_types_flag)
+        if strict_type_constraints:
+            builder_config.set_flag(trt.BuilderFlag.STRICT_TYPES)
 
         if self.optimization_profiles is not None:
             if len(self.optimization_profiles) > 0:
