@@ -842,9 +842,7 @@ def get_x86_64_requirements(base_requirements):
     requirements = base_requirements + ["numpy"]
 
     if IS_DLFW_CI:
-        return requirements + [
-            EXECUTORCH_REQUIREMENT,
-        ]
+        return requirements
     else:
         requirements = requirements + [
             "torch>=2.13.0.dev,<2.14.0",
