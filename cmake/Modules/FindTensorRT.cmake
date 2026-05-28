@@ -30,6 +30,14 @@ set(_TensorRT_SEARCH_NORMAL
 )
 list(APPEND _TensorRT_SEARCHES _TensorRT_SEARCH_NORMAL)
 
+if(WIN32)
+  set(_TensorRT_NVINFER_NAMES nvinfer_11)
+  set(_TensorRT_NVINFER_PLUGIN_NAMES nvinfer_plugin_11)
+else()
+  set(_TensorRT_NVINFER_NAMES nvinfer)
+  set(_TensorRT_NVINFER_PLUGIN_NAMES nvinfer_plugin)
+endif()
+
 # Include dir
 foreach(search ${_TensorRT_SEARCHES})
   find_path(TensorRT_INCLUDE_DIR NAMES NvInfer.h ${${search}} PATH_SUFFIXES include)
@@ -37,13 +45,13 @@ endforeach()
 
 if(NOT TensorRT_LIBRARY)
   foreach(search ${_TensorRT_SEARCHES})
-    find_library(TensorRT_LIBRARY NAMES nvinfer nvinfer_11 nvinfer_10 ${${search}} PATH_SUFFIXES lib)
+    find_library(TensorRT_LIBRARY NAMES ${_TensorRT_NVINFER_NAMES} ${${search}} PATH_SUFFIXES lib)
   endforeach()
 endif()
 
 if(NOT TensorRT_nvinfer_plugin_LIBRARY)
   foreach(search ${_TensorRT_SEARCHES})
-    find_library(TensorRT_nvinfer_plugin_LIBRARY NAMES nvinfer_plugin nvinfer_plugin_11 nvinfer_plugin_10 ${${search}} PATH_SUFFIXES lib)
+    find_library(TensorRT_nvinfer_plugin_LIBRARY NAMES ${_TensorRT_NVINFER_PLUGIN_NAMES} ${${search}} PATH_SUFFIXES lib)
   endforeach()
 endif()
 
@@ -83,7 +91,7 @@ if(TensorRT_FOUND)
     if (WIN32)
       foreach(search ${_TensorRT_SEARCHES})
         find_file(TensorRT_LIBRARY_DLL
-          NAMES nvinfer.dll nvinfer_11.dll nvinfer_10.dll
+          NAMES nvinfer_11.dll
           PATHS ${${search}}
           PATH_SUFFIXES bin
         )
@@ -108,7 +116,7 @@ if(TensorRT_FOUND)
     if (WIN32)
       foreach(search ${_TensorRT_SEARCHES})
         find_file(TensorRT_nvinfer_plugin_LIBRARY_DLL
-          NAMES nvinfer_plugin.dll nvinfer_plugin_11.dll nvinfer_plugin_10.dll
+          NAMES nvinfer_plugin_11.dll
           PATHS ${${search}}
           PATH_SUFFIXES bin
         )
