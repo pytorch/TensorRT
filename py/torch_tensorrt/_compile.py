@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections.abc
+import importlib
 import inspect
 import logging
 import platform
@@ -67,6 +68,13 @@ __all__ = [
     "save",
     "load",
 ]
+
+
+def _has_executorch_exir() -> bool:
+    try:
+        return importlib.util.find_spec("executorch.exir") is not None
+    except ModuleNotFoundError:
+        return False
 
 
 def _non_fx_input_interface(
@@ -742,6 +750,17 @@ def save(
 
     executorch_partitioners = kwargs.pop("partitioners", None)
 
+    if output_format not in accepted_formats:
+        raise ValueError(
+            f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript | aot_inductor | executorch"
+        )
+    if output_format == "executorch" and not _has_executorch_exir():
+        raise ImportError(
+            "Saving in ExecuTorch format requires the executorch package "
+            "with executorch.exir. Install executorch to use "
+            "output_format='executorch'."
+        )
+
     def _all_are_input_objects(obj: Any) -> bool:
         """Recursively check if all elements in nested collections are Input objects."""
         if isinstance(obj, Input):
@@ -841,10 +860,6 @@ def save(
     # When inferring dynamic shapes, use different sizes for args vs kwargs to avoid
     # torch.export detecting spurious equality constraints
 
-    if output_format not in accepted_formats:
-        raise ValueError(
-            f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript | aot_inductor | executorch"
-        )
     if executorch_partitioners and output_format != "executorch":
         logger.warning(
             "partitioners= is only used with output_format='executorch' and will be "
