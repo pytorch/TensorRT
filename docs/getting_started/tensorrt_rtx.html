@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=b3ff492b"></script>
+    <script src="../_static/documentation_options.js?v=3f67715b"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -622,27 +622,41 @@ installation guide for those. Only the RTX-specific deltas are listed below.</p>
 <section id="rtx-specific-dependencies">
 <h3>RTX-Specific Dependencies<a class="headerlink" href="#rtx-specific-dependencies" title="Link to this heading">#</a></h3>
 <p>Download the TensorRT-RTX tarball from <a class="reference external" href="https://developer.nvidia.com/tensorrt-rtx">https://developer.nvidia.com/tensorrt-rtx</a>.
-Torch-TensorRT currently uses TensorRT-RTX version <strong>1.4.0.76</strong>.</p>
+Torch-TensorRT currently uses TensorRT-RTX version <strong>1.5.0.114</strong>.</p>
 <p>Once downloaded:</p>
 <p><strong>On Linux</strong>, add the tarball <code class="docutils literal notranslate"><span class="pre">lib</span></code> directory to <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is extracted in /your_local_download_path/TensorRT-RTX-1.4.0.76</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.4.0.76/lib:<span class="nv">$LD_LIBRARY_PATH</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is extracted in /your_local_download_path/TensorRT-RTX-1.5.0.114</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.5.0.114/lib:<span class="nv">$LD_LIBRARY_PATH</span>
 </pre></div>
 </div>
 <p><strong>On Windows</strong>, add the tarball <code class="docutils literal notranslate"><span class="pre">lib</span></code> directory to the system <code class="docutils literal notranslate"><span class="pre">PATH</span></code>:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span>%PATH%<span class="p">;</span>C:<span class="se">\y</span>our_local_download_path<span class="se">\T</span>ensorRT-RTX-1.4.0.76<span class="se">\l</span>ib
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.4.0.76</span>
+<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.4.0.76\lib&quot;</span>
+<span class="nb">echo</span><span class="w"> </span>%PATH%<span class="w"> </span><span class="p">|</span><span class="w"> </span>findstr<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
 </section>
-<section id="building-the-wheel">
-<h3>Building the Wheel<a class="headerlink" href="#building-the-wheel" title="Link to this heading">#</a></h3>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>If you have previously built with standard TensorRT in this tree, clean the
-build environment first — otherwise <code class="docutils literal notranslate"><span class="pre">bdist_wheel</span></code> will reuse the existing
-<code class="docutils literal notranslate"><span class="pre">.so</span></code> built against standard TensorRT, which is not compatible with
-TensorRT-RTX.</p>
-</div>
+<section id="install-tensorrt-rtx-wheel">
+<h3>Install TensorRT-RTX Wheel<a class="headerlink" href="#install-tensorrt-rtx-wheel" title="Link to this heading">#</a></h3>
+<p><cite>tensorrt_rtx</cite> wheel is published on PyPI.
+During <cite>torch_tensorrt_rtx</cite> wheel installation,
+it will automatically install the <cite>tensorrt_rtx</cite> wheel.</p>
+</section>
+</section>
+<section id="build-torch-tensorrt-with-tensorrt-rtx">
+<h2>Build Torch-TensorRT with TensorRT-RTX<a class="headerlink" href="#build-torch-tensorrt-with-tensorrt-rtx" title="Link to this heading">#</a></h2>
+<section id="build-locally-with-tensorrt-rtx">
+<h3>Build Locally with TensorRT-RTX<a class="headerlink" href="#build-locally-with-tensorrt-rtx" title="Link to this heading">#</a></h3>
+<p>Before building, ensure you have completed all the prerequisite steps above, including:</p>
+<ul class="simple">
+<li><p>Cloning the repository</p></li>
+<li><p>Installing Python dependencies (setuptools, torch, pyyaml, numpy)</p></li>
+<li><p>Setting CUDA_HOME environment variable</p></li>
+<li><p>Installing the correct CUDA toolkit version</p></li>
+<li><p>Installing Python development headers</p></li>
+<li><p>Installing Bazel</p></li>
+</ul>
+<p>Then build the wheel:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>setup.py<span class="w"> </span>clean
 bazel<span class="w"> </span>clean<span class="w"> </span>--expunge
 rm<span class="w"> </span>-rf<span class="w"> </span>build/*
@@ -787,7 +801,11 @@ dumpbin<span class="w"> </span>/DEPENDENTS<span class="w"> </span>torchtrt.dll
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example-rtx-only-features">Example: RTX-Only Features</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compiling-from-source">Compiling From Source</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#rtx-specific-dependencies">RTX-Specific Dependencies</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#building-the-wheel">Building the Wheel</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#install-tensorrt-rtx-wheel">Install TensorRT-RTX Wheel</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#build-torch-tensorrt-with-tensorrt-rtx">Build Torch-TensorRT with TensorRT-RTX</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#build-locally-with-tensorrt-rtx">Build Locally with TensorRT-RTX</a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#troubleshooting">Troubleshooting</a><ul class="visible nav section-nav flex-column">
