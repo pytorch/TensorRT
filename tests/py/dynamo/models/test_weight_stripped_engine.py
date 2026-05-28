@@ -268,14 +268,12 @@ class TestWeightStrippedEngine(TestCase):
         not importlib.util.find_spec("torchvision"),
         "torchvision is not installed",
     )
-    @unittest.skipIf(
-        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-        "Engine caching compilation time assertion is unreliable with TensorRT-RTX",
-    )
     def test_dynamo_compile_with_refittable_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
-        exp_program = torch.export.export(pyt_model, args=example_inputs)
+        # Use the same inputs for both export and compile to avoid a
+        # static-shape mismatch between the exported program and the engine.
+        inputs = [torch.randn((100, 3, 224, 224)).to("cuda")]
+        exp_program = torch.export.export(pyt_model, args=tuple(inputs))
 
         engine_cache_dir = (
             "/tmp/test_dynamo_compile_with_refittable_weight_stripped_engine"
@@ -291,7 +289,6 @@ class TestWeightStrippedEngine(TestCase):
         # The 2nd and 3rd iterations are to measure the compilation time with engine caching.
         # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
         # The 3rd iteration should be faster than the 1st iteration because it loads the cached engine.
-        inputs = [torch.rand((128, 3, 224, 224)).to("cuda")]
         results = []
         times = []
         start = torch.cuda.Event(enable_timing=True)

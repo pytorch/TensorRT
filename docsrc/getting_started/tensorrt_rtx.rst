@@ -165,15 +165,15 @@ Once downloaded:
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.4.0.76
-    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.4.0.76\lib"
+    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.5.0.114
+    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.5.0.114\lib"
     echo %PATH% | findstr TensorRT-RTX
 
 Install TensorRT-RTX Wheel
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 `tensorrt_rtx` wheel is published on PyPI.
-During `torch_tensorrt_rtx` wheel installation, 
+During `torch_tensorrt_rtx` wheel installation,
 it will automatically install the `tensorrt_rtx` wheel.
 
 Build Torch-TensorRT with TensorRT-RTX
