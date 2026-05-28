@@ -68,6 +68,19 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.shape_key: Optional[str] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
+        self._owned_pool_stream: Optional[torch.cuda.Stream] = None
+        # Bind to the device of the wrapped module's first CUDA parameter so
+        # multi-GPU deployments cache the right default stream.
+        target = next(
+            (p.device for p in self.compiled_module.parameters() if p.is_cuda),
+            None,
+        )
+        self._target_device = (
+            target
+            if target is not None
+            else torch.device("cuda", torch.cuda.current_device())
+        )
+        self._default_stream = torch.cuda.default_stream(self._target_device)
         self.warm_up()
 
     def warm_up(self) -> None:
@@ -121,7 +134,29 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
         if cudagraphs_enabled:
             shape_changed = self.validate_input_shapes(inputs)
-            need_cudagraphs_record = shape_changed or self.is_weight_streaming_set
+
+            current_device = (
+                inputs[0].device
+                if inputs and inputs[0].is_cuda
+                else self._target_device
+            )
+            default_stream = self._default_stream
+            previous_engine_stream = self._engine_stream
+            self._caller_stream = torch.cuda.current_stream(current_device)
+            caller_on_default = self._caller_stream == default_stream
+            if caller_on_default:
+                if self._owned_pool_stream is None:
+                    self._owned_pool_stream = torch.cuda.Stream(self._target_device)
+                self._engine_stream = self._owned_pool_stream
+            else:
+                # Honor caller's non-default stream so its scheduling choice (e.g. SM
+                # partitioning via a CUDA Green Context) is preserved end to end.
+                self._engine_stream = self._caller_stream
+            stream_changed = self._engine_stream != previous_engine_stream
+
+            need_cudagraphs_record = (
+                shape_changed or self.is_weight_streaming_set or stream_changed
+            )
             if need_cudagraphs_record:
                 self._reset_captured_graph()
                 self._input_buffers = [None] * len(inputs)
@@ -172,14 +207,8 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     self._input_buffers, self.compiled_module._in_spec
                 )
 
-            self._caller_stream = torch.cuda.current_stream()
-            if (
-                self._engine_stream == torch.cuda.default_stream()
-                or self._engine_stream is None
-            ):
-                self._engine_stream = torch.cuda.Stream()
-
-            self._engine_stream.wait_stream(self._caller_stream)
+            if caller_on_default:
+                self._engine_stream.wait_stream(self._caller_stream)
 
             with torch.cuda.stream(self._engine_stream):
                 if need_cudagraphs_record:
@@ -188,7 +217,8 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                         self._output_buffers = self.compiled_module(*args, **kwargs)
 
                 self.cudagraph.replay()  # type: ignore
-            self._caller_stream.wait_stream(self._engine_stream)
+            if caller_on_default:
+                self._caller_stream.wait_stream(self._engine_stream)
 
             if isinstance(self._output_buffers, (list, tuple)):
                 output_buffers = self._output_buffers
