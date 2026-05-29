@@ -1031,6 +1031,7 @@ class _BackendE2ETests:
                 dtype=torch.float32,
             )],
             min_block_size=1,
+            use_python_runtime=True,
         )
         engines = _get_trt_engines(compiled)
         self.assertEqual(len(engines), 1,
@@ -1611,6 +1612,7 @@ class TestMultiOutputDynamicE2E(unittest.TestCase):
                 dtype=torch.float32,
             )],
             min_block_size=1,
+            use_python_runtime=True,
         )
         engines = _get_trt_engines(compiled)
         self.assertEqual(len(engines), 1)
@@ -1647,6 +1649,7 @@ class TestDynamicHiddenE2E(unittest.TestCase):
                 dtype=torch.float32,
             )],
             min_block_size=1,
+            use_python_runtime=True,
         )
         engines = _get_trt_engines(compiled)
         self.assertEqual(len(engines), 1)
@@ -1707,6 +1710,7 @@ class TestCrossBackendDynamicE2E(unittest.TestCase):
                 dtype=torch.float32,
             )],
             min_block_size=1,
+            use_python_runtime=True,
         )
         engines = _get_trt_engines(compiled)
         self.assertEqual(len(engines), 1, "Expected both plugins in one TRT engine")
@@ -1757,6 +1761,7 @@ class TestNonLinearFormatsE2E(unittest.TestCase):
             m,
             inputs=[torch.zeros(self._SHAPE, device="cuda")],
             min_block_size=1,
+            use_python_runtime=True,
         )
 
     def test_pluginv3_present(self):
