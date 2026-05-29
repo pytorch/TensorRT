@@ -49,6 +49,28 @@ except ImportError as e:
         "TensorRT with plugin support is required for cuTILE AOT compilation."
     ) from e
 
+
+def _trt_dtype_to_ct(td_dtype: Any) -> Any:
+    """Map a ``trt.DataType`` value to the corresponding ``cuda.tile.DType``.
+
+    Mirrors :func:`_qdp_utils.td_dtype_to_torch`; the supported set is the same
+    one cuTile / TRT QDP can handle.
+    """
+    import cuda.tile as ct  # type: ignore[import]
+
+    if td_dtype == trt.float32:
+        return ct.float32
+    if td_dtype == trt.float16:
+        return ct.float16
+    if td_dtype == trt.bfloat16:
+        return ct.bfloat16
+    if td_dtype == trt.int32:
+        return ct.int32
+    raise RuntimeError(
+        f"unsupported TRT dtype {td_dtype!r} for cuTile;"
+        " supported: float32, float16, bfloat16, int32"
+    )
+
 from .._qdp_utils import (
     AOTMetadata,
     TTAPluginError,
@@ -475,14 +497,20 @@ def aot_impl_cutile(
         block_size = _symint_to_int(scalar_symints[0], block_size)
 
     try:
-        from cuda.tile._compile import compile_tile  # type: ignore[import]
-        from cuda.tile._compiler_options import CompilerOptions  # type: ignore[import]
+        import cuda.tile as ct  # type: ignore[import]
+        from cuda.tile.compilation import (  # type: ignore[import]
+            ArrayConstraint,
+            CallingConvention,
+            ConstantConstraint,
+            KernelSignature,
+            export_kernel,
+        )
     except ImportError as exc:
         raise TTAPluginError(
             op=qdp_symbol,
             stage="aot_impl",
             backend=backend,
-            msg=f"failed to import cuTILE internals (compile_tile/CompilerOptions) for op '{qdp_symbol}': {exc}",
+            msg=f"cuTILE compilation API (cuda.tile.compilation) not available for op '{qdp_symbol}': {exc}",
         ) from exc
 
     # Verify that tileiras is on PATH — it ships with the cuda-tile package.
@@ -506,45 +534,65 @@ def aot_impl_cutile(
     num_inputs = len(inp_descs)
     num_outputs = len(out_descs)
 
-    def _make_example_tensors(flatten_all: bool) -> List[Any]:
-        out: List[Any] = []
-        for td in all_descs:
-            dims = [_safe_dim(d) for d in td.shape_expr]
-            numel = 1
-            for d in dims:
-                numel *= d
-            if flatten_all or len(dims) > 2:
-                shape = (numel,)
-            else:
-                shape = tuple(dims)
-            out.append(
-                torch.empty(
-                    shape,
-                    dtype=td_dtype_to_torch(td.dtype),
-                    device="cuda",
-                )
-            )
-        return out
-
-    example_tensors = _make_example_tensors(flatten_all=False)
     if scalar_symints:
         scalar_ints = [_symint_to_int(s, block_size) for s in scalar_symints]
-        pyfunc_args = tuple(example_tensors) + tuple(scalar_ints)
     else:
         scalar_ints = [block_size]
-        pyfunc_args = tuple(example_tensors) + (block_size,)
+
+    def _build_signature(flatten_all: bool) -> KernelSignature:
+        # Match the kernel ABI: arrays in (inputs..., outputs...) order,
+        # followed by scalar attributes as compile-time constants.
+        params: List[Any] = []
+        for td in all_descs:
+            natural_ndim = len(td.shape_expr) or 1
+            ndim = 1 if (flatten_all or natural_ndim > 2) else natural_ndim
+            params.append(
+                ArrayConstraint(
+                    dtype=_trt_dtype_to_ct(td.dtype),
+                    ndim=ndim,
+                    index_dtype=ct.int32,
+                    # cuTile rejects negative strides by default; the TRT
+                    # tensors we receive always have non-negative strides.
+                    stride_lower_bound_incl=0,
+                    alias_groups=(),
+                    may_alias_internally=False,
+                )
+            )
+        for v in scalar_ints:
+            params.append(ConstantConstraint(int(v)))
+        return KernelSignature(
+            parameters=tuple(params),
+            calling_convention=CallingConvention.cutile_python_v1(),
+            symbol=None,
+        )
+
     real_prog = recorder.real_prog
-    pyfunc = getattr(real_prog, "_pyfunc", real_prog)
+
+    # ``export_kernel`` writes the compiled artefact to a file or file-like
+    # object.  Use BytesIO to keep the cubin in memory.
+    import io as _io
+
+    major, minor = torch.cuda.get_device_capability()
+    gpu_code = f"sm_{major}{minor}"
+
+    def _compile_to_cubin(flatten_all: bool) -> bytes:
+        buf = _io.BytesIO()
+        export_kernel(
+            real_prog,
+            [_build_signature(flatten_all=flatten_all)],
+            buf,
+            gpu_code=gpu_code,
+            output_format="cubin",
+        )
+        return buf.getvalue()
 
     try:
-        result = compile_tile(pyfunc, pyfunc_args, CompilerOptions())
+        cubin_bytes = _compile_to_cubin(flatten_all=False)
     except Exception as exc:
         exc_str = str(exc)
         if "Index size" in exc_str and "array rank" in exc_str:
-            example_tensors = _make_example_tensors(flatten_all=True)
-            pyfunc_args = tuple(example_tensors) + tuple(scalar_ints)
             try:
-                result = compile_tile(pyfunc, pyfunc_args, CompilerOptions())
+                cubin_bytes = _compile_to_cubin(flatten_all=True)
             except Exception as retry_exc:
                 raise TTAPluginError(
                     op=qdp_symbol,
@@ -560,17 +608,11 @@ def aot_impl_cutile(
                 msg=f"cuTILE compilation failed: {exc}",
             ) from exc
 
-    if hasattr(result, "fname_cubin"):
-        with open(result.fname_cubin, "rb") as f:
-            cubin_bytes = f.read()
-        kernel_name_str = getattr(result, "func_name", None) or getattr(real_prog, "__name__", None) or "cutile_kernel"
-    elif isinstance(result, bytes):
-        cubin_bytes = result
-        kernel_name_str = getattr(real_prog, "kernel_name", None) or getattr(real_prog, "__name__", None) or "cutile_kernel"
-    else:
-        with open(result, "rb") as f:
-            cubin_bytes = f.read()
-        kernel_name_str = getattr(real_prog, "kernel_name", None) or getattr(real_prog, "__name__", None) or "cutile_kernel"
+    kernel_name_str = (
+        getattr(real_prog, "kernel_name", None)
+        or getattr(real_prog, "__name__", None)
+        or "cutile_kernel"
+    )
 
     num_scalars = len(scalar_symints) if scalar_symints else 1
     rank = max(1, max(len(td.shape_expr) for td in all_descs))
