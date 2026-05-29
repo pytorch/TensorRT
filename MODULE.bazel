@@ -72,7 +72,7 @@ new_local_repository(
 new_local_repository(
     name = "cuda_l4t",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-12.6",
+    path = "/usr/local/cuda-13.0",
 )
 
 # for windows
@@ -118,6 +118,19 @@ local_torch(name = "libtorch")
 #   build_file = "@//third_party/tensorrt/local:BUILD"
 #)
 
+#new_local_repository(
+#   name = "tensorrt_l4t",
+#   path = "/usr/",
+#   build_file = "@//third_party/tensorrt/local:BUILD"
+#)
+
+#new_local_repository(
+#    name = "torch_l4t",
+# please modify this path according to your local python wheel path
+#    path = "/usr/local/lib/python3.11/dist-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+#)
+
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
@@ -151,13 +164,14 @@ http_archive(
     urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-win-shared-with-deps-latest.zip"],
 )
 
-http_archive(
-    name = "torch_l4t",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "torch",
-    type = "zip",
-    urls = ["https://pypi.jetson-ai-lab.io/jp6/cu126/+f/62a/1beee9f2f1470/torch-2.8.0-cp310-cp310-linux_aarch64.whl"],
-)
+# No wheel for torch2.12
+#http_archive(
+#    name = "torch_l4t",
+#    build_file = "@//third_party/libtorch:BUILD",
+#    strip_prefix = "torch",
+#    type = "zip",
+#    urls = ["https://pypi.jetson-ai-lab.io/jp6/cu126/+f/62a/1beee9f2f1470/torch-2.8.0-cp310-cp310-linux_aarch64.whl"],
+#)
 
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag
@@ -194,9 +208,9 @@ http_archive(
 http_archive(
     name = "tensorrt_l4t",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.3.0.26",
+    strip_prefix = "TensorRT-10.16.1.11",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/tars/TensorRT-10.3.0.26.l4t.aarch64-gnu.cuda-12.6.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.aarch64-gnu.cuda-13.2.tar.gz",
     ],
 )
 

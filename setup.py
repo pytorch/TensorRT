@@ -820,11 +820,11 @@ with open(os.path.join(get_root_dir(), "README.md"), "r", encoding="utf-8") as f
 
 
 def get_jetpack_requirements(base_requirements):
-    requirements = base_requirements + ["numpy<2.0.0"]
+    requirements = base_requirements + ["numpy"]
     if IS_DLFW_CI:
         return requirements
     else:
-        return requirements + ["torch>=2.8.0,<2.9.0", "tensorrt>=10.3.0,<10.4.0"]
+        return requirements + ["torch>=2.13.0.dev,<2.14.0", "tensorrt>=10.16.1,<10.17.0"]
 
 
 def get_sbsa_requirements(base_requirements):

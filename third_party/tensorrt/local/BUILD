@@ -27,9 +27,30 @@ config_setting(
     ],
 )
 
+config_setting(
+    name = "jetpack",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "@//toolchains/dep_collection:compute_libs": "jetpack",
+    },
+)
+
 cc_library(
     name = "nvinfer_headers",
     hdrs = select({
+                ":jetpack": glob(
+            [
+                "include/NvInfer*.h",
+            ],
+            allow_empty = True,
+            exclude = [
+                "include/NvInferPlugin.h",
+                "include/NvInferPluginUtils.h",
+            ],
+        ),
         ":aarch64_linux": glob(
             [
                 "include/aarch64-linux-gnu/NvInfer*.h",
@@ -77,6 +98,7 @@ cc_library(
         ),
     }),
     includes = select({
+        ":jetpack": ["include/"],
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
         ":ci_rhel_x86_64_linux": ["include/"],
         ":windows": ["include/"],
@@ -91,6 +113,7 @@ cc_library(
 cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
+        ":jetpack": "lib/libnvinfer_static.a",
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer_static.a",
         ":ci_rhel_x86_64_linux": "lib/libnvinfer_static.a",
         ":windows": "lib/nvinfer_10.lib",
@@ -105,6 +128,7 @@ cc_import(
 cc_import(
     name = "nvinfer_lib",
     shared_library = select({
+        ":jetpack": "lib/libnvinfer.so",
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer.so",
         ":ci_rhel_x86_64_linux": "lib/libnvinfer.so",
         ":windows": "bin/nvinfer_10.dll",
@@ -123,6 +147,7 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
     ] + select({
+        ":jetpack": ["@cuda_l4t//:cudart"],
         ":windows": [
             "nvinfer_static_lib",
             "@cuda_win//:cudart",
@@ -136,6 +161,7 @@ cc_library(
 cc_import(
     name = "nvparsers_lib",
     shared_library = select({
+        ":jetpack": "lib/libnvparsers.so",
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvparsers.so",
         ":ci_rhel_x86_64_linux": "lib/libnvparsers.so",
         ":windows": "lib/nvparsers.dll",
@@ -150,6 +176,13 @@ cc_import(
 cc_library(
     name = "nvparsers_headers",
     hdrs = select({
+        ":jetpack": [
+            "include/NvCaffeParser.h",
+            "include/NvOnnxConfig.h",
+            "include/NvOnnxParser.h",
+            "include/NvOnnxParserRuntime.h",
+            "include/NvUffParser.h",
+        ],
         ":aarch64_linux": [
             "include/aarch64-linux-gnu/NvCaffeParser.h",
             "include/aarch64-linux-gnu/NvOnnxConfig.h",
@@ -185,6 +218,7 @@ cc_library(
         ]),
     }),
     includes = select({
+        ":jetpack": ["include/"],
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
         ":ci_rhel_x86_64_linux": ["include/"],
         ":windows": ["include/"],
@@ -211,6 +245,7 @@ cc_library(
 cc_import(
     name = "nvonnxparser_lib",
     shared_library = select({
+        ":jetpack": "lib/libnvonnxparser.so",
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvonnxparser.so",
         ":ci_rhel_x86_64_linux": "lib/libnvonnxparser.so",
         ":windows": "lib/nvonnxparser.dll",
@@ -225,6 +260,11 @@ cc_import(
 cc_library(
     name = "nvonnxparser_headers",
     hdrs = select({
+        ":jetpack": [
+            "include/NvOnnxConfig.h",
+            "include/NvOnnxParser.h",
+            "include/NvOnnxParserRuntime.h",
+        ],
         ":aarch64_linux": [
             "include/aarch64-linux-gnu/NvOnnxConfig.h",
             "include/aarch64-linux-gnu/NvOnnxParser.h",
@@ -250,6 +290,7 @@ cc_library(
         ]),
     }),
     includes = select({
+        ":jetpack": ["include/"],
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
         ":ci_rhel_x86_64_linux": ["include/"],
         ":windows": ["include/"],
@@ -276,6 +317,7 @@ cc_library(
 cc_import(
     name = "nvonnxparser_runtime_lib",
     shared_library = select({
+        ":jetpack": "lib/libnvonnxparser_runtime.so",
         ":aarch64_linux": "lib/x86_64-linux-gnu/libnvonnxparser_runtime.so",
         ":ci_rhel_x86_64_linux": "lib/libnvonnxparser_runtime.so",
         ":windows": "lib/nvonnxparser_runtime.dll",
@@ -290,6 +332,9 @@ cc_import(
 cc_library(
     name = "nvonnxparser_runtime_header",
     hdrs = select({
+        ":jetpack": [
+            "include/NvOnnxParserRuntime.h",
+        ],
         ":aarch64_linux": [
             "include/aarch64-linux-gnu/NvOnnxParserRuntime.h",
         ],
@@ -305,6 +350,7 @@ cc_library(
         ]),
     }),
     includes = select({
+        ":jetpack": ["include/"],
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
         ":ci_rhel_x86_64_linux": ["include/"],
         ":windows": ["include/"],
@@ -331,6 +377,7 @@ cc_library(
 cc_import(
     name = "nvcaffeparser_lib",
     shared_library = select({
+        ":jetpack": "lib/libnvcaffe_parsers.so",
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvcaffe_parsers.so",
         ":ci_rhel_x86_64_linux": "lib/libnvcaffe_parsers.so",
         ":windows": "lib/nvcaffe_parsers.dll",
@@ -345,6 +392,9 @@ cc_import(
 cc_library(
     name = "nvcaffeparser_headers",
     hdrs = select({
+        ":jetpack": [
+            "include/NvCaffeParser.h",
+        ],
         ":aarch64_linux": [
             "include/aarch64-linux-gnu/NvCaffeParser.h",
         ],
@@ -360,6 +410,7 @@ cc_library(
         ]),
     }),
     includes = select({
+        ":jetpack": ["include/"],
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
         ":ci_rhel_x86_64_linux": ["include/"],
         ":windows": ["include/"],
@@ -386,6 +437,7 @@ cc_library(
 cc_library(
     name = "nvinferplugin",
     srcs = select({
+        ":jetpack": ["lib/libnvinfer_plugin.so"],
         ":aarch64_linux": ["lib/aarch64-linux-gnu/libnvinfer_plugin.so"],
         ":ci_rhel_x86_64_linux": ["lib/libnvinfer_plugin.so"],
         ":windows": ["lib/nvinfer_plugin_10.lib"],
@@ -395,6 +447,10 @@ cc_library(
         ])],
     }),
     hdrs = select({
+        ":jetpack": glob(
+            ["include/NvInferPlugin*.h"],
+            allow_empty = True,
+        ),
         ":aarch64_linux": glob(
             ["include/aarch64-linux-gnu/NvInferPlugin*.h"],
             allow_empty = True,
@@ -416,6 +472,7 @@ cc_library(
         "-pthread",
     ],
     includes = select({
+        ":jetpack": ["include/"],
         ":aarch64_linux": ["include/aarch64-linux-gnu/"],
         ":ci_rhel_x86_64_linux": ["include/"],
         ":windows": ["include/"],
@@ -427,6 +484,7 @@ cc_library(
     linkopts = [
         "-lpthread",
     ] + select({
+        ":jetpack": ["-Wl,--no-as-needed -ldl -lrt -Wl,--as-needed"],
         ":aarch64_linux": ["-Wl,--no-as-needed -ldl -lrt -Wl,--as-needed"],
         "//conditions:default": [],
     }),
@@ -434,6 +492,7 @@ cc_library(
         "nvinfer",
     ] + select({
         ":windows": ["@cuda_win//:cudart"],
+        ":jetpack": ["@cuda_l4t//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
     alwayslink = True,
