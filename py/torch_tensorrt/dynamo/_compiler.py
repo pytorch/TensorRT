@@ -5,7 +5,7 @@ import logging
 import os
 import platform
 import warnings
-from typing import Any, Collection, List, Optional, Sequence, Union
+from typing import Any, Collection, List, Optional, Sequence, Tuple, Union
 
 import torch
 from torch.export import ExportedProgram
@@ -1217,6 +1217,181 @@ def compile_module(
     return partitioned_module
 
 
+class BindingNameMismatchError(ValueError):
+    """Raised when user-supplied ``input_binding_names`` / ``output_binding_names``
+    don't match the exported program's pytree spec.
+
+    The user provides names shaped like their original ``forward()`` would
+    receive (for inputs) or return (for outputs).  We flatten via
+    ``pytree.tree_flatten`` and compare the resulting ``TreeSpec`` against
+    the spec the exported program already carries — they must be equal,
+    which guarantees a 1:1 mapping between the user's structured names and
+    FX's flattened placeholder / output order.  No runtime queue, no
+    in-band validator: spec equality up front, single flat list passed
+    through to the interpreter.
+
+    The error message shows both specs side-by-side plus a per-leaf path
+    listing of what each binding slot expects, so the user can read the
+    correct shape off the error and re-run.
+    """
+
+    def __init__(
+        self,
+        role: str,
+        expected_spec: Any,
+        provided: Any = None,
+        provided_spec: Any = None,
+        reason: str = "spec_mismatch",
+    ) -> None:
+        self.role = role
+        self.expected_spec = expected_spec
+        self.provided = provided
+        self.provided_spec = provided_spec
+        self.reason = reason
+        super().__init__(self._format_message())
+
+    def _expected_leaf_paths(self) -> List[str]:
+        import torch.utils._pytree as pytree
+
+        if self.expected_spec is None:
+            return []
+        # Reconstruct a dummy pytree from the spec so we can walk paths via
+        # tree_flatten_with_path.  Each leaf carries its position description.
+        try:
+            dummy = pytree.tree_unflatten(
+                [object()] * self.expected_spec.num_leaves, self.expected_spec
+            )
+            paths_leaves = pytree.tree_flatten_with_path(dummy)[0]
+            return [pytree.keystr(p) or "<root>" for p, _ in paths_leaves]
+        except Exception:
+            return []
+
+    def _format_message(self) -> str:
+        role_kw = f"{self.role}_binding_names"
+        paths = self._expected_leaf_paths()
+        expected_section = (
+            f"Expected structure (from exported program "
+            f"{self.role}_spec):\n  {self.expected_spec}"
+        )
+        if paths:
+            expected_section += (
+                "\n\nExpected leaf positions (in FX flattening order):\n"
+                + "\n".join(f"  [{i}] {p}" for i, p in enumerate(paths))
+            )
+
+        if self.reason == "duplicate":
+            return (
+                f"{role_kw} contains duplicate names. Each binding name "
+                f"must be unique.\n\nProvided structure:\n  {self.provided!r}"
+            )
+        if self.reason == "overlap":
+            return (
+                "Provided input_binding_names and output_binding_names "
+                "share one or more names. Engine binding names must be "
+                "globally unique.\n\n"
+                f"Overlap: {self.provided!r}"
+            )
+        if self.reason == "non_string_leaf":
+            return (
+                f"{role_kw} pytree leaves must all be strings.\n"
+                f"Provided structure:\n  {self.provided!r}"
+            )
+
+        # spec_mismatch
+        return (
+            f"{role_kw} structure does not match the exported program's "
+            f"{self.role}_spec.\n\n"
+            f"Provided structure:\n  {self.provided_spec}\n\n"
+            f"{expected_section}\n\n"
+            f"Hint: pass a pytree of strings whose structure matches the "
+            f"exported program's "
+            f"{'(args, kwargs)' if self.role == 'input' else 'forward() return value'}."
+        )
+
+
+def _binding_name_specs(
+    exported_program: ExportedProgram,
+) -> Tuple[Optional[Any], Optional[Any], Optional[Any]]:
+    """Extract (args_spec, kwargs_spec, out_spec) from an exported program.
+
+    ``in_spec`` on an exported program is a 2-tuple TreeSpec of
+    ``(args_spec, kwargs_spec)`` that mirrors how the program was traced.
+    We return them split so the API can validate ``arg_input_binding_names``
+    against args_spec and ``kwarg_input_binding_names`` against kwargs_spec
+    independently — matching the shape of the existing ``arg_inputs`` /
+    ``kwarg_inputs`` kwargs.  ``out_spec`` is the return spec.
+    """
+    args_spec = kwargs_spec = out_spec = None
+    if exported_program.module_call_graph:
+        sig = exported_program.module_call_graph[0].signature
+        in_spec = getattr(sig, "in_spec", None)
+        out_spec = getattr(sig, "out_spec", None)
+        if in_spec is not None:
+            try:
+                args_spec = in_spec.child(0)
+                kwargs_spec = in_spec.child(1)
+            except (AttributeError, IndexError):
+                pass
+    return args_spec, kwargs_spec, out_spec
+
+
+def _resolve_pytree_binding_names(
+    user: Any,
+    role: str,
+    expected_spec: Any,
+) -> Optional[List[str]]:
+    """Flatten the user's pytree of names and verify spec equality.
+
+    Returns the flat list of names in FX flattening order, or ``None`` when
+    no override was provided.  Raises :class:`BindingNameMismatchError` on
+    any structural / typing / duplicate problem.
+    """
+    if user is None:
+        return None
+
+    import torch.utils._pytree as pytree
+
+    if expected_spec is None:
+        # Exported program doesn't carry a spec for this slot — fall back
+        # to a plain pytree flatten with no structural validation.
+        leaves, _ = pytree.tree_flatten(user)
+        if not all(isinstance(x, str) for x in leaves):
+            raise BindingNameMismatchError(
+                role=role,
+                expected_spec=None,
+                provided=user,
+                reason="non_string_leaf",
+            )
+        return list(leaves)
+
+    leaves, user_spec = pytree.tree_flatten(user)
+    if not all(isinstance(x, str) for x in leaves):
+        raise BindingNameMismatchError(
+            role=role,
+            expected_spec=expected_spec,
+            provided=user,
+            reason="non_string_leaf",
+        )
+
+    if user_spec != expected_spec:
+        raise BindingNameMismatchError(
+            role=role,
+            expected_spec=expected_spec,
+            provided=user,
+            provided_spec=user_spec,
+            reason="spec_mismatch",
+        )
+
+    if len(set(leaves)) != len(leaves):
+        raise BindingNameMismatchError(
+            role=role,
+            expected_spec=expected_spec,
+            provided=user,
+            reason="duplicate",
+        )
+    return list(leaves)
+
+
 def convert_exported_program_to_serialized_trt_engine(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -1268,6 +1443,9 @@ def convert_exported_program_to_serialized_trt_engine(
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    arg_input_binding_names: Any = None,
+    kwarg_input_binding_names: Any = None,
+    output_binding_names: Any = None,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -1556,12 +1734,55 @@ def convert_exported_program_to_serialized_trt_engine(
         exported_program, list(trt_arg_inputs), trt_kwarg_inputs
     )[0]
 
+    # Validate user-provided pytree-shaped binding names against the
+    # exported program's args / kwargs / output specs.  The shape of these
+    # kwargs mirrors arg_inputs / kwarg_inputs: caller passes a pytree of
+    # strings in the same shape as the values it would pass at runtime.
+    # Spec / typing / duplicate errors fire here before any TRT work.
+    args_spec, kwargs_spec, out_spec = _binding_name_specs(exported_program)
+    arg_names = _resolve_pytree_binding_names(
+        arg_input_binding_names, role="arg_input", expected_spec=args_spec
+    )
+    kwarg_names = _resolve_pytree_binding_names(
+        kwarg_input_binding_names, role="kwarg_input", expected_spec=kwargs_spec
+    )
+    # FX flattens placeholders in (args, kwargs) order — concatenate the
+    # two resolved lists in the same order to get the positional input list.
+    if arg_names is None and kwarg_names is None:
+        flat_input_names: Optional[List[str]] = None
+    else:
+        flat_input_names = list(arg_names or []) + list(kwarg_names or [])
+
+    flat_output_names = _resolve_pytree_binding_names(
+        output_binding_names, role="output", expected_spec=out_spec
+    )
+
+    if flat_input_names is not None:
+        if len(set(flat_input_names)) != len(flat_input_names):
+            raise BindingNameMismatchError(
+                role="input",
+                expected_spec=None,
+                provided=flat_input_names,
+                reason="duplicate",
+            )
+    if flat_input_names is not None and flat_output_names is not None:
+        overlap = set(flat_input_names) & set(flat_output_names)
+        if overlap:
+            raise BindingNameMismatchError(
+                role="input",
+                expected_spec=None,
+                provided=sorted(overlap),
+                reason="overlap",
+            )
+
     try:
         interpreter_result = interpret_module_to_result(
             gm,
             inputs=flattened_input_list,
             settings=settings,
             engine_cache=engine_cache,
+            input_binding_names=flat_input_names,
+            output_binding_names=flat_output_names,
         )
     except UnsupportedOperatorException as e:
         logger.error(

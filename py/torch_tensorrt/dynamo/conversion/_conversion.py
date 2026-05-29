@@ -4,7 +4,6 @@ import io
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence
 
-import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -25,6 +24,8 @@ from torch_tensorrt.dynamo.utils import (
     release_host_and_device_memory,
 )
 from torch_tensorrt.logging import TRT_LOGGER
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,9 @@ def interpret_module_to_result(
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
+    *,
+    input_binding_names: Optional[Sequence[str]] = None,
+    output_binding_names: Optional[Sequence[str]] = None,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
@@ -275,6 +279,8 @@ def interpret_module_to_result(
         output_dtypes=output_dtypes,
         compilation_settings=settings,
         engine_cache=engine_cache,
+        input_binding_names=input_binding_names,
+        output_binding_names=output_binding_names,
     )
 
     interpreter_result = interpreter.run()
