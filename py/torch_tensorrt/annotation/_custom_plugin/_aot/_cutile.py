@@ -11,9 +11,12 @@ AOT compilation pipeline for cuTILE kernels
    *pointer binding indices* and *scalar SymInt32 expressions* that TRT evaluates at
    runtime.
 
-3. **CUBIN compilation** — ``compile_tile(pyfunc, example_tensors, CompilerOptions())``
-   from ``cuda.tile._compile`` produces a CUBIN file containing an embedded PTX
-   debug section (``.nv_debug_ptx_txt``).
+3. **CUBIN compilation** — ``cuda.tile.compilation.export_kernel(kernel,
+   [KernelSignature(...)], buf, gpu_code=..., output_format="cubin")``
+   produces a CUBIN with an embedded PTX debug section (``.nv_debug_ptx_txt``).
+   Signatures are built from the TensorDesc + scalar attrs of the registered
+   plugin so the cubin's symbol carries the right rank/dtype/constant mangling
+   (e.g. ``_kernel_Kt1_A1f32_1l0_I128``).
 
 4. **PTX extraction and parameter reordering** — ``_extract_ptx_from_cubin`` recovers
    the PTX from the CUBIN.  The cuTILE kernel ABI uses per-tensor groups of
@@ -89,6 +92,7 @@ from .._qdp_utils import (
 from ..._recorders import CuTileLaunchRecorder
 from ..._specs import CuTileSpec
 from .._symbolic import SymbolicTensor, TensorRole
+from . import downgrade_ptx_version
 
 
 def _params_per_tensor_for_rank(rank: int) -> int:
@@ -142,9 +146,7 @@ _PTX_ENTRY_PARAM_RE = re.compile(
     re.DOTALL,
 )
 
-_PTX_VERSION_RE = re.compile(r"\.version\s+(\d+)\.(\d+)")
 _PTX_REQNTID_RE = re.compile(r"\.reqntid\s+(\d+)")
-_PTX_MAX_SUPPORTED_VERSION = (9, 0)
 
 
 def _extract_ptx_from_cubin(cubin_bytes: bytes) -> Optional[str]:
@@ -188,31 +190,14 @@ def _extract_ptx_from_cubin(cubin_bytes: bytes) -> Optional[str]:
     return "\n".join(lines) + "\n"
 
 
-# LIMITATION (short-term workaround): PTX version downgrade is a best-effort
-# text substitution.  CUDA 13.1 tileiras emits .version 9.1 but the driver in
-# our container (CUDA 13.0) only JIT-compiles up to PTX 9.0.  Lowering the
-# declared version by editing the .version line is safe only if the PTX body
-# uses no ISA features introduced after the target version.  This will silently
-# produce incorrect PTX if a future tileiras version emits instructions that
-# require a higher PTX version than the declared one after downgrade.
-# Long-term fix: align the driver and CUDA toolkit versions so no downgrade is
-# needed.
-def _downgrade_ptx_version(ptx: str) -> str:
-    """Downgrade .version directive if it exceeds what the runtime driver supports.
-
-    CUDA 13.1 tileiras emits .version 9.1 but a CUDA 13.0 driver only JIT-compiles
-    up to 9.0.  Lowering the declared version is safe as long as the PTX body doesn't
-    use features introduced after the target version (CuTile-generated PTX doesn't).
-    """
-    m = _PTX_VERSION_RE.search(ptx)
-    if not m:
-        return ptx
-    major, minor = int(m.group(1)), int(m.group(2))
-    max_major, max_minor = _PTX_MAX_SUPPORTED_VERSION
-    if (major, minor) <= (max_major, max_minor):
-        return ptx
-    replacement = f".version {max_major}.{max_minor}"
-    return ptx[: m.start()] + replacement + ptx[m.end() :]
+# PTX header version downgrade lives in ``_aot.downgrade_ptx_version`` —
+# both Triton and cuTile backends share that helper.  LIMITATION (short-term
+# workaround): the downgrade is a best-effort text substitution; safe only if
+# the PTX body uses no ISA features introduced after the target version.  This
+# will silently produce incorrect PTX if a future tileiras version emits
+# instructions that require a higher PTX version than the declared one after
+# downgrade.  Long-term fix: align the driver and CUDA toolkit versions so no
+# downgrade is needed.
 
 
 def _parse_reqntid(ptx: str) -> Optional[int]:
@@ -295,7 +280,7 @@ def _reorder_cutile_ptx_for_trt(
     reordered_ptx = _reorder_ptx_params(ptx, runtime_order)
     if reordered_ptx == ptx:
         return cubin_bytes
-    reordered_ptx = _downgrade_ptx_version(reordered_ptx)
+    reordered_ptx = downgrade_ptx_version(reordered_ptx)
     return reordered_ptx.encode("utf-8")
 
 
@@ -768,7 +753,7 @@ def aot_impl_cutile(
         # If code_out is still a cubin but we have ptx_raw available, convert to PTX
         # so we can do a safe string-replace for the kernel name.
         if not is_ptx and ptx_raw is not None:
-            downgraded = _downgrade_ptx_version(ptx_raw)
+            downgraded = downgrade_ptx_version(ptx_raw)
             code_out = downgraded.encode("utf-8")
             is_ptx = True
         if is_ptx:

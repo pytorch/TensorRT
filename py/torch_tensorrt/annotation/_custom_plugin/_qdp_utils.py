@@ -365,47 +365,15 @@ def _safe_dim(d: Any, default: int = 1) -> int:
 
 
 def td_dtype_to_torch(td_dtype: Any) -> torch.dtype:
-    """Convert a TensorRT DataType to a torch.dtype.
+    """Convert a TensorRT ``DataType`` to a ``torch.dtype``.
 
-    Args:
-        td_dtype: A ``trt.DataType`` enum value.
-
-    Raises:
-        RuntimeError: If *td_dtype* has no torch equivalent known to this function.
+    Thin wrapper around ``torch_tensorrt.dtype`` so the annotation module
+    stays aligned with the project-wide dtype bridge instead of carrying its
+    own dispatch table.
     """
-    if td_dtype == trt.float32:
-        return torch.float32
-    if td_dtype == trt.float16:
-        return torch.float16
-    if td_dtype == trt.bfloat16:
-        return torch.bfloat16
-    if td_dtype == trt.int32:
-        return torch.int32
-    raise RuntimeError(
-        f"unsupported TRT dtype {td_dtype!r}; supported: float32, float16, bfloat16, int32"
-    )
+    from torch_tensorrt import dtype as _ttdtype
 
-
-def torch_dtype_to_trt(dtype: torch.dtype) -> Any:
-    """Convert a torch.dtype to a TensorRT DataType.
-
-    Args:
-        dtype: A ``torch.dtype`` value.
-
-    Raises:
-        RuntimeError: If *dtype* has no TRT equivalent known to this function.
-    """
-    if dtype == torch.float32:
-        return trt.float32
-    if dtype == torch.float16:
-        return trt.float16
-    if dtype == torch.bfloat16:
-        return trt.bfloat16
-    if dtype == torch.int32:
-        return trt.int32
-    raise RuntimeError(
-        f"unsupported torch dtype {dtype!r}; supported: float32, float16, bfloat16, int32"
-    )
+    return _ttdtype._from(td_dtype).to(torch.dtype)
 
 
 _MAX_DIM = 2**31 - 1

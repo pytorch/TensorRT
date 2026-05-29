@@ -256,11 +256,3 @@ class SymbolicTensor:
     @property
     def is_cuda(self) -> bool:
         return True
-
-
-def cdiv(a: Any, b: int) -> Any:
-    """Ceiling division on a SymInt32 by a Python int divisor.
-
-    Only the pattern SymInt32 // int is required by the contract.
-    """
-    return (a + (b - 1)) // b

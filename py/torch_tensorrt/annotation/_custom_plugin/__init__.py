@@ -11,9 +11,13 @@ Role in the compilation pipeline
    (re-exported here as ``custom_plugin``), which returns a
    ``CustomPluginSpec`` that is stored in the boundary op's
    ``AnnotationMetadata``.
-2. **Registration** — at compile time, ``register_custom_plugin`` calls
-   ``@trtp.register`` / ``@trtp.aot_impl`` on the descriptor, making the
-   plugin visible to TRT's global plugin registry.
+2. **Registration** — at compile time, no-weights plugins go through
+   ``trt_plugins.custom_op(op_name, impl=spec)``: the desc + JIT impl are
+   provided by upstream ``generate_plugin`` (schema-derived), and the
+   ``_aot_register`` hook adds ``@trtp.autotune`` + ``@trtp.aot_impl`` via
+   ``register_autotune_and_aot``. Weighted plugins continue to use
+   ``register_custom_plugin`` (registers the desc/autotune/aot trio with
+   weights counted toward ``num_inputs``).
 3. **Lowering** — ``lower_custom_plugin_descriptor`` calls ``trtp.op.<ns>.<name>``
    to insert an ``IPluginV3`` layer into the ``INetworkDefinition``.
 
@@ -32,8 +36,16 @@ Public surface
     returns the output ``trt.ITensor`` (or tuple thereof).
 
 ``register_custom_plugin``
-    Registers ``@trtp.register`` / ``@trtp.aot_impl`` handlers for a
-    descriptor's op name.  Idempotent at the process level.
+    Registers the full ``@trtp.register`` / ``@trtp.autotune`` /
+    ``@trtp.aot_impl`` trio for a descriptor's op name. Used by the
+    weighted-plugin path (where the desc must include weight inputs).
+    Idempotent at the process level.
+
+``register_autotune_and_aot``
+    Layers ``@trtp.autotune`` + ``@trtp.aot_impl`` on top of a desc already
+    registered by upstream ``generate_plugin``. Used by the no-weights path
+    via ``custom_op(..., _aot_register=...)``. Idempotent at the process
+    level.
 
 ``QDPRuntimeError``
     Raised when TRT's QDP framework encounters a runtime error (e.g. shape
@@ -58,6 +70,7 @@ from ._descriptor import (
     CustomPluginSpec,
     custom_plugin,
     lower_custom_plugin_descriptor,
+    register_autotune_and_aot,
     register_custom_plugin,
 )
 from ._qdp_utils import QDPRuntimeError, TTAPluginError
@@ -71,6 +84,7 @@ __all__ = [
     "CustomPluginSpec",
     "custom_plugin",
     "lower_custom_plugin_descriptor",
+    "register_autotune_and_aot",
     "register_custom_plugin",
     "QDPRuntimeError",
     "TTAPluginError",

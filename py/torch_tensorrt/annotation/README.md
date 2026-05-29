@@ -114,18 +114,26 @@ are safe to hash, compare, and cache.
 
 ## 4. QDP plugin flow
 
-`tta.custom_plugin` produces a descriptor.  When you call
-`register_custom_plugin(spec, inputs)` (from `_custom_plugin._descriptor`) the
-module:
+`tta.custom_plugin` produces a `CustomPluginSpec`.  Registration goes through
+`trt_plugins.custom_op(op_name, impl=spec)` (the standard torch-trt entry
+point, extended with an `impl=` parameter for the annotation path):
 
-1. Derives a deterministic `op_name` from the kernel function + config hash.
-2. Registers `@trtp.register("tta::op_name")` — the shape/dtype descriptor
-   function derived symbolically from the kernel signature.
-3. Registers `@trtp.aot_impl("tta::op_name")` — the AOT implementation
-   function that returns `(kernel_name, ptx_or_cubin, KernelLaunchParams,
-   SymIntExprs)`.
-4. Uses a process-level lock + double-checked locking to prevent duplicate
-   registration in multi-threaded pytest-xdist workers.
+1. `impl.auto_register_torch_op(op_name)` registers the `torch.library`
+   custom op — meta + eager bodies derived from `meta_impl` and the first
+   spec's `launch_fn`.
+2. **No-weights plugins** re-enter `custom_op` with `impl=None` and an
+   `_aot_register` hook.  This routes the desc + JIT impl through upstream
+   `generate_plugin(op_name)` (schema-derived) and the converter through
+   `generate_plugin_converter(...)`.  The hook calls
+   `register_autotune_and_aot(spec, ..., qdp_name=op_name)` which only adds
+   the parts unique to TTA: `@trtp.autotune` (per-tactic dtype/format combos)
+   and `@trtp.aot_impl` (PTX/cubin emit).
+3. **Weighted plugins** keep using `register_custom_plugin` because their
+   desc has to include weight tensors (which exist at the QDP level but not
+   in the torch op's schema) and the converter must inject the weights as
+   `trt.add_constant` before delegating to `impl.lower_to_trt`.
+4. Process-level lock + double-checked locking guards both registration
+   paths against pytest-xdist worker concurrency.
 
 The QDP AOT path means **no Python is needed at TRT engine runtime** — the
 compiled kernel is embedded directly.
@@ -134,10 +142,17 @@ compiled kernel is embedded directly.
 tta.triton(launch_fn, configs)
     └─► TritonSpec
             └─► tta.custom_plugin(spec)
-                    └─► CustomPluginSpec(op_name, impl)
-                            └─► register_custom_plugin(spec, inputs)
-                                    ├─► @trtp.register  (shape descriptor)
-                                    └─► @trtp.aot_impl  (PTX/cubin → TRT)
+                    └─► CustomPluginSpec
+                            └─► trt_plugins.custom_op(op_name, impl=spec)
+                                    ├─► impl.auto_register_torch_op(op_name)
+                                    └─► no-weights: custom_op(..., _aot_register=…)
+                                            ├─► generate_plugin(op_name)
+                                            ├─► register_autotune_and_aot(spec, …)
+                                            │       ├─► @trtp.autotune
+                                            │       └─► @trtp.aot_impl
+                                            └─► generate_plugin_converter(…, use_aot_if_available=True)
+                                        weighted: register_custom_plugin(spec, num_inputs+weights, …)
+                                            + custom dynamo converter that injects weights
 ```
 
 ---

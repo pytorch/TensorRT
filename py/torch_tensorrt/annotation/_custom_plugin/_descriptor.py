@@ -1005,14 +1005,19 @@ def lower_custom_plugin_descriptor(
         # eager body is unchanged.  The launch_fn contract is:
         #   (*activations, *weights_in_declaration_order, *outputs, ...)
         if descriptor.weights:
-            import numpy as np
-            weight_trt_tensors = []
-            for wname, wtensor in descriptor.weights.items():
-                np_arr = wtensor.detach().cpu().contiguous().numpy()
-                trt_weights = trt.Weights(np_arr)
-                const_layer = ctx.net.add_constant(tuple(np_arr.shape), trt_weights)
-                const_layer.name = f"{name}_weight_{wname}"
-                weight_trt_tensors.append(const_layer.get_output(0))
+            from torch_tensorrt.dynamo.conversion.converter_utils import (
+                create_constant,
+            )
+
+            weight_trt_tensors = [
+                create_constant(
+                    ctx,
+                    wtensor.contiguous(),
+                    name=f"{name}_weight_{wname}",
+                    dtype=wtensor.dtype,
+                )
+                for wname, wtensor in descriptor.weights.items()
+            ]
             trt_inputs = list(trt_inputs) + weight_trt_tensors
 
         num_inputs = len(trt_inputs)

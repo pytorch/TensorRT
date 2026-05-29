@@ -34,7 +34,6 @@ returns the QDP AOT 4-tuple ``(kernel_name, ptx_bytes, KernelLaunchParams, SymIn
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -61,7 +60,8 @@ from .._qdp_utils import (
 from ..._recorders import TritonLaunchRecorder
 from ..._specs import TritonSpec
 from .._symbolic import SymbolicTensor, TensorRole
-from torch_tensorrt._enums import dtype as _dtype  # torch_tensorrt's shared cross-framework dtype enum
+from . import downgrade_ptx_version
+from torch_tensorrt import dtype as _dtype  # shared cross-framework dtype enum
 
 # Triton's ASTSource signature dict requires string element-type tokens for
 # pointer arguments (e.g. "*fp16").  These tokens are Triton-ABI-specific and
@@ -118,26 +118,14 @@ def _trt_dtype_to_triton_ptr(trt_dtype: Any, qdp_symbol: str) -> str:
 # mechanism so that post-compilation PTX rewriting is not needed.
 
 
-def _ptx_downgrade_version(ptx: str) -> str:
-    """Downgrade the PTX ``.version`` line from 9.x to 9.0.
-
-    Triton on CUDA 13.x emits ``.version 9.1`` (set by LLVM's NVPTX backend).
-    TRT's QDP PTX loader caps at 9.0 — kernels with a higher version silently
-    fail to load, producing a spurious ``onShapeChange`` error at runtime.
-
-    Why not pin ``ptx_version=90`` in ``triton.compile``?  Requesting 9.0 makes
-    LLVM emit ``.version 9.0``, which then fails Triton's ``make_cubin`` step
-    because the bundled ``ptxas`` (v8.7) cannot assemble PTX 9.0.  Post-compilation
-    header patching is therefore the only viable workaround until TRT's PTX loader
-    is updated to accept 9.1.  The ``.target`` line (e.g. ``sm_120a``) is unchanged.
-    """
-    lines = ptx.split("\n")
-    result = []
-    for line in lines:
-        if line.startswith(".version "):
-            line = re.sub(r"^(\.version\s+)9\.([1-9]\d*)", r"\g<1>9.0", line)
-        result.append(line)
-    return "\n".join(result)
+# Note: PTX header version downgrade lives in ``_aot.downgrade_ptx_version`` —
+# the same problem (Triton/tileiras emit ``.version 9.1`` but the TRT QDP PTX
+# loader caps at 9.0) was being solved by two near-identical helpers; backends
+# now share that one.  Triton-specific rationale for why post-compile patching
+# is the only viable workaround (rather than pinning ``ptx_version=90`` in
+# ``triton.compile``): requesting 9.0 makes LLVM emit ``.version 9.0`` which
+# then fails Triton's ``make_cubin`` step because the bundled ``ptxas`` (v8.7)
+# cannot assemble PTX 9.0.
 
 
 def _ptx_reorder_and_strip_params(
@@ -228,7 +216,7 @@ def _fix_triton_ptx_for_trt(
 
     Delegates each discrete rewrite to a named helper:
 
-    1. :func:`_ptx_downgrade_version` — cap ``.version`` at 9.0.
+    1. :func:`~.downgrade_ptx_version` — cap ``.version`` at 9.0.
     2. :func:`_ptx_reorder_and_strip_params` — reorder param declarations and
        body references to TRT runtime order (inputs → scalars → outputs) and
        strip Triton's internal trailing params.
@@ -248,7 +236,7 @@ def _fix_triton_ptx_for_trt(
         + [orig for _, orig in output_params]
     )
 
-    ptx = _ptx_downgrade_version(ptx)
+    ptx = downgrade_ptx_version(ptx)
     ptx = _ptx_reorder_and_strip_params(ptx, kernel_name, trt_order, num_used_params)
     return ptx
 
