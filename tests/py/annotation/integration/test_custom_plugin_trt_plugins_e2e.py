@@ -24,8 +24,8 @@ Test semantics (shared across all backends via _BackendE2ETests mixin)
   test_llm_hidden_binary       : gating at LLM hidden dim [batch=8, hidden=512]
   test_dynamic_batch           : dynamic batch dimension, hidden=256
   test_gated_ffn_llm           : LLM-ratio FFN (hidden=256, inter=512, 2× expansion)
-  test_gated_ffn_block         : shared-input FFN (xfail — TRT mergeMatmulLayers bug)
-  test_gated_ffn_block_contiguous : separate-input FFN workaround
+  test_gated_ffn_block         : shared-input FFN (xfail — Myelin-layout LINEAR-contract violation)
+  test_gated_ffn_block_contiguous : separate-input FFN variant (xfail — same Myelin-layout symptom)
   test_chained_silu_gate       : two chained PluginV3 ops in one engine
 
 Multi-config semantics (Triton + CuTile only, via _MultiConfigTests mixin)
@@ -902,9 +902,16 @@ class _BackendE2ETests:
         inputs = [torch.randn(16, 256, device="cuda"), torch.randn(16, 256, device="cuda")]
         _check(self, m, inputs, self._BINARY_REF, f"{self._NS}::{self._BINARY_OP}")
 
-    # TRT mergeMatmulLayers delivers non-contiguous sub-region buffers to
-    # IPluginV3::enqueue without inserting a reformat copy, violating the
-    # LINEAR stride contract.  Expected to fail until TRT fixes this.
+    # The Myelin region enclosing fc_gate / fc_up lays at least one of
+    # those matmul outputs out with a padded physical stride, but
+    # PluginTensorDesc still reports LINEAR with no physical-stride field.
+    # The stride-aware kernel then reads from the row-major stride baked
+    # in at sandbox time and gets wrong elements. (Engine inspection on
+    # TRT 10.16 shows the two matmuls remain as separate MATRIX_MULTIPLY
+    # layers — i.e. mergeMatmulLayers does not run here in practice;
+    # the same LINEAR-contract violation surfaces via the Myelin layout
+    # instead.) Expected to fail until PluginTensorDesc exposes physical
+    # stride or TRT inserts a reformat copy.
     @unittest.expectedFailure
     def test_gated_ffn_block(self):
         """Full gated FFN block with shared input — expected to fail due to TRT bug.
@@ -917,17 +924,10 @@ class _BackendE2ETests:
             h    = gate_fn(gate, up)    # custom PluginV3 — fused gate computation
             out  = fc_down(h)           # [batch, intermediate] → [batch, hidden]
 
-        Both fc_gate and fc_up share the same input ITensor x. TRT's
-        mergeMatmulLayers optimizer fuses them into a single [batch, 2*intermediate]
-        GEMM and presents each half as a [batch, intermediate] sub-region with
-        physical row-stride 2*intermediate while still tagging the format as LINEAR.
-        This violates the LINEAR stride contract: IPluginV3::enqueue receives
-        non-contiguous buffers but PluginTensorDesc has no physical stride field,
-        so the plugin infers stride = intermediate (logical) instead of 2*intermediate.
-
-        See test_gated_ffn_block_contiguous for the workaround (separate inputs).
-        TRT bug filed: mergeMatmulLayers delivers non-contiguous sub-region buffers
-        to IPluginV3::enqueue without inserting a reformat copy.
+        Both fc_gate and fc_up share the same input ITensor x. See the
+        decorator comment above for the failure mechanism on TRT 10.16.
+        ``test_gated_ffn_block_contiguous`` exercises the same family with
+        separate input ITensors and exhibits the same Myelin-layout symptom.
         """
         hidden_dim, intermediate_dim = 64, 128
         gate_op = self._op(self._BINARY_OP)
@@ -955,26 +955,32 @@ class _BackendE2ETests:
 
         _check(self, m, inputs, _ref, f"{self._NS}::{self._BINARY_OP}", rtol=1e-3, atol=1e-3)
 
-    # TRT 10.16's matmul fuser merges fc_gate / fc_up even when fed by
-    # different network inputs, regressing the workaround that test_gated_ffn_block
-    # was xfail'd against.  The plugin then receives stride-2*intermediate sub-
-    # region buffers but PluginTensorDesc still reports LINEAR with no physical
-    # stride field, so the kernel reads wrong rows.  Re-mark as xfail until
-    # either TRT inserts a reformat copy or PluginTensorDesc grows a physical
-    # stride field.
+    # The Myelin region that holds fc_gate and fc_up lays both matmul
+    # outputs out with padded physical strides; the plugin then receives
+    # buffers whose physical stride differs from the row-major stride that
+    # the AOT path bakes from shape_expr at sandbox time. PluginTensorDesc
+    # still reports LINEAR with no physical-stride field, so the stride-
+    # aware kernel reads wrong rows. The fc_gate/fc_up *layers* themselves
+    # are NOT merged (engine inspection confirms two separate MATRIX_MULTIPLY
+    # ops on TRT 10.16) — the symptom is the same family as
+    # test_gated_ffn_block (LINEAR contract violation from a buffer with
+    # non-row-major stride) but the mechanism is Myelin layout, not
+    # mergeMatmulLayers. xfail until PluginTensorDesc exposes physical
+    # stride or TRT inserts a reformat copy ahead of IPluginV3::enqueue.
     @unittest.expectedFailure
     def test_gated_ffn_block_contiguous(self):
-        """Full gated FFN block with separate inputs — workaround for TRT mergeMatmulLayers bug.
+        """Full gated FFN block with separate input ITensors for fc_gate and fc_up.
 
-        Same four-op structure as test_gated_ffn_block but fc_gate and fc_up
-        receive separate input ITensors (x and x_up), which prevents TRT's
-        mergeMatmulLayers from fusing the two matmuls.  Each matmul produces its
-        own contiguous [batch, intermediate] buffer; the plugin receives
-        contiguous inputs and the stride-aware kernel reads correct data.
+        Same four-op structure as test_gated_ffn_block, but fc_gate and fc_up
+        receive distinct network inputs. Originally designed as a workaround for
+        the (TRT 10.x-era) mergeMatmulLayers fusion; on TRT 10.16 engine
+        inspection shows the two matmuls remain as separate MATRIX_MULTIPLY
+        layers in both this test and test_gated_ffn_block, yet the plugin still
+        sees buffers whose physical stride differs from row-major (the Myelin
+        region around the matmuls is laying them out with padding). The
+        stride-aware kernel then reads wrong rows.
 
-        The model forward takes (x, x_up) where the caller passes the same
-        tensor for both; in the TRT graph they are distinct network inputs
-        so canMatmulBeHorizontallyMerged returns false.
+        See the decorator comment for the failure mechanism.
         """
         hidden_dim, intermediate_dim = 64, 128
         gate_op = self._op(self._BINARY_OP)
@@ -1052,16 +1058,17 @@ class _BackendE2ETests:
         trt_out = compiled(x)
         torch.testing.assert_close(trt_out, self._UNARY_REF(x), rtol=1e-3, atol=1e-3)
 
-    # Same TRT 10.16 matmul-fusion regression as test_gated_ffn_block_contiguous;
-    # see that test's xfail comment for the full story.
+    # Same Myelin-layout LINEAR-stride mismatch as
+    # test_gated_ffn_block_contiguous; see that test's xfail comment for
+    # the full story.
     @unittest.expectedFailure
     def test_gated_ffn_llm(self):
         """Full gated FFN at LLM expansion ratio: hidden=256, inter=512 (2×).
 
-        Same four-op structure as test_gated_ffn_block_contiguous but at LLM
-        scale: hidden=256, intermediate=512 reproduces the 2× expansion ratio
-        used in LLaMA / Mistral FFN blocks.  Two distinct inputs prevent
-        mergeMatmulLayers fusion; both matmuls produce contiguous buffers.
+        Same four-op structure as test_gated_ffn_block_contiguous, scaled to
+        the 2× expansion ratio used in LLaMA / Mistral FFN blocks. Exhibits
+        the same Myelin-layout LINEAR-contract violation; see the decorator
+        comment on test_gated_ffn_block_contiguous for the full story.
         """
         hidden_dim, intermediate_dim = 256, 512
         gate_op = self._op(self._BINARY_OP)
