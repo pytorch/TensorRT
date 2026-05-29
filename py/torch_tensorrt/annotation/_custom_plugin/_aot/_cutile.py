@@ -615,11 +615,20 @@ def aot_impl_cutile(
                 msg=f"cuTILE compilation failed: {exc}",
             ) from exc
 
-    kernel_name_str = (
-        getattr(real_prog, "kernel_name", None)
-        or getattr(real_prog, "__name__", None)
-        or "cutile_kernel"
-    )
+    # cuda-tile 1.4 wraps the user function in an opaque ``ct.kernel`` object
+    # whose only public attribute is ``replace_hints`` — the pyfunc name and
+    # mangled symbol are not reachable.  Parse the entry-point label out of
+    # the embedded PTX, which is what TRT will dispatch on at runtime.
+    _ptx_for_name = _extract_ptx_from_cubin(cubin_bytes)
+    _entry_match = _PTX_ENTRY_PARAM_RE.search(_ptx_for_name) if _ptx_for_name else None
+    if _entry_match:
+        kernel_name_str = _entry_match.group(2)
+    else:
+        kernel_name_str = (
+            getattr(real_prog, "kernel_name", None)
+            or getattr(real_prog, "__name__", None)
+            or "cutile_kernel"
+        )
 
     # Under cuda-tile >=1.4, scalar attributes are encoded as ConstantConstraint
     # and baked into the kernel symbol; no runtime scalar PTX params survive.
