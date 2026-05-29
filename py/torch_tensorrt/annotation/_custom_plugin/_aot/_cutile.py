@@ -305,15 +305,19 @@ def _infer_cutile_extra_args(
     block_size: int,
     scalar_symints: Optional[List[Any]] = None,
     rank: int = 1,
+    num_scalars: Optional[int] = None,
 ) -> Any:
     """Build SymIntExprs: (extent per dim, stride per dim) per tensor then scalar(s).
 
     Uses symbolic SymInt32 expressions for dynamic dimensions so that TRT can
     evaluate them at runtime with actual input shapes.
+
+    ``num_scalars=0`` skips the trailing scalar slot entirely; this matches the
+    cuda-tile >=1.4 ABI where ``ct.Constant``-annotated parameters are baked
+    into the kernel symbol and not exposed at runtime.
     """
-    num_scalars = 1
-    if scalar_symints:
-        num_scalars = len(scalar_symints)
+    if num_scalars is None:
+        num_scalars = len(scalar_symints) if scalar_symints else 1
     n_tensors = len(inp_descs) + len(out_descs)
     r = max(1, rank)
     n = n_tensors * 2 * r + num_scalars
@@ -541,15 +545,18 @@ def aot_impl_cutile(
 
     def _build_signature(flatten_all: bool) -> KernelSignature:
         # Match the kernel ABI: arrays in (inputs..., outputs...) order,
-        # followed by scalar attributes as compile-time constants.
+        # followed by scalar attributes as compile-time constants.  The
+        # convention used by ``_ct_launch_*`` helpers (reshape(-1) before
+        # ``ct.launch``) compiles every kernel against rank-1 views; that
+        # is what the AOT path bakes in.  ``flatten_all`` is retained for
+        # symmetry with the legacy retry path and currently has no effect.
+        del flatten_all  # noqa: F841 — kept for caller signature parity
         params: List[Any] = []
         for td in all_descs:
-            natural_ndim = len(td.shape_expr) or 1
-            ndim = 1 if (flatten_all or natural_ndim > 2) else natural_ndim
             params.append(
                 ArrayConstraint(
                     dtype=_trt_dtype_to_ct(td.dtype),
-                    ndim=ndim,
+                    ndim=1,
                     index_dtype=ct.int32,
                     # cuTile rejects negative strides by default; the TRT
                     # tensors we receive always have non-negative strides.
@@ -614,7 +621,11 @@ def aot_impl_cutile(
         or "cutile_kernel"
     )
 
-    num_scalars = len(scalar_symints) if scalar_symints else 1
+    # Under cuda-tile >=1.4, scalar attributes are encoded as ConstantConstraint
+    # and baked into the kernel symbol; no runtime scalar PTX params survive.
+    # The legacy ABI exposed one runtime scalar per ``scalar_symints`` entry
+    # (or the default block size), so the reorder helpers had a non-zero count.
+    num_scalars = 0
     rank = max(1, max(len(td.shape_expr) for td in all_descs))
     ptx_raw = _extract_ptx_from_cubin(cubin_bytes)
     num_ptx_params = _count_ptx_params(ptx_raw) if ptx_raw else 0
@@ -719,8 +730,15 @@ def aot_impl_cutile(
     launch.block_x = actual_block
     launch.shared_mem = 0
 
+    # num_scalars=0: cuda-tile >=1.4 bakes ``ct.Constant`` scalars into the
+    # kernel symbol; no runtime scalar args follow the (extent, stride) tuples.
     extra_args = _infer_cutile_extra_args(
-        inp_descs, out_descs, block_size, scalar_symints, rank=effective_rank
+        inp_descs,
+        out_descs,
+        block_size,
+        scalar_symints,
+        rank=effective_rank,
+        num_scalars=0,
     )
 
     ext = ".ptx" if is_ptx else ".cubin"
