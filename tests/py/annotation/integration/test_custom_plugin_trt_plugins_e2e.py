@@ -53,7 +53,7 @@ import triton
 import triton.language as tl
 import cuda.tile as ct
 import cutlass.cute as cute
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
 
 # ---------------------------------------------------------------------------
@@ -66,13 +66,6 @@ def _get_trt_engines(model):
         m for m in model.modules()
         if isinstance(m, TorchTensorRTModule)
     ]
-
-
-def _raw_cuda_engine(engine):
-    # Post-#4222 the Python runtime wraps trt.ICudaEngine in TRTEngine; the
-    # raw engine lives on .cuda_engine. The C++ runtime path returns a
-    # torch.classes.tensorrt.Engine which the test path no longer covers.
-    return getattr(engine, "cuda_engine", engine)
 
 
 def _engine_has_pluginv3_layer(engine, op_name):
@@ -100,7 +93,10 @@ def _engine_has_pluginv3_layer(engine, op_name):
     if creator is None or type(creator).__name__ == "IPluginCreator":
         return False
 
-    engine = _raw_cuda_engine(engine)
+    # ``engine`` is the TRTEngine wrapper that the Python runtime returns
+    # (use_python_runtime=True is set on every compile in this file); the
+    # underlying trt.ICudaEngine lives on ``.cuda_engine``.
+    engine = engine.cuda_engine
     insp = engine.create_engine_inspector()
     layer_names = [
         insp.get_layer_information(i, trt.LayerInformationFormat.ONELINE).strip()
@@ -115,7 +111,7 @@ def _engine_has_pluginv3_layer(engine, op_name):
 
 def _engine_all_layer_names(engine) -> list:
     """Return all layer name strings from the TRT engine inspector."""
-    engine = _raw_cuda_engine(engine)
+    engine = engine.cuda_engine
     insp = engine.create_engine_inspector()
     return [
         insp.get_layer_information(i, trt.LayerInformationFormat.ONELINE).strip()
