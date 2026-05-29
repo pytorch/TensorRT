@@ -451,16 +451,6 @@ std::ostream& operator<<(std::ostream& os, const TRTEngine& engine) {
 }
 
 void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& serialized_info) {
-  fprintf(stderr, "[verify_serialization_fmt] %zu entries (expected %d):\n", serialized_info.size(), SERIALIZATION_LEN);
-  for (size_t i = 0; i < serialized_info.size(); ++i) {
-    const char* name = (i < kSerializedInfoIndexNames.size()) ? kSerializedInfoIndexNames[i] : "?";
-    if (i == ENGINE_IDX) {
-      fprintf(stderr, "  [%zu] %-35s = <binary, %zu bytes>\n", i, name, serialized_info[i].size());
-    } else {
-      fprintf(stderr, "  [%zu] %-35s = \"%s\"\n", i, name, serialized_info[i].c_str());
-    }
-  }
-
   TORCHTRT_CHECK(
       serialized_info.size() == SERIALIZATION_LEN,
       "Program to be deserialized targets an incompatible Torch-TensorRT ABI");
