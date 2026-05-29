@@ -203,6 +203,8 @@ struct TRTEngine : torch::CustomClassHolder {
   at::cuda::CUDAGraph cudagraph = {};
   at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
+  at::cuda::CUDAStream default_stream = c10::cuda::getDefaultCUDAStream();
+  at::cuda::CUDAStream owned_pool_stream = c10::cuda::getDefaultCUDAStream();
   std::vector<at::Tensor> cudagraph_input_staging_buffers = {};
   std::vector<at::Tensor> cudagraph_output_staging_buffers = {};
 

@@ -1,3 +1,4 @@
+import inspect
 import itertools
 import logging
 import re
@@ -16,6 +17,42 @@ from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
 from torch_tensorrt._features import needs_qdp_plugin
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def _patch_trt_validator_issubclass() -> None:
+    # TRT's plugin validator does unguarded ``issubclass(param.annotation, ...)``
+    # at several sites in ``tensorrt_bindings.plugin._validate`` (``register``,
+    # ``impl``, ``aot_impl``, autotune). Before Python 3.13, CPython quietly
+    # unwrapped ``types.GenericAlias`` to its ``__origin__`` for ``issubclass``,
+    # so ``issubclass(npt.NDArray[np.float64], TensorDesc)`` returned ``False``
+    # without raising. Python 3.13 tightened that path: the same call now
+    # raises ``TypeError: issubclass() arg 1 must be a class``, breaking every
+    # plugin that declares a scalar attribute as ``npt.NDArray[dtype]`` (which
+    # we do — and must do — to bypass a separate scalar-conversion bug in TRT's
+    # ``_TemplatePluginCreator.create_plugin``).
+    #
+    # We shadow ``issubclass`` in the validator's module globals with a wrapper
+    # that returns ``False`` for non-class first args. Idempotent — once TRT
+    # ships the upstream guard, this is a no-op and can be deleted.
+    try:
+        from tensorrt_bindings.plugin import _validate as _trt_validate
+    except ImportError:
+        return
+    if getattr(_trt_validate, "_torch_trt_issubclass_patched", False):
+        return
+
+    _builtin_issubclass = issubclass
+
+    def _safe_issubclass(cls: Any, classinfo: Any) -> bool:
+        if not inspect.isclass(cls):
+            return False
+        return _builtin_issubclass(cls, classinfo)
+
+    _trt_validate.issubclass = _safe_issubclass
+    _trt_validate._torch_trt_issubclass_patched = True
+
+
+_patch_trt_validator_issubclass()
 
 
 _TORCH_SCHEMA_TYPE_TO_PLUGIN_ATTR_TYPE = {

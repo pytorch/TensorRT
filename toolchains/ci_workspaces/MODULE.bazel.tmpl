@@ -77,7 +77,7 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag
-# or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
+# or modify the urls to "file:///<PATH TO ARCHIVE>/<ARCHIVE NAME>"
 
 http_archive(
     name = "tensorrt",
@@ -91,9 +91,10 @@ http_archive(
 http_archive(
     name = "tensorrt_rtx",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    strip_prefix = "TensorRT-RTX-1.4.0.76",
+    strip_prefix = "TensorRT-RTX-1.5.0.114",
+    type = ".tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.4/TensorRT-RTX-1.4.0.76-Linux-x86_64-cuda-${CU_UPPERBOUND}-Release-external.tar.gz",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Linux-x86_64-cuda-${CU_UPPERBOUND}-Release-external.tar.zst",
     ],
 )
 
@@ -127,9 +128,9 @@ http_archive(
 http_archive(
     name = "tensorrt_rtx_win",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    strip_prefix = "TensorRT-RTX-1.4.0.76",
+    strip_prefix = "TensorRT-RTX-1.5.0.114",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.4/TensorRT-RTX-1.4.0.76-Windows-amd64-cuda-${CU_UPPERBOUND}-Release-external.zip",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Windows-amd64-cuda-${CU_UPPERBOUND}-Release-external.zip",
     ],
 )
 
