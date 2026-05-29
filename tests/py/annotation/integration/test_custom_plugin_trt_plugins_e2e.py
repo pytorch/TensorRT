@@ -955,6 +955,14 @@ class _BackendE2ETests:
 
         _check(self, m, inputs, _ref, f"{self._NS}::{self._BINARY_OP}", rtol=1e-3, atol=1e-3)
 
+    # TRT 10.16's matmul fuser merges fc_gate / fc_up even when fed by
+    # different network inputs, regressing the workaround that test_gated_ffn_block
+    # was xfail'd against.  The plugin then receives stride-2*intermediate sub-
+    # region buffers but PluginTensorDesc still reports LINEAR with no physical
+    # stride field, so the kernel reads wrong rows.  Re-mark as xfail until
+    # either TRT inserts a reformat copy or PluginTensorDesc grows a physical
+    # stride field.
+    @unittest.expectedFailure
     def test_gated_ffn_block_contiguous(self):
         """Full gated FFN block with separate inputs — workaround for TRT mergeMatmulLayers bug.
 
@@ -1044,6 +1052,9 @@ class _BackendE2ETests:
         trt_out = compiled(x)
         torch.testing.assert_close(trt_out, self._UNARY_REF(x), rtol=1e-3, atol=1e-3)
 
+    # Same TRT 10.16 matmul-fusion regression as test_gated_ffn_block_contiguous;
+    # see that test's xfail comment for the full story.
+    @unittest.expectedFailure
     def test_gated_ffn_llm(self):
         """Full gated FFN at LLM expansion ratio: hidden=256, inter=512 (2×).
 
