@@ -396,21 +396,36 @@ def custom_plugin(
 # ---------------------------------------------------------------------------
 
 
-def _build_input_params(num_inputs: int, annotation: Any) -> List[inspect.Parameter]:
+def _build_input_params(
+    num_inputs: int,
+    annotation: Any,
+    names: Optional[List[str]] = None,
+) -> List[inspect.Parameter]:
     """Build a positional ``inspect.Parameter`` list for TRT descriptor functions.
 
     Args:
-        num_inputs:  Number of input parameters to generate (named ``inp0`` … ``inpN``).
+        num_inputs:  Number of input parameters to generate.
         annotation:  Type annotation attached to each parameter (typically
                      ``trtp.TensorDesc``).
+        names:       Optional explicit parameter names — required when the
+                     desc/autotune functions must match a peer registration's
+                     parameter names (TRT's ``@trtp.autotune`` validator
+                     rejects mismatched names against the previously registered
+                     ``@trtp.register`` desc).  When ``None`` (default) the
+                     generic ``inp0`` … ``inpN`` names are used.
 
     Returns:
         List of ``inspect.Parameter`` objects suitable for use with
         ``inspect.Signature``.
     """
+    if names is None:
+        names = [f"inp{i}" for i in range(num_inputs)]
+    assert len(names) == num_inputs, (
+        f"expected {num_inputs} names, got {len(names)}"
+    )
     return [
-        inspect.Parameter(f"inp{i}", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=annotation)
-        for i in range(num_inputs)
+        inspect.Parameter(n, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=annotation)
+        for n in names
     ]
 
 
@@ -516,6 +531,7 @@ def _build_autotune_fn(
     num_inputs: int,
     num_outputs: int,
     tactic_table: List[TacticEntry],
+    tensor_arg_names: Optional[List[str]] = None,
 ) -> Optional[Callable[..., Any]]:
     """Build a ``@trtp.autotune`` function that registers dtype/format/tactic combinations.
 
@@ -586,8 +602,10 @@ def _build_autotune_fn(
             for tid, fmt in zip(tactic_ids, _tactic_formats)
         ]
 
-    sig_params = (_build_input_params(num_inputs, tensor_desc_cls) +
-                  [inspect.Parameter("outputs", inspect.Parameter.POSITIONAL_OR_KEYWORD)])
+    sig_params = (
+        _build_input_params(num_inputs, tensor_desc_cls, names=tensor_arg_names)
+        + [inspect.Parameter("outputs", inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+    )
     _autotune_fn.__signature__ = inspect.Signature(sig_params)
     return _autotune_fn
 
@@ -608,6 +626,7 @@ def _build_aot_fn(
     descriptor: CustomPluginSpec,
     num_inputs: int,
     tactic_table: List[TacticEntry],
+    tensor_arg_names: Optional[List[str]] = None,
 ) -> Callable[..., Any]:
     """Build a ``@trtp.aot_impl`` function that dispatches to the right backend.
 
@@ -654,7 +673,14 @@ def _build_aot_fn(
             kernel spec type is not supported.
     """
     cache = _get_aot_fn_cache()
-    cache_key = (descriptor.op_name, num_inputs)
+    # Include tensor_arg_names in the cache key — two registrations of the
+    # same op_name with different arg-name conventions (e.g. ``inp0`` vs
+    # the torch op's actual schema names) need distinct __signature__s.
+    cache_key = (
+        descriptor.op_name,
+        num_inputs,
+        tuple(tensor_arg_names) if tensor_arg_names is not None else None,
+    )
     if cache_key in cache:
         return cache[cache_key]
 
@@ -729,9 +755,11 @@ def _build_aot_fn(
                 msg=f"unsupported kernel spec type {type(spec).__name__!r} for op {op_name!r}",
             )
 
-    sig_params = (_build_input_params(num_inputs, tensor_desc_cls) +
-                  [inspect.Parameter("outputs", inspect.Parameter.POSITIONAL_OR_KEYWORD),
-                   inspect.Parameter("tactic",  inspect.Parameter.POSITIONAL_OR_KEYWORD)])
+    sig_params = (
+        _build_input_params(num_inputs, tensor_desc_cls, names=tensor_arg_names)
+        + [inspect.Parameter("outputs", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+           inspect.Parameter("tactic",  inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+    )
     _aot_fn.__signature__ = inspect.Signature(
         sig_params,
         return_annotation=typing.Tuple[
@@ -839,6 +867,77 @@ def register_custom_plugin(
         logger.debug(
             "Registered QDP plugin %r (num_inputs=%d, num_outputs=%d, tactics=%d)",
             op_name,
+            num_inputs,
+            num_outputs,
+            len(tactic_table),
+        )
+
+
+def register_autotune_and_aot(
+    descriptor: CustomPluginSpec,
+    num_inputs: int,
+    num_outputs: int,
+    qdp_name: str,
+    tensor_arg_names: Optional[List[str]] = None,
+) -> None:
+    """Layer ``@trtp.autotune`` + ``@trtp.aot_impl`` on top of a desc already
+    registered by ``generate_plugin(qdp_name)``.
+
+    Used by the public ``custom_op(..., _aot_register=...)`` hook (see
+    :mod:`torch_tensorrt.dynamo.conversion.plugins._custom_op`) for the
+    no-weights annotation path. ``generate_plugin`` provides the
+    schema-derived ``@trtp.register`` descriptor and a JIT ``@trtp.impl``;
+    the autotune + AOT callbacks built here select tactics and dispatch
+    PTX/cubin to TRT at build time so the runtime never needs Python.
+
+    Idempotent against :data:`_qdp_registered_ops` (same lock + set as
+    :func:`register_custom_plugin`).
+
+    Args:
+        descriptor:  The :class:`CustomPluginSpec` carrying backend specs.
+        num_inputs:  Number of activation TRT inputs (weights are not
+            supported on this path — use :func:`register_custom_plugin` for
+            weighted plugins).
+        num_outputs: Number of TRT outputs.
+        qdp_name:    QDP op name in ``"namespace::name"`` form. Must match
+            the op already registered by ``generate_plugin``.
+    """
+    if qdp_name in _qdp_registered_ops:
+        return
+
+    with _qdp_registration_lock:
+        if qdp_name in _qdp_registered_ops:
+            return
+
+        import tensorrt.plugin as trtp
+
+        tactic_table = build_tactic_table(descriptor.specs)
+        autotune_fn = _build_autotune_fn(
+            descriptor, num_inputs, num_outputs, tactic_table,
+            tensor_arg_names=tensor_arg_names,
+        )
+        aot_fn = _build_aot_fn(
+            descriptor, num_inputs, tactic_table,
+            tensor_arg_names=tensor_arg_names,
+        )
+
+        try:
+            trtp.autotune(qdp_name)(autotune_fn)
+            trtp.aot_impl(qdp_name)(aot_fn)
+        except Exception as exc:  # noqa: BLE001
+            if "already" in str(exc).lower():
+                logger.debug(
+                    "QDP op %r autotune/aot already registered, skipping: %s",
+                    qdp_name, exc,
+                )
+                _qdp_registered_ops.add(qdp_name)
+                return
+            raise
+
+        _qdp_registered_ops.add(qdp_name)
+        logger.debug(
+            "Registered autotune + aot_impl for %r (num_inputs=%d, num_outputs=%d, tactics=%d)",
+            qdp_name,
             num_inputs,
             num_outputs,
             len(tactic_table),
