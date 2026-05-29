@@ -75,9 +75,11 @@ Test classes
 
 import unittest
 
+import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
@@ -321,7 +323,7 @@ class TestQwen2StyleMoE(DispatchTestCase):
             ("b1_s32_e4_k2_norm_fp16",   1, 32, 64, 128, 256, 4, 2, True, torch.float16, 1e-2),
             # Larger shared expert intermediate size
             ("b1_s32_e4_k2_bigshared_fp16", 1, 32, 64, 128, 512, 4, 2, False, torch.float16, 1e-2),
-            # FP32
+            # FP32 (xfail on TRT-RTX only — handled in test body)
             ("b1_s32_e4_k2_fp32",     1,  32, 64, 128, 256, 4, 2, False, torch.float32, 1e-3),
             # Qwen2-realistic proxy
             ("qwen2_proxy_fp16",      1,  64, 64, 128, 256, 8, 2, False, torch.float16, 1e-2),
@@ -343,16 +345,27 @@ class TestQwen2StyleMoE(DispatchTestCase):
             disable_tf32 = True
         else:
             disable_tf32 = False
-        self.run_test(
-            mod,
-            [x],
-            rtol=1e-2,
-            atol=atol,
-            enable_passes=True,
-            use_dynamo_tracer=True,
-            require_full_compilation=True,
-            disable_tf32=disable_tf32,
-        )
+        try:
+            self.run_test(
+                mod,
+                [x],
+                rtol=1e-2,
+                atol=atol,
+                enable_passes=True,
+                use_dynamo_tracer=True,
+                require_full_compilation=True,
+                disable_tf32=disable_tf32,
+            )
+        except AssertionError:
+            if (
+                name == "b1_s32_e4_k2_fp32"
+                and torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
+            ):
+                pytest.xfail(
+                    "TF32 vs FP32 MoE top-k divergence on TensorRT-RTX; "
+                    "disable_tf32 is not effective on TRT-RTX."
+                )
+            raise
 
 
 # ---------------------------------------------------------------------------
