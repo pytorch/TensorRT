@@ -24,8 +24,16 @@ install_cuda_aarch64() {
             exit 1
         fi
     elif [[ ${CU_VERSION:0:4} == "cu13" ]]; then
-        # cu13: https://github.com/pytorch/pytorch/blob/main/.ci/docker/ci_commit_pins/nccl-cu13.txt
-        nccl_version="2.27.7-1"
+        # cu13: https://github.com/pytorch/pytorch/blob/main/.ci/docker/ci_commit_pins/nccl.txt
+        # NVIDIA RHEL/SBSA NCCL RPMs are published per CUDA minor.
+        if [[ ${CU_VERSION} == "cu132" ]]; then
+            nccl_version="2.29.7-1"
+        elif [[ ${CU_VERSION} == "cu130" ]]; then
+            nccl_version="2.27.7-1"
+        else
+            echo "Unsupported CUDA version: ${CU_VERSION}"
+            exit 1
+        fi
     fi
 
     dnf --nogpgcheck -y install cuda-compiler-${CU_VER}.aarch64 \

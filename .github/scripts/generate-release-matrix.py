@@ -14,10 +14,6 @@ RELEASE_PYTHON_VERSION = {
 }
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
 
-CXX11_TARBALL_CONTAINER_IMAGE = {
-    "cu130": "pytorch/libtorch-cxx11-builder:cuda13.0-main",
-}
-
 
 def main(args: list[str]) -> None:
     parser = argparse.ArgumentParser()
@@ -59,10 +55,6 @@ def main(args: list[str]) -> None:
         ):
             if item["gpu_arch_type"] == "cuda-aarch64":
                 item["container_image"] = sbsa_container_image
-            # if options.tarball_matrix != "":
-            #     item["container_image"] = CXX11_TARBALL_CONTAINER_IMAGE[
-            #         item["desired_cuda"]
-            #     ]
             filtered_includes.append(item)
     filtered_matrix_dict = {}
     filtered_matrix_dict["include"] = filtered_includes
