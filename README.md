@@ -27,7 +27,7 @@ pip install torch-tensorrt
 
 Nightly versions of Torch-TensorRT are published on the PyTorch package index
 ```bash
-pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu130
+pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu130 --extra-index-url https://pypi.org/simple
 ```
 
 Torch-TensorRT is also distributed in the ready-to-run [NVIDIA NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) which has all dependencies with the proper versions and example notebooks included.
