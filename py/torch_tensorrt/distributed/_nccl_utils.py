@@ -132,9 +132,13 @@ def setup_nccl_for_torch_tensorrt() -> None:
          RHEL lib64, or /usr/lib fallback).
       3. If <sys_libdir>/libnccl.so already points at that libnccl.so.2,
          return.
-      4. Otherwise, remove any existing libnccl.so at that path and create
-         a fresh symlink:
+      4. Otherwise, atomically install a fresh symlink:
              <sys_libdir>/libnccl.so → <pip>/libnccl.so.2
+         via "symlink to a unique per-pid temp name, then os.replace onto
+         the target."  This is multi-process safe: when several ranks of a
+         distributed test call this function concurrently, none of them
+         crash on FileExistsError, and the final on-disk state is the same
+         regardless of execution order.
       5. Run `ldconfig` to refresh /etc/ld.so.cache.
       6. Guarded by a module-global flag so subsequent calls in the same
          process are a no-op.
@@ -165,19 +169,45 @@ def setup_nccl_for_torch_tensorrt() -> None:
     sys_libdir = _sys_libdir_on_ldso_path()
     target = os.path.join(sys_libdir, "libnccl.so")
 
+    # Fast path: already set up by a prior process or rank.
+    if os.path.islink(target) and os.readlink(target) == nccl_so_2:
+        logger.debug(f"{target} already points at {nccl_so_2}; nothing to do.")
+        return
+
+    # Race-safe symlink swap.  Multiple ranks may enter this function
+    # concurrently (e.g. MultiProcessTestCase forks 2 children that each call
+    # setup_nccl_for_torch_tensorrt simultaneously).  Using `os.remove` +
+    # `os.symlink` opens a window where one rank's symlink call races with
+    # another's, raising FileExistsError on the loser.
+    #
+    # Instead: create the new symlink under a unique per-pid temp name
+    # (no contention possible — different filenames), then atomically rename
+    # it onto `target`.  `os.replace` is a single POSIX rename(2) call:
+    # it overwrites unconditionally and is observable as a single transition,
+    # never a missing or half-written state.  All ranks converge on the same
+    # final symlink without any of them crashing.
+    tmp = f"{target}.torchtrt-{os.getpid()}"
     try:
-        if os.path.lexists(target):
-            existing = os.readlink(target) if os.path.islink(target) else None
-            if existing == nccl_so_2:
-                logger.debug(f"{target} already points at {nccl_so_2}; nothing to do.")
-                return
-            os.remove(target)
-        os.symlink(nccl_so_2, target)
+        if os.path.lexists(tmp):
+            os.remove(tmp)
+        os.symlink(nccl_so_2, tmp)
+        os.replace(tmp, target)
         subprocess.run(["ldconfig"], check=False)
         logger.info(
             f"NCCL: linked {target} -> {nccl_so_2} so TRT and PyTorch share one libnccl."
         )
     except OSError as e:
+        # Clean up our temp link if we left one behind.
+        if os.path.lexists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        # If another rank already produced the correct final symlink while
+        # we were failing, accept that as success — the end state we wanted
+        # is in place.
+        if os.path.islink(target) and os.readlink(target) == nccl_so_2:
+            return
         raise RuntimeError(
             f"setup_nccl_for_torch_tensorrt(): cannot write {target} "
             f"(needed so TRT's dlopen('libnccl.so') resolves to PyTorch's libnccl.so.2). "
