@@ -166,9 +166,10 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.16.1.11",
+    strip_prefix = "TensorRT-11.0.0.114",
+    type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-13.2.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/tars/TensorRT-Enterprise-11.0.0.114-Linux-x86_64-cuda-13.2-Release-external.tar.zst",
     ],
 )
 
@@ -176,7 +177,7 @@ http_archive(
     name = "tensorrt_rtx",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
     strip_prefix = "TensorRT-RTX-1.5.0.114",
-    type = ".tar.zst",
+    type = "tar.zst",
     urls = [
         "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Linux-x86_64-cuda-13.2-Release-external.tar.zst",
     ],
@@ -185,9 +186,10 @@ http_archive(
 http_archive(
     name = "tensorrt_sbsa",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.16.1.11",
+    strip_prefix = "TensorRT-11.0.0.114",
+    type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.aarch64-gnu.cuda-13.2.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/tars/TensorRT-Enterprise-11.0.0.114-Linux-aarch64-cuda-13.2-Release-external.tar.zst",
     ],
 )
 
@@ -203,9 +205,9 @@ http_archive(
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.16.1.11",
+    strip_prefix = "TensorRT-11.0.0.114",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-13.2.zip",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/zip/TensorRT-Enterprise-11.0.0.114-Windows-amd64-cuda-13.2-Release-external.zip",
     ],
 )
 
