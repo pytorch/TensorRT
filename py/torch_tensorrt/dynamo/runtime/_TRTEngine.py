@@ -1111,8 +1111,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             logger.debug("Using the dynamic allocator runtime mode.")
             return self._execute_output_allocator(contiguous_inputs)
 
+        effective_cudagraphs = (
+            torch_tensorrt.runtime.get_cudagraphs_mode()
+            and not self._rtx_native_cudagraphs
+        )
         logger.debug(
-            f"Using the standard execution runtime mode with cudagraphs={torch_tensorrt.runtime.get_cudagraphs_mode()}"
+            f"Using the standard execution runtime mode with cudagraphs={effective_cudagraphs}"
             + (" (RTX native)" if self._rtx_native_cudagraphs else "")
         )
         return self._execute_standard(contiguous_inputs)
