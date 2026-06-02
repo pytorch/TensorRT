@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_all_gather_op,
     tensorrt_fused_nccl_all_reduce_op,
     tensorrt_fused_nccl_reduce_scatter_op,
+    tensorrt_fused_nccl_all_to_all_op
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -84,6 +85,25 @@ if ENABLED_FEATURES.native_trt_collectives:
             name,
             [args[0]],
             reduce_op=reduce_op,
+        )
+
+    @dynamo_tensorrt_converter(
+        tensorrt_fused_nccl_all_to_all_op, requires_native_multidevice=True
+    )
+    def fused_nccl_all_to_all(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
+        """All-to-all using native TensorRT DistCollective API."""
+        return impl.nccl_ops.nccl_all_to_all_native(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            [args[0]],
         )
 
 

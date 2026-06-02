@@ -949,6 +949,46 @@ class TestFuseDistributedOps(unittest.TestCase):
                 "3-arg all_reduce node."
             )
 
+    # -- all_to_all ---------------------------------------------------------
+
+    def test_fuse_all_to_all_replaces_pair(self) -> None:
+        """all_to_all_single + wait_tensor → tensorrt_fused_nccl_all_to_all_op."""
+        from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+            tensorrt_fused_nccl_all_to_all_op,
+        )
+
+        gm = _build_graph(
+            torch.ops._c10d_functional.all_to_all_single.default,
+            args_without_input=([], [], "test_group"),
+        )
+        gm = self._run_pass(gm)
+        targets = _node_targets(gm)
+        self.assertNotIn(
+            torch.ops._c10d_functional.all_to_all_single.default, targets
+        )
+        self.assertNotIn(torch.ops._c10d_functional.wait_tensor.default, targets)
+        self.assertIn(tensorrt_fused_nccl_all_to_all_op, targets)
+
+    def test_fuse_all_to_all_args(self) -> None:
+        """Fused all_to_all node carries (inp, input splits, output splits, group_name)."""
+        from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+            tensorrt_fused_nccl_all_to_all_op,
+        )
+
+        gm = _build_graph(
+            torch.ops._c10d_functional.all_to_all_single.default,
+            # input splits, output splits, group name
+            args_without_input=([1], [2], "grp"),
+        )
+        gm = self._run_pass(gm)
+        fused = next(
+            n for n in gm.graph.nodes if n.target == tensorrt_fused_nccl_all_to_all_op
+        )
+        # args: (inp_placeholder, [], [], "grp")
+        self.assertEqual(fused.args[1], [1])
+        self.assertEqual(fused.args[2], [2])
+        self.assertEqual(fused.args[3], "grp")
+
     # -- no-fuse when wait_tensor has multiple users -----------------------
 
     def test_fuse_when_wait_tensor_result_has_multiple_uses(self) -> None:
@@ -1078,6 +1118,21 @@ class _ReduceScatterModel(nn.Module):
         )
         return torch.ops._c10d_functional.wait_tensor.default(out)
 
+class _AllToAllModel(nn.Module):
+    def __init__(self, dim: int, world_size: int, group_name: str) -> None:
+        super().__init__()
+        self.fc = nn.Linear(dim, dim)
+        self.world_size = world_size
+        self.group_name = group_name
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc(x)
+        split_sizes = [x.shape[0] // self.world_size] * self.world_size
+        out = torch.ops._c10d_functional.all_to_all_single.default(
+            x, split_sizes, split_sizes, self.group_name
+        )
+        return torch.ops._c10d_functional.wait_tensor.default(out)
+
 
 @unittest.skipIf(
     not is_nccl_available(),
@@ -1155,6 +1210,14 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         dim = 8
         self._run(
             _ReduceScatterModel(dim, self.world_size, self.group_name),
+            [torch.randn(1, dim)],
+        )
+
+    def test_all_to_all_single_rank(self) -> None:
+        """all_to_all compiles and produces correct output on a single rank."""
+        dim = 8
+        self._run(
+            _AllToAllModel(dim, self.world_size, self.group_name),
             [torch.randn(1, dim)],
         )
 
@@ -1481,6 +1544,37 @@ def _multirank_reduce_scatter_all_reduce_ops(
             ref,
             f"reduce_scatter reduce_op={reduce_op!r} (TRT vs eager) rank={rank}",
         )
+
+
+def _multirank_all_to_all_correctness(
+    rank: int, world_size: int, device: torch.device
+) -> None:
+    """all_to_all sends a chunk from each rank to every other ank."""
+    import torch_tensorrt
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+    group = dist.group.WORLD
+    group_name = group.group_name if hasattr(group, "group_name") else ""
+
+    class AllToAll(nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            split_sizes = [x.shape[0] // world_size] * world_size
+            out = torch.ops._c10d_functional.all_to_all_single.default(
+                x, split_sizes, split_sizes, group_name
+            )
+            return torch.ops._c10d_functional.wait_tensor.default(out)
+
+    model = AllToAll().to(device).eval()
+    # Input: [0...world_size)
+    inp = torch.arange(world_size, device=device)
+
+    with torch.no_grad():
+        out = model(inp)
+
+    # Result for rank r: [r] * world_size
+    expected = torch.tensor([rank] * world_size, device=device)
+    _check_close(out, expected, f"all_to_all rank={rank}")
 
 
 def _multirank_distributed_mode_tp_model(
@@ -1864,6 +1958,13 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_reduce_scatter_all_reduce_ops(self.rank, self.world_size, device)
 
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_all_to_all_correctness(self) -> None:
+        """all_to_all sends a chunk from each rank to every other ank."""
+        device = self._init_dist()
+        _multirank_all_to_all_correctness(self.rank, self.world_size, device)
+
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
@@ -1919,6 +2020,7 @@ def run_multirank_tests() -> None:
         _multirank_all_reduce_correctness,
         _multirank_all_gather_correctness,
         _multirank_reduce_scatter_all_reduce_ops,
+        _multirank_all_to_all_correctness,
         _multirank_distributed_mode_tp_model,
         _multirank_distributed_mode_subgroup,
         _multirank_cpp_runtime_bind_nccl,
