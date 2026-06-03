@@ -5,6 +5,9 @@ on:
     - cron: '30 9 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   cut_nightly:
     runs-on: ubuntu-latest
