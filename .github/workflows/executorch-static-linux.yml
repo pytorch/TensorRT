@@ -24,6 +24,9 @@ on:
         default: ""
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   select-matrix:
     runs-on: ubuntu-latest

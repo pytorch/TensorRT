@@ -132,7 +132,8 @@ def main():
         manifest = {"version": torch_version}
 
         # Creating an empty manifest file for overwriting post setup
-        os.system("touch {}".format(MANIFEST_FILE))
+        with open(MANIFEST_FILE, "a"):
+            pass
     else:
         # Load manifest if already exists
         with open(MANIFEST_FILE, "r") as f:

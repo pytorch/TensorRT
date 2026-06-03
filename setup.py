@@ -339,25 +339,32 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
             dir_path + "/trtorch/lib/libtrtorch.so",
         )
     elif rt_only:
-        os.system(
-            "tar -xzf "
-            + dir_path
-            + "/../bazel-bin/libtorchtrt_runtime.tar.gz --strip-components=1 -C "
-            + dir_path
-            + "/torch_tensorrt"
+        subprocess.run(
+            [
+                "tar",
+                "-xzf",
+                dir_path + "/../bazel-bin/libtorchtrt_runtime.tar.gz",
+                "--strip-components=1",
+                "-C",
+                dir_path + "/torch_tensorrt",
+            ],
+            check=True,
         )
     else:
-        os.system(
-            "tar -xzf "
-            + dir_path
-            + "/../bazel-bin/libtorchtrt.tar.gz "
-            + "--exclude='torch_tensorrt/src' "
-            + "--exclude='torch_tensorrt/src/*' "
-            + "--exclude='torch_tensorrt/examples' "
-            + "--exclude='torch_tensorrt/examples/*' "
-            + "--strip-components=1 -C "
-            + dir_path
-            + "/torch_tensorrt"
+        subprocess.run(
+            [
+                "tar",
+                "-xzf",
+                dir_path + "/../bazel-bin/libtorchtrt.tar.gz",
+                "--exclude=torch_tensorrt/src",
+                "--exclude=torch_tensorrt/src/*",
+                "--exclude=torch_tensorrt/examples",
+                "--exclude=torch_tensorrt/examples/*",
+                "--strip-components=1",
+                "-C",
+                dir_path + "/torch_tensorrt",
+            ],
+            check=True,
         )
 
 
