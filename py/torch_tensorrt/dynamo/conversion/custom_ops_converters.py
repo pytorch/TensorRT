@@ -16,7 +16,8 @@ from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_all_gather_op,
     tensorrt_fused_nccl_all_reduce_op,
     tensorrt_fused_nccl_reduce_scatter_op,
-    tensorrt_fused_nccl_all_to_all_op
+    tensorrt_fused_nccl_all_to_all_op,
+    tensorrt_fused_nccl_scatter_op
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -104,6 +105,27 @@ if ENABLED_FEATURES.native_trt_collectives:
             SourceIR.ATEN,
             name,
             [args[0]],
+        )
+
+    @dynamo_tensorrt_converter(
+        tensorrt_fused_nccl_scatter_op, requires_native_multidevice=True
+    )
+    def fused_nccl_scatter(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
+        """Scatter using native TensorRT DistCollective API."""
+        root = args[1] if len(args) > 1 else 0
+        return impl.nccl_ops.nccl_scatter_native(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            [args[0]],
+            root=root
         )
 
 

@@ -85,6 +85,29 @@ def _(
     )
 
 
+@torch.library.custom_op("tensorrt::fused_nccl_scatter", mutates_args=())
+def _fused_nccl_scatter_impl(
+    inp: torch.Tensor, src: int, group_name: str
+) -> torch.Tensor:
+    world_size = torch.distributed.get_world_size()
+    rank = torch.distributed.get_rank()
+
+    out = torch.ops._c10d_functional.broadcast.default(inp, src, group_name)
+    out = torch.ops._c10d_functional.wait_tensor.default(out)
+
+    chunk = out.shape[0] // world_size
+    return out[rank * chunk : (rank + 1) * chunk]
+
+
+@_fused_nccl_scatter_impl.register_fake
+def _(
+    inp: torch.Tensor, src: int, group_name: str
+) -> torch.Tensor:
+    world_size = torch.distributed.get_world_size()
+    out_shape = (inp.shape[0] // world_size,) + tuple(inp.shape[1:])
+    return inp.new_empty(out_shape)
+    
+
 # Public aliases — used as FX node targets in the fuse pass, as converter keys
 # in custom_ops_converters.py, and in test equality checks. Each is the
 # torch._ops.OpOverload created by the custom_op decoration above.
@@ -94,6 +117,7 @@ tensorrt_fused_nccl_reduce_scatter_op = (
 )
 tensorrt_fused_nccl_all_reduce_op = torch.ops.tensorrt.fused_nccl_all_reduce.default
 tensorrt_fused_nccl_all_to_all_op = torch.ops.tensorrt.fused_nccl_all_to_all.default
+tensorrt_fused_nccl_scatter_op = torch.ops.tensorrt.fused_nccl_scatter.default
 
 
 def fuse_distributed_ops(
@@ -107,7 +131,7 @@ def fuse_distributed_ops(
                 torch.ops._c10d_functional.all_gather_into_tensor.default,
                 torch.ops._c10d_functional.reduce_scatter_tensor.default,
                 torch.ops._c10d_functional.all_reduce.default,
-                torch.ops._c10d_functional.all_to_all_single.default,
+                torch.ops._c10d_functional.all_to_all_single.default
             )
             and len(node.users) == 1
             and list(node.users)[0].target
@@ -137,7 +161,6 @@ def fuse_distributed_ops(
                     fused_node = gm.graph.create_node(
                         op="call_function",
                         target=tensorrt_fused_nccl_all_to_all_op,
-                        # Drop input and output splits, since TRT doesn't use them.
                         args=(node.args[0], node.args[1], node.args[2], node.args[3]),
                     )
             else:
