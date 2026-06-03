@@ -73,10 +73,10 @@ class TestRuntimeCacheSetup(TestCase):
         engine = _find_python_trt_engine(compiled)
         self.assertIsNotNone(engine, "No Python TRTEngine found in compiled model")
         self.assertIsNotNone(
-            engine._runtime_config, "runtime_config should be set for RTX"
+            engine.runtime_config, "runtime_config should be set for RTX"
         )
         self.assertIsNotNone(
-            engine._runtime_cache, "runtime_cache should be set for RTX"
+            engine.runtime_cache, "runtime_cache should be set for RTX"
         )
 
     def test_context_created_successfully(self):
@@ -90,7 +90,7 @@ class TestRuntimeCacheSetup(TestCase):
     def test_runtime_cache_path_default(self):
         compiled, _ = _compile_simple()
         engine = _find_python_trt_engine(compiled)
-        self.assertEqual(engine.runtime_cache_path, RUNTIME_CACHE_PATH)
+        self.assertEqual(engine.settings.runtime_cache_path, RUNTIME_CACHE_PATH)
 
     def test_runtime_cache_path_custom(self):
         cache_dir = tempfile.mkdtemp()
@@ -98,7 +98,7 @@ class TestRuntimeCacheSetup(TestCase):
             custom_path = os.path.join(cache_dir, "my_cache.bin")
             compiled, _ = _compile_simple(runtime_cache_path=custom_path)
             engine = _find_python_trt_engine(compiled)
-            self.assertEqual(engine.runtime_cache_path, custom_path)
+            self.assertEqual(engine.settings.runtime_cache_path, custom_path)
         finally:
             shutil.rmtree(cache_dir, ignore_errors=True)
 
@@ -268,15 +268,15 @@ class TestNonRTXUnchanged(TestCase):
         compiled, _ = _compile_simple()
         engine = _find_python_trt_engine(compiled)
         if engine is not None:
-            # The TRT-RTX runtime cache machinery is exposed via the private
-            # ``_runtime_config``/``runtime_cache`` attributes on the Python
+            # The TRT-RTX runtime cache machinery is exposed via the
+            # ``runtime_config`` / ``runtime_cache`` attributes on the Python
             # engine. On non-RTX builds neither should be populated.
             self.assertIsNone(
-                engine._runtime_config,
+                engine.runtime_config,
                 "runtime_config should be None for standard TRT",
             )
             self.assertIsNone(
-                engine._runtime_cache,
+                engine.runtime_cache,
                 "runtime_cache should be None for standard TRT",
             )
 

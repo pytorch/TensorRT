@@ -127,6 +127,59 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def set_use_output_allocator(self, enable: bool) -> None:
         self.use_output_allocator_outputs = enable
 
+    def _check_monolithic_capturability(self, stream: torch.cuda.Stream) -> None:
+        """Verify every TRT submodule is safe for monolithic stream capture.
+
+        Whole-graph CUDA graph mode wraps mixed TRT + PyTorch ops in a
+        single outer ``torch.cuda.CUDAGraph`` capture. On TRT-RTX, each
+        engine must opt out of RTX-native CUDA graphs (which would
+        interfere with the outer capture) and must pass the
+        ``IExecutionContext.is_stream_capturable`` check. Raises
+        ``RuntimeError`` if any TRT engine is not monolithically
+        capturable. No-op on non-RTX builds.
+        """
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            return
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+        from torch_tensorrt.dynamo.runtime._TRTEngine import (
+            TRTEngine,
+            _get_cuda_graph_strategy,
+        )
+
+        for name, mod in self.compiled_module.named_modules():
+            if not (
+                isinstance(mod, TorchTensorRTModule)
+                and isinstance(mod.engine, TRTEngine)
+            ):
+                continue
+            engine = mod.engine
+            if not engine._is_monolithic_capturable(stream):
+                raise RuntimeError(
+                    f"CUDA graph capture failed: TRT submodule '{name}' is "
+                    "not monolithically capturable (lazy kernel "
+                    "specialization or non-capturable stream). Whole-graph "
+                    "CUDA graph mode with mixed TRT + PyTorch ops requires "
+                    "all TRT engines to be capturable. Consider using "
+                    "cuda_graph_strategy='whole_graph_capture' with "
+                    "set_cudagraphs_mode(True) instead of enable_cudagraphs()."
+                )
+            # Disable RTX-native CUDA graphs on this engine so they don't
+            # interfere with the outer monolithic capture.
+            if engine._rtx_native_cudagraphs:
+                engine.runtime_config.cuda_graph_strategy = _get_cuda_graph_strategy(
+                    "disabled"
+                )
+                engine.context = engine._create_execution_context()
+                engine._rtx_native_cudagraphs = False
+                logger.info(
+                    f"Disabled RTX-native CUDA graphs for '{name}' "
+                    "(using outer monolithic capture instead)"
+                )
+
     def forward(
         self, *args: Any, **kwargs: Any
     ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
@@ -212,6 +265,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
             with torch.cuda.stream(self._engine_stream):
                 if need_cudagraphs_record:
+                    self._check_monolithic_capturability(self._engine_stream)
                     self.cudagraph = torch.cuda.CUDAGraph()
                     with torch.cuda.graph(self.cudagraph, stream=self._engine_stream):
                         self._output_buffers = self.compiled_module(*args, **kwargs)

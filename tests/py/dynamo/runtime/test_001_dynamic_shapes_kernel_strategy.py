@@ -139,7 +139,7 @@ class TestDynamicShapesKernelStrategyNonRTX(TestCase):
         engine = _find_python_trt_engine(compiled)
         if engine is not None:
             self.assertIsNone(
-                getattr(engine, "_runtime_config", None),
+                engine.runtime_config,
                 "runtime_config should be None for standard TRT",
             )
         # Inference should still work

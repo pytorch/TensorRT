@@ -6,6 +6,7 @@ import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._utils import is_orin
 from torch_tensorrt.dynamo.utils import prepare_inputs
 
@@ -215,6 +216,11 @@ class TestWeightStreamingPython(TestCase):
         torch._dynamo.reset()
 
     def test_weight_streaming_cudagraphs(self):
+        if ENABLED_FEATURES.tensorrt_rtx:
+            self.skipTest(
+                "Manual whole-graph CUDA graph capture (enable_cudagraphs) is "
+                "incompatible with weight streaming on TRT-RTX."
+            )
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
         exp_program = torch.export.export(model, tuple(input))
@@ -260,6 +266,12 @@ class TestWeightStreamingPython(TestCase):
         is_orin(), "There is a bug on Orin platform, skip for now until bug is fixed"
     )
     def test_runtime_state_change(self):
+        if ENABLED_FEATURES.tensorrt_rtx:
+            self.skipTest(
+                "Manual whole-graph CUDA graph capture (enable_cudagraphs) is "
+                "incompatible with weight streaming on TRT-RTX."
+            )
+
         class SampleModel(torch.nn.Module):
             def __init__(self):
                 super().__init__()
