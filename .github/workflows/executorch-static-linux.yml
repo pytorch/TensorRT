@@ -66,6 +66,7 @@ jobs:
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.select-matrix.outputs.matrix }}
+      pre-script: packaging/pre_build_script.sh
       fail-on-empty: false
       script: |
         set -euo pipefail
