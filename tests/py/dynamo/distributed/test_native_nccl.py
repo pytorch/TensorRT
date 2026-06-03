@@ -60,6 +60,8 @@ from torch.testing._internal.common_distributed import (
 )
 from torch.testing._internal.common_utils import run_tests
 
+import pytest
+
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
@@ -785,6 +787,25 @@ def _build_graph(collective_op, args_without_input):
     return torch.fx.GraphModule({}, g)
 
 
+def _build_graph_scatter(args_without_input):
+    """Build a minimal FX graph: input → scatter → wait_tensor → slice → output."""
+    world_size = torch.distributed.get_world_size()
+    rank = torch.distributed.get_rank()
+
+    g = torch.fx.Graph()
+    inp = g.placeholder("inp")
+    coll = g.call_function(torch.ops._c10d_functional.broadcast.default, args=(inp, *args_without_input))
+    wait = g.call_function(torch.ops._c10d_functional.wait_tensor.default, args=(coll,))
+    # To avoid tracing tensor sizes for test
+    # use dummy dimension to represent inp's 
+    # 0th axis shape
+    dummy_shape_dim = 10
+    chunk = dummy_shape_dim // world_size
+    chunk = g.call_function(torch.ops.aten.slice.Tensor, args=(wait, 0, rank * chunk, (rank+1) * chunk))
+    g.output(chunk)
+    return torch.fx.GraphModule({}, g)
+
+
 def _node_targets(gm: torch.fx.GraphModule) -> list:
     return [n.target for n in gm.graph.nodes if n.op == "call_function"]
 
@@ -796,6 +817,7 @@ class TestFuseDistributedOps(unittest.TestCase):
     corresponding fused op, and that edge-cases (multiple users) are
     handled correctly.
     """
+
 
     def _settings(self):
         from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -1133,6 +1155,18 @@ class _AllToAllModel(nn.Module):
         )
         return torch.ops._c10d_functional.wait_tensor.default(out)
 
+class _ScatterModel(nn.Module):
+    def __init__(self, dim: int, root : int, group_name: str) -> None:
+        super().__init__()
+        self.fc = nn.Linear(dim, dim)
+        self.group_name = group_name
+        self.root = root
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc(x)
+        return torch.ops.tensorrt.fused_nccl_scatter(x, self.root, self.group_name)
+
+
 
 @unittest.skipIf(
     not is_nccl_available(),
@@ -1159,6 +1193,7 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         cls.group = dist.new_group(ranks=[0])
         cls.group_name = cls.group.group_name
         cls.world_size = 1
+        cls.root = 0
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -1218,6 +1253,14 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         dim = 8
         self._run(
             _AllToAllModel(dim, self.world_size, self.group_name),
+            [torch.randn(1, dim)],
+        )
+
+    def test_scatter_single_rank(self) -> None:
+        """scatter compiles and produces correct output on a single rank."""
+        dim = 8
+        self._run(
+            _ScatterModel(dim, self.root, self.group_name),
             [torch.randn(1, dim)],
         )
 
@@ -1464,8 +1507,37 @@ def _multirank_all_gather_correctness(
     # After gather: shape is (world_size, 4), row i == float(i)
     assert out.shape == torch.Size([world_size, 4]), f"Shape mismatch: {out.shape}"
     for r in range(world_size):
-        expected_row = torch.full((4,), float(r), device=device)
+        expected_row = torch.full((4,), float(r), device=device, dtype=out.dtype)
         _check_close(out[r], expected_row, f"all_gather row {r} rank={rank}")
+
+
+def _multirank_scatter_correctness(
+    root: int, rank: int, world_size: int, device: torch.device
+) -> None:
+    """all_gather concatenates tensors from all ranks in order."""
+    group = dist.group.WORLD
+    group_name = group.group_name if hasattr(group, "group_name") else ""
+
+    class Scatter(nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return torch.ops.tensorrt.fused_nccl_scatter(x, root, group_name)
+
+    model = Scatter().to(device).eval()
+    # input is of shape (world_size, 4) laid out like 
+    # [0, 0, 0, 0]
+    # ...
+    # [world_size - 1, world_size - 1, world_size - 1, world_size - 1]
+
+    # Supply root only with valid input
+    inp = torch.arange(world_size, device=device).unsqueeze(1).repeat(1, 4) if rank == root else torch.full((world_size, 4), -1, device=device)
+
+    with torch.no_grad():
+        out = model(inp)
+
+    # After scatter: shape is (1, 4), row[0] == [rank, rank, rank, rank]
+    assert out.shape == torch.Size([1, 4]), f"Shape mismatch: {out.shape}"
+    expected_row = torch.full((1, 4), int(rank), device=device)
+    _check_close(out, expected_row, f"scatter row {out} rank={rank}")
 
 
 def _multirank_reduce_scatter_all_reduce_ops(
@@ -1964,6 +2036,14 @@ class TestMultirankNccl(MultiProcessTestCase):
         """all_to_all sends a chunk from each rank to every other ank."""
         device = self._init_dist()
         _multirank_all_to_all_correctness(self.rank, self.world_size, device)
+
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_scatter_correctness(self) -> None:
+        """all_to_all sends a chunk from each rank to every other ank."""
+        device = self._init_dist()
+        for i in range(self.world_size):
+            _multirank_scatter_correctness(i, self.rank, self.world_size, device)
 
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()

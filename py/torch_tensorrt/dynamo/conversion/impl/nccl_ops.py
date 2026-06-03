@@ -488,6 +488,7 @@ def nccl_all_reduce_native(
         logger.error(f"Native ALL_REDUCE failed: {e} (type: {type(e).__name__})")
         raise
 
+
 def nccl_all_to_all_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -517,7 +518,7 @@ def nccl_all_to_all_native(
     if world_size == 1:
         return plug_inputs[0]
     logger.debug(
-        f"Adding native all_gather: name={name}, rank={rank}, world_size={world_size}"
+        f"Adding native all_to_all: name={name}, rank={rank}, world_size={world_size}"
     )
 
     # Get the input tensor
@@ -569,4 +570,88 @@ def nccl_all_to_all_native(
 
     except Exception as e:
         logger.error(f"Native ALL_TO_ALL failed: {e} (type: {type(e).__name__})")
+        raise
+
+
+def nccl_scatter_native(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    plug_inputs: Tuple[Argument, ...],
+    root: int = 0
+) -> trt.ITensor:
+    """
+    Implement scatter using native TensorRT DistCollective API.
+
+    This operation has the root rank send a chunk of its data to every other rank.
+
+    Returns:
+        Output tensor after scatter operation
+
+    Example:
+        Input on rank 0: [1, 2]  shape=(2,)
+        Input on rank 1: None  shape=(2,)
+        Output on rank 0: [1] shape=(1,)
+        Output on rank 1: [2] shape=(1,)
+    """
+    rank, world_size = _get_distributed_rank_and_world_size()
+
+    # TRT add_dist_collective crashes with world_size=1; scatter of a single rank
+    # is an identity op.
+    if world_size == 1:
+        return plug_inputs[0]
+    logger.debug(
+        f"Adding native scatter: name={name}, rank={rank}, world_size={world_size}"
+    )
+
+    # Get the input tensor
+    input_tensor = plug_inputs[0]
+
+    try:
+        # Use native TensorRT DistCollective API for SCATTER
+        # For SCATTER, the reduce operation parameter is ignored
+        # The last parameter (group) can be None to include all ranks
+        import numpy as np
+
+        # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
+        groups = np.arange(world_size, dtype=np.int64)
+
+        logger.debug(
+            f"Creating scatter layer: groups={groups.tolist()}, groupSize={world_size}"
+        )
+        layer = ctx.net.add_dist_collective(
+            input_tensor,
+            trt.CollectiveOperation.SCATTER,
+            trt.ReduceOperation.NONE,  # Ignored for SCATTER
+            root,  
+            groups,  # None means all ranks participate (world_size ranks)
+        )
+
+        logger.debug(f"Successfully created native SCATTER layer: {name}")
+        logger.debug(
+            f"Calling add_dist_collective: input_shape={input_tensor.shape}, "
+            f"root={root}, groups={groups.tolist()}, groupSize={len(groups)} (inferred from array)"
+        )
+
+        set_layer_name(layer, target, name, source_ir)
+
+        output = layer.get_output(0)
+        layer.num_ranks = world_size
+
+        return output
+
+    except AttributeError as e:
+        error_msg = (
+            f"Native SCATTER failed: {e}. "
+            "This usually means TensorRT doesn't support native distributed collectives. "
+            f"Your TensorRT version: {trt.__version__}. "
+            "Native collectives require TensorRT 11 or later. "
+            "Consider using TensorRT-LLM plugins instead by setting USE_NATIVE_TRT_COLLECTIVES=0"
+        )
+        logger.error(error_msg)
+        raise RuntimeError(error_msg) from e
+
+    except Exception as e:
+        logger.error(f"Native SCATTER failed: {e} (type: {type(e).__name__})")
         raise
