@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=4a019a04"></script>
+    <script src="../../_static/documentation_options.js?v=44286970"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -477,6 +477,7 @@ document.write(`
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
@@ -543,6 +544,13 @@ document.write(`
     <span class="s2">&quot;save&quot;</span><span class="p">,</span>
     <span class="s2">&quot;load&quot;</span><span class="p">,</span>
 <span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_has_executorch_exir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">&quot;executorch.exir&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="k">except</span> <span class="ne">ModuleNotFoundError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_non_fx_input_interface</span><span class="p">(</span>
@@ -1242,6 +1250,17 @@ document.write(`
     <span class="n">executorch_partitioners</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;partitioners&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">executorch_compile_specs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;compile_specs&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 
+    <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">accepted_formats</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Provided output_format </span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2"> is not supported. Supported options are exported_program | torchscript | aot_inductor | executorch&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;executorch&quot;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_has_executorch_exir</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+            <span class="s2">&quot;Saving in ExecuTorch format requires the executorch package &quot;</span>
+            <span class="s2">&quot;with executorch.exir. Install executorch to use &quot;</span>
+            <span class="s2">&quot;output_format=&#39;executorch&#39;.&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_all_are_input_objects</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Recursively check if all elements in nested collections are Input objects.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">Input</span><span class="p">):</span>
@@ -1341,10 +1360,6 @@ document.write(`
     <span class="c1"># When inferring dynamic shapes, use different sizes for args vs kwargs to avoid</span>
     <span class="c1"># torch.export detecting spurious equality constraints</span>
 
-    <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">accepted_formats</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Provided output_format </span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2"> is not supported. Supported options are exported_program | torchscript | aot_inductor | executorch&quot;</span>
-        <span class="p">)</span>
     <span class="k">if</span> <span class="n">executorch_partitioners</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">&quot;executorch&quot;</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
             <span class="s2">&quot;partitioners= is only used with output_format=&#39;executorch&#39; and will be &quot;</span>
