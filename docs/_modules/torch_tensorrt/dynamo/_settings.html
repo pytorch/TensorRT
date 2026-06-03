@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=a1d3f465"></script>
+    <script src="../../../_static/documentation_options.js?v=3f6a3b2c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -493,6 +493,7 @@ document.write(`
     <span class="n">AUTOCAST_MAX_OUTPUT_THRESHOLD</span><span class="p">,</span>
     <span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
+    <span class="n">CUDA_GRAPH_STRATEGY</span><span class="p">,</span>
     <span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
@@ -573,6 +574,7 @@ document.write(`
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).</span>
 <span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. The cache is loaded on engine setup and saved on module cleanup. Uses file locking for concurrent access safety. Not used for standard TensorRT.</span>
 <span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for compiling shape-specialized kernels at runtime for dynamic shapes (TensorRT-RTX only). Options: &quot;lazy&quot; (compile in background, use fallback until ready), &quot;eager&quot; (compile immediately, blocking), &quot;none&quot; (always use fallback kernels). Default: &quot;lazy&quot;.</span>
+<span class="sd">        cuda_graph_strategy (str): Strategy for CUDA graph capture/replay (TensorRT-RTX only). Options: &quot;disabled&quot; (no native CUDA graphs, uses manual capture if cudagraphs mode is enabled), &quot;whole_graph_capture&quot; (TRT-RTX handles CUDA graph capture internally). When set to &quot;whole_graph_capture&quot;, the manual torch CUDA graph capture/replay in forward() is bypassed. Default: &quot;disabled&quot;.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
 <span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.</span>
@@ -628,6 +630,7 @@ document.write(`
     <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span>
     <span class="p">)</span>
+    <span class="n">cuda_graph_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">CUDA_GRAPH_STRATEGY</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">LAZY_ENGINE_INIT</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">CACHE_BUILT_ENGINES</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REUSE_CACHED_ENGINES</span>
