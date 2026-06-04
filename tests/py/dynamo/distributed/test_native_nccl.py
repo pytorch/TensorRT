@@ -2140,6 +2140,8 @@ def run_multirank_tests() -> None:
         _multirank_all_gather_correctness,
         _multirank_reduce_scatter_all_reduce_ops,
         _multirank_all_to_all_correctness,
+        _multirank_scatter_correctness,
+        _multirank_gather_correctness,
         _multirank_distributed_mode_tp_model,
         _multirank_distributed_mode_subgroup,
         _multirank_cpp_runtime_bind_nccl,
