@@ -272,7 +272,7 @@ class TRTTestCase(TestCase):
                     cuda_inputs.append(i.cuda())
 
                 mod.eval()
-                interpreter.run(precision=torch.float)
+                interpreter.run()
 
     def assert_has_op(self, mod, ops):
         ops_in_mod = set()
