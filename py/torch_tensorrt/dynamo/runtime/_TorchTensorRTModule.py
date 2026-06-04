@@ -41,6 +41,25 @@ SerializedTorchTensorRTModuleFmt = Tuple[
 ]
 
 
+def _is_cpp_runtime_available() -> bool:
+    if not ENABLED_FEATURES.torch_tensorrt_runtime:
+        return False
+
+    try:
+        _ = torch.classes.tensorrt.Engine
+    except (AttributeError, RuntimeError):
+        return False
+
+    return True
+
+
+def _should_use_python_runtime(settings: CompilationSettings) -> bool:
+    return (
+        getattr(settings, "use_python_runtime", False)
+        or not _is_cpp_runtime_available()
+    )
+
+
 class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     """``nn.Module`` that runs a TensorRT engine inside PyTorch.
 
@@ -127,7 +146,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
         self.engine: Any = None
-        self._use_python_runtime = settings.use_python_runtime
+        self._use_python_runtime = _should_use_python_runtime(settings)
 
         self.execute_engine_op: Any = None
         self.requires_output_allocator = requires_output_allocator
@@ -383,10 +402,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             # Re-resolve the runtime now that we have the loaded settings: the
             # original __init__ kwarg may have been False, but a saved engine
             # can still pin use_python_runtime=True via the settings blob.
-            self._use_python_runtime = (
-                getattr(self.settings, "use_python_runtime", False)
-                or not ENABLED_FEATURES.torch_tensorrt_runtime
-            )
+            self._use_python_runtime = _should_use_python_runtime(self.settings)
             if self._use_python_runtime:
                 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
