@@ -71,7 +71,6 @@ DECOMPOSE_ATTENTION = False
 ATTN_BIAS_IS_CAUSAL = True
 DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY = "lazy"
 CUDA_GRAPH_STRATEGY = "disabled"
-USE_PYTHON_RUNTIME = False
 
 if platform.system() == "Linux":
     import pwd
