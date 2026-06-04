@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
@@ -26,8 +27,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-
-from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -2764,45 +2763,28 @@ def aten_ops_le(
 def convolution_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Reject unsupported convolution variants on TensorRT-RTX.
-
-    Falls back to PyTorch for:
-    1. Depthwise convolutions in BF16 (no kernel support on TRT-RTX).
-    2. Grouped 3D deconvolutions (crash on TRT-RTX).
+    """Reject transposed convolutions (deconvolutions) that combine
+    stride > 1 with dilation > 1 on TensorRT-RTX — there is no kernel
+    for this case and the build fails with "Strided & Dilated Deconv
+    are currently not supported". Applies to 1D / 2D / 3D ConvTranspose;
+    regular convolutions are unaffected.
     """
     if not ENABLED_FEATURES.tensorrt_rtx:
         return True
 
-    if (input_meta := getattr(node.args[0], "meta", {}).get("tensor_meta")) is None:
-        return True
-
-    groups = args_bounds_check(node.args, 8)
-    is_grouped = groups is not None and groups > 1
-    is_transposed = bool(args_bounds_check(node.args, 6))
-    is_3d = input_meta.shape is not None and len(input_meta.shape) == 5
-    is_bf16 = input_meta.dtype == torch.bfloat16
-
-    # WAR: Grouped 3D deconvolutions crash on TRT-RTX (any dtype).
-    if is_transposed and is_grouped and is_3d:
+    if (
+        args_bounds_check(node.args, 6)  # transposed?
+        and (stride := args_bounds_check(node.args, 3))
+        and (dilation := args_bounds_check(node.args, 5))
+        and any(s > 1 for s in stride)
+        and any(d > 1 for d in dilation)
+    ):
         _LOGGER.debug(
-            "Grouped 3D deconvolution '%s' (groups=%d) is not supported on "
-            "TensorRT-RTX. Falling back to PyTorch for this layer.",
+            "Strided + dilated deconvolution '%s' is not supported on "
+            "TensorRT-RTX. Falling back to PyTorch.",
             node.name,
-            groups,
         )
         return False
-
-    # WAR: Depthwise convolutions in BF16 are not supported on TRT-RTX.
-    if is_bf16 and is_grouped:
-        if (
-            weight_meta := getattr(node.args[1], "meta", {}).get("tensor_meta")
-        ) is not None and groups == weight_meta.shape[0]:
-            _LOGGER.debug(
-                "Depthwise convolution '%s' with BF16 is not supported on "
-                "TensorRT-RTX. Falling back to PyTorch for this layer.",
-                node.name,
-            )
-            return False
 
     return True
 

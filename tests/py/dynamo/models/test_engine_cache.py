@@ -640,10 +640,6 @@ class TestEngineCache(TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
-    @unittest.skipIf(
-        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-        "Engine caching compilation time assertion is unreliable with TensorRT-RTX",
-    )
     def test_caching_small_model(self):
         from torch_tensorrt.dynamo._refit import refit_module_weights
 

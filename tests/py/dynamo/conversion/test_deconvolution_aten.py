@@ -9,6 +9,27 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
+def _any_gt_1(v):
+    return any(x > 1 for x in v) if isinstance(v, (tuple, list)) else v > 1
+
+
+def _skip_if_rtx_strided_dilated_deconv(testcase, stride, dilation):
+    """Mirror convolution_capability_validator: skip on TRT-RTX when a
+    deconv combines stride > 1 with dilation > 1.
+
+    The converter test harness drives TRTInterpreter directly and skips
+    the partitioner, so a validator-rejected op raises
+    UnsupportedOperatorException here instead of falling back to PyTorch
+    as it would in torch_tensorrt.compile.
+    """
+    if (
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
+        and _any_gt_1(stride)
+        and _any_gt_1(dilation)
+    ):
+        testcase.skipTest("Strided + dilated deconv falls back to PyTorch on TRT-RTX")
+
+
 class TestDeconvolutionConverter(DispatchTestCase):
     @parameterized.expand(
         [
@@ -34,6 +55,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
                 groups=3,
                 output_padding=1,
             ),
+            param("strided_dilated", 3, stride=2, padding=2, dilation=2),
         ]
     )
     def test_deconv1d(
@@ -47,6 +69,8 @@ class TestDeconvolutionConverter(DispatchTestCase):
         bias=True,
         output_padding=0,
     ):
+        _skip_if_rtx_strided_dilated_deconv(self, stride, dilation)
+
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -139,6 +163,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
                 groups=3,
                 output_padding=1,
             ),
+            param("strided_dilated", 3, stride=2, padding=2, dilation=2),
         ]
     )
     def test_deconv2d(
@@ -152,6 +177,8 @@ class TestDeconvolutionConverter(DispatchTestCase):
         bias=True,
         output_padding=0,
     ):
+        _skip_if_rtx_strided_dilated_deconv(self, stride, dilation)
+
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -238,8 +265,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
         bias=True,
         output_padding=0,
     ):
-        if groups > 1 and torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
-            self.skipTest("Grouped 3D deconvolutions fall back to PyTorch on TRT-RTX")
+        _skip_if_rtx_strided_dilated_deconv(self, stride, dilation)
 
         class TestModule(torch.nn.Module):
             def __init__(self):

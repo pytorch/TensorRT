@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import copy
 import logging
+import os
 import pickle
 import tempfile
 from contextlib import nullcontext
@@ -44,6 +45,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     deserialize_binding_names,
     parse_device_info,
 )
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
     _is_switch_required,
@@ -55,6 +57,24 @@ from torch_tensorrt.runtime._utils import (
 import tensorrt as trt  # isort: skip
 
 logger = logging.getLogger(__name__)
+
+
+def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
+    """Map strategy string to TRT enum. Only meaningful on TensorRT-RTX builds."""
+    return {
+        "lazy": trt.DynamicShapesKernelSpecializationStrategy.LAZY,
+        "eager": trt.DynamicShapesKernelSpecializationStrategy.EAGER,
+        "none": trt.DynamicShapesKernelSpecializationStrategy.NONE,
+    }.get(strategy_str, trt.DynamicShapesKernelSpecializationStrategy.LAZY)
+
+
+def _get_cuda_graph_strategy(strategy_str: str) -> Any:
+    """Map strategy string to TRT CudaGraphStrategy enum. Only meaningful on RTX."""
+    return {
+        "disabled": trt.CudaGraphStrategy.DISABLED,
+        "whole_graph_capture": trt.CudaGraphStrategy.WHOLE_GRAPH_CAPTURE,
+    }.get(strategy_str, trt.CudaGraphStrategy.DISABLED)
+
 
 # ---------------------------------------------------------------------------
 # TRT I/O helpers
@@ -219,7 +239,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
         self.resource_allocation_strategy = 0
-        self._runtime_config = None
+        # Initialized to ``None`` here so the destructor can safely save the
+        # cache even if ``_setup_engine`` never runs.
+        self.runtime_config: Any = None
+        self.runtime_cache: Any = None
+        # When true, ``_execute_standard`` must skip manual torch.cuda.CUDAGraph
+        # capture because TRT-RTX handles it internally.
+        self._rtx_native_cudagraphs: bool = False
         # NCCL communicator is bound lazily on the first forward pass for
         # engines compiled with native multi-device collective layers.
         self._nccl_comm: Optional[Any] = None
@@ -228,7 +254,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._setup_engine()
 
     def __del__(self) -> None:
-        self.reset_captured_graph()
+        self.close()
 
     def __deepcopy__(self, memo: dict[int, Any]) -> "TRTEngine":
         """Rebuild from serialized layout so ``copy.deepcopy`` skips unpickleable TRT handles."""
@@ -279,7 +305,11 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
         self.resource_allocation_strategy = 0
-        self._runtime_config = None
+        # See ``__init__`` for the rationale: pre-init these so a destructor
+        # firing on a partially-loaded engine never trips an ``AttributeError``.
+        self.runtime_config = None
+        self.runtime_cache = None
+        self._rtx_native_cudagraphs = False
         # NCCL communicators cannot be pickled; rebind lazily on the next
         # forward pass via setup_nccl_comm().
         self._nccl_comm = None
@@ -371,14 +401,21 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self.serialized_metadata
 
     def close(self) -> None:
-        """Release CUDA graph resources (called explicitly or via __del__)."""
+        """Persist the runtime cache and release CUDA graph resources."""
+        self._save_runtime_cache()
         self.reset_captured_graph()
 
     def _create_execution_context(self) -> trt.IExecutionContext:
-        strategy = trt.ExecutionContextAllocationStrategy.STATIC
-        if self.resource_allocation_strategy:
-            strategy = trt.ExecutionContextAllocationStrategy.USER_MANAGED
-        context = self.cuda_engine.create_execution_context(strategy)
+        if ENABLED_FEATURES.tensorrt_rtx:
+            assert self.runtime_config is not None
+            context = self.cuda_engine.create_execution_context(self.runtime_config)
+        else:
+            strategy = (
+                trt.ExecutionContextAllocationStrategy.USER_MANAGED
+                if self.resource_allocation_strategy
+                else trt.ExecutionContextAllocationStrategy.STATIC
+            )
+            context = self.cuda_engine.create_execution_context(strategy)
         assert context is not None, "Failed to create execution context"
         return context
 
@@ -392,6 +429,15 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             budget_bytes = self.cuda_engine.get_weight_streaming_automatic_budget()
             logger.debug(f"Weight streaming budget set to {budget_bytes}B")
             self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
+
+        # On TensorRT-RTX, build the IRuntimeConfig (runtime cache,
+        # dynamic-shape kernel specialization strategy, and CUDA graph
+        # strategy) up front so the one-and-only execution context picks it up.
+        if ENABLED_FEATURES.tensorrt_rtx:
+            self._setup_runtime_config()
+            self._rtx_native_cudagraphs = (
+                self.settings.cuda_graph_strategy != "disabled"
+            )
 
         self.context = self._create_execution_context()
 
@@ -442,6 +488,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             dtype._from(self.cuda_engine.get_tensor_dtype(output_name)).to(torch.dtype)
             for output_name in self.out_binding_names
         ]
+        self.input_shapes = [
+            self.cuda_engine.get_tensor_shape(input_name)
+            for input_name in self.in_binding_names
+        ]
         self.output_shapes = [
             self.cuda_engine.get_tensor_shape(output_name)
             for output_name in self.out_binding_names
@@ -452,6 +502,118 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         }
         if self.requires_output_allocator:
             self.create_output_allocator()
+
+    # --- TensorRT-RTX ---
+
+    def _setup_runtime_config(self) -> None:
+        """Build an ``IRuntimeConfig`` with runtime cache and dynamic-shape strategy.
+
+        The runtime cache stores JIT compilation results so kernel/graph
+        compilation is not repeated across inference runs. The dynamic-shape
+        kernel specialization strategy controls how the JIT compiles
+        shape-specialized kernels (``lazy``, ``eager``, or ``none``).
+        """
+        self.runtime_config = self.cuda_engine.create_runtime_config()
+        alloc_strategy = (
+            trt.ExecutionContextAllocationStrategy.USER_MANAGED
+            if self.resource_allocation_strategy
+            else trt.ExecutionContextAllocationStrategy.STATIC
+        )
+        self.runtime_config.set_execution_context_allocation_strategy(alloc_strategy)
+        self.runtime_config.dynamic_shapes_kernel_specialization_strategy = (
+            _get_dynamic_shapes_kernel_strategy(
+                self.settings.dynamic_shapes_kernel_specialization_strategy
+            )
+        )
+        logger.info(
+            "Dynamic shapes kernel specialization strategy: "
+            f"{self.settings.dynamic_shapes_kernel_specialization_strategy}"
+        )
+        self.runtime_config.cuda_graph_strategy = _get_cuda_graph_strategy(
+            self.settings.cuda_graph_strategy
+        )
+        logger.info(f"CUDA graph strategy: {self.settings.cuda_graph_strategy}")
+        self.runtime_cache = self.runtime_config.create_runtime_cache()
+        self._load_runtime_cache()
+        self.runtime_config.set_runtime_cache(self.runtime_cache)
+        logger.info("TensorRT-RTX runtime cache configured")
+
+    def _load_runtime_cache(self) -> None:
+        """Load runtime cache from disk if it exists (with a shared file lock)."""
+        if self.runtime_cache is None:
+            return
+        cache_path = self.settings.runtime_cache_path
+        if not os.path.isfile(cache_path):
+            logger.debug(f"No existing runtime cache at {cache_path}")
+            return
+        try:
+            from filelock import FileLock
+
+            lock = FileLock(cache_path + ".lock")
+            with lock.acquire(timeout=10):
+                with open(cache_path, "rb") as f:
+                    data = f.read()
+            if data:
+                self.runtime_cache.deserialize(data)
+                logger.info(f"Loaded runtime cache from {cache_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load runtime cache: {e}")
+
+    def _save_runtime_cache(self) -> None:
+        """Save runtime cache to disk (with an exclusive file lock)."""
+        if self.runtime_cache is None:
+            return
+        try:
+            host_mem = self.runtime_cache.serialize()
+            if host_mem is None:
+                return
+            cache_path = self.settings.runtime_cache_path
+            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+
+            from filelock import FileLock
+
+            lock = FileLock(cache_path + ".lock")
+            with lock.acquire(timeout=10):
+                with open(cache_path, "wb") as f:
+                    f.write(memoryview(host_mem))
+            logger.info(f"Saved runtime cache to {cache_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save runtime cache: {e}")
+
+    def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
+        """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe.
+
+        On RTX, unsafe when the TRT-RTX context is not stream-capturable, or
+        when ``"lazy"`` kernel specialization can still fire (dynamic inputs).
+        """
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            return True
+        has_dynamic_input = any(DYNAMIC_DIM in shape for shape in self.input_shapes)
+        not_capturable = (
+            not self.context.is_stream_capturable(stream.cuda_stream),
+            (
+                self.settings.dynamic_shapes_kernel_specialization_strategy == "lazy"
+                and has_dynamic_input
+            ),
+        )
+        return not any(not_capturable)
+
+    def _enable_rtx_native_cudagraphs(self) -> None:
+        """Switch this engine to TRT-RTX native CUDA graphs.
+
+        Sets the runtime config's ``cuda_graph_strategy`` to
+        ``WHOLE_GRAPH_CAPTURE`` and rebuilds the execution context so it
+        picks up the new strategy. No-op on non-RTX or when the runtime
+        config is not present.
+        """
+        if self.runtime_config is None:
+            return
+        self.runtime_config.cuda_graph_strategy = _get_cuda_graph_strategy(
+            "whole_graph_capture"
+        )
+        self.context = self._create_execution_context()
+        self._rtx_native_cudagraphs = True
+        logger.info("Switched to TRT-RTX native CUDA graphs")
 
     # --- distributed / NCCL ---
 
@@ -726,6 +888,26 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def _execute_standard(
         self, contiguous_inputs: List[torch.Tensor]
     ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+        cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+        if (
+            ENABLED_FEATURES.tensorrt_rtx
+            and cudagraphs_enabled
+            and not self._rtx_native_cudagraphs
+        ):
+            logger.warning(
+                "Manual CUDA graph capture is not guaranteed to work on "
+                "TRT-RTX (lazy kernel specialization or non-capturable "
+                "stream). Switching to TRT-RTX native CUDA graphs. Set "
+                'cuda_graph_strategy="whole_graph_capture" at compile '
+                "time to avoid this warning."
+            )
+            self._enable_rtx_native_cudagraphs()
+
+        # When RTX native is active, TRT-RTX handles capture/replay
+        # internally so the manual ``torch.cuda.CUDAGraph`` machinery is
+        # skipped.
+        effective_cudagraphs = cudagraphs_enabled and not self._rtx_native_cudagraphs
+
         # Pick the engine stream BEFORE set_runtime_states so that any
         # stream-identity change observed this call flips
         # runtime_states.context_changed in time to trigger same-call
@@ -738,7 +920,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             can_use_pre_allocated_outputs,
             need_cudagraphs_reset,
         ) = self.runtime_states.set_runtime_states(
-            torch_tensorrt.runtime.get_cudagraphs_mode(),
+            effective_cudagraphs,
             self.use_pre_allocated_outputs,
             shape_changed,
         )
@@ -753,7 +935,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         with self._profile_section("TRTEngine:ProcessInputs"):
             self.setup_input_tensors(
                 contiguous_inputs,
-                torch_tensorrt.runtime.get_cudagraphs_mode(),
+                effective_cudagraphs,
                 need_cudagraphs_record,
             )
             if shape_changed:
@@ -780,7 +962,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             for o, output_name in enumerate(self.out_binding_names):
                 if need_cudagraphs_record:
                     self._output_buffers[o] = outputs[o].clone()
-                if torch_tensorrt.runtime.get_cudagraphs_mode():
+                if effective_cudagraphs:
                     self.context.set_tensor_address(
                         output_name, self._output_buffers[o].data_ptr()
                     )
@@ -799,7 +981,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                     )
                     self.context.set_device_memory(self._dynamic_workspace.data_ptr())
 
-                if torch_tensorrt.runtime.get_cudagraphs_mode():
+                if effective_cudagraphs:
                     if need_cudagraphs_record:
                         self.cudagraph = torch.cuda.CUDAGraph()
                         if self._profile_execution:
@@ -828,7 +1010,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         ):
             self.pre_allocated_outputs = self.create_output_tensors()
 
-        if torch_tensorrt.runtime.get_cudagraphs_mode():
+        if effective_cudagraphs:
             for idx, output in enumerate(outputs):
                 output.copy_(self._output_buffers[idx])
 
@@ -929,8 +1111,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             logger.debug("Using the dynamic allocator runtime mode.")
             return self._execute_output_allocator(contiguous_inputs)
 
+        effective_cudagraphs = (
+            torch_tensorrt.runtime.get_cudagraphs_mode()
+            and not self._rtx_native_cudagraphs
+        )
         logger.debug(
-            f"Using the standard execution runtime mode with cudagraphs={torch_tensorrt.runtime.get_cudagraphs_mode()}."
+            f"Using the standard execution runtime mode with cudagraphs={effective_cudagraphs}"
+            + (" (RTX native)" if self._rtx_native_cudagraphs else "")
         )
         return self._execute_standard(contiguous_inputs)
 
