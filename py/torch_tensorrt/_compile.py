@@ -17,7 +17,6 @@ from typing import (
     Set,
     Tuple,
     Union,
-    cast,
 )
 
 import torch
@@ -63,6 +62,7 @@ if ENABLED_FEATURES.dynamo_frontend:
     )
     from torch_tensorrt.dynamo._defaults import default_device
     from torch_tensorrt.dynamo._tracer import (
+        build_dim_registry,
         get_dynamic_shapes_args,
         get_dynamic_shapes_kwargs,
     )
@@ -202,7 +202,6 @@ def compile(
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[Dict[str, Any]] = None,
     enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
-    dynamic_shapes: Optional[Any] = None,
     **kwargs: Any,
 ) -> (
     torch.nn.Module | torch.jit.ScriptModule | torch.fx.GraphModule | Callable[..., Any]
@@ -238,14 +237,6 @@ def compile(
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
-        dynamic_shapes (Any): Optional ``dynamic_shapes`` dict (or list / nested
-            structure) forwarded to ``torch.export.export``. Supply this to share a
-            ``Dim`` across multiple inputs (e.g. when ``input_ids`` and ``attention_mask``
-            must have the same batch size at runtime). When omitted, dynamic shapes are
-            auto-inferred from per-input ``min_shape``/``max_shape`` and **each input gets
-            its own independent symbol** -- which fails ``torch.export``'s constraint
-            check for models that broadcast across these axes. Only consulted when
-            ``module`` is an ``nn.Module`` (ignored for ``ExportedProgram``).
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
 
     Returns:
@@ -324,7 +315,7 @@ def compile(
                 "'arg_inputs' and 'inputs' should not be used at the same time."
             )
         if inputs is not None:
-            arg_inputs = inputs
+            arg_inputs = inputs  # type: ignore[assignment]
 
         if kwarg_inputs is None:
             kwarg_inputs = {}
@@ -346,7 +337,6 @@ def compile(
                 module,
                 torchtrt_arg_inputs,
                 kwarg_inputs=torchtrt_kwarg_inputs,
-                dynamic_shapes=dynamic_shapes,
                 **kwargs,
             )
         trt_graph_module = dynamo_compile(
@@ -424,7 +414,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs or arg_inputs  # type: ignore[assignment]
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -524,7 +514,7 @@ def convert_method_to_trt_engine(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = arg_inputs or inputs
+    arg_inputs = arg_inputs or inputs  # type: ignore[assignment]
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
@@ -844,8 +834,13 @@ def save(
                     "The explicit dynamic_shapes parameter takes precedence and Input shape specifications will be ignored."
                 )
         else:
-            inferred_dynamic_shapes = get_dynamic_shapes_args(module, arg_inputs)
-            inferred_dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
+            dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
+            inferred_dynamic_shapes = get_dynamic_shapes_args(
+                module, arg_inputs, dim_registry
+            )
+            inferred_dynamic_shapes.update(
+                get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry)
+            )
 
             if inferred_dynamic_shapes is not None:
                 dynamic_shapes = inferred_dynamic_shapes
@@ -853,13 +848,8 @@ def save(
                     f"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: {dynamic_shapes}"
                 )
 
-<<<<<<< HEAD
-        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))  # type: ignore[arg-type]
-        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())  # type: ignore[assignment]
-=======
         arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))
         kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())
->>>>>>> 7fa5d838 (dynamic shape arg)
 
     else:
         # Mixed case: some inputs are Tensors, some are Input objects

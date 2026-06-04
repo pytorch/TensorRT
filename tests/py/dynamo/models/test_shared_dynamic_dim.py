@@ -1,28 +1,27 @@
 # type: ignore
 """
-Tests for the ``dynamic_shapes=`` passthrough kwarg on ``torch_tensorrt.compile``.
+Tests for sharing a dynamic dimension across inputs via ``Input(name_dims=...)``.
 
 Background: when a model takes multiple inputs whose dynamic axes must be
 **equal at runtime** (e.g. HF encoders with ``input_ids`` / ``attention_mask``
-both shaped ``[B, S]``), the legacy auto-inference path in
-``dynamo/_tracer.py`` mints an *independent* ``Dim`` per input. ``torch.export``
-then fails its constraint check for any forward() that broadcasts across those
-axes (here: ``embed(input_ids) * mask.unsqueeze(-1)``), raising
-``ConstraintViolationError``.
+both shaped ``[B, S]``), naming each axis independently makes ``torch.export``
+mint an *independent* ``Dim`` per input. ``torch.export`` then fails its
+constraint check for any forward() that broadcasts across those axes (here:
+``embed(input_ids) * mask.unsqueeze(-1)``), raising ``ConstraintViolationError``.
 
-These tests exercise the new ``dynamic_shapes=`` passthrough that lets the
-caller supply a shared ``Dim`` directly to ``torch_tensorrt.compile`` --
-mirroring the ``torch.export.export(dynamic_shapes=...)`` signature -- so the
-shared-batch case compiles end to end without the caller having to pre-export
-the module themselves.
+``Input(name_dims={axis: name})`` lets the caller tag a dynamic axis with a
+name; the same name across inputs is exported as a single shared ``Dim``. All
+the dynamic-shape intent lives on the ``Input`` objects -- no separate
+``dynamic_shapes`` argument and no ``torch.export`` knowledge required at the
+call site.
 """
+
 import unittest
 
 import pytest
 import torch
 import torch.nn as nn
 import torch_tensorrt as torchtrt
-from torch.export import Dim
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
@@ -32,8 +31,8 @@ class _SharedBatchEncoder(nn.Module):
     """HF-style encoder stand-in: two int64 inputs sharing the batch axis.
 
     The ``embed(input_ids) * mask.unsqueeze(-1)`` broadcast forces
-    ``input_ids.size(0) == attention_mask.size(0)`` -- the relationship the
-    auto-inference path cannot express.
+    ``input_ids.size(0) == attention_mask.size(0)`` -- the relationship a shared
+    named dimension expresses.
     """
 
     def __init__(self, vocab: int = 1024, hidden: int = 32):
@@ -47,43 +46,34 @@ class _SharedBatchEncoder(nn.Module):
         return self.proj(x * mask)
 
 
-def _kwarg_inputs(seq: int = 16, batch_min: int = 1, batch_max: int = 4):
-    return {
-        "input_ids": torchtrt.Input(
-            min_shape=(batch_min, seq),
-            opt_shape=(batch_max, seq),
-            max_shape=(batch_max, seq),
-            dtype=torch.int64,
-            name="input_ids",
-        ),
-        "attention_mask": torchtrt.Input(
-            min_shape=(batch_min, seq),
-            opt_shape=(batch_max, seq),
-            max_shape=(batch_max, seq),
-            dtype=torch.int64,
-            name="attention_mask",
-        ),
-    }
+def _named_input(name: str, seq: int = 16, batch_min: int = 1, batch_max: int = 4):
+    """A dynamic int64 Input whose batch axis (0) is named "B" for sharing."""
+    return torchtrt.Input(
+        min_shape=(batch_min, seq),
+        opt_shape=(batch_max, seq),
+        max_shape=(batch_max, seq),
+        dtype=torch.int64,
+        name=name,
+        name_dims={0: "B"},
+    )
 
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_dynamic_shapes_passthrough_with_shared_batch_dim():
-    """With ``dynamic_shapes={..: {0: batch}, ..: {0: batch}}`` (one shared
-    ``Dim``), compile succeeds and the engine matches the eager model."""
+def test_name_dims_shared_batch_kwarg_inputs():
+    """Shared batch axis declared via ``Input(name_dims={0: "B"})`` on both
+    kwarg inputs -- same name => one exported symbol; engine matches eager."""
     model = _SharedBatchEncoder().eval().cuda()
 
-    batch = Dim("batch", min=1, max=4)
-    dynamic_shapes = {
-        "input_ids": {0: batch},
-        "attention_mask": {0: batch},
+    kwarg_inputs = {
+        "input_ids": _named_input("input_ids"),
+        "attention_mask": _named_input("attention_mask"),
     }
 
     trt_mod = torchtrt.compile(
         model,
         ir="dynamo",
-        kwarg_inputs=_kwarg_inputs(),
-        dynamic_shapes=dynamic_shapes,
+        kwarg_inputs=kwarg_inputs,
         min_block_size=1,
         cache_built_engines=False,
         reuse_cached_engines=False,
@@ -101,50 +91,32 @@ def test_dynamic_shapes_passthrough_with_shared_batch_dim():
         cos_sim = cosine_similarity(ref, out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            f"Shared-batch encoder out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
+            f"name_dims shared batch (kwargs) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
         )
 
 
 @pytest.mark.unit
-def test_dynamic_shapes_passthrough_positional_tuple_form():
-    """``torch.export`` also accepts ``dynamic_shapes`` as a tuple matching the
-    positional-args order. Verify the passthrough handles that form too."""
+def test_name_dims_shared_batch_positional_inputs():
+    """Same feature with positional ``inputs=[...]`` instead of kwargs."""
     model = _SharedBatchEncoder().eval().cuda()
 
-    batch = Dim("batch", min=1, max=4)
-    seq = 16
     positional_inputs = [
-        torchtrt.Input(
-            min_shape=(1, seq),
-            opt_shape=(4, seq),
-            max_shape=(4, seq),
-            dtype=torch.int64,
-            name="input_ids",
-        ),
-        torchtrt.Input(
-            min_shape=(1, seq),
-            opt_shape=(4, seq),
-            max_shape=(4, seq),
-            dtype=torch.int64,
-            name="attention_mask",
-        ),
+        _named_input("input_ids"),
+        _named_input("attention_mask"),
     ]
-    # Tuple form: one entry per positional arg, in declaration order.
-    dynamic_shapes = ({0: batch}, {0: batch})
 
     trt_mod = torchtrt.compile(
         model,
         ir="dynamo",
         inputs=positional_inputs,
-        dynamic_shapes=dynamic_shapes,
         min_block_size=1,
         cache_built_engines=False,
         reuse_cached_engines=False,
     )
 
     for bs in (4, 2):
-        ids = torch.randint(0, 1024, (bs, seq), dtype=torch.int64, device="cuda")
-        mask = torch.ones((bs, seq), dtype=torch.int64, device="cuda")
+        ids = torch.randint(0, 1024, (bs, 16), dtype=torch.int64, device="cuda")
+        mask = torch.ones((bs, 16), dtype=torch.int64, device="cuda")
 
         with torch.no_grad():
             ref = model(ids, mask)
@@ -153,58 +125,28 @@ def test_dynamic_shapes_passthrough_positional_tuple_form():
         cos_sim = cosine_similarity(ref, out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            f"Tuple-form dynamic_shapes out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
+            f"name_dims shared batch (positional) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
         )
 
 
 @pytest.mark.unit
-def test_dynamic_shapes_passthrough_mixed_args_and_kwargs():
-    """One positional input, one kwarg input, sharing a batch ``Dim``. Uses the
-    unified dict-by-parameter-name form, which spans both positional and keyword
-    parameters."""
+def test_name_dims_shared_batch_mixed_args_and_kwargs():
+    """input_ids passed positionally, attention_mask as a kwarg; both share "B"."""
     model = _SharedBatchEncoder().eval().cuda()
-
-    batch = Dim("batch", min=1, max=4)
-    seq = 16
-
-    # input_ids passed positionally, attention_mask as a kwarg.
-    positional_inputs = [
-        torchtrt.Input(
-            min_shape=(1, seq),
-            opt_shape=(4, seq),
-            max_shape=(4, seq),
-            dtype=torch.int64,
-            name="input_ids",
-        ),
-    ]
-    kwarg_inputs = {
-        "attention_mask": torchtrt.Input(
-            min_shape=(1, seq),
-            opt_shape=(4, seq),
-            max_shape=(4, seq),
-            dtype=torch.int64,
-            name="attention_mask",
-        ),
-    }
-    dynamic_shapes = {
-        "input_ids": {0: batch},
-        "attention_mask": {0: batch},
-    }
 
     trt_mod = torchtrt.compile(
         model,
         ir="dynamo",
-        inputs=positional_inputs,
-        kwarg_inputs=kwarg_inputs,
-        dynamic_shapes=dynamic_shapes,
+        inputs=[_named_input("input_ids")],
+        kwarg_inputs={"attention_mask": _named_input("attention_mask")},
         min_block_size=1,
         cache_built_engines=False,
         reuse_cached_engines=False,
     )
 
     for bs in (4, 2):
-        ids = torch.randint(0, 1024, (bs, seq), dtype=torch.int64, device="cuda")
-        mask = torch.ones((bs, seq), dtype=torch.int64, device="cuda")
+        ids = torch.randint(0, 1024, (bs, 16), dtype=torch.int64, device="cuda")
+        mask = torch.ones((bs, 16), dtype=torch.int64, device="cuda")
 
         with torch.no_grad():
             ref = model(ids, attention_mask=mask)
@@ -213,14 +155,55 @@ def test_dynamic_shapes_passthrough_mixed_args_and_kwargs():
         cos_sim = cosine_similarity(ref, out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            f"Mixed args/kwargs out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
+            f"name_dims shared batch (mixed) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
         )
 
 
 @pytest.mark.unit
-def test_dynamic_shapes_default_path_unchanged_for_static_inputs():
-    """Sanity check: when ``dynamic_shapes=None`` and inputs are fully static,
-    behavior is unchanged from the legacy path."""
+def test_name_dims_conflicting_ranges_raises():
+    """Same name with different (min, max) across inputs is a user error."""
+    from torch_tensorrt.dynamo._tracer import build_dim_registry
+
+    seq = 16
+    inputs = {
+        "input_ids": torchtrt.Input(
+            min_shape=(1, seq),
+            opt_shape=(4, seq),
+            max_shape=(4, seq),
+            dtype=torch.int64,
+            name="input_ids",
+            name_dims={0: "B"},
+        ),
+        "attention_mask": torchtrt.Input(
+            min_shape=(1, seq),
+            opt_shape=(8, seq),
+            max_shape=(8, seq),
+            dtype=torch.int64,
+            name="attention_mask",
+            name_dims={0: "B"},
+        ),
+    }
+    with assertions.assertRaises(ValueError):
+        build_dim_registry((), inputs)
+
+
+@pytest.mark.unit
+def test_name_dims_rejected_on_static_axis():
+    """Naming a static axis (min == max) is rejected at Input construction."""
+    with assertions.assertRaises(ValueError):
+        torchtrt.Input(
+            min_shape=(1, 16),
+            opt_shape=(1, 16),
+            max_shape=(1, 16),
+            dtype=torch.int64,
+            name="x",
+            name_dims={0: "B"},
+        )
+
+
+@pytest.mark.unit
+def test_default_path_unchanged_for_static_inputs():
+    """Sanity check: a fully static input with no name_dims is unchanged."""
 
     class StaticModel(nn.Module):
         def __init__(self):
