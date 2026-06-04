@@ -216,6 +216,20 @@ def test_shared_dims_rejected_on_out_of_range_axis():
 
 
 @pytest.mark.unit
+def test_name_dims_rejected_on_out_of_range_axis():
+    """An axis index outside the input's rank is rejected at construction."""
+    with assertions.assertRaises(ValueError):
+        torchtrt.Input(
+            min_shape=(1, 16),
+            opt_shape=(4, 16),
+            max_shape=(4, 16),
+            dtype=torch.int64,
+            name="x",
+            name_dims={5: "B"},  # rank is 2; axis 5 does not exist
+        )
+
+
+@pytest.mark.unit
 def test_default_path_unchanged_for_static_inputs():
     """Sanity check: a fully static input with no shared_dims is unchanged."""
 
