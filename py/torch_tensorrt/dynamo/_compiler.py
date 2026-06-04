@@ -968,10 +968,14 @@ def _build_user_symbol_bounds(
                 user_max,
             )
 
-            # If exporter bounds are finite, ``extract_var_range_info`` keeps
-            # them (override is gated on ``max_val is None``). Catch the
-            # mismatch here so the user doesn't hit a runtime "shape outside
-            # profile" error on shapes they explicitly declared.
+            # The exported program may already bound this symbol to a finite
+            # range (e.g. Dim("batch", min=10, max=20)). The compiled TRT
+            # engine's optimization profile follows that range; any shape
+            # outside it is rejected by TensorRT at runtime
+            # (IExecutionContext::setInputShape "satisfyProfile" check).
+            # Validate the user's Input range against it here -- at compile
+            # time -- before they hit that opaque runtime error on a shape
+            # they explicitly declared in Input.min_shape / Input.max_shape.
             shape_env = getattr(dim.node, "shape_env", None)
             if shape_env is None:
                 continue
@@ -993,35 +997,41 @@ def _build_user_symbol_bounds(
                 continue
 
             mismatch = (
-                f"symbol {expr}: Input({user_min}, {user_max}) vs "
-                f"exporter({exp_min}, {exp_max})."
-            )
-            hint = (
-                f" Re-export with Dim('{expr}', min={user_min}, "
-                f"max={user_max}) or adjust Input to match."
+                f"Dynamic dimension '{expr}': "
+                f"Input range [{user_min}, {user_max}] vs "
+                f"exported program range [{exp_min}, {exp_max}]."
             )
 
             if user_max > exp_max:
                 raise ValueError(
-                    f"{mismatch} Input.max_shape exceeds the exporter's max "
-                    f"({user_max} > {exp_max}); TRT will reject shapes above "
-                    f"{exp_max} at runtime.{hint}"
+                    f"{mismatch} Input.max_shape ({user_max}) exceeds the "
+                    f"exported program's max ({exp_max}). The program was "
+                    f"exported with this dimension bounded to "
+                    f"[{exp_min}, {exp_max}], so the compiled TensorRT engine "
+                    f"cannot accept shapes above {exp_max}. Either re-export "
+                    f"with Dim('{expr}', max={user_max}) or set "
+                    f"Input.max_shape <= {exp_max}."
                 )
 
             if user_min < exp_min:
                 # 1->2 is the 0/1 specialization artifact, not a user error.
                 if user_min == 1 and exp_min == 2:
                     logger.warning(
-                        "%s Input.min_shape=1 vs exporter min=2 is the "
-                        "PyTorch 0/1 specialization artifact; TRT engine "
-                        "min will be 2.",
+                        "%s Input.min_shape=1 but the exported program's min "
+                        "is 2 (PyTorch 0/1 specialization -- Dim(min=1) is "
+                        "recorded as min=2). The compiled engine's min will "
+                        "be 2.",
                         mismatch,
                     )
                     continue
                 raise ValueError(
-                    f"{mismatch} Input.min_shape is below the exporter's min "
-                    f"({user_min} < {exp_min}); TRT will reject shapes "
-                    f"below {exp_min} at runtime.{hint}"
+                    f"{mismatch} Input.min_shape ({user_min}) is below the "
+                    f"exported program's min ({exp_min}). The program was "
+                    f"exported with this dimension bounded to "
+                    f"[{exp_min}, {exp_max}], so the compiled TensorRT engine "
+                    f"cannot accept shapes below {exp_min}. Either re-export "
+                    f"with Dim('{expr}', min={user_min}) or set "
+                    f"Input.min_shape >= {exp_min}."
                 )
 
             # Strict subset: engine profile narrows to the user's bounds
@@ -1029,7 +1039,7 @@ def _build_user_symbol_bounds(
             # user got exactly what they asked for.
             logger.info(
                 "%s Narrowing engine profile to user bounds [%d, %d] "
-                "(exporter range was [%d, %d]).",
+                "(exported program range was [%d, %d]).",
                 mismatch,
                 user_min,
                 user_max,

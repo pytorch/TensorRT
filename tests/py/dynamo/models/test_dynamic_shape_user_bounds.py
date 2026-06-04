@@ -242,8 +242,8 @@ def test_build_user_symbol_bounds_raises_when_input_min_genuinely_below_export()
     with pytest.raises(ValueError) as exc_info:
         _build_user_symbol_bounds(ep.module(), [input_too_low], {})
     msg = str(exc_info.value)
-    assert "min_shape is below" in msg or "TRT will reject" in msg
-    assert "Re-export" in msg or "adjust Input" in msg
+    assert "Input.min_shape" in msg and "exported program" in msg
+    assert "re-export" in msg.lower() or "Input.min_shape >=" in msg
 
 
 @pytest.mark.unit
@@ -267,7 +267,8 @@ def test_build_user_symbol_bounds_raises_when_input_max_above_export():
     with pytest.raises(ValueError) as exc_info:
         _build_user_symbol_bounds(ep.module(), [too_wide_input], {})
     msg = str(exc_info.value)
-    assert "max_shape exceeds" in msg or "TRT will reject" in msg
+    assert "Input.max_shape" in msg and "exported program" in msg
+    assert "re-export" in msg.lower() or "Input.max_shape <=" in msg
 
 
 @pytest.mark.unit
