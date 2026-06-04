@@ -111,3 +111,7 @@ jobs:
                 cd tests/py/dynamo/runtime
                 python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/python_only_dynamo_runtime_tests_results.xml .
                 popd
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-python-only-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+    cancel-in-progress: true
