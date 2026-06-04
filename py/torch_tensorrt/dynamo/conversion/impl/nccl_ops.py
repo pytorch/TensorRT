@@ -681,12 +681,12 @@ def nccl_gather_native(
     """
     rank, world_size = _get_distributed_rank_and_world_size()
 
-    # TRT add_dist_collective crashes with world_size=1; scatter of a single rank
+    # TRT add_dist_collective crashes with world_size=1; gather of a single rank
     # is an identity op.
     if world_size == 1:
         return plug_inputs[0]
     logger.debug(
-        f"Adding native scatter: name={name}, rank={rank}, world_size={world_size}"
+        f"Adding native gather: name={name}, rank={rank}, world_size={world_size}"
     )
 
     # Get the input tensor
@@ -702,7 +702,7 @@ def nccl_gather_native(
         groups = np.arange(world_size, dtype=np.int64)
 
         logger.debug(
-            f"Creating scatter layer: groups={groups.tolist()}, groupSize={world_size}"
+            f"Creating gather layer: groups={groups.tolist()}, groupSize={world_size}"
         )
         layer = ctx.net.add_dist_collective(
             input_tensor,
