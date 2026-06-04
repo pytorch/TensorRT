@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=c2e1495e"></script>
+    <script src="../../_static/documentation_options.js?v=e780b89d"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1026,7 +1026,7 @@ document.write(`
             <span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
         <span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">dynamo_convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>  <span class="c1"># type: ignore[no-any-return]</span>
+        <span class="k">return</span> <span class="n">dynamo_convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
             <span class="n">exp_program</span><span class="p">,</span>
             <span class="n">arg_inputs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">normalized_arg_inputs</span><span class="p">),</span>
             <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span>
@@ -1858,41 +1858,36 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_engine_constants_to_python</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="s2">&quot;ExportedProgram&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="k">pass</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert C++ ``torch.classes.tensorrt.Engine`` constants to Python ``TRTEngine``.</span>
+
+<span class="sd">    The C++ runtime stores engine constants as ``torch._C.ScriptObject``</span>
+<span class="sd">    (``torch.classes.tensorrt.Engine``).  Python ``TRTEngine`` is registered as</span>
+<span class="sd">    an opaque type so ``torch.export`` can serialise it with ``pickle``.  By</span>
+<span class="sd">    converting before save the artifact is portable across both runtimes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._serialized_engine_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENGINE_IDX</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">EngineSerializer</span><span class="p">,</span>
+        <span class="n">TRTEngine</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">fqn</span><span class="p">,</span> <span class="n">constant</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">exp_program</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">constant</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">ScriptObject</span><span class="p">,</span> <span class="n">TRTEngine</span><span class="p">)):</span>
+
+            <span class="n">state</span> <span class="o">=</span> <span class="n">constant</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">state</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;TRTEngine&quot;</span>
+                <span class="ow">or</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;__torch__.torch.classes.tensorrt.Engine&quot;</span>
+            <span class="p">):</span>
+                <span class="n">serialized_info</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="n">serialized_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span>
+                    <span class="n">serialized_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">exp_program</span><span class="o">.</span><span class="n">constants</span><span class="p">[</span><span class="n">fqn</span><span class="p">]</span> <span class="o">=</span> <span class="n">EngineSerializer</span><span class="p">(</span><span class="n">serialized_info</span><span class="p">)</span>
 
 
-<span class="c1"># TODO: Uncomment this when cross serialization is enabled</span>
-<span class="c1">#     &quot;&quot;&quot;Convert C++ ``torch.classes.tensorrt.Engine`` constants to Python ``TRTEngine``.</span>
-
-<span class="c1">#     The C++ runtime stores engine constants as ``torch._C.ScriptObject``</span>
-<span class="c1">#     (``torch.classes.tensorrt.Engine``).  Python ``TRTEngine`` is registered as</span>
-<span class="c1">#     an opaque type so ``torch.export`` can serialise it with ``pickle``.  By</span>
-<span class="c1">#     converting before save the artifact is portable across both runtimes.</span>
-<span class="c1">#     &quot;&quot;&quot;</span>
-<span class="c1">#     import base64</span>
-
-<span class="c1">#     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX</span>
-<span class="c1">#     from torch_tensorrt.dynamo.runtime._TRTEngine import (</span>
-<span class="c1">#         EngineSerializer,</span>
-<span class="c1">#         TRTEngine,</span>
-<span class="c1">#     )</span>
-
-<span class="c1">#     for fqn, constant in list(exp_program.constants.items()):</span>
-<span class="c1">#         if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):</span>
-
-<span class="c1">#             state = constant.__getstate__()</span>
-<span class="c1">#             if len(state) == 2 and (</span>
-<span class="c1">#                 state[1] == &quot;TRTEngine&quot;</span>
-<span class="c1">#                 or state[1] == &quot;__torch__.torch.classes.tensorrt.Engine&quot;</span>
-<span class="c1">#             ):</span>
-<span class="c1">#                 serialized_info = list(state[0])</span>
-<span class="c1">#                 serialized_info[ENGINE_IDX] = base64.b64decode(</span>
-<span class="c1">#                     serialized_info[ENGINE_IDX]</span>
-<span class="c1">#                 )</span>
-<span class="c1">#                 exp_program.constants[fqn] = EngineSerializer(serialized_info)</span>
-
-
-<span class="c1">#</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">function_overload_with_kwargs</span><span class="p">(</span>
     <span class="n">fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
