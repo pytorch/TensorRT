@@ -100,6 +100,10 @@ CI_BUILD = False
 USE_TRT_RTX = False
 
 EXECUTORCH_REQUIREMENT = "executorch>=1.2.0"
+EXTRAS_REQUIRE = {
+    "executorch": [EXECUTORCH_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT],
+}
 
 
 if "--use-rtx" in sys.argv:
@@ -608,9 +612,7 @@ if _FX_FE_AVAIL:
     )
 
 package_data = {}
-executorch_header_package_data = (
-    [] if IS_DLFW_CI else ["include/torch_tensorrt/executorch/*.h"]
-)
+executorch_header_package_data = ["include/torch_tensorrt/executorch/*.h"]
 
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (
@@ -855,7 +857,6 @@ def get_x86_64_requirements(base_requirements):
             ]
         else:
             requirements = requirements + [
-                EXECUTORCH_REQUIREMENT,
                 "tensorrt>=11.0.0,<11.1.0",
             ]
             cuda_version = torch.version.cuda
@@ -914,6 +915,7 @@ setup(
     },
     zip_safe=False,
     install_requires=get_requirements(),
+    extras_require=EXTRAS_REQUIRE,
     packages=packages,
     package_dir=package_dir,
     include_package_data=False,
