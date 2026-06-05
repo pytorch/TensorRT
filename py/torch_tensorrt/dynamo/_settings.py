@@ -54,7 +54,6 @@ from torch_tensorrt.dynamo._defaults import (
     USE_DISTRIBUTED_MODE_TRACE,
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
-    USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
     default_device,
@@ -120,7 +119,6 @@ class CompilationSettings:
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
-        use_python_runtime (bool): Force the pure-Python TensorRT runtime (``TRTEngine`` + ``tensorrt::execute_engine_python``). When ``False`` (default) the C++ runtime is used if available and the Python runtime is used as a fallback otherwise.
     """
 
     workspace_size: int = WORKSPACE_SIZE
@@ -184,7 +182,6 @@ class CompilationSettings:
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
     decompose_attention: bool = DECOMPOSE_ATTENTION
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
-    use_python_runtime: bool = USE_PYTHON_RUNTIME
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -199,6 +196,7 @@ class CompilationSettings:
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
+        state.pop("use_python_runtime", None)
         self.__dict__.update(state)
 
 
