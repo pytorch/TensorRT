@@ -1,6 +1,6 @@
 # type: ignore
 """
-Tests for sharing a dynamic dimension across inputs via ``Input(name_dims=...)``.
+Tests for sharing a dynamic dimension across inputs via ``Input(shared_dims=...)``.
 
 Background: when a model takes multiple inputs whose dynamic axes must be
 **equal at runtime** (e.g. HF encoders with ``input_ids`` / ``attention_mask``
@@ -9,7 +9,7 @@ mint an *independent* ``Dim`` per input. ``torch.export`` then fails its
 constraint check for any forward() that broadcasts across those axes (here:
 ``embed(input_ids) * mask.unsqueeze(-1)``), raising ``ConstraintViolationError``.
 
-``Input(name_dims={axis: name})`` lets the caller tag a dynamic axis with a
+``Input(shared_dims={axis: name})`` lets the caller tag a dynamic axis with a
 name; the same name across inputs is exported as a single shared ``Dim``. All
 the dynamic-shape intent lives on the ``Input`` objects -- no separate
 ``dynamic_shapes`` argument and no ``torch.export`` knowledge required at the
@@ -54,14 +54,14 @@ def _named_input(name: str, seq: int = 16, batch_min: int = 1, batch_max: int = 
         max_shape=(batch_max, seq),
         dtype=torch.int64,
         name=name,
-        name_dims={0: "B"},
+        shared_dims={0: "B"},
     )
 
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_name_dims_shared_batch_kwarg_inputs():
-    """Shared batch axis declared via ``Input(name_dims={0: "B"})`` on both
+def test_shared_dims_shared_batch_kwarg_inputs():
+    """Shared batch axis declared via ``Input(shared_dims={0: "B"})`` on both
     kwarg inputs -- same name => one exported symbol; engine matches eager."""
     model = _SharedBatchEncoder().eval().cuda()
 
@@ -91,12 +91,12 @@ def test_name_dims_shared_batch_kwarg_inputs():
         cos_sim = cosine_similarity(ref, out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            f"name_dims shared batch (kwargs) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
+            f"shared_dims shared batch (kwargs) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
         )
 
 
 @pytest.mark.unit
-def test_name_dims_shared_batch_positional_inputs():
+def test_shared_dims_shared_batch_positional_inputs():
     """Same feature with positional ``inputs=[...]`` instead of kwargs."""
     model = _SharedBatchEncoder().eval().cuda()
 
@@ -125,12 +125,12 @@ def test_name_dims_shared_batch_positional_inputs():
         cos_sim = cosine_similarity(ref, out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            f"name_dims shared batch (positional) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
+            f"shared_dims shared batch (positional) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
         )
 
 
 @pytest.mark.unit
-def test_name_dims_shared_batch_mixed_args_and_kwargs():
+def test_shared_dims_shared_batch_mixed_args_and_kwargs():
     """input_ids passed positionally, attention_mask as a kwarg; both share "B"."""
     model = _SharedBatchEncoder().eval().cuda()
 
@@ -155,12 +155,12 @@ def test_name_dims_shared_batch_mixed_args_and_kwargs():
         cos_sim = cosine_similarity(ref, out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            f"name_dims shared batch (mixed) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
+            f"shared_dims shared batch (mixed) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
         )
 
 
 @pytest.mark.unit
-def test_name_dims_conflicting_ranges_raises():
+def test_shared_dims_conflicting_ranges_raises():
     """Same name with different (min, max) across inputs is a user error."""
     from torch_tensorrt.dynamo._tracer import build_dim_registry
 
@@ -172,7 +172,7 @@ def test_name_dims_conflicting_ranges_raises():
             max_shape=(4, seq),
             dtype=torch.int64,
             name="input_ids",
-            name_dims={0: "B"},
+            shared_dims={0: "B"},
         ),
         "attention_mask": torchtrt.Input(
             min_shape=(1, seq),
@@ -180,7 +180,7 @@ def test_name_dims_conflicting_ranges_raises():
             max_shape=(8, seq),
             dtype=torch.int64,
             name="attention_mask",
-            name_dims={0: "B"},
+            shared_dims={0: "B"},
         ),
     }
     with assertions.assertRaises(ValueError):
@@ -188,7 +188,7 @@ def test_name_dims_conflicting_ranges_raises():
 
 
 @pytest.mark.unit
-def test_name_dims_rejected_on_static_axis():
+def test_shared_dims_rejected_on_static_axis():
     """Naming a static axis (min == max) is rejected at Input construction."""
     with assertions.assertRaises(ValueError):
         torchtrt.Input(
@@ -197,12 +197,12 @@ def test_name_dims_rejected_on_static_axis():
             max_shape=(1, 16),
             dtype=torch.int64,
             name="x",
-            name_dims={0: "B"},
+            shared_dims={0: "B"},
         )
 
 
 @pytest.mark.unit
-def test_name_dims_rejected_on_out_of_range_axis():
+def test_shared_dims_rejected_on_out_of_range_axis():
     """An axis index outside the input's rank is rejected at construction."""
     with assertions.assertRaises(ValueError):
         torchtrt.Input(
@@ -211,13 +211,13 @@ def test_name_dims_rejected_on_out_of_range_axis():
             max_shape=(4, 16),
             dtype=torch.int64,
             name="x",
-            name_dims={5: "B"},  # rank is 2; axis 5 does not exist
+            shared_dims={5: "B"},  # rank is 2; axis 5 does not exist
         )
 
 
 @pytest.mark.unit
 def test_default_path_unchanged_for_static_inputs():
-    """Sanity check: a fully static input with no name_dims is unchanged."""
+    """Sanity check: a fully static input with no shared_dims is unchanged."""
 
     class StaticModel(nn.Module):
         def __init__(self):
