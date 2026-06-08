@@ -73,7 +73,7 @@ def trace(
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)
     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
-    # Build dynamic shapes from the Input objects. Inputs carrying name_dims
+    # Build dynamic shapes from the Input objects. Inputs carrying shared_dims
     # share a Dim across inputs via the registry; the rest get an independent
     # per-input Dim.
     dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
@@ -108,7 +108,7 @@ def _collect_inputs(obj: Any) -> list[Input]:
 
 
 def build_dim_registry(arg_inputs: Any, kwarg_inputs: Any) -> dict[str, Any]:
-    """Build a ``{name: torch.export.Dim}`` registry from Input.name_dims.
+    """Build a ``{name: torch.export.Dim}`` registry from Input.shared_dims.
 
     The same name appearing on multiple inputs yields a single shared ``Dim``
     instance, so ``torch.export`` treats those axes as one symbol. Conflicting
@@ -117,13 +117,13 @@ def build_dim_registry(arg_inputs: Any, kwarg_inputs: Any) -> dict[str, Any]:
     registry: dict[str, Any] = {}
     bounds: dict[str, tuple[int, int]] = {}
     for inp in _collect_inputs(arg_inputs) + _collect_inputs(kwarg_inputs):
-        name_dims = getattr(inp, "name_dims", None)
-        if not name_dims or inp.shape_mode != Input._ShapeMode.DYNAMIC:
+        shared_dims = getattr(inp, "shared_dims", None)
+        if not shared_dims or inp.shape_mode != Input._ShapeMode.DYNAMIC:
             continue
         assert isinstance(inp.shape, dict)
         min_shape = inp.shape["min_shape"]
         max_shape = inp.shape["max_shape"]
-        for axis, dim_name in name_dims.items():
+        for axis, dim_name in shared_dims.items():
             lo, hi = int(min_shape[axis]), int(max_shape[axis])
             if dim_name in bounds:
                 if bounds[dim_name] != (lo, hi):
@@ -184,15 +184,15 @@ def get_dynamic_shapes(
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
             max_shape = input.shape["max_shape"]
-            name_dims = getattr(input, "name_dims", None) or {}
+            shared_dims = getattr(input, "shared_dims", None) or {}
             assert len(min_shape) == len(opt_shape) == len(max_shape)
             for dim in range(len(min_shape)):
                 if min_shape[dim] == opt_shape[dim] == max_shape[dim]:
                     continue
-                elif dim_registry is not None and dim in name_dims:
+                elif dim_registry is not None and dim in shared_dims:
                     # Named axis: reuse the shared Dim so axes with the same
                     # name across inputs become a single exported symbol.
-                    dynamic_dims[dim] = dim_registry[name_dims[dim]]
+                    dynamic_dims[dim] = dim_registry[shared_dims[dim]]
                 else:
                     dynamic_dims[dim] = Dim(
                         input.name + "_" + str(dim),

@@ -51,7 +51,7 @@ class Input(object):
     torch_tensor: torch.Tensor = None
     name: str = ""
     is_shape_tensor: bool = False
-    name_dims: Dict[int, str] = (
+    shared_dims: Dict[int, str] = (
         {}
     )  #: Optional {axis_index: name} for dynamic axes. The same name across inputs is exported as one shared ``torch.export.Dim`` (e.g. a batch axis shared by ``input_ids`` and ``attention_mask``).
 
@@ -165,9 +165,9 @@ class Input(object):
                         "if you try to run inference with empty tensor inputs."
                     )
 
-                if "name_dims" in kwargs and kwargs["name_dims"]:
-                    self.name_dims = Input._parse_name_dims(
-                        kwargs["name_dims"], self.shape
+                if "shared_dims" in kwargs and kwargs["shared_dims"]:
+                    self.shared_dims = Input._parse_shared_dims(
+                        kwargs["shared_dims"], self.shape
                     )
 
         else:
@@ -175,9 +175,9 @@ class Input(object):
                 f"Unexpected number of positional arguments for class Input \n    Found {len(args)} arguments, expected either zero or a single positional arguments"
             )
 
-        if kwargs.get("name_dims") and self.shape_mode != Input._ShapeMode.DYNAMIC:
+        if kwargs.get("shared_dims") and self.shape_mode != Input._ShapeMode.DYNAMIC:
             raise ValueError(
-                "name_dims is only valid for dynamic inputs (min_shape/opt_shape/max_shape); "
+                "shared_dims is only valid for dynamic inputs (min_shape/opt_shape/max_shape); "
                 "it has no meaning for a statically shaped Input."
             )
 
@@ -276,29 +276,29 @@ class Input(object):
             return all(checks)
 
     @staticmethod
-    def _parse_name_dims(
-        name_dims: Any, shape: Dict[str, Tuple[int, ...]]
+    def _parse_shared_dims(
+        shared_dims: Any, shape: Dict[str, Tuple[int, ...]]
     ) -> Dict[int, str]:
-        """Validate and normalize the ``name_dims`` mapping ({axis: name}).
+        """Validate and normalize the ``shared_dims`` mapping ({axis: name}).
 
         Each named axis must be a valid index into the shape and must be
         genuinely dynamic (``min != max``); a static axis cannot vary, so naming
         it for cross-input sharing is a user error.
         """
-        if not isinstance(name_dims, dict):
+        if not isinstance(shared_dims, dict):
             raise TypeError(
-                f"name_dims must be a dict of {{axis_index: name}}, got {type(name_dims)}"
+                f"shared_dims must be a dict of {{axis_index: name}}, got {type(shared_dims)}"
             )
         rank = len(shape["min_shape"])
         parsed: Dict[int, str] = {}
-        for axis, dim_name in name_dims.items():
+        for axis, dim_name in shared_dims.items():
             if not isinstance(axis, int) or not (0 <= axis < rank):
                 raise ValueError(
-                    f"name_dims key {axis!r} is not a valid axis index for an input of rank {rank}"
+                    f"shared_dims key {axis!r} is not a valid axis index for an input of rank {rank}"
                 )
             if not isinstance(dim_name, str) or not dim_name:
                 raise ValueError(
-                    f"name_dims value for axis {axis} must be a non-empty string, got {dim_name!r}"
+                    f"shared_dims value for axis {axis} must be a non-empty string, got {dim_name!r}"
                 )
             if shape["min_shape"][axis] == shape["max_shape"][axis]:
                 raise ValueError(
