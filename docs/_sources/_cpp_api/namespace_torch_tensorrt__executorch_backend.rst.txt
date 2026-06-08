@@ -32,6 +32,8 @@ Classes
 
 - :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter`
 
+- :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard`
+
 - :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend`
 
 - :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger`

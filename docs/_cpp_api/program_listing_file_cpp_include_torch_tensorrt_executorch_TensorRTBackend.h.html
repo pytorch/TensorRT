@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=5534de61"></script>
+    <script src="../_static/documentation_options.js?v=e18999b2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -540,7 +540,6 @@ document.write(`
 <span class="w">  </span><span class="n">TRTUniquePtr</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IRuntime</span><span class="o">&gt;</span><span class="w"> </span><span class="n">runtime</span><span class="p">;</span>
 <span class="w">  </span><span class="n">TRTUniquePtr</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">ICudaEngine</span><span class="o">&gt;</span><span class="w"> </span><span class="n">engine</span><span class="p">;</span>
 <span class="w">  </span><span class="n">TRTUniquePtr</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IExecutionContext</span><span class="o">&gt;</span><span class="w"> </span><span class="n">exec_ctx</span><span class="p">;</span>
-<span class="w">  </span><span class="n">cudaStream_t</span><span class="w"> </span><span class="n">stream</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">;</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">input_binding_names</span><span class="p">;</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">output_binding_names</span><span class="p">;</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputProfileBounds</span><span class="o">&gt;</span><span class="w"> </span><span class="n">input_profile_bounds</span><span class="p">;</span>
@@ -553,6 +552,13 @@ document.write(`
 <span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">device_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 <span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">unified_memory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">mutex</span><span class="w"> </span><span class="n">mu</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or</span>
+<span class="w">  </span><span class="c1">// destroying an execution context while one of its enqueues is in flight, so when</span>
+<span class="w">  </span><span class="c1">// execute() returns without an end sync it records this event; the next execute()</span>
+<span class="w">  </span><span class="c1">// and the destructor wait on it before touching exec_ctx. One event/flag pair</span>
+<span class="w">  </span><span class="c1">// suffices because a handle runs on a single thread at a time.</span>
+<span class="w">  </span><span class="n">cudaEvent_t</span><span class="w"> </span><span class="n">inflight_event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">inflight_pending</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
 
 <span class="w">  </span><span class="o">~</span><span class="n">EngineHandle</span><span class="p">();</span>
 <span class="p">};</span>
@@ -572,6 +578,35 @@ document.write(`
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Span</span><span class="o">&lt;::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">EValue</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
 
 <span class="w">  </span><span class="kt">void</span><span class="w"> </span><span class="nf">destroy</span><span class="p">(</span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">DelegateHandle</span><span class="o">*</span><span class="w"> </span><span class="n">handle</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="c1">// Selects, for the calling thread, the CUDA stream the delegate runs TensorRT on;</span>
+<span class="c1">// scope it around execution.</span>
+<span class="c1">//</span>
+<span class="c1">// Confines inference to a CUDA green context&#39;s SM partition when the caller</span>
+<span class="c1">// passes a cuGreenCtxStreamCreate stream: confinement rides the stream (the green</span>
+<span class="c1">// context need not be current), and cudaStreamPerThread — the no-guard default —</span>
+<span class="c1">// is rejected while a green context is current. While active, device-resident</span>
+<span class="c1">// outputs are left enqueued on the stream (no end sync) to compose with later GPU</span>
+<span class="c1">// work.</span>
+<span class="c1">//</span>
+<span class="c1">// Contract: the stream is on the engine&#39;s device and outlives the guard; a handle</span>
+<span class="c1">// is executed by one thread at a time. On the no-end-sync path (guard active, all</span>
+<span class="c1">// I/O device-resident) execute() returns with the TensorRT enqueue still in flight</span>
+<span class="c1">// on the stream; the delegate itself orders the next execute() on, and the</span>
+<span class="c1">// destruction of, that handle after the work completes (via an internal completion</span>
+<span class="c1">// event), so the caller need only synchronize the stream before reading</span>
+<span class="c1">// device-resident outputs.</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CudaStreamGuard</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="k">public</span><span class="o">:</span>
+<span class="w">  </span><span class="k">explicit</span><span class="w"> </span><span class="n">CudaStreamGuard</span><span class="p">(</span><span class="n">cudaStream_t</span><span class="w"> </span><span class="n">stream</span><span class="p">);</span>
+<span class="w">  </span><span class="o">~</span><span class="n">CudaStreamGuard</span><span class="p">();</span>
+<span class="w">  </span><span class="n">CudaStreamGuard</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">CudaStreamGuard</span><span class="o">&amp;</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+<span class="w">  </span><span class="n">CudaStreamGuard</span><span class="o">&amp;</span><span class="w"> </span><span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">CudaStreamGuard</span><span class="o">&amp;</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+
+<span class="w"> </span><span class="k">private</span><span class="o">:</span>
+<span class="w">  </span><span class="n">cudaStream_t</span><span class="w"> </span><span class="n">prev_stream_</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">prev_set_</span><span class="p">;</span>
 <span class="p">};</span>
 
 <span class="p">}</span><span class="w"> </span><span class="c1">// namespace executorch_backend</span>
