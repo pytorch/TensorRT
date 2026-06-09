@@ -207,11 +207,14 @@ if ! "${python_executable}" - <<'PY'
 import importlib
 import importlib.util
 
-missing = [
-    name
-    for name in ("yaml", "torch", "torch_tensorrt", "executorch.exir")
-    if importlib.util.find_spec(name) is None
-]
+missing = []
+for name in ("yaml", "torch", "torch_tensorrt", "executorch.exir"):
+    try:
+        spec = importlib.util.find_spec(name)
+    except ModuleNotFoundError:
+        spec = None
+    if spec is None:
+        missing.append(name)
 if missing:
     raise SystemExit(
         "Missing Python package(s) required to export the .pte and build the runner: "
