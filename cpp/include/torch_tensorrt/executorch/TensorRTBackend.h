@@ -50,7 +50,6 @@ struct EngineHandle {
   TRTUniquePtr<nvinfer1::IRuntime> runtime;
   TRTUniquePtr<nvinfer1::ICudaEngine> engine;
   TRTUniquePtr<nvinfer1::IExecutionContext> exec_ctx;
-  cudaStream_t stream = nullptr;
   std::vector<std::string> input_binding_names;
   std::vector<std::string> output_binding_names;
   std::vector<InputProfileBounds> input_profile_bounds;
@@ -63,6 +62,13 @@ struct EngineHandle {
   int device_id = 0;
   bool unified_memory = false;
   std::mutex mu;
+  // Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or
+  // destroying an execution context while one of its enqueues is in flight, so when
+  // execute() returns without an end sync it records this event; the next execute()
+  // and the destructor wait on it before touching exec_ctx. One event/flag pair
+  // suffices because a handle runs on a single thread at a time.
+  cudaEvent_t inflight_event = nullptr;
+  bool inflight_pending = false;
 
   ~EngineHandle();
 };
@@ -82,6 +88,35 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
       ::executorch::runtime::Span<::executorch::runtime::EValue*> args) const override;
 
   void destroy(::executorch::runtime::DelegateHandle* handle) const override;
+};
+
+// Selects, for the calling thread, the CUDA stream the delegate runs TensorRT on;
+// scope it around execution.
+//
+// Confines inference to a CUDA green context's SM partition when the caller
+// passes a cuGreenCtxStreamCreate stream: confinement rides the stream (the green
+// context need not be current), and cudaStreamPerThread — the no-guard default —
+// is rejected while a green context is current. While active, device-resident
+// outputs are left enqueued on the stream (no end sync) to compose with later GPU
+// work.
+//
+// Contract: the stream is on the engine's device and outlives the guard; a handle
+// is executed by one thread at a time. On the no-end-sync path (guard active, all
+// I/O device-resident) execute() returns with the TensorRT enqueue still in flight
+// on the stream; the delegate itself orders the next execute() on, and the
+// destruction of, that handle after the work completes (via an internal completion
+// event), so the caller need only synchronize the stream before reading
+// device-resident outputs.
+class CudaStreamGuard {
+ public:
+  explicit CudaStreamGuard(cudaStream_t stream);
+  ~CudaStreamGuard();
+  CudaStreamGuard(const CudaStreamGuard&) = delete;
+  CudaStreamGuard& operator=(const CudaStreamGuard&) = delete;
+
+ private:
+  cudaStream_t prev_stream_;
+  bool prev_set_;
 };
 
 } // namespace executorch_backend

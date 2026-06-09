@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Struct GraphInputs &#8212; Torch-TensorRT</title>
+    <title>Class CudaStreamGuard &#8212; Torch-TensorRT</title>
   
   
   
@@ -49,7 +49,7 @@
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
     <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = '_cpp_api/structtorch__tensorrt_1_1GraphInputs';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
@@ -58,8 +58,8 @@
         </script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Struct Input" href="structtorch__tensorrt_1_1Input.html" />
-    <link rel="prev" title="Struct TRTDeleter" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html" />
+    <link rel="next" title="Class TensorRTBackend" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html" />
+    <link rel="prev" title="Class Device::DeviceType" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -457,12 +457,12 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html">Struct TensorRTBlobHeader</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
-<li class="toctree-l3 current active"><a class="current reference internal" href="#">Struct GraphInputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1GraphInputs.html">Struct GraphInputs</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Input.html">Struct Input</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
-<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.html">Class CudaStreamGuard</a></li>
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">Class CudaStreamGuard</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
@@ -543,7 +543,7 @@ document.write(`
     
     <li class="breadcrumb-item"><a href="torch_tensort_cpp.html" class="nav-link">Torch-TensorRT C++ API</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page">Struct GraphInputs</li>
+    <li class="breadcrumb-item active" aria-current="page">Class...</li>
   </ul>
 </nav>
 </div>
@@ -560,28 +560,36 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="struct-graphinputs">
-<span id="exhale-struct-structtorch-tensorrt-1-1graphinputs"></span><h1>Struct GraphInputs<a class="headerlink" href="#struct-graphinputs" title="Link to this heading">#</a></h1>
+  <section id="class-cudastreamguard">
+<span id="exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1cudastreamguard"></span><h1>Class CudaStreamGuard<a class="headerlink" href="#class-cudastreamguard" title="Link to this heading">#</a></h1>
 <ul class="simple">
-<li><p>Defined in <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h"><span class="std std-ref">File torch_tensorrt.h</span></a></p></li>
+<li><p>Defined in <a class="reference internal" href="file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h.html#file-cpp-include-torch-tensorrt-executorch-tensorrtbackend-h"><span class="std std-ref">File TensorRTBackend.h</span></a></p></li>
 </ul>
-<section id="struct-documentation">
-<h2>Struct Documentation<a class="headerlink" href="#struct-documentation" title="Link to this heading">#</a></h2>
-<dl class="cpp struct">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt11GraphInputsE">
-<span class="target" id="structtorch__tensorrt_1_1GraphInputs"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GraphInputs</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt11GraphInputsE" title="Link to this definition">#</a><br /></dt>
-<dd><p>A struct to hold complex inputs. </p>
-<p>This struct can either hold a complex inputs of shape or a flattened one, </p>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
-<dl class="cpp var">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt11GraphInputs15input_signatureE">
-<span class="target" id="structtorch__tensorrt_1_1GraphInputs_1ad5a2d79fb0ab7afd2a4d0a5f0e200ac7"></span><span class="n"><span class="pre">torch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">jit</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">IValue</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">input_signature</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt11GraphInputs15input_signatureE" title="Link to this definition">#</a><br /></dt>
+<section id="class-documentation">
+<h2>Class Documentation<a class="headerlink" href="#class-documentation" title="Link to this heading">#</a></h2>
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardE">
+<span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CudaStreamGuard</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardE" title="Link to this definition">#</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuard15CudaStreamGuardE12cudaStream_t">
+<span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard_1ae5a1450d69adf2ca52677b6c290031be"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CudaStreamGuard</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuard15CudaStreamGuardE12cudaStream_t" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
-<dl class="cpp var">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt11GraphInputs6inputsE">
-<span class="target" id="structtorch__tensorrt_1_1GraphInputs_1a3d2a9ff85bc319c29793b2177085cb0f"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="structtorch__tensorrt_1_1Input.html#_CPPv4N14torch_tensorrt5InputE" title="torch_tensorrt::Input"><span class="n"><span class="pre">Input</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">inputs</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt11GraphInputs6inputsE" title="Link to this definition">#</a><br /></dt>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardD0Ev">
+<span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard_1a7bcb8b23b32961df665687a83ed450b1"></span><span class="sig-name descname"><span class="n"><span class="pre">~CudaStreamGuard</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardD0Ev" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuard15CudaStreamGuardERK15CudaStreamGuard">
+<span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard_1ab4e4b04cf020e5c3848e91ac9b466533"></span><span class="sig-name descname"><span class="n"><span class="pre">CudaStreamGuard</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuard15CudaStreamGuardERK15CudaStreamGuard" title="torch_tensorrt::executorch_backend::CudaStreamGuard::CudaStreamGuard"><span class="n"><span class="pre">CudaStreamGuard</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuard15CudaStreamGuardERK15CudaStreamGuard" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardaSERK15CudaStreamGuard">
+<span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard_1ad456c83c4c1613088e5341da3f84bda4"></span><a class="reference internal" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardE" title="torch_tensorrt::executorch_backend::CudaStreamGuard"><span class="n"><span class="pre">CudaStreamGuard</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardE" title="torch_tensorrt::executorch_backend::CudaStreamGuard"><span class="n"><span class="pre">CudaStreamGuard</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardaSERK15CudaStreamGuard" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 </div>
@@ -601,20 +609,20 @@ document.write(`
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html"
+       href="classtorch__tensorrt_1_1Device_1_1DeviceType.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Struct TRTDeleter</p>
+        <p class="prev-next-title">Class Device::DeviceType</p>
       </div>
     </a>
     <a class="right-next"
-       href="structtorch__tensorrt_1_1Input.html"
+       href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Struct Input</p>
+        <p class="prev-next-title">Class TensorRTBackend</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -636,10 +644,12 @@ document.write(`
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#struct-documentation">Struct Documentation</a><ul class="visible nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt11GraphInputsE"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt::GraphInputs</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt11GraphInputs15input_signatureE"><code class="docutils literal notranslate"><span class="pre">input_signature</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt11GraphInputs6inputsE"><code class="docutils literal notranslate"><span class="pre">inputs</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#class-documentation">Class Documentation</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardE"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt::executorch_backend::CudaStreamGuard</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuard15CudaStreamGuardE12cudaStream_t"><code class="docutils literal notranslate"><span class="pre">CudaStreamGuard()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardD0Ev"><code class="docutils literal notranslate"><span class="pre">~CudaStreamGuard()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuard15CudaStreamGuardERK15CudaStreamGuard"><code class="docutils literal notranslate"><span class="pre">CudaStreamGuard()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend15CudaStreamGuardaSERK15CudaStreamGuard"><code class="docutils literal notranslate"><span class="pre">operator=()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -649,7 +659,7 @@ document.write(`
 
   
   <div class="tocsection editthispage">
-    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/_cpp_api/structtorch__tensorrt_1_1GraphInputs.rst">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.rst">
       <i class="fa-solid fa-pencil"></i>
       
       
@@ -664,7 +674,7 @@ document.write(`
   <div class="sidebar-secondary-item">
 
   <div class="tocsection sourcelink">
-    <a href="../_sources/_cpp_api/structtorch__tensorrt_1_1GraphInputs.rst.txt">
+    <a href="../_sources/_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.rst.txt">
       <i class="fa-solid fa-file-lines"></i> Show Source
     </a>
   </div>

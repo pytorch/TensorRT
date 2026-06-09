@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=5534de61"></script>
+    <script src="../_static/documentation_options.js?v=e18999b2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -462,6 +462,7 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.html">Class CudaStreamGuard</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
@@ -600,11 +601,6 @@ document.write(`
 <dd></dd></dl>
 
 <dl class="cpp var">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle6streamE">
-<span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle_1a324d04f154eb8375e0b69b7d15f06b21"></span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stream</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">nullptr</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle6streamE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
-
-<dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle19input_binding_namesE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle_1af8ffd8e92d8ef8c58c360ddc1ac9c3c0"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">input_binding_names</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle19input_binding_namesE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
@@ -662,6 +658,16 @@ document.write(`
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle2muE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle_1a1d1a03170288315e3beaee5ea4be52e6"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">mutex</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">mu</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle2muE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle14inflight_eventE">
+<span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle_1a939d319fe56e880fb1eca378101b4ace"></span><span class="n"><span class="pre">cudaEvent_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">inflight_event</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">nullptr</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle14inflight_eventE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle16inflight_pendingE">
+<span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle_1ad0a6a36be679f6304914d1222ee4d773"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">inflight_pending</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle16inflight_pendingE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 </div>
@@ -723,7 +729,6 @@ document.write(`
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle7runtimeE"><code class="docutils literal notranslate"><span class="pre">runtime</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle6engineE"><code class="docutils literal notranslate"><span class="pre">engine</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle8exec_ctxE"><code class="docutils literal notranslate"><span class="pre">exec_ctx</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle6streamE"><code class="docutils literal notranslate"><span class="pre">stream</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle19input_binding_namesE"><code class="docutils literal notranslate"><span class="pre">input_binding_names</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle20output_binding_namesE"><code class="docutils literal notranslate"><span class="pre">output_binding_names</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle20input_profile_boundsE"><code class="docutils literal notranslate"><span class="pre">input_profile_bounds</span></code></a></li>
@@ -736,6 +741,8 @@ document.write(`
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle9device_idE"><code class="docutils literal notranslate"><span class="pre">device_id</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle14unified_memoryE"><code class="docutils literal notranslate"><span class="pre">unified_memory</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle2muE"><code class="docutils literal notranslate"><span class="pre">mu</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle14inflight_eventE"><code class="docutils literal notranslate"><span class="pre">inflight_event</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle16inflight_pendingE"><code class="docutils literal notranslate"><span class="pre">inflight_pending</span></code></a></li>
 </ul>
 </li>
 </ul>
