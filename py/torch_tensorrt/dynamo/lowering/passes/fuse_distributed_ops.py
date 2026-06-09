@@ -75,8 +75,11 @@ def _fused_nccl_all_to_all_impl(
     input_splits: list[int] | None,
     group_name: str,
 ) -> torch.Tensor:
-    out_shape = inp.shape
-    return inp.new_empty(out_shape)
+    return torch.ops._c10d_functional.wait_tensor.default(
+        torch.ops._c10d_functional.all_to_all_single.default(
+            inp, output_splits, input_splits, group_name
+        )
+    )
 
 
 @_fused_nccl_all_to_all_impl.register_fake
@@ -86,11 +89,8 @@ def _(
     input_splits: list[int] | None,
     group_name: str,
 ) -> torch.Tensor:
-    return torch.ops._c10d_functional.wait_tensor.default(
-        torch.ops._c10d_functional.all_to_all_single.default(
-            inp, output_splits, input_splits, group_name
-        )
-    )
+    out_shape = inp.shape
+    return inp.new_empty(out_shape)
 
 
 @torch.library.custom_op("tensorrt::fused_nccl_scatter", mutates_args=())

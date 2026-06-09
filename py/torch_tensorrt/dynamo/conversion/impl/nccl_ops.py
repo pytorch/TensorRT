@@ -6,6 +6,7 @@ from typing import Optional, Tuple, Union
 import numpy as np
 import tensorrt as trt
 from torch.fx.node import Argument, Target
+from torch_tensorrt._features import needs_native_collectives
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import set_layer_name
@@ -220,6 +221,7 @@ def nccl_reduce_scatter(
     return layer.get_output(0)
 
 
+@needs_native_collectives
 def nccl_all_gather_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -287,22 +289,12 @@ def nccl_all_gather_native(
 
         return output
 
-    except AttributeError as e:
-        error_msg = (
-            f"Native ALL_GATHER failed: {e}. "
-            "This usually means TensorRT doesn't support native distributed collectives. "
-            f"Your TensorRT version: {trt.__version__}. "
-            "Native collectives require TensorRT 10.16 or later. "
-            "Consider using TensorRT-LLM plugins instead by setting USE_NATIVE_TRT_COLLECTIVES=0"
-        )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
-
     except Exception as e:
         logger.error(f"Native ALL_GATHER failed: {e} (type: {type(e).__name__})")
         raise
 
 
+@needs_native_collectives
 def nccl_reduce_scatter_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -378,22 +370,12 @@ def nccl_reduce_scatter_native(
 
         return output
 
-    except AttributeError as e:
-        error_msg = (
-            f"Native ALL_REDUCE_SCATTER failed: {e}. "
-            "This usually means TensorRT doesn't support native distributed collectives. "
-            f"Your TensorRT version: {trt.__version__}. "
-            "Native collectives require TensorRT 10.16 or later. "
-            "Consider using TensorRT-LLM plugins instead by setting USE_NATIVE_TRT_COLLECTIVES=0"
-        )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
-
     except Exception as e:
         logger.error(f"Native REDUCE_SCATTER failed: {e} (type: {type(e).__name__})")
         raise
 
 
+@needs_native_collectives
 def nccl_all_reduce_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -473,22 +455,12 @@ def nccl_all_reduce_native(
 
         return output
 
-    except AttributeError as e:
-        error_msg = (
-            f"Native ALL_REDUCE failed: {e}. "
-            "This usually means TensorRT doesn't support native distributed collectives. "
-            f"Your TensorRT version: {trt.__version__}. "
-            "Native collectives require TensorRT 10.16 or later. "
-            "Consider using TensorRT-LLM plugins instead by setting USE_NATIVE_TRT_COLLECTIVES=0"
-        )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
-
     except Exception as e:
         logger.error(f"Native ALL_REDUCE failed: {e} (type: {type(e).__name__})")
         raise
 
 
+@needs_native_collectives
 def nccl_all_to_all_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -557,22 +529,12 @@ def nccl_all_to_all_native(
 
         return output
 
-    except AttributeError as e:
-        error_msg = (
-            f"Native ALL_TO_ALL failed: {e}. "
-            "This usually means TensorRT doesn't support native distributed collectives. "
-            f"Your TensorRT version: {trt.__version__}. "
-            "Native collectives require TensorRT 11 or later. "
-            "Consider using TensorRT-LLM plugins instead by setting USE_NATIVE_TRT_COLLECTIVES=0"
-        )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
-
     except Exception as e:
         logger.error(f"Native ALL_TO_ALL failed: {e} (type: {type(e).__name__})")
         raise
 
 
+@needs_native_collectives
 def nccl_scatter_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -641,22 +603,12 @@ def nccl_scatter_native(
 
         return output
 
-    except AttributeError as e:
-        error_msg = (
-            f"Native SCATTER failed: {e}. "
-            "This usually means TensorRT doesn't support native distributed collectives. "
-            f"Your TensorRT version: {trt.__version__}. "
-            "Native collectives require TensorRT 11 or later. "
-            "Consider using TensorRT-LLM plugins instead by setting USE_NATIVE_TRT_COLLECTIVES=0"
-        )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
-
     except Exception as e:
         logger.error(f"Native SCATTER failed: {e} (type: {type(e).__name__})")
         raise
 
 
+@needs_native_collectives
 def nccl_gather_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -671,7 +623,7 @@ def nccl_gather_native(
     This operation has the root rank receive a chunk of data from every other rank
 
     Returns:
-        Output tensor after scatter operation
+        Output tensor after gather operation
 
     Example:
         Input on rank 0: [1]  shape=(1,)
@@ -724,17 +676,6 @@ def nccl_gather_native(
         layer.num_ranks = world_size
 
         return output
-
-    except AttributeError as e:
-        error_msg = (
-            f"Native GATHER failed: {e}. "
-            "This usually means TensorRT doesn't support native distributed collectives. "
-            f"Your TensorRT version: {trt.__version__}. "
-            "Native collectives require TensorRT 11 or later. "
-            "Consider using TensorRT-LLM plugins instead by setting USE_NATIVE_TRT_COLLECTIVES=0"
-        )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
 
     except Exception as e:
         logger.error(f"Native GATHER failed: {e} (type: {type(e).__name__})")

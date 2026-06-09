@@ -5,14 +5,14 @@ from collections import namedtuple
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 
 import tensorrt
-
-from packaging import version
 from torch_tensorrt._utils import (
     check_cross_compile_trt_win_lib,
     check_native_trt_collectives,
     load_tensorrt_llm_for_nccl,
     sanitized_torch_version,
 )
+
+from packaging import version
 
 FeatureSet = namedtuple(
     "FeatureSet",
@@ -226,6 +226,18 @@ def needs_trtllm_for_nccl(f: Callable[..., Any]) -> Callable[..., Any]:
                 )
 
             return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_native_collectives(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.native_trt_collectives:
+            return f(*args, **kwargs)
+        else:
+            raise NotImplementedError(
+                "TensorRT 11+ is required for native NCCL collectives"
+            )
 
     return wrapper
 
