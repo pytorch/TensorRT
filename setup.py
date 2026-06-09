@@ -99,7 +99,7 @@ RELEASE = False
 CI_BUILD = False
 USE_TRT_RTX = False
 
-EXECUTORCH_REQUIREMENT = "executorch>=1.2.0"
+EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
 EXTRAS_REQUIRE = {
     "executorch": [EXECUTORCH_REQUIREMENT],
     "all": [EXECUTORCH_REQUIREMENT],
