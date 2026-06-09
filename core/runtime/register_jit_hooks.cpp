@@ -1,6 +1,7 @@
 #include <codecvt>
 
 #include "core/runtime/Platform.h"
+#include "core/runtime/RuntimeSettings.h"
 #include "core/runtime/runtime.h"
 #include "core/util/macros.h"
 
@@ -13,6 +14,21 @@ namespace core {
 namespace runtime {
 
 namespace {
+
+// Register `RuntimeCacheHandle` as a torchbind class so Python can pass the same
+// underlying `IRuntimeCache` to both Python and C++ engine backends. File I/O on
+// the handle is the Python side's responsibility; the C++ struct only holds the
+// shared_ptr and an informational path string. The method bodies (and the
+// `#ifdef TRT_MAJOR_RTX` they entail) live in RuntimeSettings.cpp -- this file
+// is registration-only.
+static auto TORCHTRT_UNUSED RuntimeCacheHandleRegistration =
+    torch::class_<RuntimeCacheHandle>("tensorrt", "RuntimeCacheHandle")
+        .def(torch::init<std::string>())
+        .def_readwrite("path", &RuntimeCacheHandle::path)
+        .def("serialize", &RuntimeCacheHandle::serialize)
+        .def("deserialize", &RuntimeCacheHandle::deserialize)
+        .def("has_cache", &RuntimeCacheHandle::has_cache);
+
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
 //     auto input_vec = inputs.vec();
@@ -40,12 +56,38 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("reset_captured_graph", &TRTEngine::reset_captured_graph)
         .def("set_output_tensors_as_unowned", &TRTEngine::set_output_tensors_as_unowned)
         .def("are_output_tensors_unowned", &TRTEngine::are_output_tensors_unowned)
+        // Lambda wrapper because torchbind's ``def`` template lacks a
+        // ``const noexcept`` member-function specialization; routing through a
+        // plain function pointer would force us to drop the ``noexcept`` on
+        // ``num_execution_contexts_created`` itself.
+        .def(
+            "num_execution_contexts_created",
+            [](const c10::intrusive_ptr<TRTEngine>& self) -> int64_t { return self->num_execution_contexts_created(); })
         .def(
             "use_dynamically_allocated_resources",
             [](const c10::intrusive_ptr<TRTEngine>& self, bool dynamic) -> void {
               self->set_resource_allocation_strategy(
                   dynamic ? TRTEngine::ResourceAllocationStrategy::kDynamic
                           : TRTEngine::ResourceAllocationStrategy::kStatic);
+            })
+        .def(
+            "update_runtime_settings",
+            [](const c10::intrusive_ptr<TRTEngine>& self,
+               int64_t dynamic_shapes_kernel_specialization_strategy,
+               int64_t cuda_graph_strategy,
+               c10::optional<c10::intrusive_ptr<RuntimeCacheHandle>> runtime_cache) -> void {
+              // Strategies cross the Py->C++ boundary as ints (TorchBind uses
+              // ``int64_t``; the struct stores enums whose underlying type is
+              // ``int32_t``, mirroring the nvinfer1 enum values). The
+              // ``to_*_strategy`` validators bounds-check and return the enum.
+              // ``c10::optional`` lets TorchBind accept Python ``None`` for
+              // the cache; translate to a (possibly null) intrusive_ptr.
+              RuntimeSettings rs;
+              rs.dynamic_shapes_kernel_specialization_strategy = to_dynamic_shapes_kernel_strategy(
+                  static_cast<int32_t>(dynamic_shapes_kernel_specialization_strategy));
+              rs.cuda_graph_strategy = to_cuda_graph_strategy(static_cast<int32_t>(cuda_graph_strategy));
+              rs.runtime_cache = runtime_cache.has_value() ? std::move(*runtime_cache) : nullptr;
+              (void)self->runtime_settings(std::move(rs));
             })
         .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
         .def_readwrite("pre_allocated_outputs", &TRTEngine::pre_allocated_outputs)
