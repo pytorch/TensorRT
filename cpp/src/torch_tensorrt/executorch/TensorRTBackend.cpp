@@ -317,6 +317,20 @@ Result<DelegateHandle*> TensorRTBackend::init(
 // Args layout (mirroring the Python exporter):
 //   args[0 .. num_inputs-1]             – input EValues
 //   args[num_inputs .. num_inputs+num_outputs-1] – output EValues
+//
+// Device-handling contract (intentional divergence from the CUDA/AOTI delegate;
+// do not "reconcile" without revisiting this):
+//   1. We ignore the per-tensor device metadata the partitioner emits (the AOT
+//      target_device CompileSpec, serialized into extra_tensor_info's
+//      device_type/device_index). Instead we sniff each pointer at runtime
+//      (is_cuda_accessible_ptr) so the backend stays correct for host- or
+//      device-resident inputs; asserting device_type would reject valid host
+//      inputs today.
+//   2. We stage host<->device ourselves via cudaMemcpyAsync into cached scratch
+//      buffers rather than ExecuTorch device-copy ops or a DeviceAllocator; the
+//      copy is conditional on the runtime pointer check and shares the stream.
+//   3. The engine-baked device_id (applied via cudaSetDevice) is the runtime
+//      source of truth for the GPU, not the AOT target_device.
 // ---------------------------------------------------------------------------
 Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle* handle, Span<EValue*> args) const {
   (void)context;
@@ -563,6 +577,17 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for output '%s'", name.c_str());
       return Error::InvalidState;
     }
+  }
+
+  // One-shot diagnostic: host-resident I/O was just staged through a device
+  // copy, so this engine is off the zero-copy fast path.
+  if ((input_staged_from_host || output_staged_to_host) && !engine->staged_logged) {
+    ET_LOG(
+        Info,
+        "TensorRTBackend::execute: an I/O tensor is host memory; staging it "
+        "through a device copy (zero-copy requires device-resident tensors). "
+        "Logged once per engine.");
+    engine->staged_logged = true;
   }
 
   // ------------------------------------------------------------------

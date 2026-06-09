@@ -61,6 +61,9 @@ struct EngineHandle {
   size_t num_outputs = 0;
   int device_id = 0;
   bool unified_memory = false;
+  // Set the first time execute() stages an IO tensor through a host<->device
+  // copy; guards a one-shot Info log (read/written under mu).
+  bool staged_logged = false;
   std::mutex mu;
   // Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or
   // destroying an execution context while one of its enqueues is in flight, so when
