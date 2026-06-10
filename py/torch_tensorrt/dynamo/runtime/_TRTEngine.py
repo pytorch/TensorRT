@@ -893,9 +893,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             logger.warning(
                 "Manual CUDA graph capture is not guaranteed to work on "
                 "TRT-RTX (lazy kernel specialization or non-capturable "
-                "stream). Switching to TRT-RTX native CUDA graphs. Set "
-                'cuda_graph_strategy="whole_graph_capture" at compile '
-                "time to avoid this warning."
+                "stream). Switching to TRT-RTX native CUDA graphs. Apply "
+                'RuntimeSettings(cuda_graph_strategy="whole_graph_capture") '
+                "via the runtime_config CM or mod.runtime_settings setter "
+                "to avoid this warning."
             )
             self._enable_rtx_native_cudagraphs()
 
