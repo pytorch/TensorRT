@@ -304,10 +304,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         pre-setup case is just "stash for later".
         """
         self._dispatch_runtime_settings_to_engine(rs)
-        # Reflect the substituted handle (the dispatch path pre-wrapped any
-        # path-string ``runtime_cache`` into a ``RuntimeCacheHandle``) back
-        # so reads of ``self._runtime_settings`` agree with what the engine
-        # actually saw. Mirrors the reconciliation in ``setup_engine``.
+        # ``_dispatch_runtime_settings_to_engine`` has just updated
+        # ``self._implicit_cache_handle`` to match what the engine attached
+        # (or reset it to None for non-path inputs / ``rs.runtime_cache=None``).
+        # If non-None, the dispatch substituted a wrapper in for a path string;
+        # reflect that here so reads of ``self._runtime_settings`` agree with
+        # what the engine sees. Mirrors the reconciliation in ``setup_engine``.
         if self._implicit_cache_handle is not None:
             rs = rs.merge(runtime_cache=self._implicit_cache_handle)
         self._runtime_settings = rs
@@ -567,6 +569,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             # RuntimeSettings are NOT serialized; restore defaults. Caller can
             # reapply via ``mod.runtime_settings = ...`` (per submodule) or a CM after load.
             self._runtime_settings = RuntimeSettings()
+            # Mirror the settings reset on the implicit cache handle so a
+            # stale wrapper from prior use doesn't survive load_state_dict and
+            # silently write the fresh engine's cache bytes to the old path.
+            self._implicit_cache_handle = None
             if not ENABLED_FEATURES.torch_tensorrt_runtime:
                 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 

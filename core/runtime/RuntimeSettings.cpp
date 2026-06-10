@@ -6,6 +6,10 @@
 #include <tuple>
 #include <type_traits>
 
+// ``at::empty`` (factory function) lives in ``ATen/Functions.h``. Some bundled
+// torch builds (e.g. torch_l4t on Jetpack) only ship the minimal
+// ``ATen/core/Tensor.h`` transitively, so include the full ATen surface here.
+#include "ATen/ATen.h"
 #include "core/util/prelude.h"
 
 namespace torch_tensorrt {

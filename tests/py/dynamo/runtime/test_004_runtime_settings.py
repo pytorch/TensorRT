@@ -1,6 +1,7 @@
 """Whitebox tests for the RuntimeSettings data model + dispatch."""
 
 import dataclasses
+import io
 import unittest
 
 import torch
@@ -288,6 +289,110 @@ class TestLazyExecutionContextCreation(TestCase):
         _ = compiled(*inputs)
         for mod, prior in zip(ttrt_modules, baseline):
             self.assertEqual(mod.engine.num_execution_contexts_created(), prior)
+
+
+class TestSaveLoadRuntimeSettingsRoundTrip(TestCase):
+    """Regression: ``_implicit_cache_handle`` must be initialized on every
+    construction path so a post-load ``mod.runtime_settings = ...`` does not
+    raise AttributeError. Catches the B2 regression if the init ever moves
+    back out of ``__init__``."""
+
+    def test_setter_after_save_load_does_not_raise(self):
+        compiled = _compile_simple()
+        buf = io.BytesIO()
+        torch.save(compiled, buf)
+        buf.seek(0)
+        loaded = torch.load(buf, weights_only=False)
+        # B2 used to AttributeError on the next line because the slot wasn't
+        # initialized in ``set_extra_state``.
+        _apply_runtime_settings(
+            loaded, RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
+        )
+
+
+class TestNestedRuntimeConfigCudagraphs(TestCase):
+    """Pinned-down composition contract: nesting ``runtime_config`` outside
+    ``enable_cudagraphs`` yields a single ``createExecutionContext`` call;
+    reversing the nesting yields two (warm-up creates with old settings, flip
+    invalidates, next execute recreates)."""
+
+    def _walk_engines(self, compiled):
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        for _, mod in compiled.named_modules():
+            if isinstance(mod, TorchTensorRTModule):
+                yield mod
+
+    @unittest.skipIf(
+        not ENABLED_FEATURES.tensorrt_rtx,
+        "cuda_graph_strategy is TRT-RTX-only",
+    )
+    def test_nested_runtime_config_outside_cudagraphs_is_one_create(self):
+        """``with runtime_config(...) as m: with enable_cudagraphs(m) as w:``
+        applies settings state-only first; the cudagraphs warm-up then
+        materializes the context with the strategy already in effect."""
+        from torch_tensorrt.runtime import enable_cudagraphs
+
+        compiled = _compile_simple()
+        inputs = [torch.randn(2, 3).cuda()]
+        with runtime_config(compiled, cuda_graph_strategy="whole_graph_capture") as m:
+            with enable_cudagraphs(m) as w:
+                _ = w(*inputs)
+        for mod in self._walk_engines(compiled):
+            n = mod.engine.num_execution_contexts_created()
+            self.assertEqual(
+                n,
+                1,
+                f"Nested form should create exactly 1 context, got {n}",
+            )
+
+    @unittest.skipIf(
+        not ENABLED_FEATURES.tensorrt_rtx,
+        "cuda_graph_strategy is TRT-RTX-only",
+    )
+    def test_inverted_nesting_creates_two_contexts(self):
+        """Anti-pattern: settings flip *inside* the cudagraphs CM invalidates
+        the warmed context. Documented to cost 2 creates; this test pins it."""
+        from torch_tensorrt.runtime import enable_cudagraphs
+
+        compiled = _compile_simple()
+        inputs = [torch.randn(2, 3).cuda()]
+        with enable_cudagraphs(compiled) as w:
+            # warm_up has materialized the context with default settings
+            with runtime_config(compiled, cuda_graph_strategy="whole_graph_capture"):
+                _ = w(*inputs)
+        for mod in self._walk_engines(compiled):
+            n = mod.engine.num_execution_contexts_created()
+            self.assertEqual(
+                n,
+                2,
+                f"Inverted form should create exactly 2 contexts, got {n}",
+            )
+
+
+class TestToTorchbindHandleOrphanGuard(TestCase):
+    """H1 regression: ``_to_torchbind_handle`` must reject a Python-side
+    ``RuntimeCacheHandle`` carrying a live pybind cache but no torchbind
+    sibling crossing into the C++ runtime, rather than silently creating a
+    fresh torchbind and orphaning the user's cache."""
+
+    @unittest.skipIf(
+        not ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Orphan guard fires only on the C++ runtime dispatch path",
+    )
+    def test_orphan_pybind_cache_raises(self):
+        from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
+
+        rc = RuntimeCacheHandle(path="")
+        # Force the orphan-hazard state: a non-None ``_cache`` (pybind) with
+        # no ``_torchbind`` sibling. The actual ``_cache`` object isn't
+        # exercised by the guard; only its non-None-ness is.
+        rc._cache = object()
+        with self.assertRaises(RuntimeError) as cm:
+            _to_torchbind_handle(rc)
+        self.assertIn("orphan", str(cm.exception).lower())
 
 
 if __name__ == "__main__":
