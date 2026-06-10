@@ -185,12 +185,13 @@ TRTEngine::TRTEngine(
   LOG_DEBUG(
       "Resource allocation strategy: "
       << (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "Dynamic" : "Static"));
-  // ``exec_ctx`` is created lazily on first use (``execute_engine``,
-  // ``enable_profiling``, ``bind_nccl_comm``, ``infer_outputs``, ``to_str``).
-  // Deferring here lets the Python ``setup_engine`` cpp branch dispatch user
-  // ``RuntimeSettings`` before the (expensive, kernel-JIT-compiling) TRT
-  // ``createExecutionContext`` call -- collapses the historical
-  // "create-with-defaults then recreate-with-settings" pair into a single create.
+  // ``exec_ctx_`` is created lazily on first ``exec_ctx()`` read (the only
+  // public path: ``execute_engine``, ``enable_profiling``, ``bind_nccl_comm``,
+  // ``infer_outputs``). Deferring here lets the Python ``setup_engine`` cpp
+  // branch dispatch user ``RuntimeSettings`` before the (expensive,
+  // kernel-JIT-compiling) TRT ``createExecutionContext`` call -- collapses
+  // the historical "create-with-defaults then recreate-with-settings" pair
+  // into a single create.
 
   // Pre-allocate placeholder for empty tensors (TensorRT requires non-null addresses)
   cudaMalloc(&empty_tensor_placeholder, 1);
@@ -288,9 +289,9 @@ TRTEngine::TRTEngine(
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
   // Distributed engines must have a bound communicator on the IExecutionContext
-  // before the first collective; bind here. ``bind_nccl_comm`` lazily creates
-  // ``exec_ctx`` via ``ensure_execution_context`` if it hasn't been built yet.
-  // For non-distributed engines we leave ``exec_ctx`` null so the first
+  // before the first collective; bind here. ``bind_nccl_comm`` materializes
+  // ``exec_ctx_`` lazily via the ``exec_ctx()`` getter if it isn't built yet.
+  // For non-distributed engines we leave ``exec_ctx_`` null so the first
   // ``execute_engine`` (typically right after the Python settings dispatch)
   // is the single TRT context-create site.
   if (this->requires_native_multidevice) {
@@ -304,7 +305,7 @@ TRTEngine::~TRTEngine() {
   // (`RuntimeCacheHandle.save()` invoked from the runtime_cache CM or the engine
   // wrapper). The C++ side just lets refcounts drop.
   trt_engine_profiler.reset();
-  exec_ctx.reset();
+  exec_ctx_.reset();
   cuda_engine.reset();
   if (empty_tensor_placeholder) {
     cudaFree(empty_tensor_placeholder);
@@ -319,7 +320,7 @@ void TRTEngine::disable_profiling() {
   // Drop the profiler-attached context; next execute lazily creates a fresh
   // one with no profiler. (TRT has no detach-profiler API -- recreate is the
   // canonical way.)
-  invalidate_execution_context();
+  invalidate_exec_ctx();
 }
 
 void TRTEngine::dump_engine_layer_info_to_file(const std::string& path) {
@@ -340,11 +341,9 @@ void TRTEngine::dump_engine_layer_info() {
 void TRTEngine::enable_profiling() {
   profile_execution = true;
   trt_engine_profiler = std::make_unique<TRTEngineProfiler>(name);
-  // ``setProfiler`` requires a live ``IExecutionContext``; under the lazy-create
-  // policy the ctx may be null when the user toggles profiling before the first
-  // execute.
-  ensure_execution_context();
-  exec_ctx->setProfiler(trt_engine_profiler.get());
+  // ``setProfiler`` requires a live ``IExecutionContext``; the ``exec_ctx()``
+  // getter materializes it lazily if it isn't built yet.
+  exec_ctx()->setProfiler(trt_engine_profiler.get());
 }
 
 void TRTEngine::set_output_tensors_as_unowned(bool enable) {
@@ -375,18 +374,19 @@ std::string TRTEngine::get_serialized_metadata() {
 }
 
 std::vector<at::Tensor> TRTEngine::infer_outputs(std::vector<std::vector<int64_t>> input_shapes) {
-  // Lazy-create: callers can hit this before the first execute_engine.
-  ensure_execution_context();
+  // Lazy-create via the getter -- callers can hit this before the first
+  // execute_engine.
+  auto* ctx = exec_ctx();
   std::vector<at::Tensor> outputs;
   TORCHTRT_CHECK(
       (in_binding_names.size() == input_shapes.size()),
       "The number of input shapes provided doesn't match with the number of input names registered.");
   // Set all input shapes
   for (size_t i = 0; i < input_shapes.size(); i++) {
-    exec_ctx->setInputShape(in_binding_names[i].c_str(), core::util::toDims(input_shapes[i]));
+    ctx->setInputShape(in_binding_names[i].c_str(), core::util::toDims(input_shapes[i]));
   }
   for (size_t i = 0; i < out_binding_names.size(); i++) {
-    auto output_shape = core::util::toVec(exec_ctx->getTensorShape(out_binding_names[i].c_str()));
+    auto output_shape = core::util::toVec(ctx->getTensorShape(out_binding_names[i].c_str()));
     auto output_dtype =
         core::util::TRTDataTypeToScalarType(cuda_engine->getTensorDataType(out_binding_names[i].c_str()));
     auto output_tensor = torch::empty(output_shape, torch::dtype(output_dtype));
@@ -415,7 +415,7 @@ int64_t TRTEngine::get_device_memory_budget() {
 
 bool TRTEngine::set_device_memory_budget(int64_t budget) {
   // Weight-streaming budget cannot be modified while a context is live; drop it.
-  invalidate_execution_context();
+  invalidate_exec_ctx();
   if (profile_execution) {
     trt_engine_profiler.reset();
   }
@@ -426,9 +426,9 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
     enable_profiling();
   }
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-  // exec_ctx was invalidated — re-bind the NCCL communicator if this is a
-  // distributed engine that has already been set up. ``bind_nccl_comm`` ensures
-  // the context before binding.
+  // Context was invalidated -- re-bind the NCCL communicator if this is a
+  // distributed engine that has already been set up. ``bind_nccl_comm``
+  // ensures the context before binding via the ``exec_ctx()`` getter.
   if (nccl_initialized) {
     bind_nccl_comm();
   }
@@ -454,19 +454,21 @@ std::string TRTEngine::to_str() const {
   ss << "Torch-TensorRT TensorRT Engine:" << std::endl;
   ss << "  Name: " << name << std::endl;
   // Shape/dtype queries require a live IExecutionContext. Under the lazy-create
-  // policy ``exec_ctx`` may be null at debug-log time (e.g. ctor-time LOG_DEBUG
-  // before the first execute_engine). Fall back to a marker.
-  if (exec_ctx == nullptr) {
+  // policy the context may be null at debug-log time (e.g. ctor-time LOG_DEBUG
+  // before the first execute_engine). Probe via ``has_exec_ctx()`` so we don't
+  // accidentally trigger creation just to print a debug message.
+  if (!has_exec_ctx()) {
     ss << "  Inputs: <execution context not yet materialized>" << std::endl;
     ss << "  Outputs: <execution context not yet materialized>" << std::endl;
   } else {
+    auto* ctx = exec_ctx_.get();
     ss << "  Inputs: [" << std::endl;
     for (uint64_t i = 0; i < num_io.first; i++) {
       ss << "    id: " << i << std::endl;
       ss << "      name: " << in_binding_names[i].c_str() << std::endl;
-      ss << "      shape: " << exec_ctx->getTensorShape(in_binding_names[i].c_str()) << std::endl;
+      ss << "      shape: " << ctx->getTensorShape(in_binding_names[i].c_str()) << std::endl;
       ss << "      dtype: "
-         << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getTensorDataType(in_binding_names[i].c_str()))
+         << util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(in_binding_names[i].c_str()))
          << std::endl;
     }
     ss << "  ]" << std::endl;
@@ -474,10 +476,10 @@ std::string TRTEngine::to_str() const {
     for (uint64_t o = 0; o < num_io.second; o++) {
       ss << "    id: " << o << std::endl;
       ss << "      name: " << out_binding_names[o].c_str() << std::endl;
-      ss << "      shape: " << exec_ctx->getTensorShape(out_binding_names[o].c_str()) << std::endl;
+      ss << "      shape: " << ctx->getTensorShape(out_binding_names[o].c_str()) << std::endl;
       ss << "      dtype: "
          << util::TRTDataTypeToScalarType(
-                exec_ctx->getEngine().getTensorDataType(out_binding_names[o].c_str()))
+                ctx->getEngine().getTensorDataType(out_binding_names[o].c_str()))
          << std::endl;
     }
     ss << "  ]" << std::endl;
@@ -567,7 +569,7 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
         "Setting resource allocation strategy to "
         << (this->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic ? "dynamic"
                                                                                                   : "static"));
-    invalidate_execution_context();
+    invalidate_exec_ctx();
   }
 }
 
@@ -651,10 +653,8 @@ bool TRTEngine::bind_nccl_comm() {
   }
 
   // Distributed engines must hold a live IExecutionContext at bind time.
-  // Under the lazy-create policy this is the first call site that needs it.
-  ensure_execution_context();
-  TORCHTRT_CHECK(exec_ctx.get() != nullptr, "Cannot bind NCCL communicator: execution context is null");
-  exec_ctx->setCommunicator(reinterpret_cast<void*>(comm_ptr));
+  // The ``exec_ctx()`` getter materializes it lazily on first call.
+  exec_ctx()->setCommunicator(reinterpret_cast<void*>(comm_ptr));
   this->nccl_initialized = true;
   LOG_INFO("NCCL comm bound (rank=" << this->rank << ", device=" << this->device_info.id << ")");
   return true;
@@ -666,17 +666,19 @@ void TRTEngine::release_nccl_comm() {
   }
   LOG_INFO("Releasing NCCL communicator from engine '" << this->name << "'");
   torch::cuda::synchronize(device_info.id);
-  invalidate_execution_context();
+  invalidate_exec_ctx();
   // Eagerly rebuild so the engine returns to a "context-live, no NCCL" state
-  // (callers may immediately query exec_ctx for shape/dtype info post-release).
-  ensure_execution_context();
+  // (callers may immediately query the context for shape/dtype info post-release).
+  (void)exec_ctx();
   this->nccl_initialized = false;
   LOG_INFO("NCCL communicator released from engine '" << this->name << "'");
 }
 #endif // ENABLE_TRT_NCCL_COLLECTIVES
 
 bool TRTEngine::is_monolithic_capturable(cudaStream_t stream) const {
-  return runtime_cfg.is_monolithic_capturable(has_dynamic_inputs, exec_ctx.get(), stream);
+  // Probe via the raw backing pointer -- this is a read-only check, we don't
+  // want to materialize the context just to ask whether capture is feasible.
+  return runtime_cfg.is_monolithic_capturable(has_dynamic_inputs, exec_ctx_.get(), stream);
 }
 
 void TRTEngine::disable_rtx_native_cudagraphs() {
@@ -699,10 +701,10 @@ bool TRTEngine::runtime_settings(RuntimeSettings new_settings) {
   }
   // Lazy: drop the live context, but do NOT eagerly recreate. The next user
   // (typically the next ``execute_engine`` call) will lazy-create with the
-  // new settings via ``ensure_execution_context``. This collapses the
-  // historical "ctor-create-with-defaults + dispatch-recreate-with-settings"
-  // pair on the Python ``setup_engine`` cpp branch into a single create.
-  invalidate_execution_context();
+  // new settings via the ``exec_ctx()`` getter. This collapses the historical
+  // "ctor-create-with-defaults + dispatch-recreate-with-settings" pair on the
+  // Python ``setup_engine`` cpp branch into a single create.
+  invalidate_exec_ctx();
   // Existing recreate sites set runtime_states.context_changed for cudagraph
   // re-record; do the same here so a settings flip inside an active CM forces
   // the next enqueue to re-record any captured graph.
@@ -710,22 +712,27 @@ bool TRTEngine::runtime_settings(RuntimeSettings new_settings) {
   return true;
 }
 
-void TRTEngine::ensure_execution_context() {
-  if (exec_ctx == nullptr) {
+nvinfer1::IExecutionContext* TRTEngine::exec_ctx() {
+  if (exec_ctx_ == nullptr) {
     recreate_execution_context();
   }
+  return exec_ctx_.get();
 }
 
-void TRTEngine::invalidate_execution_context() noexcept {
-  exec_ctx.reset();
+void TRTEngine::invalidate_exec_ctx() noexcept {
+  exec_ctx_.reset();
+}
+
+bool TRTEngine::has_exec_ctx() const noexcept {
+  return exec_ctx_ != nullptr;
 }
 
 void TRTEngine::recreate_execution_context() {
   const auto allocation_strategy = resource_allocation_strategy == ResourceAllocationStrategy::kDynamic
       ? nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED
       : nvinfer1::ExecutionContextAllocationStrategy::kSTATIC;
-  exec_ctx = runtime_cfg.create_execution_context(cuda_engine.get(), allocation_strategy);
-  TORCHTRT_CHECK(exec_ctx.get() != nullptr, "Unable to (re)create TensorRT execution context");
+  exec_ctx_ = runtime_cfg.create_execution_context(cuda_engine.get(), allocation_strategy);
+  TORCHTRT_CHECK(exec_ctx_.get() != nullptr, "Unable to (re)create TensorRT execution context");
   ++num_execution_contexts_created_;
 }
 

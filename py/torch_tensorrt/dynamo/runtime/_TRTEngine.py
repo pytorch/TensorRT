@@ -11,7 +11,6 @@ from __future__ import annotations
 import base64
 import copy
 import logging
-import os
 import pickle
 import tempfile
 from contextlib import nullcontext
@@ -210,7 +209,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         serialized_info: SerializedTensorRTEngineFmt,
         *,
         profile_execution: bool = False,
-        runtime_settings: Optional[RuntimeSettings] = None,
     ) -> None:
         self._profile_execution = profile_execution
         self.profile_path_prefix = tempfile.gettempdir()
@@ -240,15 +238,20 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # it. Mirrors ``TRTEngine::num_execution_contexts_created`` on the
         # C++ side.
         self._num_execution_contexts_created: int = 0
+        # Backing field for the ``context`` property. The property is the only
+        # API path to the IExecutionContext; lazy-creates on first read,
+        # rebuilds after ``invalidate_context()``. There is no setter, so
+        # external code cannot stash a stale or wrong-settings context here.
+        self._context: Optional[trt.IExecutionContext] = None
         # NCCL communicator is bound lazily on the first forward pass for
         # engines compiled with native multi-device collective layers.
         self._nccl_comm: Optional[Any] = None
 
         # Owns RuntimeSettings + the live trt.IRuntimeConfig + the
         # engine-implicit RuntimeCacheHandle. Hides all RTX feature gates.
-        self._trt_runtime_config: TRTRuntimeConfig = TRTRuntimeConfig(
-            runtime_settings or RuntimeSettings()
-        )
+        # ``RuntimeSettings`` default; callers wanting non-defaults assign via
+        # the module's ``runtime_settings`` setter after compile.
+        self._trt_runtime_config: TRTRuntimeConfig = TRTRuntimeConfig(RuntimeSettings())
 
         self._load_serialized_info(serialized_info)
         self._setup_engine()
@@ -268,6 +271,33 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def runtime_config(self) -> Any:
         """The live ``trt.IRuntimeConfig`` (or ``None`` on non-RTX builds)."""
         return self._trt_runtime_config._live
+
+    @property
+    def context(self) -> trt.IExecutionContext:
+        """Lazily-materialized ``IExecutionContext``.
+
+        Reads create the context on first access; ``invalidate_context()``
+        drops the cached one. The property is the only path in: there is no
+        setter (write raises ``AttributeError``), so external code cannot
+        bypass the laziness or stash a stale/wrong-settings context.
+
+        Mirrors the cpp ``TRTEngine::exec_ctx()`` getter.
+        """
+        if self._context is None:
+            self._context = self._create_execution_context()
+        return self._context
+
+    def invalidate_context(self) -> None:
+        """Drop the live execution context. Next ``self.context`` read
+        rebuilds it with the then-current ``runtime_settings``. Called from
+        every settings-mutation path so reads of ``self.context`` always
+        observe up-to-date settings."""
+        self._context = None
+
+    def has_context(self) -> bool:
+        """True iff the execution context has been materialized. Probes
+        WITHOUT triggering creation; intended for tests/introspection."""
+        return self._context is not None
 
     def __del__(self) -> None:
         self.close()
@@ -323,6 +353,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.resource_allocation_strategy = 0
         self._rtx_native_cudagraphs = False
         self._num_execution_contexts_created = 0
+        self._context: Optional[trt.IExecutionContext] = None
         # NCCL communicators cannot be pickled; rebind lazily on the next
         # forward pass via setup_nccl_comm().
         self._nccl_comm = None
@@ -459,11 +490,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             logger.debug(f"Weight streaming budget set to {budget_bytes}B")
             self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
 
-        # The TRTRuntimeConfig shim builds the live IRuntimeConfig (with cache
-        # + strategies) inside ``create_execution_context`` on RTX; no-op
-        # otherwise. Track the cudagraph-disabled-or-not state for the
-        # ``_execute_standard`` path to consult.
-        self.context = self._create_execution_context()
+        # IExecutionContext is created lazily on first ``self.context`` read.
+        # Track the cudagraph-disabled-or-not state for the ``_execute_standard``
+        # path to consult.
         self._rtx_native_cudagraphs = ENABLED_FEATURES.tensorrt_rtx and (
             self.runtime_settings.cuda_graph_strategy != "disabled"
         )
@@ -477,9 +506,11 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
             # For engines with native NCCL collective layers, all ranks must
             # have a live IExecutionContext before any rank executes a
-            # collective. Barrier here so a fast-compiling rank does not race
-            # ahead and issue an NCCL op while another rank is still inside
-            # deserialize_cuda_engine / create_execution_context.
+            # collective. Materialize the context up front (mirrors the C++
+            # ctor's eager bind_nccl_comm path) and barrier so a fast-compiling
+            # rank does not race ahead.
+            _ = self.context  # property triggers create_execution_context
+
             if (
                 dist.is_available()
                 and dist.is_initialized()
@@ -537,12 +568,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         Fast-paths on equality via ``TRTRuntimeConfig.set_settings``. On
         change, the prior implicit cache (if any) is saved, the live
-        ``IRuntimeConfig`` is invalidated, and a fresh ``IExecutionContext``
-        is created.
+        ``IRuntimeConfig`` is invalidated, and the ``IExecutionContext`` is
+        invalidated -- the next ``self.context`` read rebuilds it with the
+        new settings.
         """
         if not self._trt_runtime_config.set_settings(new_settings):
             return
-        self.context = self._create_execution_context()
+        self.invalidate_context()
         self._rtx_native_cudagraphs = ENABLED_FEATURES.tensorrt_rtx and (
             self.runtime_settings.cuda_graph_strategy != "disabled"
         )
@@ -611,23 +643,25 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         self._nccl_comm = comm_ptr
 
-        # Bind communicator to TRT execution context (PyCapsule required by TRT Python API)
-        if self.context is not None:
-            import ctypes
+        # Bind communicator to TRT execution context (PyCapsule required by TRT
+        # Python API). ``self.context`` is the lazy-create property; reading it
+        # here materializes the context if it hasn't been created yet (mirrors
+        # the cpp ``bind_nccl_comm`` path which also ensures the context first).
+        import ctypes
 
-            ctypes.pythonapi.PyCapsule_New.restype = ctypes.py_object
-            ctypes.pythonapi.PyCapsule_New.argtypes = [
-                ctypes.c_void_p,
-                ctypes.c_char_p,
-                ctypes.c_void_p,
-            ]
-            comm_capsule = ctypes.pythonapi.PyCapsule_New(comm_ptr, None, None)
-            ok = self.context.set_communicator(comm_capsule)
-            if not ok:
-                raise RuntimeError(
-                    f"TRT context.set_communicator() returned False for rank={dist.get_rank()}. "
-                    f"comm_ptr={comm_ptr:#x}. Failed to bind NCCL communicator to TRT execution context."
-                )
+        ctypes.pythonapi.PyCapsule_New.restype = ctypes.py_object
+        ctypes.pythonapi.PyCapsule_New.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_void_p,
+        ]
+        comm_capsule = ctypes.pythonapi.PyCapsule_New(comm_ptr, None, None)
+        ok = self.context.set_communicator(comm_capsule)
+        if not ok:
+            raise RuntimeError(
+                f"TRT context.set_communicator() returned False for rank={dist.get_rank()}. "
+                f"comm_ptr={comm_ptr:#x}. Failed to bind NCCL communicator to TRT execution context."
+            )
 
         logger.info(
             f"NCCL comm set up (rank={dist.get_rank()}, world_size={dist.get_world_size()})"
@@ -654,7 +688,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
         if self.cuda_engine.weight_streaming_budget_v2 != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
-        self.context = self._create_execution_context()
+        self.invalidate_context()
         self.runtime_states.context_changed = True
 
     def reset_captured_graph(self) -> None:
@@ -667,7 +701,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if self.resource_allocation_strategy == new_strategy:
             return
         self.resource_allocation_strategy = new_strategy
-        self.context = self._create_execution_context()
+        self.invalidate_context()
         self.runtime_states.context_changed = True
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
@@ -689,7 +723,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
     def disable_profiling(self) -> None:
         torch.cuda.synchronize()
-        self.context = self._create_execution_context()
+        self.invalidate_context()
         self._profile_execution = False
         self.runtime_states.context_changed = True
 

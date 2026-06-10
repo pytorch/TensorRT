@@ -34,25 +34,39 @@ def _fresh_conv_model_and_inputs(seed=0):
     return ConvModel().eval().cuda(), [torch.randn(2, 3, 16, 16).cuda()]
 
 
+def _apply_runtime_settings(compiled, rs):
+    """Apply ``RuntimeSettings`` to every ``TorchTensorRTModule`` under ``compiled``.
+
+    Mirrors what user code would do: ``mod.runtime_settings = rs`` after
+    compile. The compile-time hint (``torchtrt.compile(runtime_settings=...)``)
+    was dropped now that lazy ``IExecutionContext`` creation absorbs the
+    one-create benefit it used to provide.
+    """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+
+    for _, mod in compiled.named_modules():
+        if isinstance(mod, TorchTensorRTModule):
+            mod.runtime_settings = rs
+
+
 def _compile(model, inputs, *, runtime_cache_path=None):
     """Compile ``model`` through whichever runtime the build selects.
 
-    ``runtime_cache_path``, when supplied, is threaded as a compile-time hint via
-    ``runtime_settings=RuntimeSettings(runtime_cache=path)`` (per-engine cache).
+    When ``runtime_cache_path`` is supplied, the cache path is applied via
+    ``mod.runtime_settings = RuntimeSettings(runtime_cache=path)`` after
+    compile -- matches the post-refactor user flow.
     """
-    rs = (
-        RuntimeSettings(runtime_cache=runtime_cache_path)
-        if runtime_cache_path is not None
-        else None
-    )
     compiled = torchtrt.compile(
         model,
         ir="dynamo",
         inputs=inputs,
         min_block_size=1,
-        runtime_settings=rs,
     )
     torch._dynamo.reset()
+    if runtime_cache_path is not None:
+        _apply_runtime_settings(
+            compiled, RuntimeSettings(runtime_cache=runtime_cache_path)
+        )
     return compiled
 
 
@@ -105,10 +119,16 @@ class TestRuntimeCacheSetup(TestCase):
         self.assertIsNotNone(engine)
         self.assertIsNotNone(engine.runtime_config)
 
-    def test_context_created_successfully(self):
-        compiled, _ = _compile_simple()
+    def test_context_is_lazy_until_forward(self):
+        """Engine context is materialized lazily on first forward, not at setup."""
+        compiled, inputs = _compile_simple()
         engine = _find_python_trt_engine(compiled)
-        self.assertIsNotNone(engine.context)
+        self.assertFalse(
+            engine.has_context(),
+            "Expected lazy context: engine.has_context() must be False until first forward",
+        )
+        _ = compiled(*inputs)
+        self.assertTrue(engine.has_context())
 
     def test_default_uses_temp_path_implicit_handle(self):
         """Default RuntimeSettings points runtime_cache at the per-user temp file

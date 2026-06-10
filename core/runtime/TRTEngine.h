@@ -124,7 +124,6 @@ struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
   std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
-  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
   bool output_tensors_are_unowned = false;
   std::string name;
@@ -292,7 +291,7 @@ struct TRTEngine : torch::CustomClassHolder {
   // Setter overload (matches the getter name). Returns true iff the settings
   // actually changed -- consumers can read the diff result to decide whether
   // to invalidate dependent state. On change, invalidates the live
-  // ``IRuntimeConfig`` (the next ``ensure_execution_context`` rebuilds with
+  // ``IRuntimeConfig`` (the next ``exec_ctx()`` getter call rebuilds with
   // the new settings).
   [[nodiscard]] bool runtime_settings(RuntimeSettings new_settings);
 
@@ -309,16 +308,26 @@ struct TRTEngine : torch::CustomClassHolder {
   // already disabled.
   void disable_rtx_native_cudagraphs();
 
-  // Materialize ``exec_ctx`` if it is currently null, using the current settings
-  // from ``runtime_cfg``. Idempotent: a non-null ``exec_ctx`` is left untouched.
-  // Called from every site that needs the live context (``execute_engine``,
-  // ``enable_profiling``, ``bind_nccl_comm``, ``infer_outputs``, etc.).
-  void ensure_execution_context();
+  // The only path to the live ``IExecutionContext``. Materializes it lazily on
+  // first call using the current settings from ``runtime_cfg``; subsequent
+  // calls return the cached instance until ``invalidate_exec_ctx()`` drops it.
+  //
+  // External code accesses the context exclusively through this getter -- the
+  // backing field ``exec_ctx_`` is private. No setter; the only way to drop
+  // the context is ``invalidate_exec_ctx()``.
+  //
+  // Returns a raw pointer owned by the internal ``shared_ptr``; do not store
+  // across an invalidate. Returned pointer is never null (the underlying
+  // factory throws if creation fails).
+  nvinfer1::IExecutionContext* exec_ctx();
 
-  // Drop the live ``exec_ctx`` without recreating. The next ``ensure_execution_context``
-  // (typically inside the next ``execute_engine`` call) will rebuild from the
-  // current ``runtime_cfg`` settings.
-  void invalidate_execution_context() noexcept;
+  // Drop the live execution context without recreating. The next ``exec_ctx()``
+  // call rebuilds from the current ``runtime_cfg`` settings.
+  void invalidate_exec_ctx() noexcept;
+
+  // True iff the execution context has been materialized. Probes WITHOUT
+  // triggering creation; for tests/introspection.
+  [[nodiscard]] bool has_exec_ctx() const noexcept;
 
   // Test/observability hook: increments once every time ``runtime_cfg.create_execution_context``
   // is invoked (i.e. an actual TRT createExecutionContext call, which on RTX
@@ -330,9 +339,14 @@ struct TRTEngine : torch::CustomClassHolder {
   }
 
  private:
-  // Single entry point that (re)creates exec_ctx via runtime_cfg.create_execution_context.
-  // Bumps ``num_execution_contexts_created_``. Callers should normally go through
-  // ``ensure_execution_context`` for the lazy semantics.
+  // Backing storage for the execution context. External code reaches it only
+  // through ``exec_ctx()`` / ``invalidate_exec_ctx()`` / ``has_exec_ctx()``
+  // -- code-construction ban on stashing a stale context.
+  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx_;
+
+  // Single entry point that (re)creates exec_ctx_ via runtime_cfg.create_execution_context.
+  // Bumps ``num_execution_contexts_created_``. Called from ``exec_ctx()`` when
+  // the cached context is null.
   void recreate_execution_context();
 
   int64_t num_execution_contexts_created_ = 0;

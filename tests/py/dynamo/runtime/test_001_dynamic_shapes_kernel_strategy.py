@@ -40,12 +40,22 @@ def _compile_dynamic_conv(strategy):
         inputs=[inp],
         enabled_precisions={torch.float32},
         min_block_size=1,
-        runtime_settings=RuntimeSettings(
-            dynamic_shapes_kernel_specialization_strategy=strategy,
-        ),
     )
     torch._dynamo.reset()
+    _apply_runtime_settings(
+        compiled,
+        RuntimeSettings(dynamic_shapes_kernel_specialization_strategy=strategy),
+    )
     return compiled
+
+
+def _apply_runtime_settings(compiled, rs):
+    """Apply ``RuntimeSettings`` to every inner ``TorchTensorRTModule``."""
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+
+    for _, mod in compiled.named_modules():
+        if isinstance(mod, TorchTensorRTModule):
+            mod.runtime_settings = rs
 
 
 def _compile_simple(*, runtime_settings=None):
@@ -64,9 +74,10 @@ def _compile_simple(*, runtime_settings=None):
         ir="dynamo",
         inputs=inputs,
         min_block_size=1,
-        runtime_settings=runtime_settings,
     )
     torch._dynamo.reset()
+    if runtime_settings is not None:
+        _apply_runtime_settings(compiled, runtime_settings)
     return compiled
 
 
@@ -161,13 +172,17 @@ class TestDynamicShapesKernelStrategySetup(TestCase):
                     )
                 )
                 engine = _find_python_trt_engine(compiled)
-                self.assertIsNotNone(
-                    engine.context,
-                    f"Execution context should be created for {strategy}",
+                self.assertFalse(
+                    engine.has_context(),
+                    f"Lazy: context should NOT yet exist for {strategy}",
                 )
                 for bs in (1, 2, 4):
                     output = compiled(torch.randn(bs, 3).cuda())
                     self.assertEqual(output.shape, (bs, 3))
+                self.assertTrue(
+                    engine.has_context(),
+                    f"Context should exist after first forward for {strategy}",
+                )
 
 
 @unittest.skipIf(

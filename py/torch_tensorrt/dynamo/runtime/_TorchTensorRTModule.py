@@ -66,7 +66,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         requires_output_allocator: bool = False,
         requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
-        runtime_settings: Optional[RuntimeSettings] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -132,9 +131,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
 
-        # Per-engine runtime mode controls. Defaults to ``RuntimeSettings()`` if
-        # not supplied; the dataclass validates at ``__post_init__``.
-        self._runtime_settings: RuntimeSettings = runtime_settings or RuntimeSettings()
+        # Per-engine runtime mode controls. Initialized to defaults; callers
+        # apply non-defaults via ``mod.runtime_settings = ...`` after compile,
+        # or via a runtime CM (``runtime_config``, ``runtime_cache``, etc.).
+        self._runtime_settings: RuntimeSettings = RuntimeSettings()
         self.symbolic_shape_expressions = symbolic_shape_expressions
         self.requires_native_multidevice = requires_native_multidevice
         self.target_platform = (
@@ -439,28 +439,23 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if not ENABLED_FEATURES.torch_tensorrt_runtime:
             from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
-            # Pre-wrap any path-string ``runtime_cache`` into a handle so the
-            # engine's TRTRuntimeConfig only ever sees handles. The handle's
-            # underlying pybind IRuntimeCache is materialized lazily inside
-            # ``ensure_cache`` when the engine first applies settings.
-            rs_for_engine, needs_load = self._materialize_implicit_handle(
-                self._runtime_settings
-            )
             self.engine = TRTEngine(
                 self._pack_engine_info(),
                 profile_execution=self.profiling_enabled,
-                runtime_settings=rs_for_engine,
             )
             self.execute_engine_op = torch.ops.tensorrt.execute_engine_python
-            if needs_load and self._implicit_cache_handle is not None:
-                try:
-                    self._implicit_cache_handle.load()
-                except Exception as e:
-                    logger.debug(f"Failed to load implicit runtime cache: {e}")
         else:
             self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
             self.execute_engine_op = torch.ops.tensorrt.execute_engine
-            self._dispatch_runtime_settings_to_engine(self._runtime_settings)
+
+        # Apply ``self._runtime_settings`` to the freshly-constructed engine.
+        # Same path for both runtimes -- the helper materializes any implicit
+        # cache handle, dispatches to engine.update_runtime_settings, and (for
+        # the cpp path where the cache materializes eagerly inside dispatch)
+        # loads on-disk bytes. Python rt context creation stays lazy: the
+        # update_runtime_settings call invalidates the (still-None) context
+        # without forcing a JIT compile.
+        self._dispatch_runtime_settings_to_engine(self._runtime_settings)
 
         # Reflect the substituted handle back onto ``self._runtime_settings``
         # so subsequent reads (CM snapshot/restore, ``mod.runtime_settings``)

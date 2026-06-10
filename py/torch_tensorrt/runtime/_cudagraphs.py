@@ -142,4 +142,25 @@ def get_cuda_graph_module(
 def enable_cudagraphs(
     compiled_module: Union[torch.fx.GraphModule, torch.nn.Module],
 ) -> _CudagraphsContextManager:
+    """Wrap ``compiled_module`` for outer torch.cuda.CUDAGraph capture/replay.
+
+    The wrapper's ctor runs a warm-up pass over the underlying module, which
+    materializes the engine's ``IExecutionContext`` with whatever
+    ``runtime_settings`` are in effect at that moment. To combine cudagraphs
+    with non-default runtime knobs, apply the knobs **before** entering this
+    CM -- either via the nested-CM pattern::
+
+        with runtime_config(mod, cuda_graph_strategy="whole_graph_capture") as m:
+            with enable_cudagraphs(m) as wrapped:
+                out = wrapped(x)
+
+    or via direct assignment::
+
+        mod.runtime_settings = RuntimeSettings(...)
+        with enable_cudagraphs(mod) as wrapped:
+            out = wrapped(x)
+
+    Changing ``runtime_settings`` *inside* the ``with enable_cudagraphs(...)``
+    block invalidates the warmed context and forces a recapture on next call.
+    """
     return _CudagraphsContextManager(compiled_module)

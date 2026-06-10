@@ -429,5 +429,19 @@ def set_cuda_graph_strategy(
 
     Accepts ``"disabled"`` or ``"whole_graph_capture"``. Delegates to
     :func:`runtime_config`.
+
+    Composition with outer CUDA graph capture: to combine the RTX strategy
+    with the cudagraphs wrapper, nest this CM outside :func:`enable_cudagraphs`
+    so the strategy is applied before the wrapper materializes the
+    ``IExecutionContext``::
+
+        with set_cuda_graph_strategy(mod, "whole_graph_capture") as m:
+            with enable_cudagraphs(m) as wrapped:
+                out = wrapped(x)
+
+    The outer CM applies the strategy state-only; the inner wrapper's
+    ``warm_up`` then creates the context with the strategy in effect (one
+    create). Reversing the nesting forces a recreate when the strategy
+    flips after warm-up.
     """
     return runtime_config(target_or_targets, cuda_graph_strategy=strategy)

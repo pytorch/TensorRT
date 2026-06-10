@@ -17,8 +17,17 @@ class CudaGraphConvModel(torch.nn.Module):
         return torch.relu(self.conv(x))
 
 
+def _apply_runtime_settings(compiled, rs):
+    """Apply ``RuntimeSettings`` to every inner ``TorchTensorRTModule``."""
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+
+    for _, mod in compiled.named_modules():
+        if isinstance(mod, TorchTensorRTModule):
+            mod.runtime_settings = rs
+
+
 def _compile_conv(strategy):
-    """Compile CudaGraphConvModel with the given cuda_graph_strategy hint."""
+    """Compile CudaGraphConvModel + apply cuda_graph_strategy post-compile."""
     model = CudaGraphConvModel().eval().cuda()
     inputs = [torch.randn(2, 3, 16, 16).cuda()]
     compiled = torchtrt.compile(
@@ -27,9 +36,9 @@ def _compile_conv(strategy):
         inputs=inputs,
         enabled_precisions={torch.float32},
         min_block_size=1,
-        runtime_settings=RuntimeSettings(cuda_graph_strategy=strategy),
     )
     torch._dynamo.reset()
+    _apply_runtime_settings(compiled, RuntimeSettings(cuda_graph_strategy=strategy))
     return compiled, inputs
 
 
@@ -55,9 +64,10 @@ def _compile_simple(*, runtime_settings=None):
         inputs=inputs,
         enabled_precisions={torch.float32},
         min_block_size=1,
-        runtime_settings=runtime_settings,
     )
     torch._dynamo.reset()
+    if runtime_settings is not None:
+        _apply_runtime_settings(compiled, runtime_settings)
     return compiled
 
 

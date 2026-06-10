@@ -53,7 +53,6 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_device,
     to_torch_tensorrt_device,
 )
-from torch_tensorrt.runtime._runtime_config import RuntimeSettings
 
 logger = logging.getLogger(__name__)
 
@@ -461,7 +460,6 @@ def compile(
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
-    runtime_settings: Optional[RuntimeSettings] = None,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -776,7 +774,6 @@ def compile(
         trt_kwarg_inputs,
         settings,
         engine_cache,
-        runtime_settings=runtime_settings,
     )
     return trt_gm
 
@@ -890,7 +887,6 @@ def compile_module(
     engine_cache: Optional[BaseEngineCache] = None,
     *,
     _debugger_config: Optional[DebuggerConfig] = None,
-    runtime_settings: Optional[RuntimeSettings] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
 
@@ -1128,7 +1124,6 @@ def compile_module(
                 settings=settings,
                 name=name,
                 engine_cache=engine_cache,
-                runtime_settings=runtime_settings,
             )
 
             trt_modules[name] = trt_module
