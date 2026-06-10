@@ -135,6 +135,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # apply non-defaults via ``mod.runtime_settings = ...`` after compile,
         # or via a runtime CM (``runtime_config``, ``runtime_cache``, etc.).
         self._runtime_settings: RuntimeSettings = RuntimeSettings()
+        # Single-owner slot for the engine-implicit ``RuntimeCacheHandle``.
+        # Initialized here so the invariant doesn't depend on which engine-
+        # construction path (``setup_engine`` vs ``set_extra_state``) ran.
+        self._implicit_cache_handle: Any = None
         self.symbolic_shape_expressions = symbolic_shape_expressions
         self.requires_native_multidevice = requires_native_multidevice
         self.target_platform = (
@@ -300,6 +304,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         pre-setup case is just "stash for later".
         """
         self._dispatch_runtime_settings_to_engine(rs)
+        # Reflect the substituted handle (the dispatch path pre-wrapped any
+        # path-string ``runtime_cache`` into a ``RuntimeCacheHandle``) back
+        # so reads of ``self._runtime_settings`` agree with what the engine
+        # actually saw. Mirrors the reconciliation in ``setup_engine``.
+        if self._implicit_cache_handle is not None:
+            rs = rs.merge(runtime_cache=self._implicit_cache_handle)
         self._runtime_settings = rs
 
     def _dispatch_runtime_settings_to_engine(self, rs: RuntimeSettings) -> None:
@@ -375,7 +385,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """
         from torch_tensorrt.runtime._runtime_cache import RuntimeCacheHandle
 
-        old = self._implicit_cache_handle  # type: ignore[has-type]
+        old = self._implicit_cache_handle
         rc = rs.runtime_cache
         # Same wrapper already owned -> CM enter/exit with no override on
         # ``runtime_cache`` lands here. Re-dispatching the same object would
@@ -429,12 +439,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """
         if self.engine is not None:
             return
-
-        # ``_implicit_cache_handle`` is the canonical single-owner slot for the
-        # engine-implicit ``RuntimeCacheHandle``; both runtimes route through
-        # ``_materialize_implicit_handle`` to populate it. Initialize first so
-        # the helper's read of ``self._implicit_cache_handle`` is well-defined.
-        self._implicit_cache_handle: Any = None
 
         if not ENABLED_FEATURES.torch_tensorrt_runtime:
             from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine

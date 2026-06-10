@@ -48,10 +48,6 @@ from torch_tensorrt.dynamo._defaults import (
     RUNTIME_CACHE_PATH,
 )
 
-# Single-shot guard for the non-RTX construction warning -- emit once per
-# process, not once per RuntimeSettings instance.
-_NON_RTX_WARNING_EMITTED = False
-
 if TYPE_CHECKING:
     from torch_tensorrt.runtime._runtime_cache import RuntimeCacheHandle
 
@@ -90,6 +86,15 @@ class RuntimeSettings:
 
     Equality compares all fields; for ``runtime_cache``, handle equality is
     by identity (same handle ⇒ same cache).
+
+    Note on the default disk path: the default ``runtime_cache`` points at a
+    per-user temp file (see ``torch_tensorrt.dynamo._defaults.RUNTIME_CACHE_PATH``).
+    Concurrent processes for the same user share that file via filelock --
+    that prevents corruption, but **not** lost-update races (process A's
+    save can clobber kernels process B just generated). For
+    multi-process / CI / hyperparameter-sweep workloads where lost kernels
+    materially slow you down, either give each worker its own
+    ``runtime_cache="..."`` path or pass ``runtime_cache=None`` to opt out.
     """
 
     dynamic_shapes_kernel_specialization_strategy: str = (
@@ -115,18 +120,17 @@ class RuntimeSettings:
                 f"Invalid cuda_graph_strategy: {self.cuda_graph_strategy!r}. "
                 f"Expected one of {list(_CUDA_GRAPH_STRATEGY_MAP)}."
             )
-        # RuntimeSettings only takes effect on TRT-RTX builds. Warn once per
-        # process on regular TRT so users don't silently expect cache /
-        # strategy plumbing to do anything.
-        global _NON_RTX_WARNING_EMITTED
-        if not ENABLED_FEATURES.tensorrt_rtx and not _NON_RTX_WARNING_EMITTED:
+        # RuntimeSettings only takes effect on TRT-RTX builds. Warn on every
+        # construction on regular TRT so users don't silently expect cache /
+        # strategy plumbing to do anything. Callers that want once-per-process
+        # behavior can filter via ``warnings.simplefilter("once", UserWarning)``.
+        if not ENABLED_FEATURES.tensorrt_rtx:
             warnings.warn(
                 "RuntimeSettings is only honored on TRT-RTX builds; "
                 "constructing it on regular TensorRT has no effect.",
                 UserWarning,
                 stacklevel=2,
             )
-            _NON_RTX_WARNING_EMITTED = True
 
     def merge(self, **overrides: Any) -> "RuntimeSettings":
         """Return a new ``RuntimeSettings`` with ``overrides`` applied on top of self."""
@@ -429,19 +433,5 @@ def set_cuda_graph_strategy(
 
     Accepts ``"disabled"`` or ``"whole_graph_capture"``. Delegates to
     :func:`runtime_config`.
-
-    Composition with outer CUDA graph capture: to combine the RTX strategy
-    with the cudagraphs wrapper, nest this CM outside :func:`enable_cudagraphs`
-    so the strategy is applied before the wrapper materializes the
-    ``IExecutionContext``::
-
-        with set_cuda_graph_strategy(mod, "whole_graph_capture") as m:
-            with enable_cudagraphs(m) as wrapped:
-                out = wrapped(x)
-
-    The outer CM applies the strategy state-only; the inner wrapper's
-    ``warm_up`` then creates the context with the strategy in effect (one
-    create). Reversing the nesting forces a recreate when the strategy
-    flips after warm-up.
     """
     return runtime_config(target_or_targets, cuda_graph_strategy=strategy)

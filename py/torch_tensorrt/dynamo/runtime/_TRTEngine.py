@@ -509,6 +509,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             # collective. Materialize the context up front (mirrors the C++
             # ctor's eager bind_nccl_comm path) and barrier so a fast-compiling
             # rank does not race ahead.
+            #
+            # Trade-off: NCCL engines forfeit the "one createExecutionContext
+            # per setup" invariant the non-NCCL path enjoys. Any subsequent
+            # ``mod.runtime_settings = ...`` invalidates this eagerly-created
+            # context and triggers a second create on next execute. Tests
+            # that assert on the create count (e.g.
+            # ``test_one_context_create_with_default_settings``) must skip
+            # NCCL engines.
             _ = self.context  # property triggers create_execution_context
 
             if (

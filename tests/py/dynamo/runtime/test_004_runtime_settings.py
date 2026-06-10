@@ -206,7 +206,13 @@ class TestLazyExecutionContextCreation(TestCase):
         self.assertTrue(ttrt_modules, "Expected at least one TorchTensorRTModule")
         # Both runtimes are now strictly lazy: nothing materializes a context
         # at setup. First execute is the single create site.
+        # NCCL/multi-device engines are excluded -- they eagerly bind their
+        # NCCL communicator (which materializes the context) at setup so the
+        # cross-rank barrier completes before any execute. See
+        # ``_TRTEngine._setup_engine`` and ``TRTEngine.cpp:bind_nccl_comm``.
         for mod in ttrt_modules:
+            if getattr(mod.engine, "requires_native_multidevice", False):
+                continue
             n = mod.engine.num_execution_contexts_created()
             self.assertEqual(n, 0, f"expected 0 contexts at setup, got {n}")
 

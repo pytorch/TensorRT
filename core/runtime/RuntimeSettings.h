@@ -72,8 +72,8 @@ enum class CudaGraphStrategy : int32_t {
 // the enum (or throw with a clear message on out-of-range). Used only inside
 // the torchbind ``update_runtime_settings`` lambda -- the rest of the code
 // passes the enum type directly.
-[[nodiscard]] DynamicShapesKernelSpecializationStrategy to_dynamic_shapes_kernel_strategy(int32_t v);
-[[nodiscard]] CudaGraphStrategy to_cuda_graph_strategy(int32_t v);
+[[nodiscard]] DynamicShapesKernelSpecializationStrategy to_dynamic_shapes_kernel_strategy(int64_t v);
+[[nodiscard]] CudaGraphStrategy to_cuda_graph_strategy(int64_t v);
 
 // Per-engine runtime-only knobs sampled at IExecutionContext creation.
 //

@@ -21,17 +21,19 @@ constexpr std::array<std::string_view, 2> kCgStrategyNames = {"disabled", "whole
 
 } // namespace
 
-DynamicShapesKernelSpecializationStrategy to_dynamic_shapes_kernel_strategy(int32_t v) {
+DynamicShapesKernelSpecializationStrategy to_dynamic_shapes_kernel_strategy(int64_t v) {
+  // Take ``int64_t`` so out-of-range Python callers (TorchBind uses int64) are
+  // caught here -- casting to int32_t first would silently wrap.
   TORCHTRT_CHECK(
-      v >= 0 && static_cast<size_t>(v) < kDsStrategyNames.size(),
+      v >= 0 && static_cast<size_t>(v) < std::size(kDsStrategyNames),
       "Invalid dynamic_shapes_kernel_specialization_strategy int: " << v
                                                                     << " (expected 0..2 mapping to lazy|eager|none)");
   return static_cast<DynamicShapesKernelSpecializationStrategy>(v);
 }
 
-CudaGraphStrategy to_cuda_graph_strategy(int32_t v) {
+CudaGraphStrategy to_cuda_graph_strategy(int64_t v) {
   TORCHTRT_CHECK(
-      v >= 0 && static_cast<size_t>(v) < kCgStrategyNames.size(),
+      v >= 0 && static_cast<size_t>(v) < std::size(kCgStrategyNames),
       "Invalid cuda_graph_strategy int: " << v << " (expected 0..1 mapping to disabled|whole_graph_capture)");
   return static_cast<CudaGraphStrategy>(v);
 }
@@ -40,12 +42,12 @@ std::string_view ds_strategy_name(DynamicShapesKernelSpecializationStrategy v) {
   // Negative underlying values wrap to a huge ``size_t``, so a single bounds
   // check from the top covers both ends without needing ``std::clamp``.
   auto const i = static_cast<size_t>(v);
-  return i < kDsStrategyNames.size() ? kDsStrategyNames[i] : "<unknown>";
+  return i < std::size(kDsStrategyNames) ? kDsStrategyNames[i] : "<unknown>";
 }
 
 std::string_view cg_strategy_name(CudaGraphStrategy v) {
   auto const i = static_cast<size_t>(v);
-  return i < kCgStrategyNames.size() ? kCgStrategyNames[i] : "<unknown>";
+  return i < std::size(kCgStrategyNames) ? kCgStrategyNames[i] : "<unknown>";
 }
 
 // ---- RuntimeCacheHandle methods ---------------------------------------------

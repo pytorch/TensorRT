@@ -79,13 +79,14 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               // Strategies cross the Py->C++ boundary as ints (TorchBind uses
               // ``int64_t``; the struct stores enums whose underlying type is
               // ``int32_t``, mirroring the nvinfer1 enum values). The
-              // ``to_*_strategy`` validators bounds-check and return the enum.
+              // ``to_*_strategy`` validators take ``int64_t`` so out-of-range
+              // values can't slip through a silent narrowing cast.
               // ``c10::optional`` lets TorchBind accept Python ``None`` for
               // the cache; translate to a (possibly null) intrusive_ptr.
               RuntimeSettings rs;
-              rs.dynamic_shapes_kernel_specialization_strategy = to_dynamic_shapes_kernel_strategy(
-                  static_cast<int32_t>(dynamic_shapes_kernel_specialization_strategy));
-              rs.cuda_graph_strategy = to_cuda_graph_strategy(static_cast<int32_t>(cuda_graph_strategy));
+              rs.dynamic_shapes_kernel_specialization_strategy =
+                  to_dynamic_shapes_kernel_strategy(dynamic_shapes_kernel_specialization_strategy);
+              rs.cuda_graph_strategy = to_cuda_graph_strategy(cuda_graph_strategy);
               rs.runtime_cache = runtime_cache.has_value() ? std::move(*runtime_cache) : nullptr;
               (void)self->runtime_settings(std::move(rs));
             })

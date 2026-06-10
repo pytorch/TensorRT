@@ -352,10 +352,26 @@ class _RuntimeCacheContextManager:
         if self._inner_cm is not None:
             self._inner_cm.__exit__(*args)
         if self.autosave and self.handle is not None:
-            if self._stream is not None:
-                self.handle.save_to_stream(self._stream)
-            elif self.path:
-                self.handle.save()
+            # Wait for in-flight enqueues on the still-attached cache before
+            # ``_inner_cm.__exit__`` detached it; otherwise a concurrent
+            # ``compiled(*inputs)`` on another thread can land kernels into a
+            # cache that's about to be read here.
+            try:
+                torch.cuda.synchronize()
+            except Exception as e:
+                logger.debug(f"torch.cuda.synchronize() before save failed: {e}")
+            # Swallow save errors at exit so a transient filesystem failure
+            # (full disk, filelock timeout, permission denied) doesn't mask
+            # the user's actual exception when the ``with`` block is already
+            # exiting via raise. Mirrors the engine-implicit handle's
+            # ``__del__`` semantics.
+            try:
+                if self._stream is not None:
+                    self.handle.save_to_stream(self._stream)
+                elif self.path:
+                    self.handle.save()
+            except Exception as e:
+                logger.warning(f"Failed to autosave runtime cache on CM exit: {e}")
 
 
 def runtime_cache(
@@ -410,5 +426,23 @@ def _to_torchbind_handle(
     # through to constructing a fresh torchbind would orphan the existing one.
     if isinstance(rc, RuntimeCacheHandle) and rc._torchbind is not None:
         return rc._torchbind
-    path = rc if isinstance(rc, str) else rc.path
-    return torch.classes.tensorrt.RuntimeCacheHandle(path)
+    # Mixed-runtime hazard: a Python-side ``RuntimeCacheHandle`` with a
+    # materialized pybind ``IRuntimeCache`` (``_cache``) but no torchbind
+    # sibling would be silently orphaned here -- the C++ engine attaches the
+    # fresh torchbind below and the in-memory kernel population is lost.
+    # Reject loudly so the user picks a deliberate fix (re-create the handle
+    # on the C++ side, or serialize + deserialize the bytes across).
+    if isinstance(rc, RuntimeCacheHandle) and rc._cache is not None:
+        raise RuntimeError(
+            "Cannot attach a Python-side RuntimeCacheHandle (with a live "
+            "pybind IRuntimeCache) to a C++ runtime engine: the cache would "
+            "be orphaned. Reconstruct the handle on the C++ side, or "
+            "serialize/deserialize the cache bytes explicitly."
+        )
+    # Truthy-string check: ``""`` would construct a no-op torchbind handle.
+    # Mirrors the gate in ``_materialize_implicit_handle``.
+    if isinstance(rc, str) and rc:
+        return torch.classes.tensorrt.RuntimeCacheHandle(rc)
+    if isinstance(rc, RuntimeCacheHandle):
+        return torch.classes.tensorrt.RuntimeCacheHandle(rc.path)
+    return None
