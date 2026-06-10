@@ -1,7 +1,6 @@
 """Whitebox tests for the RuntimeSettings data model + dispatch."""
 
 import dataclasses
-import io
 import unittest
 
 import torch
@@ -291,22 +290,28 @@ class TestLazyExecutionContextCreation(TestCase):
             self.assertEqual(mod.engine.num_execution_contexts_created(), prior)
 
 
-class TestSaveLoadRuntimeSettingsRoundTrip(TestCase):
-    """Regression: ``_implicit_cache_handle`` must be initialized on every
-    construction path so a post-load ``mod.runtime_settings = ...`` does not
-    raise AttributeError. Catches the B2 regression if the init ever moves
-    back out of ``__init__``."""
+class TestStateDictRoundTripRuntimeSettings(TestCase):
+    """Regression guard for the ``set_extra_state`` -> setter path.
 
-    def test_setter_after_save_load_does_not_raise(self):
-        compiled = _compile_simple()
-        buf = io.BytesIO()
-        torch.save(compiled, buf)
-        buf.seek(0)
-        loaded = torch.load(buf, weights_only=False)
-        # B2 used to AttributeError on the next line because the slot wasn't
-        # initialized in ``set_extra_state``.
+    The B2 bug surfaced specifically through ``load_state_dict`` (which
+    routes through ``set_extra_state``), not ``torch.save`` /
+    ``torch.load`` (which goes through pickle and restores ``__dict__``
+    wholesale, bypassing ``set_extra_state`` entirely). This test takes
+    the ``state_dict`` path so it exercises the actual bug path.
+
+    Catches: a future ``set_extra_state`` that overwrites / clobbers
+    ``_implicit_cache_handle`` (or any future regression that leaves
+    the slot in a state the setter can't handle)."""
+
+    def test_setter_after_load_state_dict_does_not_raise(self):
+        src = _compile_simple()
+        state = src.state_dict()  # routes through get_extra_state
+        dst = _compile_simple()
+        dst.load_state_dict(state)  # routes through set_extra_state
+        # B2 used to AttributeError on the next line because the slot
+        # wasn't initialized after ``set_extra_state``.
         _apply_runtime_settings(
-            loaded, RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
+            dst, RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
         )
 
 
