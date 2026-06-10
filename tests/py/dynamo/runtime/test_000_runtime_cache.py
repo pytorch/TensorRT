@@ -419,6 +419,26 @@ class TestRuntimeCacheStreamSupport(TestCase):
         with self.assertRaises(TypeError):
             runtime_cache(compiled, 42)  # type: ignore[arg-type]
 
+    def test_bytesio_first_run_smoke(self):
+        """Smoke test: ``runtime_cache(mod, io.BytesIO())`` enter -> forward ->
+        exit cycle on both runtimes without raising. Exercises the dispatch
+        glue end-to-end (handle construction, attach, save-on-exit).
+
+        Deliberately first-run only -- the load-back-into-fresh-engine half
+        (see ``test_stream_bytesio_round_trip``) skips on cpp because the
+        ``IRuntimeCache`` is materialized lazily on context creation, so
+        bytes loaded before that don't survive. The dispatch path itself
+        is the regression surface this test protects."""
+        compiled, inputs = _compile_simple()
+        buf = io.BytesIO()
+        with runtime_cache(compiled, buf) as rc:
+            self.assertEqual(rc.path, "", "stream-mode keeps path empty")
+            _ = compiled(*inputs)
+        # On CM exit the handle saved into ``buf``. We don't assert on
+        # content here because cpp-rt cache population is workload-dependent;
+        # a non-raising exit is the contract.
+        self.assertIsInstance(buf.getvalue(), bytes)
+
 
 if __name__ == "__main__":
     run_tests()
