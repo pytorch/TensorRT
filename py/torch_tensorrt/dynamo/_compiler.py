@@ -622,31 +622,6 @@ def compile(
             "Please use torch_tensorrt.dynamo.cross_compile_for_windows() if you want to cross compile the module in Linux for inferencing in Windows."
         )
 
-    # Deprecation shim for the runtime-only knobs that moved out of compile():
-    # accept the old kwargs, warn, and dispatch them through the new
-    # ``mod.runtime_settings = ...`` setter after compile_module returns.
-    # Rename of ``runtime_cache_path`` -> ``runtime_cache`` happens at the
-    # ``RuntimeSettings(**)`` call below.
-    _DEPRECATED_RUNTIME_KWARGS = {
-        "cuda_graph_strategy",
-        "dynamic_shapes_kernel_specialization_strategy",
-        "runtime_cache_path",
-    }
-    deprecated_runtime_kwargs = {
-        k: kwargs.pop(k) for k in list(kwargs) if k in _DEPRECATED_RUNTIME_KWARGS
-    }
-    if deprecated_runtime_kwargs:
-        warnings.warn(
-            "Passing runtime-only knobs (cuda_graph_strategy, "
-            "dynamic_shapes_kernel_specialization_strategy, runtime_cache_path) "
-            "to ``torch_tensorrt.compile()`` is deprecated. After compile, apply "
-            "them via ``mod.runtime_settings = RuntimeSettings(...)`` or wrap calls "
-            "in the ``torch_tensorrt.runtime.runtime_config(...)`` context manager. "
-            "Will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
     engine_capability = EngineCapability._from(engine_capability)
 
     if torch_executed_modules is not None and torch_executed_modules:
@@ -800,25 +775,6 @@ def compile(
         settings,
         engine_cache,
     )
-
-    # Apply any deprecated runtime kwargs via the new setter. Quiet on default
-    # so users that pass nothing don't pay the walk cost.
-    if deprecated_runtime_kwargs:
-        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-            TorchTensorRTModule,
-        )
-        from torch_tensorrt.runtime._runtime_config import RuntimeSettings
-
-        # Old name -> new name on the dataclass.
-        if "runtime_cache_path" in deprecated_runtime_kwargs:
-            deprecated_runtime_kwargs["runtime_cache"] = deprecated_runtime_kwargs.pop(
-                "runtime_cache_path"
-            )
-        rs = RuntimeSettings(**deprecated_runtime_kwargs)
-        for _, m in trt_gm.named_modules():
-            if isinstance(m, TorchTensorRTModule):
-                m.runtime_settings = rs
-
     return trt_gm
 
 
