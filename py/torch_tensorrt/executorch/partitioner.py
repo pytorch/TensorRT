@@ -15,9 +15,9 @@ from torch.export import ExportedProgram
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
 from torch_tensorrt.executorch.backend import (
-    TensorRTBackend,
     _get_engine_info_from_edge_program,
     _parse_device_id,
+    TensorRTBackend,
 )
 from torch_tensorrt.executorch.operator_support import TensorRTOperatorSupport
 
@@ -34,6 +34,15 @@ try:
     )
 except ImportError:
     _TARGET_DEVICE_COMPILE_SPEC_KEY = "target_device"
+
+# Compile spec key that carries the TensorRT weight streaming budget into the
+# delegate. Must match kWeightStreamingBudgetKey on the C++ side
+# (cpp/include/torch_tensorrt/executorch/WeightStreamingBudget.h). The value is a
+# non-negative decimal integer of bytes (ASCII). The key is absent for the
+# automatic budget, which the delegate applies itself for streamable engines.
+# The delegate also reads this same key as a load-time backend option (runtime
+# spec), which takes precedence over this baked value when provided at load.
+WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY = "weight_streaming_budget"
 
 logger = logging.getLogger(__name__)
 

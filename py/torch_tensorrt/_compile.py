@@ -30,32 +30,26 @@ else:
 
 if ENABLED_FEATURES.torchscript_frontend:
     import torch_tensorrt.ts
-    from torch_tensorrt.ts._compiler import compile as torchscript_compile
     from torch_tensorrt.ts._compiler import (
+        compile as torchscript_compile,
         convert_method_to_trt_engine as ts_convert_method_to_trt_engine,
     )
 
 if ENABLED_FEATURES.dynamo_frontend:
     from torch.export import ExportedProgram
-    from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
     from torch_tensorrt.dynamo._compiler import (
+        compile as dynamo_compile,
         convert_exported_program_to_serialized_trt_engine as dynamo_convert_exported_program_to_serialized_trt_engine,
-    )
-    from torch_tensorrt.dynamo._compiler import (
         cross_compile_for_windows as dynamo_cross_compile_for_windows,
-    )
-    from torch_tensorrt.dynamo._compiler import (
         load_cross_compiled_exported_program as dynamo_load_cross_compiled_exported_program,
-    )
-    from torch_tensorrt.dynamo._compiler import (
         save_cross_compiled_exported_program as dynamo_save_cross_compiled_exported_program,
     )
     from torch_tensorrt.dynamo._defaults import default_device
     from torch_tensorrt.dynamo._tracer import (
         get_dynamic_shapes_args,
         get_dynamic_shapes_kwargs,
+        trace as dynamo_trace,
     )
-    from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
     from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 logger = logging.getLogger(__name__)
@@ -728,11 +722,26 @@ def save(
 
                 - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes
                   parameter takes precedence.
-        kwargs: Additional format-specific kwargs. ``partitioners=`` and
-                ``compile_specs=`` are only used with ``output_format="executorch"``;
-                otherwise they are ignored with a warning. Pass
+        kwargs: Additional format-specific kwargs. ``partitioners=``,
+                ``compile_specs=``, and ``weight_streaming_budget=`` are only used
+                with ``output_format="executorch"``; otherwise they are ignored
+                with a warning. Pass
                 ``compile_specs=[CompileSpec("target_device", b"cuda:<i>")]`` to
                 override the default target device (``cuda:0``).
+                ``weight_streaming_budget`` controls the TensorRT weight streaming
+                budget for the delegate: ``None`` (the default) lets the delegate
+                pick an automatic budget at load, and a non-negative integer sets
+                an explicit GPU budget in bytes. For a program with multiple
+                TensorRT engines an explicit byte budget applies to each engine
+                independently, so prefer ``None`` there. Only an engine built with
+                ``enable_weight_streaming=True`` honors the budget at runtime. This
+                value is an export-time default; it can be overridden at load with a
+                ``weight_streaming_budget`` backend option so the same ``.pte`` can
+                be sized for different GPUs without re-exporting. That load-time
+                override currently works only from runtimes that pass ExecuTorch
+                backend options (the C++ ``Module`` API and iOS); the ExecuTorch
+                Python and Android loaders do not expose it yet and use this
+                export-time value.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -759,6 +768,7 @@ def save(
 
     executorch_partitioners = kwargs.pop("partitioners", None)
     executorch_compile_specs = kwargs.pop("compile_specs", None)
+    executorch_weight_streaming_budget = kwargs.pop("weight_streaming_budget", None)
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -769,6 +779,16 @@ def save(
             "Saving in ExecuTorch format requires the executorch package "
             "with executorch.exir. Install with: pip install "
             "\"executorch\" to use output_format='executorch'."
+        )
+    # Recognized executorch options are popped above; any other leftover kwarg
+    # for output_format='executorch' is a typo (the executorch path forwards no
+    # other kwargs), so fail loudly instead of silently ignoring it.
+    if output_format == "executorch" and kwargs:
+        raise TypeError(
+            "save() received unexpected keyword argument(s) for "
+            f"output_format='executorch': {sorted(kwargs)}. Supported executorch "
+            "options are 'partitioners', 'compile_specs', and "
+            "'weight_streaming_budget'."
         )
 
     def _all_are_input_objects(obj: Any) -> bool:
@@ -880,6 +900,16 @@ def save(
             "compile_specs= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
+    if executorch_weight_streaming_budget is not None and output_format != "executorch":
+        logger.warning(
+            "weight_streaming_budget= is only used with output_format='executorch' "
+            f"and will be ignored for output_format='{output_format}'."
+        )
+    if executorch_weight_streaming_budget is not None and output_format == "executorch":
+        # Validate eagerly so an invalid budget (non-int or out-of-range) fails
+        # fast, before any expensive export. It is normalized again later when
+        # building the compile_specs.
+        _normalize_weight_streaming_budget(executorch_weight_streaming_budget)
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
@@ -948,6 +978,7 @@ def save(
                     file_path,
                     partitioners=executorch_partitioners,
                     compile_specs=executorch_compile_specs,
+                    weight_streaming_budget=executorch_weight_streaming_budget,
                 )
             else:
                 raise RuntimeError(
@@ -1013,6 +1044,7 @@ def save(
                         file_path,
                         partitioners=executorch_partitioners,
                         compile_specs=executorch_compile_specs,
+                        weight_streaming_budget=executorch_weight_streaming_budget,
                     )
                 else:
                     raise RuntimeError(
@@ -1099,6 +1131,7 @@ def save(
                         file_path,
                         partitioners=executorch_partitioners,
                         compile_specs=executorch_compile_specs,
+                        weight_streaming_budget=executorch_weight_streaming_budget,
                     )
                 else:
                     raise RuntimeError(
@@ -1233,9 +1266,7 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
         # Use FX's unique-attr-name helper so re-export passes (which may
         # invoke this rewriter multiple times on the same `gm`) don't
         # silently overwrite earlier engine buffers.
-        from torch.fx.experimental.const_fold import (
-            get_unique_attr_name_in_module,
-        )
+        from torch.fx.experimental.const_fold import get_unique_attr_name_in_module
 
         buffer_name = get_unique_attr_name_in_module(gm, "_trt_engine_0")
         gm.register_buffer(buffer_name, engine_tensor, persistent=True)
@@ -1296,6 +1327,80 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
     return exp_program
 
 
+WEIGHT_STREAMING_BUDGET_MAX_BYTES = 2**63
+
+
+def _normalize_weight_streaming_budget(
+    weight_streaming_budget: Any,
+) -> Optional[bytes]:
+    """Validate the budget and encode it as a compile-spec value.
+
+    ``None`` (the default) means automatic: the delegate picks the budget at load.
+    A non-negative integer is an explicit GPU budget in bytes. Returns the ASCII
+    bytes to store in the CompileSpec, or ``None`` when no budget was supplied.
+    """
+    if weight_streaming_budget is None:
+        return None
+    # bool is an int subclass, so reject it explicitly along with non-ints.
+    if isinstance(weight_streaming_budget, bool) or not isinstance(
+        weight_streaming_budget, int
+    ):
+        raise TypeError(
+            "weight_streaming_budget must be a non-negative int (number of bytes) "
+            f"or None for automatic, got {type(weight_streaming_budget).__name__}."
+        )
+    if (
+        weight_streaming_budget < 0
+        or weight_streaming_budget >= WEIGHT_STREAMING_BUDGET_MAX_BYTES
+    ):
+        raise ValueError(
+            "weight_streaming_budget must be in [0, 2**63), got "
+            f"{weight_streaming_budget}."
+        )
+    return str(weight_streaming_budget).encode("ascii")
+
+
+def _resolve_executorch_compile_specs(
+    exp_program: Any,
+    caller_compile_specs: Sequence[Any],
+    weight_streaming_budget: Any,
+) -> List[Any]:
+    """Resolve the compile_specs passed to TensorRTPartitioner.
+
+    Appends the explicit weight streaming budget (from the save() kwarg) as a
+    CompileSpec. When no budget is given nothing is added and the delegate applies
+    TensorRT's automatic budget itself for engines built with weight streaming.
+    Caller-provided compile_specs are forwarded unchanged.
+    """
+    from executorch.exir.backend.compile_spec_schema import CompileSpec
+    from torch_tensorrt.executorch.partitioner import (
+        WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY,
+    )
+
+    specs = list(caller_compile_specs)
+    if any(
+        getattr(spec, "key", None) == WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY
+        for spec in specs
+    ):
+        raise ValueError(
+            f"Do not pass a CompileSpec('{WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY}', "
+            "...) in compile_specs; use the weight_streaming_budget argument of "
+            "save() instead."
+        )
+    spec_value = _normalize_weight_streaming_budget(weight_streaming_budget)
+    if spec_value is None:
+        return specs
+
+    if _count_executorch_engine_nodes(exp_program) > 1:
+        logger.warning(
+            "weight_streaming_budget is an explicit byte budget but the program "
+            "contains multiple TensorRT engines; it is applied to each engine "
+            "independently. Pass None to size each engine's budget automatically."
+        )
+    specs.append(CompileSpec(WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY, spec_value))
+    return specs
+
+
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an ExportedProgram (with TensorRT execute_engine nodes) as an ExecuTorch .pte file.
 
@@ -1318,16 +1423,12 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "\"executorch\" to use output_format='executorch'."
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
-    from torch_tensorrt.executorch import (
-        TensorRTPartitioner,
-        get_edge_compile_config,
-    )
+    from torch_tensorrt.executorch import get_edge_compile_config, TensorRTPartitioner
 
     extra_partitioners = kwargs.get("partitioners") or []
     if not isinstance(extra_partitioners, (list, tuple)):
         raise TypeError(
-            "partitioners must be a list or tuple when using "
-            "output_format='executorch'"
+            "partitioners must be a list or tuple when using output_format='executorch'"
         )
     # Forward any caller-provided compile_specs to TensorRTPartitioner so users
     # can override the default target_device ("cuda:0") by passing e.g.
@@ -1339,9 +1440,17 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "compile_specs must be a list or tuple when using "
             "output_format='executorch'"
         )
-    partitioners = [
-        TensorRTPartitioner(compile_specs=list(executorch_compile_specs))
-    ] + list(extra_partitioners)
+    # Resolve the weight streaming budget into the compile_specs from the save()
+    # kwarg. If none is given nothing is added and the delegate applies TensorRT's
+    # automatic budget itself for engines built with weight streaming.
+    resolved_compile_specs = _resolve_executorch_compile_specs(
+        exp_program,
+        list(executorch_compile_specs),
+        kwargs.get("weight_streaming_budget"),
+    )
+    partitioners = [TensorRTPartitioner(compile_specs=resolved_compile_specs)] + list(
+        extra_partitioners
+    )
 
     engine_count = _count_executorch_engine_nodes(exp_program)
     if engine_count > 1:
@@ -1377,14 +1486,10 @@ def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> Non
     import base64
 
     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
-    from torch_tensorrt.dynamo.runtime._TRTEngine import (
-        EngineSerializer,
-        TRTEngine,
-    )
+    from torch_tensorrt.dynamo.runtime._TRTEngine import EngineSerializer, TRTEngine
 
     for fqn, constant in list(exp_program.constants.items()):
         if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):
-
             state = constant.__getstate__()
             if len(state) == 2 and (
                 state[1] == "TRTEngine"
