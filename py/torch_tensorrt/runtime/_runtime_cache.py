@@ -5,9 +5,9 @@ Used by:
 
 * The runtime ``cache()`` CM to attach a SHARED cache across one or more
   modules' engines.
-* ``RuntimeSettings(runtime_cache=...)`` for compile-time hints (string path
-  ⇒ engine creates an implicit per-engine handle; ``RuntimeCacheHandle`` ⇒
-  external shared handle attached directly).
+* ``RuntimeSettings(runtime_cache=...)`` (string path ⇒ engine creates an
+  implicit per-engine handle; ``RuntimeCacheHandle`` ⇒ external shared
+  handle attached directly).
 
 File I/O lives entirely on the Python side under a ``filelock`` (this module).
 The C++-side ``torch.classes.tensorrt.RuntimeCacheHandle`` is a passive
@@ -36,7 +36,7 @@ class RuntimeCacheHandle:
     Three construction patterns differ in *who else holds a reference*, which
     drives the ``autosave_on_del`` flag:
 
-    1. **Engine-implicit** (compile-time hint): when an engine sees
+    1. **Engine-implicit**: when an engine sees
        ``RuntimeSettings(runtime_cache="/path")``, the engine's
        ``TRTRuntimeConfig`` materializes a handle internally with
        ``autosave_on_del=True``. No other Python object holds the handle,
@@ -60,10 +60,7 @@ class RuntimeCacheHandle:
     **Equality is identity-based.** Two handles wrap distinct underlying
     ``IRuntimeCache`` instances even when they share a path, and the runtime
     treats them as such (separate ``IRuntimeConfig`` slots, no
-    kernel-specialization sharing). So ``a == b`` iff ``a is b``. This falls
-    out of Python's default ``object.__eq__`` semantics; no explicit override
-    is needed. Used by ``update_runtime_settings`` to fast-path the
-    "same handle, no change" case.
+    kernel-specialization sharing).
     """
 
     def __init__(

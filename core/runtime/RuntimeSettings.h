@@ -69,23 +69,11 @@ enum class CudaGraphStrategy : int32_t {
 };
 
 // Boundary validators: take the int that crossed the Py->C++ wire and return
-// the enum (or throw with a clear message on out-of-range). Used only inside
-// the torchbind ``update_runtime_settings`` lambda -- the rest of the code
-// passes the enum type directly.
+// the enum (or throw with a clear message on out-of-range).
 [[nodiscard]] DynamicShapesKernelSpecializationStrategy to_dynamic_shapes_kernel_strategy(int64_t v);
 [[nodiscard]] CudaGraphStrategy to_cuda_graph_strategy(int64_t v);
 
-// Per-engine runtime-only knobs sampled at IExecutionContext creation.
-//
-// ``RuntimeSettings`` is a plain struct (not a torchbind class) because we
-// flatten it into positional args at the torchbind boundary -- TorchBind can't
-// carry a dataclass natively. Equality is value-by-value; the cache field
-// compares by pointer identity (same handle -> same cache).
-//
-// The strategy fields are typed enums. The Python user-facing API takes strings
-// (``"lazy" | "eager" | "none"`` etc.) and validates them at the Python
-// boundary; the torchbind lambda then maps the underlying ``int32_t`` to the
-// enum via ``to_*_strategy`` and stores typed values here.
+// Per-engine runtime-only knobs that move across the Python/C++ boundary.
 struct RuntimeSettings {
   DynamicShapesKernelSpecializationStrategy dynamic_shapes_kernel_specialization_strategy =
       DynamicShapesKernelSpecializationStrategy::kLAZY;
@@ -100,9 +88,7 @@ struct RuntimeSettings {
   [[nodiscard]] std::string to_str() const;
 };
 
-// Reverse-lookup helpers used by ``to_str`` and ``operator<<``. Out-of-range
-// values render as ``"<unknown>"``. Defined here so other translation units
-// (e.g. ``TRTEngine.cpp`` for ``LOG_DEBUG``) can use the same mapping.
+// Reverse-lookup helpers (enum -> name); out-of-range renders as ``"<unknown>"``.
 [[nodiscard]] std::string_view ds_strategy_name(DynamicShapesKernelSpecializationStrategy v);
 [[nodiscard]] std::string_view cg_strategy_name(CudaGraphStrategy v);
 

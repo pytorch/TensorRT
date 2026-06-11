@@ -213,12 +213,6 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
-  // Materialize the IExecutionContext on the first execute (under the lazy-create
-  // policy the ctor and ``update_runtime_settings`` no longer eagerly build one).
-  // First touch of ``exec_ctx()`` below materializes the IExecutionContext
-  // if it hasn't been built yet (replaces the old explicit
-  // ``ensure_execution_context`` call).
-
   // All inputs are expected to be on CUDA. Warn and move any that are not.
   for (auto& inp : inputs) {
     if (inp.defined() && !inp.is_cuda()) {
@@ -248,13 +242,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   auto run_standard_execution = [&]() {
     bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
-    // effective_cudagraphs controls the manual at::cuda::CUDAGraph path below. On TRT-RTX
-    // builds the engine-internal runtime owns capture/replay inside enqueueV3 whenever the
-    // engine has a cuda_graph_strategy set or subgraph cudagraphs are enabled; the struct
-    // reports that via `uses_internal_capture` so the caller skips its manual wrapper. If
-    // an outer stream capture is already in progress (e.g. the caller wraps this module in
-    // CudaGraphsTorchTensorRTModule for whole-graph capture), engine-internal capture would
-    // collide, so we disable it one-shot here.
+    // effective_cudagraphs controls the manual at::cuda::CUDAGraph path below. For TRT-RTX
+    // the runtime owns capture/replay inside enqueueV3 whenever it has a cuda_graph_strategy
+    // set or subgraph cudagraphs are enabled.  The `uses_internal_capture` API below lets the caller
+    // know to skip the manual capture path. If an outer stream capture is already in progress
+    // (e.g. the caller wraps this module in  CudaGraphsTorchTensorRTModule for whole-graph capture),
+    // engine-internal capture would collide, so we disable it one-shot here.
     bool effective_cudagraphs = cudagraphs_enabled;
     if (compiled_engine->runtime_cfg.uses_internal_capture(cudagraphs_enabled)) {
       effective_cudagraphs = false;

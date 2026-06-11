@@ -279,20 +279,17 @@ struct TRTEngine : torch::CustomClassHolder {
   ResourceAllocationStrategy get_resource_allocation_strategy();
 
   // Owns the canonical `RuntimeSettings` plus the live `IRuntimeConfig` derived
-  // from them. The engine forwards `runtime_settings()` and
-  // `update_runtime_settings()` here -- there is no separate settings field on
-  // the engine.
+  // from them.
   TRTRuntimeConfig runtime_cfg;
 
   [[nodiscard]] RuntimeSettings const& runtime_settings() const noexcept {
     return runtime_cfg.settings();
   }
 
-  // Setter overload (matches the getter name). Returns true iff the settings
-  // actually changed -- consumers can read the diff result to decide whether
-  // to invalidate dependent state. On change, invalidates the live
-  // ``IRuntimeConfig`` (the next ``exec_ctx()`` getter call rebuilds with
-  // the new settings).
+  // Setter. Returns true iff the settings actually changed -- consumers can
+  // read the diff result to decide whether to invalidate dependent state. On
+  // change, invalidates the live ``IRuntimeConfig`` (the next ``exec_ctx()``
+  // getter call rebuilds with the new settings).
   [[nodiscard]] bool runtime_settings(RuntimeSettings new_settings);
 
   // Whether the engine has any input binding with a dynamic dimension. Computed
@@ -308,14 +305,9 @@ struct TRTEngine : torch::CustomClassHolder {
   // already disabled.
   void disable_rtx_native_cudagraphs();
 
-  // The only path to the live ``IExecutionContext``. Materializes it lazily on
-  // first call using the current settings from ``runtime_cfg``; subsequent
-  // calls return the cached instance until ``invalidate_exec_ctx()`` drops it.
-  //
-  // External code accesses the context exclusively through this getter -- the
-  // backing field ``exec_ctx_`` is private. No setter; the only way to drop
-  // the context is ``invalidate_exec_ctx()``.
-  //
+  // Obtains the execution context. Materializes it lazily on first call using
+  // the current settings from ``runtime_cfg`` and subsequent calls return the
+  // cached instance until invalidated.
   // Returns a raw pointer owned by the internal ``shared_ptr``; do not store
   // across an invalidate. Returned pointer is never null (the underlying
   // factory throws if creation fails).
@@ -329,19 +321,13 @@ struct TRTEngine : torch::CustomClassHolder {
   // triggering creation; for tests/introspection.
   [[nodiscard]] bool has_exec_ctx() const noexcept;
 
-  // Test/observability hook: increments once every time ``runtime_cfg.create_execution_context``
-  // is invoked (i.e. an actual TRT createExecutionContext call, which on RTX
-  // also JIT-compiles the specialized kernel set). Bound on the torchbind class
-  // via a lambda wrapper -- torchbind's ``def`` template is not specialized for
-  // ``const noexcept`` member functions, so this method is registered indirectly.
   [[nodiscard]] int64_t num_execution_contexts_created() const noexcept {
     return num_execution_contexts_created_;
   }
 
  private:
   // Backing storage for the execution context. External code reaches it only
-  // through ``exec_ctx()`` / ``invalidate_exec_ctx()`` / ``has_exec_ctx()``
-  // -- code-construction ban on stashing a stale context.
+  // through ``exec_ctx()`` / ``invalidate_exec_ctx()`` / ``has_exec_ctx()``.
   std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx_;
 
   // Single entry point that (re)creates exec_ctx_ via runtime_cfg.create_execution_context.

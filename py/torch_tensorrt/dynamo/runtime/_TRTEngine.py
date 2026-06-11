@@ -449,13 +449,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self.serialized_metadata
 
     def close(self) -> None:
-        """Release CUDA graph resources.
-
-        Implicit runtime cache persistence is now driven by the
-        :class:`~torch_tensorrt.runtime._runtime_cache.RuntimeCacheHandle`'s
-        own ``__del__`` (with ``autosave_on_del=True``), so no explicit save
-        is needed here.
-        """
+        """Release CUDA graph resources."""
         self.reset_captured_graph()
 
     def _create_execution_context(self) -> trt.IExecutionContext:
@@ -508,15 +502,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             # have a live IExecutionContext before any rank executes a
             # collective. Materialize the context up front (mirrors the C++
             # ctor's eager bind_nccl_comm path) and barrier so a fast-compiling
-            # rank does not race ahead.
+            # rank does not race ahead
+            # and issue an NCCL op while another rank is still inside
+            # deserialize_cuda_engine / create_execution_context.
             #
             # Trade-off: NCCL engines forfeit the "one createExecutionContext
             # per setup" invariant the non-NCCL path enjoys. Any subsequent
             # ``mod.runtime_settings = ...`` invalidates this eagerly-created
-            # context and triggers a second create on next execute. Tests
-            # that assert on the create count (e.g.
-            # ``test_one_context_create_with_default_settings``) must skip
-            # NCCL engines.
+            # context and triggers a second create on next execute.
             _ = self.context  # property triggers create_execution_context
 
             if (

@@ -185,13 +185,8 @@ TRTEngine::TRTEngine(
   LOG_DEBUG(
       "Resource allocation strategy: "
       << (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "Dynamic" : "Static"));
-  // ``exec_ctx_`` is created lazily on first ``exec_ctx()`` read (the only
-  // public path: ``execute_engine``, ``enable_profiling``, ``bind_nccl_comm``,
-  // ``infer_outputs``). Deferring here lets the Python ``setup_engine`` cpp
-  // branch dispatch user ``RuntimeSettings`` before the (expensive,
-  // kernel-JIT-compiling) TRT ``createExecutionContext`` call -- collapses
-  // the historical "create-with-defaults then recreate-with-settings" pair
-  // into a single create.
+  // ``exec_ctx_`` is created lazily on first ``exec_ctx()`` read so that any
+  // JIT compilations can occur after all runtime settings are provided.
 
   // Pre-allocate placeholder for empty tensors (TensorRT requires non-null addresses)
   cudaMalloc(&empty_tensor_placeholder, 1);
@@ -282,7 +277,6 @@ TRTEngine::TRTEngine(
   has_dynamic_inputs = engine_has_dynamic_inputs(cuda_engine.get(), in_binding_names);
 
 #ifndef NDEBUG
-  // Debug builds want profiling on from the start; that requires a live ctx.
   this->enable_profiling();
 #endif
   LOG_DEBUG(*this);
@@ -318,8 +312,7 @@ void TRTEngine::disable_profiling() {
   profile_execution = false;
   trt_engine_profiler.reset();
   // Drop the profiler-attached context; next execute lazily creates a fresh
-  // one with no profiler. (TRT has no detach-profiler API -- recreate is the
-  // canonical way.)
+  // one with no profiler.
   invalidate_exec_ctx();
 }
 
@@ -341,8 +334,6 @@ void TRTEngine::dump_engine_layer_info() {
 void TRTEngine::enable_profiling() {
   profile_execution = true;
   trt_engine_profiler = std::make_unique<TRTEngineProfiler>(name);
-  // ``setProfiler`` requires a live ``IExecutionContext``; the ``exec_ctx()``
-  // getter materializes it lazily if it isn't built yet.
   exec_ctx()->setProfiler(trt_engine_profiler.get());
 }
 
@@ -552,8 +543,9 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
   serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = this->requires_native_multidevice ? "1" : "0";
+  // rank/world_size are runtime facts (may differ at load time); not serialized.
   // RuntimeSettings are intentionally NOT serialized: they're per-engine, in-memory
-  // initialization values, not part of the engine's identity. See pytorch/TensorRT#4310.
+  // initialization values, not part of the engine's identity.
 
   return serialized_info;
 }
