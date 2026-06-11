@@ -359,11 +359,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         Cpp rt: needs the torchbind sibling live; without it, the cpp engine
         has no way to hold the same underlying ``IRuntimeCache``.
         """
-        from torch_tensorrt.runtime._runtime_cache import _TorchbindBacking
-
         if not ENABLED_FEATURES.torch_tensorrt_runtime:
             return True
-        return isinstance(w._backing, _TorchbindBacking)
+        return w.is_torchbind_backed()
 
     def _send_to_engine(self, rs: RuntimeSettings) -> None:
         """Push ``rs`` to whichever engine flavor is attached."""

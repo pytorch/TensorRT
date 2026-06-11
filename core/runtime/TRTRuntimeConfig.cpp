@@ -37,6 +37,9 @@ void TRTRuntimeConfig::ensure_initialized(TORCHTRT_UNUSED nvinfer1::ICudaEngine*
   // an explicit user opt-in we leave the IRuntimeConfig cache-less.
   auto& rt_cache = settings_.runtime_cache;
   if (rt_cache) {
+    // ``cache`` is owned by ``rt_cache->trt_handle_`` (kept alive through the
+    // settings); the local ``shared_ptr`` here is just an attach handle and
+    // does not need to outlive the call.
     auto cache = rt_cache->ensure_materialized(config.get());
     TORCHTRT_CHECK(cache.get() != nullptr, "Failed to create IRuntimeCache for shared RuntimeCacheHandle");
     if (config->setRuntimeCache(*cache)) {

@@ -123,8 +123,8 @@ std::shared_ptr<nvinfer1::IRuntimeCache> RuntimeCacheHandle::ensure_materialized
     // This is the cpp-rt warm-start path: ``load()`` fired before the first
     // ``ensure_materialized``, bytes parked in ``pending_warm_bytes_``,
     // first engine to ``ensure_materialized`` creates the cache and drains.
-    if (!pending_warm_bytes_.empty()) {
-      trt_handle_->deserialize(pending_warm_bytes_.data(), pending_warm_bytes_.size());
+    if (!std::empty(pending_warm_bytes_)) {
+      trt_handle_->deserialize(pending_warm_bytes_.data(), std::size(pending_warm_bytes_));
       pending_warm_bytes_.clear();
       pending_warm_bytes_.shrink_to_fit();
       LOG_DEBUG("Drained pending warm-start bytes into IRuntimeCache.");

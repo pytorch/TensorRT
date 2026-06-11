@@ -144,12 +144,13 @@ class RuntimeCacheHandle:
         self.autosave_on_del = autosave_on_del
         self._lock = threading.Lock()
 
-    @property
-    def cache(self) -> Any:
-        """The underlying Python pybind ``trt.IRuntimeCache``. ``None`` if not yet materialized or if backed by a torchbind sibling."""
-        if isinstance(self._backing, _PybindBacking):
-            return self._backing._cache
-        return None
+    def is_torchbind_backed(self) -> bool:
+        """``True`` iff this handle wraps a torchbind sibling (cpp rt path)."""
+        return isinstance(self._backing, _TorchbindBacking)
+
+    def is_pybind_backed(self) -> bool:
+        """``True`` iff this handle wraps a pybind ``IRuntimeCache`` (Python rt path)."""
+        return isinstance(self._backing, _PybindBacking)
 
     def ensure_cache(self, runtime_config: Any) -> Any:
         """Idempotent. First caller materializes via ``runtime_config.create_runtime_cache()``.
@@ -163,13 +164,6 @@ class RuntimeCacheHandle:
                 self._backing = _PybindBacking(runtime_config.create_runtime_cache())
             assert isinstance(self._backing, _PybindBacking)
             return self._backing._cache
-
-    def _read_bytes(self) -> Optional[bytes]:
-        return self._backing.serialize_bytes() if self._backing is not None else None
-
-    def _write_bytes(self, data: bytes) -> None:
-        if self._backing is not None:
-            self._backing.deserialize_bytes(data)
 
     def load_from_stream(self, stream: IO[bytes]) -> int:
         """Read bytes from ``stream`` and deserialize into the underlying cache.
@@ -187,7 +181,7 @@ class RuntimeCacheHandle:
         data = stream.read()
         if not data:
             return 0
-        self._write_bytes(data)
+        self._backing.deserialize_bytes(data)
         logger.debug(f"Loaded runtime cache from stream ({len(data)} bytes)")
         return len(data)
 
@@ -201,7 +195,7 @@ class RuntimeCacheHandle:
         opened and uses the return value to decide whether to promote the tmp
         to the destination (avoids writing a zero-byte cache file).
         """
-        data = self._read_bytes()
+        data = self._backing.serialize_bytes() if self._backing is not None else None
         if not data:
             return 0
         stream.write(data)
@@ -376,23 +370,16 @@ class _RuntimeCacheContextManager:
                 "under the target(s)."
             )
 
-        # 2. Build the handle. The underlying ``IRuntimeCache`` materializes
-        # differently per runtime:
-        #
-        # - Python rt: ``IRuntimeConfig.create_runtime_cache()`` returns a pybind
-        #   ``IRuntimeCache`` directly; we materialize up front and load before
-        #   attach.
-        # - Cpp rt: the torchbind sibling carries a ``shared_ptr<IRuntimeCache>``
-        #   that the C++ ``TRTRuntimeConfig::ensure_initialized`` populates on
-        #   first attach; we attach first and load after.
+        # 2. Build the handle, then load (uniform load-then-attach order across
+        # both runtimes). On Python rt, the pybind ``IRuntimeCache`` materializes
+        # up-front via ``create_runtime_cache()``. On cpp rt, the torchbind
+        # sibling defers materialization until first ``ensure_materialized``;
+        # ``handle.load()`` stashes bytes in cpp ``pending_warm_bytes_`` which
+        # the engine drains on materialization.
         #
         # ``autosave_on_del=False`` in both cases -- the CM saves explicitly on
         # ``__exit__``; letting ``__del__`` also save would double-write when
         # ``rc`` falls out of scope after the with-block.
-        # Build the handle. Both runtimes follow the same load-then-attach
-        # order after the cpp-rt warm-start fix: the cpp deserialize stashes
-        # bytes in ``pending_warm_bytes_`` when ``trt_handle_`` isn't live yet,
-        # and drains them on the first ``ensure_materialized``.
         if isinstance(bootstrap_module.engine, TRTEngine):
             cache_obj = bootstrap_module.engine.runtime_config.create_runtime_cache()
             self.handle = RuntimeCacheHandle(

@@ -16,20 +16,12 @@ This module groups three closely related concepts together:
 
 Three ways to use ``RuntimeSettings``:
 
-1. **Compile-time hint** (recommended fast path) -- prime the engine with the
-   desired initial values so no CM enter/exit recreate is needed::
-
-       compiled = torchtrt.compile(
-           model, ...,
-           runtime_settings=RuntimeSettings(cuda_graph_strategy="whole_graph_capture"),
-       )
-
-2. **Runtime context manager** -- toggle settings inside a ``with`` block.
-3. **Programmatic** -- assign ``module.runtime_settings = rs`` directly.
+1. **Runtime context manager** -- toggle settings inside a ``with`` block.
+2. **Programmatic** -- assign ``module.runtime_settings = rs`` directly.
 
 ``RuntimeSettings`` is intentionally NOT part of ``CompilationSettings`` and is
-NOT serialized into the engine tuple (per GitHub pytorch/TensorRT#4310). It's
-purely an in-memory initialization parameter / runtime override state.
+NOT serialized into the engine tuple. It's purely an in-memory initialization
+parameter / runtime override state.
 """
 
 from __future__ import annotations
