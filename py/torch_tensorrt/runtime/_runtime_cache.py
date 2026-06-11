@@ -128,40 +128,25 @@ class RuntimeCacheHandle:
         torchbind_handle: Any = None,
     ) -> None:
         # Mutually exclusive at construction -- enforced, not just documented.
-        if cache is not None and torchbind_handle is not None:
+        if cache and torchbind_handle:
             raise ValueError(
                 "RuntimeCacheHandle: specify ``cache`` OR ``torchbind_handle``, not both"
             )
-        if cache is not None:
-            self._backing: Optional[_CacheBacking] = _PybindBacking(cache)
-        elif torchbind_handle is not None:
+        self._backing: Optional[_CacheBacking] = None
+        if cache:
+            self._backing = _PybindBacking(cache)
+        elif torchbind_handle:
             self._backing = _TorchbindBacking(torchbind_handle)
-        else:
-            self._backing = None
         self.path = path
         self.autosave_on_del = autosave_on_del
         self._lock = threading.Lock()
 
-    # Back-compat properties for callers that previously inspected the raw
-    # fields. ``RuntimeCacheHandle`` is in the public API surface and the
-    # ``runtime_settings`` setter / ``_to_torchbind_handle`` helper read
-    # these.
-    @property
-    def _cache(self) -> Any:
-        if isinstance(self._backing, _PybindBacking):
-            return self._backing._cache
-        return None
-
-    @property
-    def _torchbind(self) -> Any:
-        if isinstance(self._backing, _TorchbindBacking):
-            return self._backing.torchbind
-        return None
-
     @property
     def cache(self) -> Any:
         """The underlying Python pybind ``trt.IRuntimeCache``. ``None`` if not yet materialized or if backed by a torchbind sibling."""
-        return self._cache
+        if isinstance(self._backing, _PybindBacking):
+            return self._backing._cache
+        return None
 
     def ensure_cache(self, runtime_config: Any) -> Any:
         """Idempotent. First caller materializes via ``runtime_config.create_runtime_cache()``.
