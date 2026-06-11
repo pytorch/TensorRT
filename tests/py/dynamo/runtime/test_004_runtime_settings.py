@@ -390,11 +390,11 @@ class TestToTorchbindHandleOrphanGuard(TestCase):
     def test_orphan_pybind_cache_raises(self):
         from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
 
-        rc = RuntimeCacheHandle(path="")
-        # Force the orphan-hazard state: a non-None ``_cache`` (pybind) with
-        # no ``_torchbind`` sibling. The actual ``_cache`` object isn't
-        # exercised by the guard; only its non-None-ness is.
-        rc._cache = object()
+        # Force the orphan-hazard state: a pybind-backed handle (no
+        # torchbind sibling) crossing into the cpp dispatch path. The
+        # ``object()`` placeholder for the pybind cache is sufficient --
+        # the guard only checks the backing type, not the cache itself.
+        rc = RuntimeCacheHandle(cache=object(), path="")
         with self.assertRaises(RuntimeError) as cm:
             _to_torchbind_handle(rc)
         self.assertIn("orphan", str(cm.exception).lower())

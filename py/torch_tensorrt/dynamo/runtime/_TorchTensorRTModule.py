@@ -328,9 +328,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # ``autosave_on_del=True`` is how implicit caches persist across runs.
         # On cpp rt, also attach the torchbind sibling so the cpp engine can
         # hold a reference to the same underlying ``IRuntimeCache``.
-        new = RuntimeCacheHandle(path=rc, autosave_on_del=True)
         if ENABLED_FEATURES.torch_tensorrt_runtime:
-            new._torchbind = torch.classes.tensorrt.RuntimeCacheHandle(rc)
+            tb = torch.classes.tensorrt.RuntimeCacheHandle(rc)
+            new = RuntimeCacheHandle(torchbind_handle=tb, path=rc, autosave_on_del=True)
+        else:
+            new = RuntimeCacheHandle(path=rc, autosave_on_del=True)
         self._set_managed_handle(new)
         return rs.merge(runtime_cache=new)
 
