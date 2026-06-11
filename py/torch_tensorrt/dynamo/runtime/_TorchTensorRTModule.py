@@ -498,7 +498,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             )
 
             serialized_metadata = serialized_engine_info[SERIALIZED_METADATA_IDX]
-            assert isinstance(serialized_metadata, bytes)
+            # ``_pack_engine_info`` packs the metadata as a ``str``
+            # (base64-of-pickle.dumps decoded to utf-8); ``decode_metadata``
+            # expects the same. The assertion was inherited from an older
+            # bytes-typed format and never updated.
+            assert isinstance(serialized_metadata, str)
             metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
             self.settings = metadata["settings"]
             self.weight_name_map = metadata["weight_name_map"]

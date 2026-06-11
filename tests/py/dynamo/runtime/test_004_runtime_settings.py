@@ -317,9 +317,16 @@ class TestStateDictRoundTripRuntimeSettings(TestCase):
 
 class TestNestedRuntimeConfigCudagraphs(TestCase):
     """Pinned-down composition contract: nesting ``runtime_config`` outside
-    ``enable_cudagraphs`` yields a single ``createExecutionContext`` call;
-    reversing the nesting yields two (warm-up creates with old settings, flip
-    invalidates, next execute recreates)."""
+    ``enable_cudagraphs`` applies settings state-only first; the wrapper's
+    warm-up then materializes the context with the strategy already in
+    effect (one ``createExecutionContext`` call total).
+
+    Inverted nesting is documented as an anti-pattern but is hard to
+    observe via create count -- the cudagraph wrapper replays the
+    recorded graph without going through ``engine.context``, so a
+    settings flip *inside* the cudagraphs CM doesn't trigger a recreate
+    on the next call. The semantic bug there (stale strategy in the
+    replayed graph) is not captured by ``num_execution_contexts_created``."""
 
     def _walk_engines(self, compiled):
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
@@ -351,29 +358,6 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
                 n,
                 1,
                 f"Nested form should create exactly 1 context, got {n}",
-            )
-
-    @unittest.skipIf(
-        not ENABLED_FEATURES.tensorrt_rtx,
-        "cuda_graph_strategy is TRT-RTX-only",
-    )
-    def test_inverted_nesting_creates_two_contexts(self):
-        """Anti-pattern: settings flip *inside* the cudagraphs CM invalidates
-        the warmed context. Documented to cost 2 creates; this test pins it."""
-        from torch_tensorrt.runtime import enable_cudagraphs
-
-        compiled = _compile_simple()
-        inputs = [torch.randn(2, 3).cuda()]
-        with enable_cudagraphs(compiled) as w:
-            # warm_up has materialized the context with default settings
-            with runtime_config(compiled, cuda_graph_strategy="whole_graph_capture"):
-                _ = w(*inputs)
-        for mod in self._walk_engines(compiled):
-            n = mod.engine.num_execution_contexts_created()
-            self.assertEqual(
-                n,
-                2,
-                f"Inverted form should create exactly 2 contexts, got {n}",
             )
 
 
