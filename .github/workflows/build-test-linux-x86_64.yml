@@ -493,6 +493,7 @@ jobs:
                 pushd .
                 cd tests/py/dynamo
                 python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
+                python -m pip install pyyaml "executorch>=1.3.1"
                 python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_executorch_tests_results.xml executorch/
                 popd
 
