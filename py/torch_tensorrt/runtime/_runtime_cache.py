@@ -128,14 +128,17 @@ class RuntimeCacheHandle:
         torchbind_handle: Any = None,
     ) -> None:
         # Mutually exclusive at construction -- enforced, not just documented.
-        if cache and torchbind_handle:
+        # ``is not None`` (not truthy) because ``torchbind_handle`` is a
+        # ``torch.ScriptObject`` whose ``__len__`` is unimplemented; ``bool()``
+        # on it raises ``NotImplementedError``.
+        if cache is not None and torchbind_handle is not None:
             raise ValueError(
                 "RuntimeCacheHandle: specify ``cache`` OR ``torchbind_handle``, not both"
             )
         self._backing: Optional[_CacheBacking] = None
-        if cache:
+        if cache is not None:
             self._backing = _PybindBacking(cache)
-        elif torchbind_handle:
+        elif torchbind_handle is not None:
             self._backing = _TorchbindBacking(torchbind_handle)
         self.path = path
         self.autosave_on_del = autosave_on_del
