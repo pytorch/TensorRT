@@ -425,10 +425,20 @@ def _compile_kernel(spec: KernelSpec) -> Tuple[bytes, Any, Any]:
     options = ProgramOptions(
         std=spec.compile_std, arch=arch, include_path=include_paths
     )
-    program = Program(spec.kernel_source, code_type="c++", options=options)
-    module = program.compile("ptx", name_expressions=(spec.kernel_name,))
-    ptx: bytes = module.code
-    kernel = module.get_kernel(spec.kernel_name)
+    # Two Program instances because cuda.core consumes name_expressions on the
+    # first compile() and raises NVRTC_ERROR_NO_NAME_EXPRESSIONS_AFTER_COMPILATION
+    # on the second call.
+    ptx_program = Program(spec.kernel_source, code_type="c++", options=options)
+    ptx: bytes = ptx_program.compile("ptx", name_expressions=(spec.kernel_name,)).code
+    # Use CUBIN — not PTX — to materialize the loadable kernel for the eager
+    # path.  Loading PTX goes through the driver's PTX JIT, which raises
+    # CUDA_ERROR_UNSUPPORTED_PTX_VERSION when the host driver predates the PTX
+    # ISA emitted by NVRTC (e.g. CI hosts on an older CUDA driver running
+    # cuda-python wheels built against a newer CUDA toolkit). CUBIN is loaded
+    # as-is — no driver-side PTX compatibility check.
+    cubin_program = Program(spec.kernel_source, code_type="c++", options=options)
+    cubin_module = cubin_program.compile("cubin", name_expressions=(spec.kernel_name,))
+    kernel = cubin_module.get_kernel(spec.kernel_name)
     return ptx, device, kernel
 
 
