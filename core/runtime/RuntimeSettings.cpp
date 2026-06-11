@@ -66,10 +66,11 @@ at::Tensor RuntimeCacheHandle::serialize() const {
   auto const opts = at::TensorOptions().dtype(at::kByte);
   auto const empty = [&]() { return at::empty({0}, opts); };
 #ifdef TRT_MAJOR_RTX
-  if (!trt_handle) {
+  std::lock_guard<std::mutex> lock(state_mu_);
+  if (!trt_handle_) {
     return empty();
   }
-  auto host_mem = make_trt(trt_handle->serialize());
+  auto host_mem = make_trt(trt_handle_->serialize());
   if (!host_mem) {
     return empty();
   }
@@ -83,21 +84,55 @@ at::Tensor RuntimeCacheHandle::serialize() const {
 
 void RuntimeCacheHandle::deserialize(TORCHTRT_UNUSED at::Tensor data) {
 #ifdef TRT_MAJOR_RTX
-  if (data.numel() == 0 || !trt_handle) {
+  if (data.numel() == 0) {
     return;
   }
   auto contig = data.contiguous().to(at::kCPU);
-  trt_handle->deserialize(contig.data_ptr(), static_cast<size_t>(contig.numel()));
+  std::lock_guard<std::mutex> lock(state_mu_);
+  if (trt_handle_) {
+    // Live cache -- write through directly.
+    trt_handle_->deserialize(contig.data_ptr(), static_cast<size_t>(contig.numel()));
+  } else {
+    // No live cache yet -- stash bytes for the next ``ensure_materialized``
+    // call to drain. Fixes the cpp-rt warm-start path where ``wrapper.load()``
+    // fires before any engine has materialized ``trt_handle_``.
+    auto const* p = static_cast<uint8_t const*>(contig.data_ptr());
+    pending_warm_bytes_.assign(p, p + contig.numel());
+  }
 #endif
 }
 
 bool RuntimeCacheHandle::has_cache() const {
 #ifdef TRT_MAJOR_RTX
-  return trt_handle != nullptr;
+  std::lock_guard<std::mutex> lock(state_mu_);
+  return trt_handle_ != nullptr;
 #else
   return false;
 #endif
 }
+
+#ifdef TRT_MAJOR_RTX
+std::shared_ptr<nvinfer1::IRuntimeCache> RuntimeCacheHandle::ensure_materialized(nvinfer1::IRuntimeConfig* config) {
+  std::lock_guard<std::mutex> lock(state_mu_);
+  if (!trt_handle_) {
+    trt_handle_ = make_trt(config->createRuntimeCache());
+    if (!trt_handle_) {
+      return nullptr;
+    }
+    // Drain any bytes that ``deserialize`` stashed pre-materialization.
+    // This is the cpp-rt warm-start path: ``load()`` fired before the first
+    // ``ensure_materialized``, bytes parked in ``pending_warm_bytes_``,
+    // first engine to ``ensure_materialized`` creates the cache and drains.
+    if (!pending_warm_bytes_.empty()) {
+      trt_handle_->deserialize(pending_warm_bytes_.data(), pending_warm_bytes_.size());
+      pending_warm_bytes_.clear();
+      pending_warm_bytes_.shrink_to_fit();
+      LOG_DEBUG("Drained pending warm-start bytes into IRuntimeCache.");
+    }
+  }
+  return trt_handle_;
+}
+#endif
 
 // ---- RuntimeSettings methods ------------------------------------------------
 

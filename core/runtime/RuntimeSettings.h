@@ -1,9 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "ATen/core/Tensor.h"
 #include "ATen/core/ivalue.h"
@@ -21,15 +23,9 @@ namespace runtime {
 // File I/O lives on the Python side (filelock + on-disk persistence via
 // the ``serialize`` / ``deserialize`` members below). The C++ struct is purely
 // a holder; ``path`` is informational and is not consulted by the C++ runtime.
-struct RuntimeCacheHandle : public torch::CustomClassHolder {
+class RuntimeCacheHandle : public torch::CustomClassHolder {
+ public:
   std::string path;
-
-#ifdef TRT_MAJOR_RTX
-  // The live TensorRT runtime cache. The first engine that attaches this handle
-  // materializes it via ``IRuntimeConfig::createRuntimeCache()`` and writes the
-  // shared_ptr here; subsequent engines reuse the same pointer for true sharing.
-  std::shared_ptr<nvinfer1::IRuntimeCache> trt_handle;
-#endif
 
   explicit RuntimeCacheHandle(std::string p = "") : path(std::move(p)) {}
 
@@ -42,14 +38,36 @@ struct RuntimeCacheHandle : public torch::CustomClassHolder {
   // serialized cache bytes are not valid UTF-8.
   [[nodiscard]] at::Tensor serialize() const;
 
-  // Inverse of ``serialize``. Expects a uint8 ``at::Tensor``. No-op for empty
-  // input, when the underlying ``IRuntimeCache`` has not been materialized yet,
-  // or on non-RTX builds.
+  // Inverse of ``serialize``. If the underlying ``IRuntimeCache`` is live,
+  // deserializes directly; otherwise stashes the bytes for the next
+  // ``ensure_materialized`` call to drain. No-op on empty input or non-RTX
+  // builds.
   void deserialize(at::Tensor data);
 
   // True iff an engine has populated the underlying ``IRuntimeCache``.
   // Always false on non-RTX builds.
   [[nodiscard]] bool has_cache() const;
+
+#ifdef TRT_MAJOR_RTX
+  // Idempotently materialize the underlying ``IRuntimeCache`` via ``config``
+  // and drain any bytes that ``deserialize`` stashed before materialization.
+  // Returns the now-live cache (or ``nullptr`` if creation failed).
+  //
+  // Safe to call concurrently from multiple engines sharing this handle
+  // (which is what ``runtime_cache([a, b], path)`` does): exactly one caller
+  // creates + drains, others see the already-live cache.
+  std::shared_ptr<nvinfer1::IRuntimeCache> ensure_materialized(nvinfer1::IRuntimeConfig* config);
+
+ private:
+  // All cache-state access is serialized through ``state_mu_``: this handle
+  // is potentially shared between engines and may be touched from Python (GIL
+  // does not extend into the cpp deserialize path).
+  // Invariant: ``trt_handle_`` non-null XOR ``pending_warm_bytes_`` may carry
+  // bytes; both fields require ``state_mu_`` to read or write.
+  mutable std::mutex state_mu_;
+  std::shared_ptr<nvinfer1::IRuntimeCache> trt_handle_;
+  std::vector<uint8_t> pending_warm_bytes_;
+#endif
 };
 
 // Strategy enums mirroring the corresponding ``nvinfer1`` enums on TRT-RTX.

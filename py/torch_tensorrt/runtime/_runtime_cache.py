@@ -35,7 +35,6 @@ class _CacheBacking(Protocol):
 
     def serialize_bytes(self) -> Optional[bytes]: ...
     def deserialize_bytes(self, data: bytes) -> None: ...
-    def is_ready(self) -> bool: ...
 
 
 class _PybindBacking:
@@ -53,22 +52,22 @@ class _PybindBacking:
     def deserialize_bytes(self, data: bytes) -> None:
         self._cache.deserialize(data)
 
-    def is_ready(self) -> bool:
-        # If you have a pybind cache, it's materialized.
-        return True
-
 
 class _TorchbindBacking:
     """Wraps a torchbind ``RuntimeCacheHandle`` sibling (cpp rt path).
 
     The cpp engine materializes the underlying ``trt_handle`` lazily on first
-    execute, so ``is_ready()`` only returns True after that has happened.
+    execute. ``deserialize_bytes`` is safe to call before that happens -- the
+    cpp side stashes the bytes in ``pending_warm_bytes_`` and drains them on
+    the next ``ensure_materialized``.
     """
 
     def __init__(self, tb: Any) -> None:
         self._tb = tb
 
     def serialize_bytes(self) -> Optional[bytes]:
+        # ``has_cache()`` is load-bearing here: you can't serialize an
+        # un-materialized cpp cache.
         if not self._tb.has_cache():
             return None
         tensor = self._tb.serialize()
@@ -77,13 +76,10 @@ class _TorchbindBacking:
         return bytes(tensor.cpu().contiguous().numpy())
 
     def deserialize_bytes(self, data: bytes) -> None:
-        if not self._tb.has_cache():
-            return
+        # No has_cache() gate -- the cpp side stashes bytes if trt_handle_
+        # isn't materialized yet; ``ensure_materialized`` drains them.
         tensor = torch.frombuffer(bytearray(data), dtype=torch.uint8)
         self._tb.deserialize(tensor)
-
-    def is_ready(self) -> bool:
-        return self._tb.has_cache()
 
     @property
     def torchbind(self) -> Any:
@@ -184,7 +180,7 @@ class RuntimeCacheHandle:
         return self._backing.serialize_bytes() if self._backing is not None else None
 
     def _write_bytes(self, data: bytes) -> None:
-        if self._backing is not None and self._backing.is_ready():
+        if self._backing is not None:
             self._backing.deserialize_bytes(data)
 
     def load_from_stream(self, stream: IO[bytes]) -> int:
@@ -405,29 +401,23 @@ class _RuntimeCacheContextManager:
         # ``autosave_on_del=False`` in both cases -- the CM saves explicitly on
         # ``__exit__``; letting ``__del__`` also save would double-write when
         # ``rc`` falls out of scope after the with-block.
+        # Build the handle. Both runtimes follow the same load-then-attach
+        # order after the cpp-rt warm-start fix: the cpp deserialize stashes
+        # bytes in ``pending_warm_bytes_`` when ``trt_handle_`` isn't live yet,
+        # and drains them on the first ``ensure_materialized``.
         if isinstance(bootstrap_module.engine, TRTEngine):
             cache_obj = bootstrap_module.engine.runtime_config.create_runtime_cache()
             self.handle = RuntimeCacheHandle(
                 cache=cache_obj, path=self.path, autosave_on_del=False
             )
-            self._load_into(self.handle)
-            self._inner_cm = runtime_config(
-                list(self._targets), runtime_cache=self.handle
-            )
-            self._inner_cm.__enter__()
         else:
             tb = torch.classes.tensorrt.RuntimeCacheHandle(self.path)
             self.handle = RuntimeCacheHandle(
                 torchbind_handle=tb, path=self.path, autosave_on_del=False
             )
-            # Attach first -- the C++ engine materializes ``tb.trt_handle`` in
-            # the process of applying ``runtime_settings``. After that the load
-            # path can write into a live ``IRuntimeCache``.
-            self._inner_cm = runtime_config(
-                list(self._targets), runtime_cache=self.handle
-            )
-            self._inner_cm.__enter__()
-            self._load_into(self.handle)
+        self._load_into(self.handle)
+        self._inner_cm = runtime_config(list(self._targets), runtime_cache=self.handle)
+        self._inner_cm.__enter__()
         return self.handle
 
     def __exit__(self, *args: Any) -> None:

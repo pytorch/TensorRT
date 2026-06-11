@@ -440,5 +440,75 @@ class TestRuntimeCacheStreamSupport(TestCase):
         self.assertIsInstance(buf.getvalue(), bytes)
 
 
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache is TRT-RTX-only",
+)
+@unittest.skipIf(
+    not ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Warm-start drain is cpp-rt-only (pending_warm_bytes_ on the cpp handle)",
+)
+class TestCppRtWarmStart(TestCase):
+    """Regression for the cpp-rt warm-start path.
+
+    The cpp ``RuntimeCacheHandle::deserialize`` used to silently drop bytes
+    when ``trt_handle_`` wasn't materialized yet -- so warm-start
+    (``mod.runtime_settings = RuntimeSettings(runtime_cache="/x")`` with a
+    pre-existing cache file) loaded nothing into the cpp cache, and the
+    second run JIT'd kernels fresh. The fix stashes the bytes in
+    ``pending_warm_bytes_`` and drains them inside the next
+    ``ensure_materialized`` call. Test pins the contract via a
+    ``serialize()`` roundtrip post-execute."""
+
+    def test_warm_start_drains_pending_bytes_on_cpp_rt(self):
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+        from torch_tensorrt.runtime._runtime_cache import _TorchbindBacking
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+
+            # Cold run: populate + save to disk.
+            m1, inputs = _compile_simple(runtime_cache_path=path)
+            _ = m1(*inputs)
+            del m1
+            gc.collect()
+            self.assertTrue(
+                os.path.exists(path), "cold run should have saved the cache"
+            )
+            cold_size = os.path.getsize(path)
+            self.assertGreater(cold_size, 0)
+
+            # Warm run: fresh module, same path. After first execute, the
+            # torchbind's serialize() should include the cold-run bytes
+            # (which would not be the case if the warm-start drain were
+            # missing).
+            m2, _ = _compile_simple(runtime_cache_path=path)
+            _ = m2(*inputs)
+            found = False
+            for _, sub in m2.named_modules():
+                if not isinstance(sub, TorchTensorRTModule):
+                    continue
+                handle = sub._implicit_cache_handle
+                if handle is None or not isinstance(handle._backing, _TorchbindBacking):
+                    continue
+                tb = handle._backing.torchbind
+                self.assertTrue(
+                    tb.has_cache(),
+                    "trt_handle should be materialized after first execute",
+                )
+                warm_bytes = bytes(tb.serialize().cpu().numpy())
+                self.assertGreaterEqual(
+                    len(warm_bytes),
+                    cold_size,
+                    "Warm-start failed to drain pending bytes -- second run "
+                    "started cold instead of inheriting kernels from disk.",
+                )
+                found = True
+                break
+            self.assertTrue(found, "No TorchTensorRTModule with implicit handle found")
+
+
 if __name__ == "__main__":
     run_tests()
