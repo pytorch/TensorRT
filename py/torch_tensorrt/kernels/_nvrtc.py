@@ -41,7 +41,10 @@ def compile_to_ptx(
     """Compile CUDA C++ source to PTX using NVRTC via cuda-python.
 
     Returns:
-        (ptx_bytes, device, kernel_object)
+        (ptx_bytes, device, None) — the third slot is reserved for a loadable
+        kernel handle but is intentionally not materialized here; see
+        ``_derive._compile_kernel`` if you need one (it compiles to CUBIN to
+        avoid driver-side PTX JIT).
     """
     Device, Program, ProgramOptions, _launch, _LaunchConfig = _cuda_core_imports()
 
@@ -57,8 +60,10 @@ def compile_to_ptx(
     program = Program(kernel_source, code_type="c++", options=options)
     module = program.compile("ptx", name_expressions=(kernel_name,))
     ptx: bytes = module.code
-    kernel = module.get_kernel(kernel_name)
     _LOGGER.debug(
         "Compiled kernel '%s' to PTX for %s (%d bytes)", kernel_name, arch, len(ptx)
     )
-    return ptx, device, kernel
+    # Materializing a Kernel from the PTX module triggers the driver's PTX JIT,
+    # which fails with CUDA_ERROR_UNSUPPORTED_PTX_VERSION when the host driver
+    # is older than the PTX ISA NVRTC emits. Callers only consume ``ptx``.
+    return ptx, device, None
