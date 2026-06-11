@@ -414,16 +414,3 @@ def set_dynamic_shapes_kernel_strategy(
     return runtime_config(
         target_or_targets, dynamic_shapes_kernel_specialization_strategy=strategy
     )
-
-
-def set_cuda_graph_strategy(
-    target_or_targets: Union["torch.nn.Module", Sequence["torch.nn.Module"]],
-    strategy: str,
-) -> _RuntimeConfigContextManager:
-    """Context manager that sets the cuda-graph strategy on all TRT engines
-    under ``target_or_targets``.
-
-    Accepts ``"disabled"`` or ``"whole_graph_capture"``. Delegates to
-    :func:`runtime_config`.
-    """
-    return runtime_config(target_or_targets, cuda_graph_strategy=strategy)

@@ -125,12 +125,14 @@ class TestCudaGraphStrategySetup(TestCase):
         compiled = _compile_simple()
         engine = _find_python_trt_engine(compiled)
         self.assertEqual(engine.runtime_settings.cuda_graph_strategy, "disabled")
-        with torchtrt.runtime.set_cuda_graph_strategy(compiled, "whole_graph_capture"):
+        with torchtrt.runtime.enable_cudagraphs(
+            compiled, cuda_graph_strategy="whole_graph_capture"
+        ) as wrapped:
             self.assertEqual(
                 engine.runtime_settings.cuda_graph_strategy, "whole_graph_capture"
             )
             for bs in (1, 2, 4):
-                output = compiled(torch.randn(bs, 3).cuda())
+                output = wrapped(torch.randn(bs, 3).cuda())
                 self.assertEqual(output.shape, (bs, 3))
         # Restored on exit.
         self.assertEqual(engine.runtime_settings.cuda_graph_strategy, "disabled")

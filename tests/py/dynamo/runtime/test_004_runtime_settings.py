@@ -360,6 +360,46 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
                 f"Nested form should create exactly 1 context, got {n}",
             )
 
+    @unittest.skipIf(
+        not ENABLED_FEATURES.tensorrt_rtx,
+        "cuda_graph_strategy is TRT-RTX-only",
+    )
+    def test_collapsed_cudagraphs_with_strategy_is_one_create(self):
+        """``with enable_cudagraphs(mod, cuda_graph_strategy=...) as w:`` --
+        the collapsed form folds the prior ``set_cuda_graph_strategy`` CM
+        into ``enable_cudagraphs``. Should yield the same single
+        ``createExecutionContext`` call as the explicit nested form."""
+        from torch_tensorrt.runtime import enable_cudagraphs
+
+        compiled = _compile_simple()
+        inputs = [torch.randn(2, 3).cuda()]
+        with enable_cudagraphs(
+            compiled, cuda_graph_strategy="whole_graph_capture"
+        ) as w:
+            _ = w(*inputs)
+        for mod in self._walk_engines(compiled):
+            n = mod.engine.num_execution_contexts_created()
+            self.assertEqual(
+                n,
+                1,
+                f"Collapsed form should create exactly 1 context, got {n}",
+            )
+
+    @unittest.skipIf(
+        ENABLED_FEATURES.tensorrt_rtx,
+        "Non-RTX-only fail-fast guard",
+    )
+    def test_enable_cudagraphs_strategy_kwarg_rejected_on_non_rtx(self):
+        """``cuda_graph_strategy`` is a TRT-RTX-only knob. Passing the kwarg
+        on a non-RTX build should fail fast at function-call time, not
+        silently propagate to a no-op."""
+        from torch_tensorrt.runtime import enable_cudagraphs
+
+        compiled = _compile_simple()
+        with self.assertRaises(RuntimeError) as cm:
+            enable_cudagraphs(compiled, cuda_graph_strategy="whole_graph_capture")
+        self.assertIn("TRT-RTX-only", str(cm.exception))
+
 
 class TestToTorchbindHandleOrphanGuard(TestCase):
     """H1 regression: ``_to_torchbind_handle`` must reject a Python-side

@@ -14,7 +14,6 @@ from torch_tensorrt.runtime._runtime_cache import RuntimeCacheHandle, runtime_ca
 from torch_tensorrt.runtime._runtime_config import (
     RuntimeSettings,
     runtime_config,
-    set_cuda_graph_strategy,
     set_dynamic_shapes_kernel_strategy,
 )
 from torch_tensorrt.runtime._weight_streaming import weight_streaming
