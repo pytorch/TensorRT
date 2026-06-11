@@ -78,6 +78,49 @@ Here's a simple example that exports a matmul layer with some restrictions on dy
     # Run inference
     trt_gm(*inputs)
 
+Sharing a Dynamic Dimension Across Multiple Inputs
+---------------------------------------------------
+
+HuggingFace-style encoders and similar models take multiple inputs (e.g.
+``input_ids`` and ``attention_mask``) whose dynamic axes **must be equal at
+runtime**.  If you assign an independent dynamic dimension to each input,
+``torch.export`` detects that the two independent symbols are forced equal by
+the model's forward pass (e.g. a broadcast) and raises a
+``ConstraintViolationError``.
+
+``torch_tensorrt.Input(shared_dims={axis: name})`` solves this without any
+manual ``torch.export`` work.  Axes that share the same name across inputs are
+exported as a single ``torch.export.Dim``, so the equality constraint is
+satisfied automatically.
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+
+    model = MyHFEncoder().eval().cuda()
+
+    inputs = [
+        torch_tensorrt.Input(
+            min_shape=(1, 16), opt_shape=(4, 16), max_shape=(8, 16),
+            dtype=torch.int64, name="input_ids",
+            shared_dims={0: "B"},          # axis 0 named "B"
+        ),
+        torch_tensorrt.Input(
+            min_shape=(1, 16), opt_shape=(4, 16), max_shape=(8, 16),
+            dtype=torch.int64, name="attention_mask",
+            shared_dims={0: "B"},          # same name → same Dim
+        ),
+    ]
+
+    trt_model = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
+
+The same name on the same axis index across different inputs produces one
+shared ``Dim``; different names produce independent ``Dim``\s.  Multiple axes
+can be shared simultaneously with ``shared_dims={0: "B", 1: "S"}``.
+
+See the full runnable example: :ref:`shared_dynamic_dims`.
+
 Dynamic shapes using torch.compile (JIT)
 ------------------------------------
 
