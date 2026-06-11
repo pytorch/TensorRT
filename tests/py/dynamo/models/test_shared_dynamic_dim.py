@@ -243,5 +243,116 @@ def test_default_path_unchanged_for_static_inputs():
     assertions.assertTrue(cosine_similarity(ref, out) > COSINE_THRESHOLD)
 
 
+# ---------------------------------------------------------------------------
+# Namedtuple shape API tests
+# ---------------------------------------------------------------------------
+#
+# The namedtuple API lets users name axes by using a namedtuple as the shape
+# spec.  Field names that appear on multiple inputs are automatically treated
+# as a shared torch.export.Dim — no explicit shared_dims kwarg required.
+#
+#   input_shape1 = namedtuple('S', ['n', 'c', 'h', 'w'])
+#   input_shape2 = namedtuple('S', ['c', 'seq'])
+#   Both have field 'c' → one shared Dim("c").
+
+from collections import namedtuple
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_namedtuple_shared_batch_positional_inputs():
+    """Namedtuple field 'c' shared across two inputs — same as shared_dims={...:'c'}."""
+    model = _SharedBatchEncoder().eval().cuda()
+
+    # seq is static
+    S1 = namedtuple("shape", ["c", "seq"])
+
+    positional_inputs = [
+        torchtrt.Input(
+            min_shape=S1(1, 16),
+            opt_shape=S1(4, 16),
+            max_shape=S1(4, 16),
+            dtype=torch.int64,
+            name="input_ids",
+        ),
+        torchtrt.Input(
+            min_shape=S1(1, 16),
+            opt_shape=S1(4, 16),
+            max_shape=S1(4, 16),
+            dtype=torch.int64,
+            name="attention_mask",
+        ),
+    ]
+
+    trt_mod = torchtrt.compile(
+        model,
+        ir="dynamo",
+        inputs=positional_inputs,
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+
+    for bs in (4, 2):
+        ids = torch.randint(0, 1024, (bs, 16), dtype=torch.int64, device="cuda")
+        mask = torch.ones((bs, 16), dtype=torch.int64, device="cuda")
+        with torch.no_grad():
+            ref = model(ids, mask)
+            out = trt_mod(ids, mask)
+        cos_sim = cosine_similarity(ref, out)
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            f"namedtuple shared batch (positional) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
+        )
+
+
+@pytest.mark.unit
+def test_namedtuple_static_axes_skipped():
+    """Static axes (min==max) in a namedtuple are not added to shared_dims."""
+    S = namedtuple("shape", ["batch", "seq"])
+    inp = torchtrt.Input(
+        min_shape=S(1, 16),
+        opt_shape=S(4, 16),
+        max_shape=S(4, 16),
+        dtype=torch.int64,
+        name="x",
+    )
+    # 'seq' axis: min=max=16 → static, must not appear in shared_dims
+    assertions.assertNotIn(1, inp.shared_dims)
+    # 'batch' axis: min=1, max=4 → dynamic, must appear
+    assertions.assertIn(0, inp.shared_dims)
+    assertions.assertEqual(inp.shared_dims[0], "batch")
+
+
+@pytest.mark.unit
+def test_namedtuple_mismatched_fields_raises():
+    """opt_shape namedtuple with different fields than min_shape is rejected."""
+    S1 = namedtuple("shape", ["b", "c"])
+    S2 = namedtuple("shape", ["b", "seq"])
+    with assertions.assertRaises(ValueError):
+        torchtrt.Input(
+            min_shape=S1(1, 16),
+            opt_shape=S2(4, 16),
+            max_shape=S1(4, 16),
+            dtype=torch.int64,
+            name="x",
+        )
+
+
+@pytest.mark.unit
+def test_namedtuple_and_shared_dims_together_raises():
+    """Passing both a namedtuple shape and shared_dims kwarg is rejected."""
+    S = namedtuple("shape", ["b", "c"])
+    with assertions.assertRaises(ValueError):
+        torchtrt.Input(
+            min_shape=S(1, 16),
+            opt_shape=S(4, 16),
+            max_shape=S(4, 16),
+            dtype=torch.int64,
+            name="x",
+            shared_dims={0: "b"},
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
