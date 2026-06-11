@@ -399,14 +399,6 @@ class _RuntimeCacheContextManager:
         if self._inner_cm is not None:
             self._inner_cm.__exit__(*args)
         if self.autosave and self.handle is not None:
-            # Wait for in-flight enqueues on the still-attached cache before
-            # ``_inner_cm.__exit__`` detached it; otherwise a concurrent
-            # ``compiled(*inputs)`` on another thread can land kernels into a
-            # cache that's about to be read here.
-            try:
-                torch.cuda.synchronize()
-            except Exception as e:
-                logger.debug(f"torch.cuda.synchronize() before save failed: {e}")
             # Swallow save errors at exit so a transient filesystem failure
             # (full disk, filelock timeout, permission denied) doesn't mask
             # the user's actual exception when the ``with`` block is already
@@ -432,8 +424,7 @@ def runtime_cache(
     written once on exit; ownership of open/close stays with the caller.
 
     Yields the :class:`RuntimeCacheHandle` for inspection or explicit
-    ``handle.save()`` calls (e.g., for mid-block checkpointing -- caller is
-    responsible for ``torch.cuda.synchronize()`` first).
+    ``handle.save()`` calls (e.g., for mid-block checkpointing).
     """
     return _RuntimeCacheContextManager(target_or_targets, path, autosave)
 
