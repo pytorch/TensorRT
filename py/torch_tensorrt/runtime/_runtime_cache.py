@@ -48,11 +48,10 @@ _FILELOCK_TIMEOUT_S = 10.0
 class _RuntimeCacheHandleProtocol(Protocol):
     """Common interface for python-rt and cpp-rt runtime-cache handles.
 
-    Direct 1:1 port of the cpp ``RuntimeCacheHandle`` class's public surface
-    (``core/runtime/RuntimeSettings.h``). Both the python class
-    :class:`_RuntimeCacheHandle` and the torchbind class
-    ``torch.classes.tensorrt.RuntimeCacheHandle`` satisfy this Protocol,
-    letting :class:`RuntimeCache` forward to either without branching.
+    Both the python class :class:`_RuntimeCacheHandle` and the torchbind
+    class ``torch.classes.tensorrt.RuntimeCacheHandle`` satisfy this
+    Protocol, letting :class:`RuntimeCache` forward to either without
+    branching.
 
     Note: ``ensure_materialized`` is C++-public on the cpp class but NOT
     registered with torchbind (see ``core/runtime/register_jit_hooks.cpp``).
@@ -85,8 +84,7 @@ class _RuntimeCacheHandle:
     creates ``_cache = runtime_config.create_runtime_cache()`` and drains
     ``_pending_warm_bytes`` into it. Idempotent.
 
-    Thread-safe via ``_lock``. Mirrors cpp ``state_mu_``: the real race
-    lives in ``ensure_materialized``'s check-then-set across the
+    Needed for ``ensure_materialized``'s check-then-set across the
     GIL-releasing ``create_runtime_cache`` C call when a single handle is
     shared across N engines whose forwards run on different threads.
     """
@@ -199,14 +197,11 @@ class RuntimeCache:
         is ``_handle.path``."""
         return self._handle.path
 
-    def is_torchbind_backed(self) -> bool:
-        """``True`` iff this handle wraps the cpp torchbind class (cpp rt)."""
+    def is_cpp_runtime(self) -> bool:
+        """``True`` iff this handle is backed by the cpp runtime (wraps the
+        torchbind ``torch.classes.tensorrt.RuntimeCacheHandle``). ``False``
+        for the python runtime (wraps :class:`_RuntimeCacheHandle`)."""
         return not isinstance(self._handle, _RuntimeCacheHandle)
-
-    def is_pybind_backed(self) -> bool:
-        """``True`` iff this handle wraps the python :class:`_RuntimeCacheHandle`
-        (python rt)."""
-        return isinstance(self._handle, _RuntimeCacheHandle)
 
     def has_cache(self) -> bool:
         """Forwards to ``_handle.has_cache()``. ``True`` once the underlying
@@ -227,20 +222,8 @@ class RuntimeCache:
 
     def load_from_stream(self, stream: IO[bytes]) -> int:
         """Read bytes from ``stream`` and deserialize into the underlying
-        cache.
-
-        Returns the number of bytes consumed. ``0`` means "nothing to load"
-        -- the stream had no bytes (first-run case, mirroring path-mode's
-        missing-file early-return). IO errors from the stream itself
-        (closed handle, ``UnsupportedOperation`` on a write-only sink,
-        etc.) propagate -- the caller passed something wrong and should
-        hear about it. Path-mode :meth:`load` delegates here once the file
-        is opened.
-
-        On a pre-materialized python ``_RuntimeCacheHandle``, the bytes are
-        stashed in ``_pending_warm_bytes`` and drained on the next
-        ``ensure_materialized``. On the cpp side, the cpp ``deserialize``
-        does the same via cpp ``pending_warm_bytes_``.
+        cache. Returns the number of bytes consumed; ``0`` means the
+        stream had no bytes.
         """
         data = stream.read()
         if not data:
@@ -252,14 +235,8 @@ class RuntimeCache:
 
     def save_to_stream(self, stream: IO[bytes]) -> int:
         """Serialize the underlying cache and write bytes to ``stream``.
-
-        Returns the number of bytes written. ``0`` means "nothing to save"
-        -- the cache hadn't picked up any entries yet (or wasn't
-        materialized). IO errors from the stream (closed handle,
-        ``UnsupportedOperation`` on a read-only sink, etc.) propagate.
-        Path-mode :meth:`save` delegates here once the tmp file is opened
-        and uses the return value to decide whether to promote the tmp to
-        the destination (avoids writing a zero-byte cache file).
+        Returns the number of bytes written; ``0`` means the cache had
+        nothing to serialize (no entries, or not yet materialized).
         """
         tensor = self._handle.serialize()
         if tensor.numel() == 0:
@@ -520,20 +497,20 @@ def _to_torchbind_handle(
         # Reuse an existing torchbind sibling so the C++ engine sees the
         # same underlying pointer across calls. Falling through to construct
         # a fresh torchbind would orphan the existing one.
-        if rc.is_torchbind_backed():
+        if rc.is_cpp_runtime():
             return rc._handle  # the torchbind object directly
-        # Mixed-runtime hazard: a pybind-backed handle crossing into the cpp
-        # runtime would silently drop its materialized ``IRuntimeCache``
-        # (the cpp engine would attach a fresh torchbind below). Reject so
-        # the user picks a deliberate fix.
-        if rc.is_pybind_backed() and rc.has_cache():
+        # Mixed-runtime hazard: a python-rt handle with a live ``IRuntimeCache``
+        # crossing into the cpp runtime would silently drop the cache (the
+        # cpp engine would attach a fresh torchbind below). Reject so the
+        # user picks a deliberate fix.
+        if rc.has_cache():
             raise RuntimeError(
                 "Cannot attach a Python-side RuntimeCache (with a live "
                 "pybind IRuntimeCache) to a C++ runtime engine: the cache would "
                 "be orphaned. Reconstruct the handle on the C++ side, or "
                 "serialize/deserialize the cache bytes explicitly."
             )
-        # Pybind-backed but pre-materialization: synthesize a torchbind from
+        # Python-rt handle, pre-materialization: synthesize a torchbind from
         # the (possibly empty) path. The cpp side will load disk bytes via
         # its own deserialize once materialized.
         return torch.classes.tensorrt.RuntimeCacheHandle(rc.path) if rc.path else None

@@ -505,7 +505,7 @@ class TestCppRtWarmStart(TestCase):
                 if not isinstance(sub, TorchTensorRTModule):
                     continue
                 handle = sub._implicit_cache_handle
-                if handle is None or not handle.is_torchbind_backed():
+                if handle is None or not handle.is_cpp_runtime():
                     continue
                 tb = handle._handle  # the torchbind object directly
                 self.assertTrue(
@@ -574,7 +574,7 @@ class TestImplicitWarmLoadPyRt(TestCase):
                 if not isinstance(sub, TorchTensorRTModule):
                     continue
                 handle = sub._implicit_cache_handle
-                if handle is None or not handle.is_pybind_backed():
+                if handle is None or handle.is_cpp_runtime():
                     continue
                 inner = handle._handle
                 self.assertIsInstance(inner, _RuntimeCacheHandle)

@@ -368,15 +368,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self._implicit_cache_handle = new
 
     def _wrapper_still_attached(self, w: Any) -> bool:
-        """Is ``w`` reusable for the current runtime?
-
-        Python rt: any wrapper is fine (cache materializes lazily on first use).
-        Cpp rt: needs the torchbind sibling live; without it, the cpp engine
-        has no way to hold the same underlying ``IRuntimeCache``.
+        """Is ``w`` reusable for the current runtime? Python rt always
+        accepts; cpp rt needs the torchbind sibling live (else the cpp
+        engine has no way to hold the same underlying ``IRuntimeCache``).
         """
-        if not ENABLED_FEATURES.torch_tensorrt_runtime:
-            return True
-        return w.is_torchbind_backed()
+        return not ENABLED_FEATURES.torch_tensorrt_runtime or w.is_cpp_runtime()
 
     def _send_to_engine(self, rs: RuntimeSettings) -> None:
         """Push ``rs`` to whichever engine flavor is attached."""
