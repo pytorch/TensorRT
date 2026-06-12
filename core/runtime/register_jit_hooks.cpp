@@ -27,7 +27,21 @@ static auto TORCHTRT_UNUSED RuntimeCacheHandleRegistration =
         .def_readwrite("path", &RuntimeCacheHandle::path)
         .def("serialize", &RuntimeCacheHandle::serialize)
         .def("deserialize", &RuntimeCacheHandle::deserialize)
-        .def("has_cache", &RuntimeCacheHandle::has_cache);
+        .def("has_cache", &RuntimeCacheHandle::has_cache)
+        // ``def_pickle`` registers ``__getstate__`` / ``__setstate__`` so the
+        // handle can survive ``deepcopy`` / ``torch.export.save`` paths that
+        // walk Python attributes (e.g. ``TorchTensorRTModule._implicit_cache_handle``).
+        // We persist only the ``path`` string: the underlying ``IRuntimeCache``
+        // is GPU-side state that can't cross a process boundary anyway, and
+        // ``_resolve_runtime_cache`` re-warms from disk on the deserialized
+        // path through the standard load -> pending_warm_bytes flow.
+        .def_pickle(
+            // __getstate__
+            [](c10::intrusive_ptr<RuntimeCacheHandle> const& self) -> std::string { return self->path; },
+            // __setstate__
+            [](std::string path) -> c10::intrusive_ptr<RuntimeCacheHandle> {
+              return c10::make_intrusive<RuntimeCacheHandle>(std::move(path));
+            });
 
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
