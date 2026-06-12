@@ -41,7 +41,7 @@ from torch_tensorrt.dynamo._defaults import (
 )
 
 if TYPE_CHECKING:
-    from torch_tensorrt.runtime._runtime_cache import RuntimeCacheHandle
+    from torch_tensorrt.runtime._runtime_cache import RuntimeCache
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class RuntimeSettings:
             TRT-RTX-only; no-op on standard TensorRT.
         cuda_graph_strategy: ``"disabled" | "whole_graph_capture"``. TRT-RTX-only.
         runtime_cache: ``None``, a disk path string, or a
-            :class:`RuntimeCacheHandle`. ``None`` ⇒ no cache attached. A
+            :class:`RuntimeCache`. ``None`` ⇒ no cache attached. A
             string is honored at engine construction time and primes a
             per-engine disk-backed cache (engine owns the implicit handle and
             it saves on ``__del__``). A handle is the shared-cache form,
@@ -93,7 +93,7 @@ class RuntimeSettings:
         DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY
     )
     cuda_graph_strategy: str = CUDA_GRAPH_STRATEGY
-    runtime_cache: Optional[Union[str, "RuntimeCacheHandle"]] = field(  # noqa: F821
+    runtime_cache: Optional[Union[str, "RuntimeCache"]] = field(  # noqa: F821
         default_factory=lambda: RUNTIME_CACHE_PATH
     )
 
@@ -250,7 +250,7 @@ class TRTRuntimeConfig:
 
         Resolves ``runtime_cache``:
         - ``None`` ⇒ no cache attached.
-        - ``RuntimeCacheHandle`` ⇒ caller owns lifecycle (handle holds the
+        - ``RuntimeCache`` ⇒ caller owns lifecycle (handle holds the
           IRuntimeCache reference; ``ensure_cache`` materializes it on first
           use). String paths are pre-wrapped into handles by the upstream
           :py:meth:`TorchTensorRTModule._materialize_implicit_handle`; raw
@@ -259,7 +259,7 @@ class TRTRuntimeConfig:
         # Deferred imports: trt is import-aliased to tensorrt_rtx on RTX builds,
         # and _runtime_cache imports this module's RuntimeSettings.
         import tensorrt as trt
-        from torch_tensorrt.runtime._runtime_cache import RuntimeCacheHandle
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
 
         self._live.dynamic_shapes_kernel_specialization_strategy = (
             self._to_trt_ds_strategy(trt)
@@ -273,10 +273,8 @@ class TRTRuntimeConfig:
 
         rc = self._settings.runtime_cache
         if rc is None:
-            logger.debug(
-                "Runtime cache disabled (no RuntimeCacheHandle / path provided)."
-            )
-        elif isinstance(rc, RuntimeCacheHandle):
+            logger.debug("Runtime cache disabled (no RuntimeCache / path provided).")
+        elif isinstance(rc, RuntimeCache):
             cache = rc.ensure_cache(self._live)
             self._live.set_runtime_cache(cache)
             # Engine-implicit handles need disk-warm on first attach (the
@@ -292,7 +290,7 @@ class TRTRuntimeConfig:
                     logger.warning(f"Failed to load implicit runtime cache: {e}")
         else:
             raise TypeError(
-                f"runtime_cache must be None or RuntimeCacheHandle by the time "
+                f"runtime_cache must be None or RuntimeCache by the time "
                 f"it reaches TRTRuntimeConfig; got {type(rc).__name__}. "
                 f"Path strings should be pre-wrapped by the module."
             )

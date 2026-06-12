@@ -248,7 +248,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._nccl_comm: Optional[Any] = None
 
         # Owns RuntimeSettings + the live trt.IRuntimeConfig + the
-        # engine-implicit RuntimeCacheHandle. Hides all RTX feature gates.
+        # engine-implicit RuntimeCache. Hides all RTX feature gates.
         # ``RuntimeSettings`` default; callers wanting non-defaults assign via
         # the module's ``runtime_settings`` setter after compile.
         self._trt_runtime_config: TRTRuntimeConfig = TRTRuntimeConfig(RuntimeSettings())

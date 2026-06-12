@@ -1,17 +1,23 @@
-"""Runtime cache handle + ``runtime_cache()`` context manager.
+"""Runtime cache facade + per-runtime handle + ``runtime_cache()`` CM.
 
-The handle wraps a ``trt.IRuntimeCache`` plus optional disk-backing config.
-Used by:
+User-facing :class:`RuntimeCache` is a thin facade that wraps an inner
+runtime-cache handle. The inner handle is either:
 
-* The runtime ``cache()`` CM to attach a SHARED cache across one or more
-  modules' engines.
-* ``RuntimeSettings(runtime_cache=...)`` (string path ⇒ engine creates an
-  implicit per-engine handle; ``RuntimeCacheHandle`` ⇒ external shared
-  handle attached directly).
+* :class:`_RuntimeCacheHandle` (python rt) -- this module's python port of
+  the cpp ``RuntimeCacheHandle`` class declared in
+  ``core/runtime/RuntimeSettings.h``. Same public surface, same semantics,
+  including deferred materialization (pending bytes drained on first
+  ``ensure_materialized``).
+* ``torch.classes.tensorrt.RuntimeCacheHandle`` (cpp rt) -- the torchbind
+  cross-language sibling, used directly. The cpp side already implements
+  pending-bytes semantics and is interface-compatible with the python
+  class, so no wrapper class is needed on the cpp-rt path.
 
-File I/O lives entirely on the Python side under a ``filelock`` (this module).
-The C++-side ``torch.classes.tensorrt.RuntimeCacheHandle`` is a passive
-shared_ptr wrapper used only to cross the Python/C++ boundary.
+Both implementations satisfy :class:`_RuntimeCacheHandleProtocol`. The
+facade forwards straight through with no isinstance branching.
+
+File I/O lives entirely on the Python side under a ``filelock`` (this
+module).
 """
 
 from __future__ import annotations
@@ -20,7 +26,15 @@ import logging
 import os
 import shutil
 import threading
-from typing import IO, Any, Optional, Protocol, Sequence, Union
+from typing import (
+    IO,
+    Any,
+    Optional,
+    Protocol,
+    Sequence,
+    Union,
+    runtime_checkable,
+)
 
 import torch
 import torch_tensorrt
@@ -30,174 +44,227 @@ logger = logging.getLogger(__name__)
 _FILELOCK_TIMEOUT_S = 10.0
 
 
-class _CacheBacking(Protocol):
-    """Abstracts pybind vs torchbind serialization of a TensorRT IRuntimeCache."""
+@runtime_checkable
+class _RuntimeCacheHandleProtocol(Protocol):
+    """Common interface for python-rt and cpp-rt runtime-cache handles.
 
-    def serialize_bytes(self) -> Optional[bytes]: ...
-    def deserialize_bytes(self, data: bytes) -> None: ...
+    Direct 1:1 port of the cpp ``RuntimeCacheHandle`` class's public surface
+    (``core/runtime/RuntimeSettings.h``). Both the python class
+    :class:`_RuntimeCacheHandle` and the torchbind class
+    ``torch.classes.tensorrt.RuntimeCacheHandle`` satisfy this Protocol,
+    letting :class:`RuntimeCache` forward to either without branching.
 
-
-class _PybindBacking:
-    """Wraps a pybind ``trt.IRuntimeCache`` directly (Python rt path)."""
-
-    def __init__(self, cache: Any) -> None:
-        self._cache = cache
-
-    def serialize_bytes(self) -> Optional[bytes]:
-        host_mem = self._cache.serialize()
-        if host_mem is None or host_mem.nbytes == 0:
-            return None
-        return bytes(memoryview(host_mem))
-
-    def deserialize_bytes(self, data: bytes) -> None:
-        self._cache.deserialize(data)
-
-
-class _TorchbindBacking:
-    """Wraps a torchbind ``RuntimeCacheHandle`` sibling (cpp rt path).
-
-    The cpp engine materializes the underlying ``trt_handle`` lazily on first
-    execute. ``deserialize_bytes`` is safe to call before that happens -- the
-    cpp side stashes the bytes in ``pending_warm_bytes_`` and drains them on
-    the next ``ensure_materialized``.
+    Note: ``ensure_materialized`` is C++-public on the cpp class but NOT
+    registered with torchbind (see ``core/runtime/register_jit_hooks.cpp``).
+    The cpp engine calls it directly from cpp ``TRTRuntimeConfig::ensure_initialized``;
+    python only ever invokes it on the python-rt :class:`_RuntimeCacheHandle`.
+    The Protocol method is structurally present but unreachable on cpp rt.
     """
 
-    def __init__(self, tb: Any) -> None:
-        self._tb = tb
+    path: str
 
-    def serialize_bytes(self) -> Optional[bytes]:
-        # ``has_cache()`` is load-bearing here: you can't serialize an
-        # un-materialized cpp cache.
-        if not self._tb.has_cache():
-            return None
-        tensor = self._tb.serialize()
-        if tensor.numel() == 0:
-            return None
-        return bytes(tensor.cpu().contiguous().numpy())
-
-    def deserialize_bytes(self, data: bytes) -> None:
-        # No has_cache() gate -- the cpp side stashes bytes if trt_handle_
-        # isn't materialized yet; ``ensure_materialized`` drains them.
-        tensor = torch.frombuffer(bytearray(data), dtype=torch.uint8)
-        self._tb.deserialize(tensor)
-
-    @property
-    def torchbind(self) -> Any:
-        return self._tb
+    def serialize(self) -> torch.Tensor: ...
+    def deserialize(self, data: torch.Tensor) -> None: ...
+    def has_cache(self) -> bool: ...
+    def ensure_materialized(self, runtime_config: Any) -> Optional[Any]: ...
 
 
-class RuntimeCacheHandle:
-    """Wraps a ``trt.IRuntimeCache`` (or a torchbind sibling) + optional disk path.
+class _RuntimeCacheHandle:
+    """Python-rt port of cpp ``RuntimeCacheHandle``. Module-private.
 
-    Three construction patterns differ in *who else holds a reference*, which
-    drives the ``autosave_on_del`` flag:
+    Same public surface as the cpp class. Two states:
+
+    * **pending**: ``_cache is None``; ``_pending_warm_bytes`` may hold
+      bytes stashed from a pre-materialize ``deserialize``. ``serialize``
+      returns an empty tensor; ``has_cache`` returns ``False``.
+    * **materialized**: ``_cache`` is a live ``trt.IRuntimeCache``.
+      ``deserialize`` feeds bytes into the cache; ``serialize`` reads
+      cache bytes back as a uint8 tensor; ``has_cache`` returns ``True``.
+
+    ``ensure_materialized(runtime_config)`` is the state transition:
+    creates ``_cache = runtime_config.create_runtime_cache()`` and drains
+    ``_pending_warm_bytes`` into it. Idempotent.
+
+    Thread-safe via ``_lock``. Mirrors cpp ``state_mu_``: the real race
+    lives in ``ensure_materialized``'s check-then-set across the
+    GIL-releasing ``create_runtime_cache`` C call when a single handle is
+    shared across N engines whose forwards run on different threads.
+    """
+
+    def __init__(self, path: str = "") -> None:
+        self.path: str = path
+        # Internal storage uses python ``bytes`` (matches what
+        # ``trt.IRuntimeCache.deserialize(blob)`` takes). The public
+        # ``serialize`` / ``deserialize`` use ``torch.Tensor`` to mirror
+        # the cpp signature; conversion is at the API boundary.
+        self._cache: Optional[Any] = None
+        self._pending_warm_bytes: Optional[bytes] = None
+        self._lock = threading.Lock()
+
+    def serialize(self) -> torch.Tensor:
+        with self._lock:
+            if self._cache is None:
+                return torch.empty(0, dtype=torch.uint8)
+            host_mem = self._cache.serialize()
+            if host_mem is None or host_mem.nbytes == 0:
+                return torch.empty(0, dtype=torch.uint8)
+            return torch.frombuffer(
+                bytearray(bytes(memoryview(host_mem))), dtype=torch.uint8
+            )
+
+    def deserialize(self, data: torch.Tensor) -> None:
+        with self._lock:
+            if data.numel() == 0:
+                return
+            data_bytes = bytes(data.cpu().contiguous().numpy())
+            if self._cache is None:
+                self._pending_warm_bytes = data_bytes
+                return
+            self._cache.deserialize(data_bytes)
+
+    def has_cache(self) -> bool:
+        return self._cache is not None
+
+    def ensure_materialized(self, runtime_config: Any) -> Any:
+        """Idempotently create the underlying ``trt.IRuntimeCache`` against
+        ``runtime_config`` and drain any pending warm-load bytes.
+
+        Returns the live cache. Safe to call concurrently from multiple
+        engines sharing this handle (the lock guards check-then-set across
+        the GIL-releasing ``create_runtime_cache`` C call).
+        """
+        with self._lock:
+            if self._cache is None:
+                self._cache = runtime_config.create_runtime_cache()
+                if self._pending_warm_bytes is not None:
+                    self._cache.deserialize(self._pending_warm_bytes)
+                    self._pending_warm_bytes = None
+            return self._cache
+
+
+class RuntimeCache:
+    """User-facing handle for the TensorRT-RTX runtime kernel cache.
+
+    Three construction patterns differ in *who else holds a reference*,
+    which drives the ``autosave_on_del`` flag:
 
     1. **Engine-implicit**: when an engine sees
        ``RuntimeSettings(runtime_cache="/path")``, the engine's
-       ``TRTRuntimeConfig`` materializes a handle internally with
-       ``autosave_on_del=True``. No other Python object holds the handle,
-       so ``__del__`` writes the cache to disk on the engine's last release.
+       ``TRTRuntimeConfig`` materializes a :class:`RuntimeCache` internally
+       with ``autosave_on_del=True``. No other Python object holds it, so
+       ``__del__`` writes the cache to disk on the engine's last release.
 
     2. **Runtime CM** (shared, multi-engine): the :func:`runtime_cache` CM
-       constructs a handle with ``autosave_on_del=False`` and explicitly
-       calls ``handle.save()`` on ``__exit__``. The handle's ``__del__``
-       no-ops since the CM already saved.
+       constructs a :class:`RuntimeCache` with ``autosave_on_del=False``
+       and explicitly calls ``handle.save()`` on ``__exit__``. The
+       ``__del__`` no-ops since the CM already saved.
 
     3. **User-constructed** (advanced): hand-built handles default to
        ``autosave_on_del=False`` so save timing stays under the user's
-       control. Opt in with ``RuntimeCacheHandle(path=..., autosave_on_del=True)``
-       for with-block-style autosave on hand-built handles.
+       control. Opt in with
+       ``RuntimeCache(path=..., autosave_on_del=True)`` for with-block-style
+       autosave on hand-built handles.
 
-    Backing is polymorphic via :class:`_CacheBacking`: either a
-    :class:`_PybindBacking` (Python rt; wraps ``trt.IRuntimeCache``) or a
-    :class:`_TorchbindBacking` (cpp rt; wraps the torchbind sibling). Exactly
-    one is set at any time; the "exactly one" invariant is enforced at
-    construction.
+    The internal ``_handle`` is either :class:`_RuntimeCacheHandle`
+    (python rt) or ``torch.classes.tensorrt.RuntimeCacheHandle`` (cpp rt,
+    used directly). Both satisfy :class:`_RuntimeCacheHandleProtocol`;
+    the facade forwards without branching.
 
-    **Equality is identity-based.** Two handles wrap distinct underlying
-    ``IRuntimeCache`` instances even when they share a path, and the runtime
-    treats them as such (separate ``IRuntimeConfig`` slots, no
+    **Identity-based equality.** Two handles wrap distinct underlying
+    ``IRuntimeCache`` instances even when they share a path, and the
+    runtime treats them as such (separate ``IRuntimeConfig`` slots, no
     kernel-specialization sharing).
     """
 
     def __init__(
         self,
-        cache: Any = None,
         path: str = "",
         autosave_on_del: bool = False,
         torchbind_handle: Any = None,
     ) -> None:
-        # Mutually exclusive at construction -- enforced, not just documented.
         # ``is not None`` (not truthy) because ``torchbind_handle`` is a
         # ``torch.ScriptObject`` whose ``__len__`` is unimplemented; ``bool()``
         # on it raises ``NotImplementedError``.
-        if cache is not None and torchbind_handle is not None:
-            raise ValueError(
-                "RuntimeCacheHandle: specify ``cache`` OR ``torchbind_handle``, not both"
-            )
-        self._backing: Optional[_CacheBacking] = None
-        if cache is not None:
-            self._backing = _PybindBacking(cache)
-        elif torchbind_handle is not None:
-            self._backing = _TorchbindBacking(torchbind_handle)
-        self.path = path
+        if torchbind_handle is not None:
+            # Cpp-rt: use the torchbind class directly as the handle. It
+            # satisfies _RuntimeCacheHandleProtocol structurally.
+            self._handle: _RuntimeCacheHandleProtocol = torchbind_handle
+        else:
+            self._handle = _RuntimeCacheHandle(path=path)
         self.autosave_on_del = autosave_on_del
-        self._lock = threading.Lock()
+
+    @property
+    def path(self) -> str:
+        """The disk path the handle is anchored to. Single source of truth
+        is ``_handle.path``."""
+        return self._handle.path
 
     def is_torchbind_backed(self) -> bool:
-        """``True`` iff this handle wraps a torchbind sibling (cpp rt path)."""
-        return isinstance(self._backing, _TorchbindBacking)
+        """``True`` iff this handle wraps the cpp torchbind class (cpp rt)."""
+        return not isinstance(self._handle, _RuntimeCacheHandle)
 
     def is_pybind_backed(self) -> bool:
-        """``True`` iff this handle wraps a pybind ``IRuntimeCache`` (Python rt path)."""
-        return isinstance(self._backing, _PybindBacking)
+        """``True`` iff this handle wraps the python :class:`_RuntimeCacheHandle`
+        (python rt)."""
+        return isinstance(self._handle, _RuntimeCacheHandle)
 
-    def ensure_cache(self, runtime_config: Any) -> Any:
-        """Idempotent. First caller materializes via ``runtime_config.create_runtime_cache()``.
+    def has_cache(self) -> bool:
+        """Forwards to ``_handle.has_cache()``. ``True`` once the underlying
+        ``trt.IRuntimeCache`` has been materialized."""
+        return self._handle.has_cache()
 
-        Only meaningful for the Python-runtime path. The C++ runtime
-        materializes its cache inside the engine and exposes bytes through
-        the torchbind sibling.
+    def ensure_cache(self, runtime_config: Any) -> Optional[Any]:
+        """Engine-internal: materialize the cache against ``runtime_config``
+        and return it. Called only from python
+        :meth:`TRTRuntimeConfig._apply_settings`, which only runs on python
+        rt. On cpp rt the engine materializes via the cpp side directly;
+        this method is structurally unreachable.
         """
-        with self._lock:
-            if self._backing is None:
-                self._backing = _PybindBacking(runtime_config.create_runtime_cache())
-            assert isinstance(self._backing, _PybindBacking)
-            return self._backing._cache
+        if isinstance(self._handle, _RuntimeCacheHandle):
+            return self._handle.ensure_materialized(runtime_config)
+        # Unreachable in practice: _apply_settings doesn't run on cpp rt.
+        return None
 
     def load_from_stream(self, stream: IO[bytes]) -> int:
-        """Read bytes from ``stream`` and deserialize into the underlying cache.
+        """Read bytes from ``stream`` and deserialize into the underlying
+        cache.
 
-        Returns the number of bytes consumed. ``0`` means "nothing to load" --
-        either the handle has no backing cache yet or the stream had no bytes
-        (first-run case, mirroring path-mode's missing-file early-return).
-        IO errors from the stream itself (closed handle, ``UnsupportedOperation``
-        on a write-only sink, etc.) propagate -- the caller passed something
-        wrong and should hear about it. Path-mode :meth:`load` delegates here
-        once the file is opened.
+        Returns the number of bytes consumed. ``0`` means "nothing to load"
+        -- the stream had no bytes (first-run case, mirroring path-mode's
+        missing-file early-return). IO errors from the stream itself
+        (closed handle, ``UnsupportedOperation`` on a write-only sink,
+        etc.) propagate -- the caller passed something wrong and should
+        hear about it. Path-mode :meth:`load` delegates here once the file
+        is opened.
+
+        On a pre-materialized python ``_RuntimeCacheHandle``, the bytes are
+        stashed in ``_pending_warm_bytes`` and drained on the next
+        ``ensure_materialized``. On the cpp side, the cpp ``deserialize``
+        does the same via cpp ``pending_warm_bytes_``.
         """
-        if self._backing is None:
-            return 0
         data = stream.read()
         if not data:
             return 0
-        self._backing.deserialize_bytes(data)
+        tensor = torch.frombuffer(bytearray(data), dtype=torch.uint8)
+        self._handle.deserialize(tensor)
         logger.debug(f"Loaded runtime cache from stream ({len(data)} bytes)")
         return len(data)
 
     def save_to_stream(self, stream: IO[bytes]) -> int:
         """Serialize the underlying cache and write bytes to ``stream``.
 
-        Returns the number of bytes written. ``0`` means "nothing to save" --
-        the cache hadn't picked up any entries yet. IO errors from the stream
-        (closed handle, ``UnsupportedOperation`` on a read-only sink, etc.)
-        propagate. Path-mode :meth:`save` delegates here once the tmp file is
-        opened and uses the return value to decide whether to promote the tmp
-        to the destination (avoids writing a zero-byte cache file).
+        Returns the number of bytes written. ``0`` means "nothing to save"
+        -- the cache hadn't picked up any entries yet (or wasn't
+        materialized). IO errors from the stream (closed handle,
+        ``UnsupportedOperation`` on a read-only sink, etc.) propagate.
+        Path-mode :meth:`save` delegates here once the tmp file is opened
+        and uses the return value to decide whether to promote the tmp to
+        the destination (avoids writing a zero-byte cache file).
         """
-        data = self._backing.serialize_bytes() if self._backing is not None else None
-        if not data:
+        tensor = self._handle.serialize()
+        if tensor.numel() == 0:
             return 0
+        data = bytes(tensor.cpu().contiguous().numpy())
         stream.write(data)
         logger.debug(f"Saved runtime cache to stream ({len(data)} bytes)")
         return len(data)
@@ -205,15 +272,12 @@ class RuntimeCacheHandle:
     def load(self, path: Optional[str] = None) -> None:
         """Read bytes from disk and deserialize into the underlying cache.
 
-        No-op if no cache backing is present, the resolved path is empty, or
-        the file doesn't exist (first run). Caller must ensure no enqueue is
-        concurrently writing (the CM enforces this by ordering load before
-        engine attach; ``ensure_cache`` is called inside engine setup).
+        No-op if the resolved path is empty or the file doesn't exist
+        (first run). Caller must ensure no concurrent writer (the CM
+        enforces this by ordering load before engine attach).
         """
         target = path if path is not None else self.path
         if not target:
-            return
-        if self._backing is None:
             return
         if not os.path.exists(target):
             return  # first run; nothing to load
@@ -224,11 +288,12 @@ class RuntimeCacheHandle:
                 self.load_from_stream(f)
 
     def save(self, path: Optional[str] = None) -> None:
-        """Serialize the underlying cache and write to disk under a filelock.
+        """Serialize the underlying cache and write to disk under a
+        filelock.
 
-        No-op if path is empty or the cache wasn't materialized. Caller must
-        ensure no enqueue is concurrently writing (the CM detaches the cache
-        from all engines before calling save in ``__exit__``).
+        No-op if path is empty or the cache wasn't materialized. Caller
+        must ensure no concurrent writer (the CM detaches the cache from
+        all engines before calling save in ``__exit__``).
         """
         target = path if path is not None else self.path
         if not target:
@@ -266,17 +331,16 @@ class RuntimeCacheHandle:
 
     def __repr__(self) -> str:
         return (
-            f"RuntimeCacheHandle(path={self.path!r}, "
+            f"RuntimeCache(path={self.path!r}, "
             f"autosave_on_del={self.autosave_on_del}, "
-            f"materialized={self._backing is not None})"
+            f"materialized={self.has_cache()})"
         )
 
 
 class _RuntimeCacheContextManager:
     """``with runtime_cache(target, path) as rc:`` -- shared cache CM.
 
-    Bootstraps an ``IRuntimeCache`` from one of the engines under target,
-    wraps it in a :class:`RuntimeCacheHandle`, loads from disk (or a
+    Builds a fresh :class:`RuntimeCache`, loads from disk (or a
     user-provided stream), attaches to all engines under all listed targets
     for the duration of the block, and saves on exit if ``autosave``.
 
@@ -318,10 +382,10 @@ class _RuntimeCacheContextManager:
             )
 
         self.autosave = autosave
-        self.handle: Optional[RuntimeCacheHandle] = None
+        self.handle: Optional[RuntimeCache] = None
         self._inner_cm: Any = None
 
-    def _load_into(self, handle: "RuntimeCacheHandle") -> None:
+    def _load_into(self, handle: "RuntimeCache") -> None:
         """Apply our IO source to the handle's load path.
 
         Path-mode -> filelocked read from disk. Stream-mode -> single
@@ -334,7 +398,7 @@ class _RuntimeCacheContextManager:
             handle.load()
         # else: in-memory, nothing to load
 
-    def _save_from(self, handle: "RuntimeCacheHandle") -> None:
+    def _save_from(self, handle: "RuntimeCache") -> None:
         """Apply our IO source to the handle's save path.
 
         Path-mode -> filelocked atomic-rename write. Stream-mode -> single
@@ -346,7 +410,7 @@ class _RuntimeCacheContextManager:
             handle.save()
         # else: in-memory, nothing to save
 
-    def __enter__(self) -> RuntimeCacheHandle:
+    def __enter__(self) -> RuntimeCache:
         # Defer imports to avoid a circular dependency:
         # _runtime_cache -> _runtime_config -> _TorchTensorRTModule -> (indirect) _runtime_cache.
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
@@ -370,24 +434,20 @@ class _RuntimeCacheContextManager:
                 "under the target(s)."
             )
 
-        # 2. Build the handle, then load (uniform load-then-attach order across
-        # both runtimes). On Python rt, the pybind ``IRuntimeCache`` materializes
-        # up-front via ``create_runtime_cache()``. On cpp rt, the torchbind
-        # sibling defers materialization until first ``ensure_materialized``;
-        # ``handle.load()`` stashes bytes in cpp ``pending_warm_bytes_`` which
-        # the engine drains on materialization.
+        # 2. Build the handle in its pending state on both runtimes. Disk
+        # bytes go through ``handle.load*`` into pending storage; the first
+        # engine's ``_apply_settings`` (python rt) or cpp ``ensure_initialized``
+        # (cpp rt) materializes the underlying ``IRuntimeCache`` and drains
+        # the pending bytes atomically.
         #
-        # ``autosave_on_del=False`` in both cases -- the CM saves explicitly on
-        # ``__exit__``; letting ``__del__`` also save would double-write when
-        # ``rc`` falls out of scope after the with-block.
+        # ``autosave_on_del=False`` in both cases -- the CM saves explicitly
+        # on ``__exit__``; letting ``__del__`` also save would double-write
+        # when ``rc`` falls out of scope after the with-block.
         if isinstance(bootstrap_module.engine, TRTEngine):
-            cache_obj = bootstrap_module.engine.runtime_config.create_runtime_cache()
-            self.handle = RuntimeCacheHandle(
-                cache=cache_obj, path=self.path, autosave_on_del=False
-            )
+            self.handle = RuntimeCache(path=self.path, autosave_on_del=False)
         else:
             tb = torch.classes.tensorrt.RuntimeCacheHandle(self.path)
-            self.handle = RuntimeCacheHandle(
+            self.handle = RuntimeCache(
                 torchbind_handle=tb, path=self.path, autosave_on_del=False
             )
         self._load_into(self.handle)
@@ -423,7 +483,7 @@ def runtime_cache(
     file handle or ``io.BytesIO``). Streams are read once on enter and
     written once on exit; ownership of open/close stays with the caller.
 
-    Yields the :class:`RuntimeCacheHandle` for inspection or explicit
+    Yields the :class:`RuntimeCache` for inspection or explicit
     ``handle.save()`` calls (e.g., for mid-block checkpointing).
     """
     return _RuntimeCacheContextManager(target_or_targets, path, autosave)
@@ -431,11 +491,12 @@ def runtime_cache(
 
 # When the C++ Torch-TensorRT runtime is loaded, we ALSO expose
 # ``torch.classes.tensorrt.RuntimeCacheHandle`` as the canonical
-# cross-language handle. The Python class above is the user-facing API;
-# at dispatch time the Python module converts to/from the torchbind class as
-# needed (see ``TorchTensorRTModule.runtime_settings`` setter).
+# cross-language handle. The Python :class:`RuntimeCache` above is the
+# user-facing API; at dispatch time the Python module converts to/from
+# the torchbind class as needed (see ``TorchTensorRTModule.runtime_settings``
+# setter).
 def _to_torchbind_handle(
-    rc: Union[None, str, "RuntimeCacheHandle", Any],
+    rc: Union[None, str, "RuntimeCache", Any],
 ) -> Any:
     """Convert a Python-side ``runtime_cache`` value to a torchbind handle
     suitable for ``torch.classes.tensorrt.Engine.update_runtime_settings(...)``.
@@ -455,24 +516,26 @@ def _to_torchbind_handle(
         )
     if isinstance(rc, torch.ScriptObject):
         return rc
-    if isinstance(rc, RuntimeCacheHandle):
+    if isinstance(rc, RuntimeCache):
         # Reuse an existing torchbind sibling so the C++ engine sees the
         # same underlying pointer across calls. Falling through to construct
         # a fresh torchbind would orphan the existing one.
-        if isinstance(rc._backing, _TorchbindBacking):
-            return rc._backing.torchbind
+        if rc.is_torchbind_backed():
+            return rc._handle  # the torchbind object directly
         # Mixed-runtime hazard: a pybind-backed handle crossing into the cpp
         # runtime would silently drop its materialized ``IRuntimeCache``
         # (the cpp engine would attach a fresh torchbind below). Reject so
         # the user picks a deliberate fix.
-        if isinstance(rc._backing, _PybindBacking):
+        if rc.is_pybind_backed() and rc.has_cache():
             raise RuntimeError(
-                "Cannot attach a Python-side RuntimeCacheHandle (with a live "
+                "Cannot attach a Python-side RuntimeCache (with a live "
                 "pybind IRuntimeCache) to a C++ runtime engine: the cache would "
                 "be orphaned. Reconstruct the handle on the C++ side, or "
                 "serialize/deserialize the cache bytes explicitly."
             )
-        # No backing yet: synthesize a torchbind from the (possibly empty) path.
+        # Pybind-backed but pre-materialization: synthesize a torchbind from
+        # the (possibly empty) path. The cpp side will load disk bytes via
+        # its own deserialize once materialized.
         return torch.classes.tensorrt.RuntimeCacheHandle(rc.path) if rc.path else None
     # Truthy-string check: ``""`` would construct a no-op torchbind handle.
     if isinstance(rc, str) and rc:

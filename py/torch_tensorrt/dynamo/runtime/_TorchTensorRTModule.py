@@ -133,7 +133,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         # Per-engine runtime mode controls.
         self._runtime_settings: RuntimeSettings = RuntimeSettings()
-        # Engine-implicit ``RuntimeCacheHandle``: built lazily when the user
+        # Engine-implicit ``RuntimeCache``: built lazily when the user
         # passes a path string via ``runtime_settings`` (the module owns the
         # wrapper; the engine just holds a reference).
         self._implicit_cache_handle: Any = None
@@ -299,13 +299,13 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self._runtime_settings = rs_resolved
 
     def _resolve_runtime_cache(self, rs: RuntimeSettings) -> RuntimeSettings:
-        """Normalize ``rs.runtime_cache`` to ``None`` | ``RuntimeCacheHandle`` (never a path str).
+        """Normalize ``rs.runtime_cache`` to ``None`` | ``RuntimeCache`` (never a path str).
 
         Manages the ``_implicit_cache_handle`` slot as a side effect: builds a
         fresh wrapper for a new path, reuses the existing one for the same
         path, releases it (with save-on-swap) for non-path inputs.
         """
-        from torch_tensorrt.runtime._runtime_cache import RuntimeCacheHandle
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
 
         rc = rs.runtime_cache
 
@@ -330,9 +330,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # hold a reference to the same underlying ``IRuntimeCache``.
         if ENABLED_FEATURES.torch_tensorrt_runtime:
             tb = torch.classes.tensorrt.RuntimeCacheHandle(rc)
-            new = RuntimeCacheHandle(torchbind_handle=tb, path=rc, autosave_on_del=True)
+            new = RuntimeCache(torchbind_handle=tb, path=rc, autosave_on_del=True)
         else:
-            new = RuntimeCacheHandle(path=rc, autosave_on_del=True)
+            new = RuntimeCache(path=rc, autosave_on_del=True)
         self._set_managed_handle(new)
         return rs.merge(runtime_cache=new)
 

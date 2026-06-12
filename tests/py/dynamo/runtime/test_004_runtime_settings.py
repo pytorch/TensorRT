@@ -9,7 +9,7 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.runtime import (
-    RuntimeCacheHandle,
+    RuntimeCache,
     RuntimeSettings,
     runtime_config,
 )
@@ -403,7 +403,7 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
 
 class TestToTorchbindHandleOrphanGuard(TestCase):
     """H1 regression: ``_to_torchbind_handle`` must reject a Python-side
-    ``RuntimeCacheHandle`` carrying a live pybind cache but no torchbind
+    ``RuntimeCache`` carrying a live pybind cache but no torchbind
     sibling crossing into the C++ runtime, rather than silently creating a
     fresh torchbind and orphaning the user's cache."""
 
@@ -414,11 +414,13 @@ class TestToTorchbindHandleOrphanGuard(TestCase):
     def test_orphan_pybind_cache_raises(self):
         from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
 
-        # Force the orphan-hazard state: a pybind-backed handle (no
-        # torchbind sibling) crossing into the cpp dispatch path. The
-        # ``object()`` placeholder for the pybind cache is sufficient --
-        # the guard only checks the backing type, not the cache itself.
-        rc = RuntimeCacheHandle(cache=object(), path="")
+        # Force the orphan-hazard state: a pybind-backed handle whose
+        # underlying python ``_RuntimeCacheHandle`` reports has_cache()=True
+        # crossing into the cpp dispatch path. Whitebox: poke the internal
+        # ``_cache`` slot with a sentinel object since the guard only checks
+        # ``has_cache()``, not the cache content itself.
+        rc = RuntimeCache(path="")
+        rc._handle._cache = object()  # whitebox: simulate materialized state
         with self.assertRaises(RuntimeError) as cm:
             _to_torchbind_handle(rc)
         self.assertIn("orphan", str(cm.exception).lower())

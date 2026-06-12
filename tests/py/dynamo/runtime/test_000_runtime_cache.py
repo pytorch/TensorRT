@@ -113,10 +113,20 @@ def _find_python_trt_module(compiled):
 class TestRuntimeCacheSetup(TestCase):
     """Tests that runtime config and per-engine cache are correctly created for RTX."""
 
-    def test_runtime_config_created(self):
-        compiled, _ = _compile_simple()
+    def test_runtime_config_lazy_until_execute(self):
+        """``engine.runtime_config`` is lazily materialized on first execute,
+        not at compile/setup time. The cache + strategy plumbing relies on
+        this contract; flipping it changes the "one createExecutionContext"
+        invariant for post-compile ``mod.runtime_settings = ...`` flows.
+        """
+        compiled, inputs = _compile_simple()
         engine = _find_python_trt_engine(compiled)
         self.assertIsNotNone(engine)
+        # Pre-execute: lazy, IRuntimeConfig not yet created.
+        self.assertIsNone(engine.runtime_config)
+        # First forward materializes the execution context, which in turn
+        # materializes the IRuntimeConfig via TRTRuntimeConfig.ensure_initialized.
+        compiled(*inputs)
         self.assertIsNotNone(engine.runtime_config)
 
     def test_context_is_lazy_until_forward(self):
@@ -306,16 +316,16 @@ class TestRuntimeCacheContextManager(TestCase):
             self.assertTrue(os.path.exists(path))
 
 
-class TestRuntimeCacheHandleAutosave(TestCase):
-    """Whitebox tests for RuntimeCacheHandle.autosave_on_del semantics."""
+class TestRuntimeCacheAutosave(TestCase):
+    """Whitebox tests for RuntimeCache.autosave_on_del semantics."""
 
     def test_user_built_handle_no_autosave_by_default(self):
         """Hand-built handle defaults to autosave_on_del=False; nothing on GC."""
-        from torch_tensorrt.runtime._runtime_cache import RuntimeCacheHandle
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
 
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "rc.bin")
-            handle = RuntimeCacheHandle(path=path)
+            handle = RuntimeCache(path=path)
             self.assertFalse(handle.autosave_on_del)
             del handle
             gc.collect()
@@ -338,11 +348,6 @@ class TestRuntimeCacheStreamSupport(TestCase):
     directly in the round-trip test.
     """
 
-    @unittest.skipIf(
-        ENABLED_FEATURES.torch_tensorrt_runtime,
-        "Round-trip asserts load before first inference; cpp rt materializes "
-        "the IRuntimeCache lazily on context creation",
-    )
     def test_stream_bytesio_round_trip(self):
         """Write cache bytes through BytesIO once, read them back into a fresh module."""
         compiled_a, inputs_a = _compile_simple()
@@ -361,15 +366,17 @@ class TestRuntimeCacheStreamSupport(TestCase):
         compiled_b, inputs_b = _compile_simple()
         replay = io.BytesIO(written)
         with runtime_cache(compiled_b, replay) as rc_b:
-            # Load fired on enter; the cache should now serialize back to bytes.
+            # Loaded bytes are stashed pending; first forward triggers
+            # ``ensure_materialized`` which drains them into the live cache.
+            # (Same lazy contract on both python rt and cpp rt now.)
+            _ = compiled_b(*inputs_b)
             sanity = io.BytesIO()
             wrote_back = rc_b.save_to_stream(sanity)
             self.assertGreater(
                 wrote_back,
                 0,
-                "load_from_stream should have populated the cache",
+                "load_from_stream + forward should have populated the cache",
             )
-            _ = compiled_b(*inputs_b)
 
     def test_stream_open_file_handle(self):
         """Pass an opened binary file handle directly to the CM."""
@@ -389,13 +396,8 @@ class TestRuntimeCacheStreamSupport(TestCase):
                 "CM exit should have written cache bytes into the file handle",
             )
 
-    @unittest.skipIf(
-        ENABLED_FEATURES.torch_tensorrt_runtime,
-        "Calls load_from_stream before first inference; cpp rt materializes "
-        "the IRuntimeCache lazily on context creation",
-    )
     def test_handle_stream_methods_direct(self):
-        """Exercise RuntimeCacheHandle.{load,save}_from_stream on a CM-yielded handle."""
+        """Exercise RuntimeCache.{load,save}_from_stream on a CM-yielded handle."""
         compiled_a, inputs_a = _compile_simple()
         with runtime_cache(compiled_a, "") as rc_a:
             _ = compiled_a(*inputs_a)
@@ -407,11 +409,14 @@ class TestRuntimeCacheStreamSupport(TestCase):
                 "round-trip"
             )
 
-        compiled_b, _ = _compile_simple()
+        compiled_b, inputs_b = _compile_simple()
         with runtime_cache(compiled_b, "") as rc_b:
             buf.seek(0)
             m = rc_b.load_from_stream(buf)
             self.assertEqual(m, n, "round-trip should consume the same byte count")
+            # Loaded bytes are stashed pending until first forward materializes
+            # the cache (same lazy contract on python rt and cpp rt).
+            _ = compiled_b(*inputs_b)
 
     def test_rejects_unsupported_io_type(self):
         """An int / random object is neither a path nor a stream -> TypeError."""
@@ -425,10 +430,11 @@ class TestRuntimeCacheStreamSupport(TestCase):
         glue end-to-end (handle construction, attach, save-on-exit).
 
         Deliberately first-run only -- the load-back-into-fresh-engine half
-        (see ``test_stream_bytesio_round_trip``) skips on cpp because the
-        ``IRuntimeCache`` is materialized lazily on context creation, so
-        bytes loaded before that don't survive. The dispatch path itself
-        is the regression surface this test protects."""
+        (see ``test_stream_bytesio_round_trip``) needs an explicit forward
+        post-load on both runtimes (the ``IRuntimeCache`` is materialized
+        lazily on context creation, so bytes loaded before that are stashed
+        in pending state until ``ensure_materialized`` drains them). The
+        dispatch path itself is the regression surface this test protects."""
         compiled, inputs = _compile_simple()
         buf = io.BytesIO()
         with runtime_cache(compiled, buf) as rc:
@@ -464,7 +470,6 @@ class TestCppRtWarmStart(TestCase):
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
             TorchTensorRTModule,
         )
-        from torch_tensorrt.runtime._runtime_cache import _TorchbindBacking
 
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "rc.bin")
@@ -491,9 +496,9 @@ class TestCppRtWarmStart(TestCase):
                 if not isinstance(sub, TorchTensorRTModule):
                     continue
                 handle = sub._implicit_cache_handle
-                if handle is None or not isinstance(handle._backing, _TorchbindBacking):
+                if handle is None or not handle.is_torchbind_backed():
                     continue
-                tb = handle._backing.torchbind
+                tb = handle._handle  # the torchbind object directly
                 self.assertTrue(
                     tb.has_cache(),
                     "trt_handle should be materialized after first execute",

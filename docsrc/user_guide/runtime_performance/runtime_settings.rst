@@ -19,7 +19,7 @@ Three knobs that affect TensorRT-RTX runtime behavior **without** recompiling:
      - ``"lazy"`` | ``"eager"`` | ``"none"``
      - When dynamic-shape kernels are JIT-compiled.
    * - ``runtime_cache``
-     - ``None`` | ``str`` path | ``RuntimeCacheHandle``
+     - ``None`` | ``str`` path | ``RuntimeCache``
      - On-disk cache of JIT-compiled kernels.
 
 All three live on ``torch_tensorrt.runtime.RuntimeSettings`` (a frozen
@@ -109,7 +109,7 @@ Different from ``runtime_config(runtime_cache="...")``:
 
 * ``runtime_config`` gives each module its **own** implicit cache; modules do
   not share kernels.
-* ``runtime_cache`` constructs **one shared** ``RuntimeCacheHandle`` and
+* ``runtime_cache`` constructs **one shared** ``RuntimeCache`` and
   attaches it to *all* listed modules.
 
 Use ``runtime_cache`` when you want multiple modules to pool kernels, or you
@@ -217,7 +217,7 @@ If you want *non*-strategy knobs alongside cudagraphs (e.g. a different
 Share one cache across ``runtime_config(...)`` calls on different modules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The handle yielded by ``runtime_cache([...])`` is a ``RuntimeCacheHandle`` you
+The handle yielded by ``runtime_cache([...])`` is a ``RuntimeCache`` you
 can plug into any ``runtime_config(...)`` call. Useful when you want a shared
 cache plus per-module strategy overrides:
 
@@ -259,7 +259,7 @@ and ``mod2`` consumes ``mod1``'s output under the same cache:
 
 What happens, step by step:
 
-* The outer ``runtime_cache`` builds **one** shared ``RuntimeCacheHandle``
+* The outer ``runtime_cache`` builds **one** shared ``RuntimeCache``
   ``rc`` and attaches it to both ``mod1`` and ``mod2`` — any kernel JIT'd
   while running ``mod1`` is available to ``mod2`` with no re-compile.
 * The inner ``runtime_config`` applies ``"eager"`` dynamic-shapes
@@ -276,16 +276,16 @@ What happens, step by step:
 
 ----
 
-Advanced: caller-owned ``RuntimeCacheHandle``
+Advanced: caller-owned ``RuntimeCache``
 ---------------------------------------------
 
 Construct your own handle if you want full lifetime control:
 
 .. code-block:: python
 
-    from torch_tensorrt.runtime import RuntimeCacheHandle, RuntimeSettings
+    from torch_tensorrt.runtime import RuntimeCache, RuntimeSettings
 
-    handle = RuntimeCacheHandle(path="/var/cache/jit.bin", autosave_on_del=True)
+    handle = RuntimeCache(path="/var/cache/jit.bin", autosave_on_del=True)
     mod.runtime_settings = RuntimeSettings(runtime_cache=handle)
     out = mod(x)
     # handle.save() will fire when handle goes out of scope (autosave_on_del=True)
@@ -294,7 +294,7 @@ Or with explicit save/load:
 
 .. code-block:: python
 
-    handle = RuntimeCacheHandle(path="/var/cache/jit.bin")  # autosave_on_del=False default
+    handle = RuntimeCache(path="/var/cache/jit.bin")  # autosave_on_del=False default
     handle.load()
     mod.runtime_settings = RuntimeSettings(runtime_cache=handle)
     out = mod(x)
@@ -369,7 +369,7 @@ Don't nest ``runtime_cache(...)`` CMs with the same path
         with runtime_cache(mod, "/p") as rc2:
             out = mod(x)
 
-Each ``runtime_cache(...)`` builds a *different* ``RuntimeCacheHandle``
+Each ``runtime_cache(...)`` builds a *different* ``RuntimeCache``
 object. The inner one displaces the outer's handle from the engine. On inner
 exit, ``rc2.save()`` writes ``/p``. On outer exit, the engine has ``rc1``
 re-attached (different ``IRuntimeCache`` from ``rc2``), and ``rc1.save()``
@@ -426,7 +426,7 @@ Quick reference
    * - Cache to/from a stream
      - ``with runtime_cache(mod, io.BytesIO()):``
    * - Caller-controlled cache lifetime
-     - construct ``RuntimeCacheHandle(...)`` directly
+     - construct ``RuntimeCache(...)`` directly
    * - In-memory cache (no disk)
      - ``RuntimeSettings(runtime_cache=None)`` or ``runtime_cache(mod, "")``
    * - Non-cuda-graph settings alongside cudagraphs capture
