@@ -307,7 +307,6 @@ class MutableTorchTensorRTModule(object):
             self.exp_program,
             self.arg_inputs,
             self.kwarg_inputs,
-            use_weight_map_cache=True,
             in_place=True,
         )
 

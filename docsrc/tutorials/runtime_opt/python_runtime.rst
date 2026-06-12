@@ -130,10 +130,6 @@ produced outside Torch-TensorRT):
 ``settings`` (:class:`~torch_tensorrt.dynamo._settings.CompilationSettings`, optional)
     Device and runtime options (must match how the engine was built).
 
-``weight_name_map`` (``dict``, optional)
-    Mapping of TRT weight names to PyTorch state dict names. Required for refit
-    support via :func:`~torch_tensorrt.dynamo.refit_module_weights`.
-
 ``requires_output_allocator`` (``bool``, default ``False``)
     Set to ``True`` if the engine contains data-dependent-shape ops (``nonzero``,
     ``unique``, etc.) that require TRT's output allocator.
