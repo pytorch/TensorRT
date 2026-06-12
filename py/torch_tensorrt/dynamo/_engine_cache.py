@@ -24,7 +24,6 @@ UnpackedCacheHit = Tuple[
     List[str],
     Sequence[Input],
     CompilationSettings,
-    Optional[Dict[str, Any]],
     bool,
     bool,
 ]
@@ -108,11 +107,10 @@ class BaseEngineCache(ABC):
         output_names: List[str],
         input_specs: Sequence[Input],
         compilation_settings: CompilationSettings,
-        weight_name_map: Optional[Dict[Any, Any]],
         requires_output_allocator: bool,
         requires_native_multidevice: bool,
     ) -> bytes:
-        """Pack serialized engine, input names, output names, and weight map into a single blob
+        """Pack serialized engine, input names, and output names into a single blob
 
         Args:
             serialized_engine (bytes): serialized TRT engine
@@ -120,7 +118,6 @@ class BaseEngineCache(ABC):
             output_names (List[str]): output names of TRT engine
             input_specs (Sequence[Input]): input specs of TRT engine
             compilation_settings (CompilationSettings): compilation settings of TRT engine
-            weight_name_map (Optional[Dict[Any, Any]]): weight name map for refitting
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
         Returns:
@@ -135,7 +132,6 @@ class BaseEngineCache(ABC):
                 "output_names": output_names,
                 "input_specs": input_specs,
                 "compilation_settings": settings,
-                "weight_name_map": weight_name_map,
                 "requires_output_allocator": requires_output_allocator,
                 "requires_native_multidevice": requires_native_multidevice,
             }
@@ -143,13 +139,13 @@ class BaseEngineCache(ABC):
 
     @staticmethod
     def unpack(packed_obj: bytes) -> UnpackedCacheHit:
-        """Unpack packed blob into serialized engine, input names, output names, and weight map
+        """Unpack packed blob into serialized engine, input names, and output names
 
         Args:
             packed_obj (bytes): packed blob
 
         Returns:
-            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, Optional[Dict[str, Any]]]: serialized engine, input names, output names, input specs, CompilationSettings, weight name map
+            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, bool, bool]: serialized engine, input names, output names, input specs, CompilationSettings, requires_output_allocator, requires_native_multidevice
         """
         unpacked = pickle.loads(packed_obj)
         return (
@@ -158,7 +154,6 @@ class BaseEngineCache(ABC):
             unpacked["output_names"],
             unpacked["input_specs"],
             unpacked["compilation_settings"],
-            unpacked["weight_name_map"],
             unpacked["requires_output_allocator"],
             unpacked.get("requires_native_multidevice", False),
         )
