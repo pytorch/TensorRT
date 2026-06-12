@@ -467,6 +467,15 @@ class TestCppRtWarmStart(TestCase):
     ``serialize()`` roundtrip post-execute."""
 
     def test_warm_start_drains_pending_bytes_on_cpp_rt(self):
+        """Cold run saves to disk, warm run materializes a populated cache.
+
+        Note: the assertion ``len(warm_bytes) >= cold_size`` is satisfied
+        even when warm regenerates kernels from scratch (no disk load)
+        because the same model produces a deterministic kernel set on
+        both runs. The strict "disk-load actually fired" guarantee lives
+        in :class:`TestImplicitWarmLoadPyRt` via whitebox introspection of
+        ``_pending_warm_bytes`` pre-forward; this test covers the cpp-rt
+        end-to-end dispatch path itself."""
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
             TorchTensorRTModule,
         )
@@ -509,6 +518,81 @@ class TestCppRtWarmStart(TestCase):
                     cold_size,
                     "Warm-start failed to drain pending bytes -- second run "
                     "started cold instead of inheriting kernels from disk.",
+                )
+                found = True
+                break
+            self.assertTrue(found, "No TorchTensorRTModule with implicit handle found")
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache is TRT-RTX-only",
+)
+@unittest.skipIf(
+    ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Pending-bytes introspection requires the Python TRTEngine path",
+)
+class TestImplicitWarmLoadPyRt(TestCase):
+    """Strong warm-load contract: implicit handle disk bytes must reach
+    the pending buffer at handle construction time (in
+    ``_TorchTensorRTModule._resolve_runtime_cache``), so the first
+    ``ensure_materialized`` drains them into the live IRuntimeCache.
+
+    Whitebox test for the python rt path -- inspects
+    ``_RuntimeCacheHandle._pending_warm_bytes`` directly. The cpp-rt path
+    is symmetric (cpp ``pending_warm_bytes_`` in the torchbind handle) but
+    not introspectable from python; the end-to-end dispatch is covered by
+    :meth:`TestCppRtWarmStart.test_warm_start_drains_pending_bytes_on_cpp_rt`."""
+
+    def test_pending_warm_bytes_populated_at_construction(self):
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+        from torch_tensorrt.runtime._runtime_cache import _RuntimeCacheHandle
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+
+            # Cold run: populate + save to disk.
+            m1, inputs = _compile_simple(runtime_cache_path=path)
+            _ = m1(*inputs)
+            del m1
+            gc.collect()
+            self.assertTrue(os.path.exists(path))
+            with open(path, "rb") as f:
+                cold_disk_bytes = f.read()
+            self.assertGreater(len(cold_disk_bytes), 0)
+
+            # Warm run: fresh module pointing at the same disk path.
+            # ``_resolve_runtime_cache`` constructs a fresh implicit handle
+            # and (per this PR) warm-loads disk bytes into the inner's
+            # pending buffer immediately -- BEFORE any forward.
+            m2, _ = _compile_simple(runtime_cache_path=path)
+
+            found = False
+            for _, sub in m2.named_modules():
+                if not isinstance(sub, TorchTensorRTModule):
+                    continue
+                handle = sub._implicit_cache_handle
+                if handle is None or not handle.is_pybind_backed():
+                    continue
+                inner = handle._handle
+                self.assertIsInstance(inner, _RuntimeCacheHandle)
+                # Cache not yet materialized (no forward has run yet).
+                self.assertIsNone(
+                    inner._cache,
+                    "cache should not be materialized pre-forward",
+                )
+                # But pending warm bytes were populated by the load() call
+                # in _resolve_runtime_cache.
+                self.assertIsNotNone(
+                    inner._pending_warm_bytes,
+                    "pending warm bytes should be populated at construction",
+                )
+                self.assertEqual(
+                    inner._pending_warm_bytes,
+                    cold_disk_bytes,
+                    "pending warm bytes should match the disk file contents",
                 )
                 found = True
                 break

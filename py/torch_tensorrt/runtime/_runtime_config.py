@@ -250,11 +250,13 @@ class TRTRuntimeConfig:
 
         Resolves ``runtime_cache``:
         - ``None`` ⇒ no cache attached.
-        - ``RuntimeCache`` ⇒ caller owns lifecycle (handle holds the
-          IRuntimeCache reference; ``ensure_cache`` materializes it on first
-          use). String paths are pre-wrapped into handles by the upstream
-          :py:meth:`TorchTensorRTModule._materialize_implicit_handle`; raw
-          strings are not accepted here.
+        - ``RuntimeCache`` ⇒ caller owns lifecycle. ``ensure_cache``
+          materializes the inner ``IRuntimeCache`` on first use and drains
+          any pending warm bytes loaded into the handle's pending buffer at
+          construction time (by ``_TorchTensorRTModule._resolve_runtime_cache``
+          for engine-implicit handles, or by the ``runtime_cache`` CM for
+          shared ones). String paths are pre-wrapped into handles upstream;
+          raw strings are not accepted here.
         """
         # Deferred imports: trt is import-aliased to tensorrt_rtx on RTX builds,
         # and _runtime_cache imports this module's RuntimeSettings.
@@ -277,17 +279,6 @@ class TRTRuntimeConfig:
         elif isinstance(rc, RuntimeCache):
             cache = rc.ensure_cache(self._live)
             self._live.set_runtime_cache(cache)
-            # Engine-implicit handles need disk-warm on first attach (the
-            # module's post-dispatch load fires while the pybind cache is
-            # still un-materialized due to lazy IExecutionContext creation;
-            # by the time we're here, ``ensure_cache`` has materialized it).
-            # External + CM-yielded handles (autosave_on_del=False) are loaded
-            # by their owner, not us.
-            if rc.autosave_on_del and rc.path:
-                try:
-                    rc.load()
-                except Exception as e:
-                    logger.warning(f"Failed to load implicit runtime cache: {e}")
         else:
             raise TypeError(
                 f"runtime_cache must be None or RuntimeCache by the time "

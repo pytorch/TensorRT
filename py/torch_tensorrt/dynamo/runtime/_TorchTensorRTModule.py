@@ -333,6 +333,21 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             new = RuntimeCache(torchbind_handle=tb, path=rc, autosave_on_del=True)
         else:
             new = RuntimeCache(path=rc, autosave_on_del=True)
+        # Warm-load disk bytes into pending state on the freshly-constructed
+        # handle. Bytes land in the inner handle's pending buffer (python
+        # ``_RuntimeCacheHandle._pending_warm_bytes`` or cpp
+        # ``pending_warm_bytes_``) and get drained on first
+        # ``ensure_materialized``. Loading here -- once, at construction --
+        # unifies the implicit-handle warm-load with the CM-yielded one, and
+        # is the only callsite that bridges disk -> cache for an implicit
+        # handle on the cpp-rt path (the prior code loaded only from python
+        # ``_apply_settings``, which doesn't run on cpp rt).
+        try:
+            new.load()
+        except Exception as e:
+            logger.warning(
+                f"Failed to warm-load implicit runtime cache from {rc!r}: {e}"
+            )
         self._set_managed_handle(new)
         return rs.merge(runtime_cache=new)
 
