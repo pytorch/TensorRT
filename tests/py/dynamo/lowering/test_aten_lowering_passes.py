@@ -301,8 +301,7 @@ class TestNormalizeNegativeSliceStop(TestCase):
         slice_node = next(
             node
             for node in gm.graph.nodes
-            if node.op == "call_function"
-            and node.target == torch.ops.aten.slice.Tensor
+            if node.op == "call_function" and node.target == torch.ops.aten.slice.Tensor
         )
         self.assertEqual(slice_node.args[1], 1)
 
@@ -326,9 +325,7 @@ class TestNormalizeNegativeSliceStop(TestCase):
         x.meta["val"] = torch.empty(2, 5, 3)
         n = graph.placeholder("n")
         neg = graph.call_function(torch.ops.aten.neg.default, args=(n,))
-        sliced = graph.call_function(
-            torch.ops.aten.slice.Tensor, args=(x, 1, 0, neg)
-        )
+        sliced = graph.call_function(torch.ops.aten.slice.Tensor, args=(x, 1, 0, neg))
         graph.output(sliced)
 
         gm = torch.fx.GraphModule({}, graph)
@@ -337,8 +334,7 @@ class TestNormalizeNegativeSliceStop(TestCase):
         slice_node = next(
             node
             for node in gm.graph.nodes
-            if node.op == "call_function"
-            and node.target == torch.ops.aten.slice.Tensor
+            if node.op == "call_function" and node.target == torch.ops.aten.slice.Tensor
         )
 
         normalized_stop = slice_node.args[3]
