@@ -1,3 +1,6 @@
+import operator
+import sys
+
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
@@ -276,6 +279,106 @@ class TestRemoveSymIntNodes(TestCase):
         out = trt_module(inputs)
         # if the model can be successfully compiled, we regard the test as passed
         self.assertTrue(True)
+
+
+class TestNormalizeNegativeSliceStop(TestCase):
+    def test_normalizes_negative_symbolic_start_bound(self):
+        from torch_tensorrt.dynamo.lowering.passes.normalize_negative_slice_stop import (
+            normalize_negative_slice_stop,
+        )
+
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        x.meta["val"] = torch.empty(2, 5, 3)
+        n = graph.placeholder("n")
+        neg = graph.call_function(operator.neg, args=(n,))
+        sliced = graph.call_function(torch.ops.aten.slice.Tensor, args=(x, -2, neg))
+        graph.output(sliced)
+
+        gm = torch.fx.GraphModule({}, graph)
+        gm = normalize_negative_slice_stop(gm)
+
+        slice_node = next(
+            node
+            for node in gm.graph.nodes
+            if node.op == "call_function"
+            and node.target == torch.ops.aten.slice.Tensor
+        )
+        self.assertEqual(slice_node.args[1], 1)
+
+        normalized_start = slice_node.args[2]
+        self.assertEqual(normalized_start.op, "call_function")
+        self.assertEqual(normalized_start.target, operator.sub)
+
+        dim_size, offset = normalized_start.args
+        self.assertEqual(dim_size.target, torch.ops.aten.sym_size.int)
+        self.assertEqual(dim_size.args[0], x)
+        self.assertEqual(dim_size.args[1], 1)
+        self.assertEqual(offset, n)
+
+    def test_normalizes_negative_symbolic_stop_bound(self):
+        from torch_tensorrt.dynamo.lowering.passes.normalize_negative_slice_stop import (
+            normalize_negative_slice_stop,
+        )
+
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        x.meta["val"] = torch.empty(2, 5, 3)
+        n = graph.placeholder("n")
+        neg = graph.call_function(torch.ops.aten.neg.default, args=(n,))
+        sliced = graph.call_function(
+            torch.ops.aten.slice.Tensor, args=(x, 1, 0, neg)
+        )
+        graph.output(sliced)
+
+        gm = torch.fx.GraphModule({}, graph)
+        gm = normalize_negative_slice_stop(gm)
+
+        slice_node = next(
+            node
+            for node in gm.graph.nodes
+            if node.op == "call_function"
+            and node.target == torch.ops.aten.slice.Tensor
+        )
+
+        normalized_stop = slice_node.args[3]
+        self.assertEqual(normalized_stop.op, "call_function")
+        self.assertEqual(normalized_stop.target, operator.sub)
+
+        dim_size, offset = normalized_stop.args
+        self.assertEqual(dim_size.target, torch.ops.aten.sym_size.int)
+        self.assertEqual(dim_size.args[0], x)
+        self.assertEqual(dim_size.args[1], 1)
+        self.assertEqual(offset, n)
+
+
+class TestEliminateSymMinInt64Max(TestCase):
+    def test_eliminates_noop_sym_min_int64_max(self):
+        if not hasattr(torch, "sym_min"):
+            self.skipTest("torch.sym_min is not available")
+
+        from torch_tensorrt.dynamo.lowering.passes.eliminate_sym_min_int64_max import (
+            eliminate_sym_min_int64_max,
+        )
+
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        rhs_int64_max = graph.call_function(torch.sym_min, args=(x, sys.maxsize))
+        lhs_int64_max = graph.call_function(torch.sym_min, args=(2**63 - 1, x))
+        graph.output((rhs_int64_max, lhs_int64_max))
+
+        gm = torch.fx.GraphModule({}, graph)
+        gm = eliminate_sym_min_int64_max(gm)
+
+        self.assertFalse(
+            any(
+                node.op == "call_function" and node.target is torch.sym_min
+                for node in gm.graph.nodes
+            )
+        )
+
+        output_node = next(node for node in gm.graph.nodes if node.op == "output")
+        self.assertEqual(output_node.args[0], (x, x))
 
 
 class TestRewriteEfficientAttention(TestCase):

@@ -898,6 +898,67 @@ def _insert_complex_io_adapters(
         partitioned_module.recompile()
 
 
+def _apply_dynamic_shape_bounds(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: dict[Any, Any],
+) -> None:
+    """Propagate user Input min/max bounds into the FX shape_env.
+
+    This lets explicit torch_tensorrt.Input bounds constrain exported programs
+    that otherwise carry broad Dim.DYNAMIC ranges.
+    """
+    from torch.utils._sympy.value_ranges import ValueRanges
+
+    placeholders = [n for n in gm.graph.nodes if n.op == "placeholder"]
+
+    sample_by_name: dict[str, Input] = {}
+    for i, node in enumerate(placeholders):
+        if i < len(sample_arg_inputs):
+            inp = sample_arg_inputs[i]
+            if isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC:
+                sample_by_name[node.target] = inp
+
+    for name, inp in sample_kwarg_inputs.items():
+        if isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC:
+            sample_by_name[name] = inp
+
+    if not sample_by_name:
+        return
+
+    updated_syms: set = set()
+    for node in placeholders:
+        if node.target not in sample_by_name:
+            continue
+
+        sample_input = sample_by_name[node.target]
+        fake_val = node.meta.get("val")
+        if not isinstance(fake_val, torch.Tensor):
+            continue
+
+        min_shape = sample_input.shape["min_shape"]
+        max_shape = sample_input.shape["max_shape"]
+
+        for d, dim in enumerate(fake_val.size()):
+            if not isinstance(dim, torch.SymInt) or d >= len(min_shape):
+                continue
+
+            expr = dim.node.expr
+            if expr in updated_syms:
+                continue
+
+            shape_env = dim.node.shape_env
+            if expr not in shape_env.var_to_range:
+                continue
+
+            old_range = shape_env.var_to_range[expr]
+            lower = max(old_range.lower, min_shape[d])
+            upper = min(old_range.upper, max_shape[d])
+            shape_env.var_to_range[expr] = ValueRanges(lower=lower, upper=upper)
+            updated_syms.add(expr)
+            logger.debug("Updated shape_env range for %s: [%s, %s]", expr, lower, upper)
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -928,6 +989,8 @@ def compile_module(
     dryrun_tracker = DryRunTracker()
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
+
+    _apply_dynamic_shape_bounds(gm, sample_arg_inputs, sample_kwarg_inputs)
 
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
