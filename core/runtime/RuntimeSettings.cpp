@@ -90,6 +90,8 @@ at::Tensor RuntimeCacheHandle::serialize() const {
 #ifdef TRT_MAJOR_RTX
   std::lock_guard<std::mutex> lock(state_mu_);
   if (!trt_handle_) {
+    LOG_WARNING(
+        "RuntimeCacheHandle::serialize() called before the IRuntimeCache was materialized; returning empty bytes.");
     return empty();
   }
   auto host_mem = make_trt(trt_handle_->serialize());
@@ -109,6 +111,7 @@ at::Tensor RuntimeCacheHandle::serialize() const {
 void RuntimeCacheHandle::deserialize(TORCHTRT_UNUSED at::Tensor data) {
 #ifdef TRT_MAJOR_RTX
   if (data.numel() == 0) {
+    LOG_WARNING("RuntimeCacheHandle::deserialize() called with an empty tensor; nothing to load.");
     return;
   }
   auto contig = data.contiguous().to(at::kCPU);
