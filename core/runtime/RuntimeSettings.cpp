@@ -178,8 +178,8 @@ bool RuntimeSettings::operator==(RuntimeSettings const& other) const noexcept {
 std::string RuntimeSettings::to_str() const {
   std::ostringstream os;
   os << "RuntimeSettings{" << std::endl;
-  os << "  Dynamic Shapes Kernel Strategy: " << dynamic_shapes_kernel_specialization_strategy.to_string() << std::endl;
-  os << "  CUDA Graph Strategy: " << cuda_graph_strategy.to_string() << std::endl;
+  os << "  Dynamic Shapes Kernel Strategy: " << dynamic_shapes_kernel_specialization_strategy << std::endl;
+  os << "  CUDA Graph Strategy: " << cuda_graph_strategy << std::endl;
   if (runtime_cache) {
     auto const& p = runtime_cache->path;
     os << "  Runtime Cache: " << (p.empty() ? "<in-memory shared>" : p) << std::endl;
