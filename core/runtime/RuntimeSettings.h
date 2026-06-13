@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <memory>
 #include <mutex>
 #include <ostream>
@@ -15,6 +16,12 @@
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
+
+// Reverse-lookup tables shared by ``to_string()`` (constexpr, inline below) and
+// the ``from_underlying`` / ``from_string`` validators in the .cpp. Indices
+// match the enum integer values (which mirror the nvinfer1 enums).
+inline constexpr std::array<std::string_view, 3> kDsStrategyNames = {"lazy", "eager", "none"};
+inline constexpr std::array<std::string_view, 2> kCgStrategyNames = {"disabled", "whole_graph_capture"};
 
 // A passive wrapper around an ``IRuntimeCache``. Registered as a torchbind class
 // so it can be passed by ``c10::intrusive_ptr`` across the Python/C++ boundary;
@@ -101,7 +108,12 @@ class DynamicShapesKernelSpecializationStrategy {
     return v_;
   }
 
-  [[nodiscard]] std::string_view to_string() const noexcept;
+  [[nodiscard]] constexpr std::string_view to_string() const noexcept {
+    // Negative underlying values wrap to a huge ``size_t``, so a single
+    // bounds check from the top covers both ends without needing ``std::clamp``.
+    auto const i = static_cast<size_t>(v_);
+    return i < std::size(kDsStrategyNames) ? kDsStrategyNames[i] : std::string_view{"<unknown>"};
+  }
   [[nodiscard]] constexpr int32_t to_underlying() const noexcept {
     return static_cast<int32_t>(v_);
   }
@@ -154,7 +166,10 @@ class CudaGraphStrategy {
     return v_;
   }
 
-  [[nodiscard]] std::string_view to_string() const noexcept;
+  [[nodiscard]] constexpr std::string_view to_string() const noexcept {
+    auto const i = static_cast<size_t>(v_);
+    return i < std::size(kCgStrategyNames) ? kCgStrategyNames[i] : std::string_view{"<unknown>"};
+  }
   [[nodiscard]] constexpr int32_t to_underlying() const noexcept {
     return static_cast<int32_t>(v_);
   }

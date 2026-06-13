@@ -16,23 +16,9 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
-namespace {
-
-// Reverse-lookup tables. Indices match the enum integer values (which mirror
-// the nvinfer1 enums). Out-of-range -> "<unknown>".
-constexpr std::array<std::string_view, 3> kDsStrategyNames = {"lazy", "eager", "none"};
-constexpr std::array<std::string_view, 2> kCgStrategyNames = {"disabled", "whole_graph_capture"};
-
-} // namespace
-
 // ---- DynamicShapesKernelSpecializationStrategy -----------------------------
-
-std::string_view DynamicShapesKernelSpecializationStrategy::to_string() const noexcept {
-  // Negative underlying values wrap to a huge ``size_t``, so a single bounds
-  // check from the top covers both ends without needing ``std::clamp``.
-  auto const i = static_cast<size_t>(v_);
-  return i < std::size(kDsStrategyNames) ? kDsStrategyNames[i] : std::string_view{"<unknown>"};
-}
+// (``to_string`` is constexpr-inline in the header; the name arrays
+// ``kDsStrategyNames`` / ``kCgStrategyNames`` live in the header too.)
 
 DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrategy::from_underlying(int64_t v) {
   TORCHTRT_CHECK(
@@ -54,11 +40,6 @@ DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrat
 }
 
 // ---- CudaGraphStrategy -----------------------------------------------------
-
-std::string_view CudaGraphStrategy::to_string() const noexcept {
-  auto const i = static_cast<size_t>(v_);
-  return i < std::size(kCgStrategyNames) ? kCgStrategyNames[i] : std::string_view{"<unknown>"};
-}
 
 CudaGraphStrategy CudaGraphStrategy::from_underlying(int64_t v) {
   TORCHTRT_CHECK(
