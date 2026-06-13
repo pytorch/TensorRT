@@ -19,6 +19,11 @@ namespace runtime {
 
 namespace {
 
+// Reverse-lookup tables. Indices match the enum integer values (which mirror
+// the nvinfer1 enums). Out-of-range -> "<unknown>".
+constexpr std::array<std::string_view, 3> kDsStrategyNames = {"lazy", "eager", "none"};
+constexpr std::array<std::string_view, 2> kCgStrategyNames = {"disabled", "whole_graph_capture"};
+
 // "a|b|c" from {"a", "b", "c"}. Used to render the accepted-names tail of the
 // validator error messages.
 template <size_t N>
@@ -53,8 +58,13 @@ std::string format_expected_name(std::array<std::string_view, N> const& names) {
 } // namespace
 
 // ---- DynamicShapesKernelSpecializationStrategy -----------------------------
-// (``to_string`` is constexpr-inline in the header; the name arrays
-// ``kDsStrategyNames`` / ``kCgStrategyNames`` live in the header too.)
+
+std::string_view DynamicShapesKernelSpecializationStrategy::to_string() const noexcept {
+  // Negative underlying values wrap to a huge ``size_t``, so a single bounds
+  // check from the top covers both ends without needing ``std::clamp``.
+  auto const i = static_cast<size_t>(v_);
+  return i < std::size(kDsStrategyNames) ? kDsStrategyNames[i] : std::string_view{"<unknown>"};
+}
 
 DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrategy::from_underlying(int64_t v) {
   TORCHTRT_CHECK(
@@ -78,6 +88,11 @@ DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrat
 }
 
 // ---- CudaGraphStrategy -----------------------------------------------------
+
+std::string_view CudaGraphStrategy::to_string() const noexcept {
+  auto const i = static_cast<size_t>(v_);
+  return i < std::size(kCgStrategyNames) ? kCgStrategyNames[i] : std::string_view{"<unknown>"};
+}
 
 CudaGraphStrategy CudaGraphStrategy::from_underlying(int64_t v) {
   TORCHTRT_CHECK(
