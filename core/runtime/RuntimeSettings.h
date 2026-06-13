@@ -70,26 +70,119 @@ class RuntimeCacheHandle : public torch::CustomClassHolder {
 #endif
 };
 
-// Strategy enums mirroring the corresponding ``nvinfer1`` enums on TRT-RTX.
+// Strategy types mirroring the corresponding ``nvinfer1`` enums on TRT-RTX.
 // Declared here unconditionally so non-RTX builds can still pass these values
 // through the data model -- only the ``static_cast`` to the nvinfer1 type
 // (inside ``TRTRuntimeConfig::ensure_initialized``) is RTX-only. Integer
 // values must stay in sync with the nvinfer1 enums.
-enum class DynamicShapesKernelSpecializationStrategy : int32_t {
-  kLAZY = 0,
-  kEAGER = 1,
-  kNONE = 2,
+//
+// Each strategy is a "newtype" class wrapping a nested ``enum Value`` so all
+// string/int conversions live on the type. Pattern mirrors
+// ``core/conversion/var/Var.h`` (``Var::Type`` + ``Var::type_name()``). The
+// implicit ``operator Value()`` unwrap keeps the existing
+// ``switch (s)`` / ``static_cast<nvinfer1::X>(s)`` / ``s == Class::kFOO``
+// usage compiling unchanged.
+
+class DynamicShapesKernelSpecializationStrategy {
+ public:
+  enum Value : int32_t {
+    kLAZY = 0,
+    kEAGER = 1,
+    kNONE = 2,
+  };
+
+  constexpr DynamicShapesKernelSpecializationStrategy() = default;
+  constexpr DynamicShapesKernelSpecializationStrategy(Value v) noexcept : v_(v) {}
+
+  // Implicit unwrap to the inner enum. Lets ``switch (s)``, comparisons,
+  // and ``static_cast<nvinfer1::DynamicShapesKernelSpecializationStrategy>(s)``
+  // resolve through the inner ``Value`` without explicit calls.
+  constexpr operator Value() const noexcept {
+    return v_;
+  }
+
+  [[nodiscard]] std::string_view to_string() const noexcept;
+  [[nodiscard]] constexpr int32_t to_underlying() const noexcept {
+    return static_cast<int32_t>(v_);
+  }
+  // ``int64_t`` so out-of-range Python callers (TorchBind uses int64) are
+  // caught here. Throws on out-of-range.
+  [[nodiscard]] static DynamicShapesKernelSpecializationStrategy from_underlying(int64_t v);
+  // Throws on unknown name.
+  [[nodiscard]] static DynamicShapesKernelSpecializationStrategy from_string(std::string_view name);
+
+  // Two comparison overloads -- mirrors the ``TensorFormat`` pattern in
+  // ``cpp/include/torch_tensorrt/torch_tensorrt.h``. Both overloads have a
+  // zero-UDC viable match (one for class-vs-class, one for class-vs-Value),
+  // which beats the built-in ``int == int`` (1 UDC via ``operator Value()``)
+  // and the single-overload version (1 UDC via implicit Value ctor).
+  constexpr bool operator==(DynamicShapesKernelSpecializationStrategy o) const noexcept {
+    return v_ == o.v_;
+  }
+  constexpr bool operator==(Value o) const noexcept {
+    return v_ == o;
+  }
+  constexpr bool operator!=(DynamicShapesKernelSpecializationStrategy o) const noexcept {
+    return v_ != o.v_;
+  }
+  constexpr bool operator!=(Value o) const noexcept {
+    return v_ != o;
+  }
+  // Disable accidental truthy use: ``if (strategy)`` would otherwise compare
+  // against ``kLAZY = 0`` and silently surprise.
+  explicit operator bool() = delete;
+
+ private:
+  Value v_ = kLAZY;
 };
 
-enum class CudaGraphStrategy : int32_t {
-  kDISABLED = 0,
-  kWHOLE_GRAPH_CAPTURE = 1,
+inline std::ostream& operator<<(std::ostream& os, DynamicShapesKernelSpecializationStrategy s) {
+  return os << s.to_string();
+}
+
+class CudaGraphStrategy {
+ public:
+  enum Value : int32_t {
+    kDISABLED = 0,
+    kWHOLE_GRAPH_CAPTURE = 1,
+  };
+
+  constexpr CudaGraphStrategy() = default;
+  constexpr CudaGraphStrategy(Value v) noexcept : v_(v) {}
+
+  constexpr operator Value() const noexcept {
+    return v_;
+  }
+
+  [[nodiscard]] std::string_view to_string() const noexcept;
+  [[nodiscard]] constexpr int32_t to_underlying() const noexcept {
+    return static_cast<int32_t>(v_);
+  }
+  [[nodiscard]] static CudaGraphStrategy from_underlying(int64_t v);
+  [[nodiscard]] static CudaGraphStrategy from_string(std::string_view name);
+
+  // Two-overload comparisons (see DynamicShapesKernelSpecializationStrategy).
+  constexpr bool operator==(CudaGraphStrategy o) const noexcept {
+    return v_ == o.v_;
+  }
+  constexpr bool operator==(Value o) const noexcept {
+    return v_ == o;
+  }
+  constexpr bool operator!=(CudaGraphStrategy o) const noexcept {
+    return v_ != o.v_;
+  }
+  constexpr bool operator!=(Value o) const noexcept {
+    return v_ != o;
+  }
+  explicit operator bool() = delete;
+
+ private:
+  Value v_ = kDISABLED;
 };
 
-// Boundary validators: take the int that crossed the Py->C++ wire and return
-// the enum (or throw with a clear message on out-of-range).
-[[nodiscard]] DynamicShapesKernelSpecializationStrategy to_dynamic_shapes_kernel_strategy(int64_t v);
-[[nodiscard]] CudaGraphStrategy to_cuda_graph_strategy(int64_t v);
+inline std::ostream& operator<<(std::ostream& os, CudaGraphStrategy s) {
+  return os << s.to_string();
+}
 
 // Per-engine runtime-only knobs that move across the Python/C++ boundary.
 struct RuntimeSettings {
@@ -105,10 +198,6 @@ struct RuntimeSettings {
 
   [[nodiscard]] std::string to_str() const;
 };
-
-// Reverse-lookup helpers (enum -> name); out-of-range renders as ``"<unknown>"``.
-[[nodiscard]] std::string_view ds_strategy_name(DynamicShapesKernelSpecializationStrategy v);
-[[nodiscard]] std::string_view cg_strategy_name(CudaGraphStrategy v);
 
 std::ostream& operator<<(std::ostream& os, RuntimeSettings const& rs);
 

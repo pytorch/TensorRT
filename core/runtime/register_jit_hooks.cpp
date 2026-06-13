@@ -95,8 +95,9 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               // to a possibly-null ``intrusive_ptr``).
               RuntimeSettings rs;
               rs.dynamic_shapes_kernel_specialization_strategy =
-                  to_dynamic_shapes_kernel_strategy(dynamic_shapes_kernel_specialization_strategy);
-              rs.cuda_graph_strategy = to_cuda_graph_strategy(cuda_graph_strategy);
+                  DynamicShapesKernelSpecializationStrategy::from_underlying(
+                      dynamic_shapes_kernel_specialization_strategy);
+              rs.cuda_graph_strategy = CudaGraphStrategy::from_underlying(cuda_graph_strategy);
               rs.runtime_cache = runtime_cache.has_value() ? std::move(*runtime_cache) : nullptr;
               (void)self->runtime_settings(std::move(rs));
             })

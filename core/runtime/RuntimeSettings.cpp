@@ -25,33 +25,55 @@ constexpr std::array<std::string_view, 2> kCgStrategyNames = {"disabled", "whole
 
 } // namespace
 
-DynamicShapesKernelSpecializationStrategy to_dynamic_shapes_kernel_strategy(int64_t v) {
-  // Take ``int64_t`` so out-of-range Python callers (TorchBind uses int64) are
-  // caught here -- casting to int32_t first would silently wrap.
+// ---- DynamicShapesKernelSpecializationStrategy -----------------------------
+
+std::string_view DynamicShapesKernelSpecializationStrategy::to_string() const noexcept {
+  // Negative underlying values wrap to a huge ``size_t``, so a single bounds
+  // check from the top covers both ends without needing ``std::clamp``.
+  auto const i = static_cast<size_t>(v_);
+  return i < std::size(kDsStrategyNames) ? kDsStrategyNames[i] : std::string_view{"<unknown>"};
+}
+
+DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrategy::from_underlying(int64_t v) {
   TORCHTRT_CHECK(
       v >= 0 && static_cast<size_t>(v) < std::size(kDsStrategyNames),
       "Invalid dynamic_shapes_kernel_specialization_strategy int: " << v
                                                                     << " (expected 0..2 mapping to lazy|eager|none)");
-  return static_cast<DynamicShapesKernelSpecializationStrategy>(v);
+  return DynamicShapesKernelSpecializationStrategy(static_cast<Value>(v));
 }
 
-CudaGraphStrategy to_cuda_graph_strategy(int64_t v) {
+DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrategy::from_string(
+    std::string_view name) {
+  for (size_t i = 0; i < std::size(kDsStrategyNames); ++i) {
+    if (kDsStrategyNames[i] == name) {
+      return DynamicShapesKernelSpecializationStrategy(static_cast<Value>(i));
+    }
+  }
+  TORCHTRT_CHECK(
+      false, "Invalid dynamic_shapes_kernel_specialization_strategy name: " << name << " (expected lazy|eager|none)");
+}
+
+// ---- CudaGraphStrategy -----------------------------------------------------
+
+std::string_view CudaGraphStrategy::to_string() const noexcept {
+  auto const i = static_cast<size_t>(v_);
+  return i < std::size(kCgStrategyNames) ? kCgStrategyNames[i] : std::string_view{"<unknown>"};
+}
+
+CudaGraphStrategy CudaGraphStrategy::from_underlying(int64_t v) {
   TORCHTRT_CHECK(
       v >= 0 && static_cast<size_t>(v) < std::size(kCgStrategyNames),
       "Invalid cuda_graph_strategy int: " << v << " (expected 0..1 mapping to disabled|whole_graph_capture)");
-  return static_cast<CudaGraphStrategy>(v);
+  return CudaGraphStrategy(static_cast<Value>(v));
 }
 
-std::string_view ds_strategy_name(DynamicShapesKernelSpecializationStrategy v) {
-  // Negative underlying values wrap to a huge ``size_t``, so a single bounds
-  // check from the top covers both ends without needing ``std::clamp``.
-  auto const i = static_cast<size_t>(v);
-  return i < std::size(kDsStrategyNames) ? kDsStrategyNames[i] : "<unknown>";
-}
-
-std::string_view cg_strategy_name(CudaGraphStrategy v) {
-  auto const i = static_cast<size_t>(v);
-  return i < std::size(kCgStrategyNames) ? kCgStrategyNames[i] : "<unknown>";
+CudaGraphStrategy CudaGraphStrategy::from_string(std::string_view name) {
+  for (size_t i = 0; i < std::size(kCgStrategyNames); ++i) {
+    if (kCgStrategyNames[i] == name) {
+      return CudaGraphStrategy(static_cast<Value>(i));
+    }
+  }
+  TORCHTRT_CHECK(false, "Invalid cuda_graph_strategy name: " << name << " (expected disabled|whole_graph_capture)");
 }
 
 // ---- RuntimeCacheHandle methods ---------------------------------------------
@@ -149,9 +171,8 @@ bool RuntimeSettings::operator==(RuntimeSettings const& other) const noexcept {
 std::string RuntimeSettings::to_str() const {
   std::ostringstream os;
   os << "RuntimeSettings{" << std::endl;
-  os << "  Dynamic Shapes Kernel Strategy: " << ds_strategy_name(dynamic_shapes_kernel_specialization_strategy)
-     << std::endl;
-  os << "  CUDA Graph Strategy: " << cg_strategy_name(cuda_graph_strategy) << std::endl;
+  os << "  Dynamic Shapes Kernel Strategy: " << dynamic_shapes_kernel_specialization_strategy.to_string() << std::endl;
+  os << "  CUDA Graph Strategy: " << cuda_graph_strategy.to_string() << std::endl;
   if (runtime_cache) {
     auto const& p = runtime_cache->path;
     os << "  Runtime Cache: " << (p.empty() ? "<in-memory shared>" : p) << std::endl;
