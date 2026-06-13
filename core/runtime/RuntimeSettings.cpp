@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstring>
+#include <iterator>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
@@ -22,12 +23,13 @@ namespace {
 // validator error messages.
 template <size_t N>
 std::string join_string_views(std::string_view sep, std::array<std::string_view, N> const& parts) {
+  if (N == 0) {
+    return {};
+  }
   std::ostringstream os;
-  for (auto it = parts.begin(); it != parts.end(); ++it) {
-    if (it != parts.begin()) {
-      os << sep;
-    }
-    os << *it;
+  os << *std::cbegin(parts);
+  for (auto it = std::next(std::cbegin(parts)); it != std::cend(parts); ++it) {
+    os << sep << *it;
   }
   return os.str();
 }
