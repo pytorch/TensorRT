@@ -52,15 +52,18 @@ void TRTRuntimeConfig::ensure_initialized(TORCHTRT_UNUSED nvinfer1::ICudaEngine*
   }
 
   // Enum values mirror the nvinfer1 enums byte-for-byte (validated at the
-  // boundary via ``from_underlying``); a plain ``static_cast`` is enough,
-  // routed through the wrapper's implicit ``operator Value()`` unwrap.
+  // boundary via ``from_underlying``); go through the wrapper's
+  // ``to_underlying()`` first since gcc 13 rejects the direct
+  // class -> nvinfer1-enum static_cast (only one user-defined conversion
+  // allowed in a static_cast chain).
   config->setDynamicShapesKernelSpecializationStrategy(static_cast<nvinfer1::DynamicShapesKernelSpecializationStrategy>(
-      settings_.dynamic_shapes_kernel_specialization_strategy));
+      settings_.dynamic_shapes_kernel_specialization_strategy.to_underlying()));
   LOG_DEBUG(
       "Dynamic shapes kernel specialization strategy set to "
       << settings_.dynamic_shapes_kernel_specialization_strategy.to_string());
 
-  if (!config->setCudaGraphStrategy(static_cast<nvinfer1::CudaGraphStrategy>(settings_.cuda_graph_strategy))) {
+  if (!config->setCudaGraphStrategy(
+          static_cast<nvinfer1::CudaGraphStrategy>(settings_.cuda_graph_strategy.to_underlying()))) {
     LOG_WARNING("Failed to set CUDA graph strategy; continuing with default.");
   } else {
     LOG_DEBUG("CUDA graph strategy set to " << settings_.cuda_graph_strategy.to_string());

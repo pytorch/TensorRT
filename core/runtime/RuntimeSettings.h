@@ -94,9 +94,10 @@ class DynamicShapesKernelSpecializationStrategy {
   constexpr DynamicShapesKernelSpecializationStrategy() = default;
   constexpr DynamicShapesKernelSpecializationStrategy(Value v) noexcept : v_(v) {}
 
-  // Implicit unwrap to the inner enum. Lets ``switch (s)``, comparisons,
-  // and ``static_cast<nvinfer1::DynamicShapesKernelSpecializationStrategy>(s)``
-  // resolve through the inner ``Value`` without explicit calls.
+  // Implicit unwrap to the inner enum. Lets ``switch (s)`` and comparisons
+  // resolve through the inner ``Value`` without explicit calls. Casts to the
+  // ``nvinfer1`` enum still need ``.to_underlying()`` in front (gcc 13 limits
+  // ``static_cast<enum>`` chains to one UDC).
   constexpr operator Value() const noexcept {
     return v_;
   }
