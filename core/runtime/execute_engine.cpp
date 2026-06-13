@@ -95,9 +95,9 @@ bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngi
 void setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
-    nvinfer1::IExecutionContext* ctx,
     bool cudagraphs_enabled,
     bool need_cudagraphs_record) {
+  auto* ctx = compiled_engine->exec_ctx();
   compiled_engine->reset_active_input_tensors();
 
   for (size_t i = 0; i < inputs.size(); i++) {
@@ -166,9 +166,8 @@ void setup_input_tensors(
   }
 }
 
-std::vector<at::Tensor> create_output_tensors(
-    c10::intrusive_ptr<TRTEngine> compiled_engine,
-    nvinfer1::IExecutionContext* ctx) {
+std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  auto* ctx = compiled_engine->exec_ctx();
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
   for (auto output_indices : compiled_engine->out_binding_map) {
     // out_binding_map stores TRT_IDX: PYT_IDX
@@ -191,7 +190,8 @@ std::vector<at::Tensor> create_output_tensors(
   return outputs;
 }
 
-void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine, nvinfer1::IExecutionContext* ctx) {
+void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  auto* ctx = compiled_engine->exec_ctx();
   if (compiled_engine->output_allocator == nullptr) {
     std::unordered_map<std::string, at::ScalarType> output_dtypes_dict;
     for (size_t o = 0; o < compiled_engine->out_binding_names.size(); ++o) {
@@ -301,7 +301,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, ctx, effective_cudagraphs, need_cudagraphs_record);
+      setup_input_tensors(inputs, compiled_engine, effective_cudagraphs, need_cudagraphs_record);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
@@ -322,7 +322,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       if (can_use_pre_allocated_outputs) {
         outputs = compiled_engine->pre_allocated_outputs;
       } else {
-        outputs = create_output_tensors(compiled_engine, ctx);
+        outputs = create_output_tensors(compiled_engine);
       }
 
       for (auto output_indices : compiled_engine->out_binding_map) {
@@ -395,7 +395,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     if (compiled_engine->use_pre_allocated_outputs &&
         (compiled_engine->pre_allocated_outputs.size() == 0 || compiled_engine->output_tensors_are_unowned ||
          shape_changed)) {
-      compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine, ctx);
+      compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine);
     }
 
     if (caller_on_default) {
@@ -429,7 +429,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, ctx, false, false);
+      setup_input_tensors(inputs, compiled_engine, false, false);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
@@ -447,7 +447,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         output_allocator_profiler_guard =
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
       }
-      create_output_allocator(compiled_engine, ctx);
+      create_output_allocator(compiled_engine);
     }
 
     auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
