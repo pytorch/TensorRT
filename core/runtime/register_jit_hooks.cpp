@@ -32,7 +32,7 @@ static auto TORCHTRT_UNUSED RuntimeCacheHandleRegistration =
         // handle can survive ``deepcopy`` / ``torch.export.save`` paths that
         // walk Python attributes (e.g. ``TorchTensorRTModule._implicit_cache_handle``).
         // We persist only the ``path`` string: the underlying ``IRuntimeCache``
-        // is GPU-side state that can't cross a process boundary anyway, and
+        // is CPU-side state that can't cross a process boundary anyway, and
         // ``_resolve_runtime_cache`` re-warms from disk on the deserialized
         // path through the standard load -> pending_warm_bytes flow.
         .def_pickle(
