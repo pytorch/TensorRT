@@ -94,6 +94,7 @@ at::Tensor RuntimeCacheHandle::serialize() const {
   }
   auto host_mem = make_trt(trt_handle_->serialize());
   if (!host_mem) {
+    LOG_WARNING("IRuntimeCache::serialize() returned null host memory; returning empty bytes.");
     return empty();
   }
   auto tensor = at::empty({static_cast<int64_t>(host_mem->size())}, opts);
