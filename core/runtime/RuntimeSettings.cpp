@@ -100,6 +100,7 @@ at::Tensor RuntimeCacheHandle::serialize() const {
   std::memcpy(tensor.data_ptr(), host_mem->data(), host_mem->size());
   return tensor;
 #else
+  LOG_WARNING("RuntimeCacheHandle::serialize() invoked on a non-RTX build; returning empty bytes.");
   return empty();
 #endif
 }
@@ -121,6 +122,8 @@ void RuntimeCacheHandle::deserialize(TORCHTRT_UNUSED at::Tensor data) {
     auto const* p = static_cast<uint8_t const*>(contig.data_ptr());
     pending_warm_bytes_.assign(p, p + contig.numel());
   }
+#else
+  LOG_WARNING("RuntimeCacheHandle::deserialize() invoked on a non-RTX build; bytes ignored.");
 #endif
 }
 
