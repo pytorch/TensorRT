@@ -697,6 +697,11 @@ bool TRTEngine::runtime_settings(RuntimeSettings new_settings) {
   // "ctor-create-with-defaults + dispatch-recreate-with-settings" pair on the
   // Python ``setup_engine`` cpp branch into a single create.
   invalidate_exec_ctx();
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // The communicator was bound onto the IExecutionContext we just dropped, so
+  // the next ``execute_engine`` must re-bind via ``bind_nccl_comm()``.
+  nccl_initialized = false;
+#endif
   // Existing recreate sites set runtime_states.context_changed for cudagraph
   // re-record; do the same here so a settings flip inside an active CM forces
   // the next enqueue to re-record any captured graph.
