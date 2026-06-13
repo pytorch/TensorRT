@@ -16,6 +16,40 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+namespace {
+
+// "a|b|c" from {"a", "b", "c"}. Used to render the accepted-names tail of the
+// validator error messages.
+template <size_t N>
+std::string join_string_views(std::string_view sep, std::array<std::string_view, N> const& parts) {
+  std::ostringstream os;
+  for (auto it = parts.begin(); it != parts.end(); ++it) {
+    if (it != parts.begin()) {
+      os << sep;
+    }
+    os << *it;
+  }
+  return os.str();
+}
+
+// "(expected 0..N-1 mapping to a|b|c)" -- the common error-message tail.
+template <size_t N>
+std::string format_expected_strategy(std::array<std::string_view, N> const& names) {
+  std::ostringstream os;
+  os << "(expected 0.." << (N - 1) << " mapping to " << join_string_views("|", names) << ')';
+  return os.str();
+}
+
+// "(expected a|b|c)" -- name-only variant for ``from_string`` errors.
+template <size_t N>
+std::string format_expected_name(std::array<std::string_view, N> const& names) {
+  std::ostringstream os;
+  os << "(expected " << join_string_views("|", names) << ')';
+  return os.str();
+}
+
+} // namespace
+
 // ---- DynamicShapesKernelSpecializationStrategy -----------------------------
 // (``to_string`` is constexpr-inline in the header; the name arrays
 // ``kDsStrategyNames`` / ``kCgStrategyNames`` live in the header too.)
@@ -23,8 +57,8 @@ namespace runtime {
 DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrategy::from_underlying(int64_t v) {
   TORCHTRT_CHECK(
       v >= 0 && static_cast<size_t>(v) < std::size(kDsStrategyNames),
-      "Invalid dynamic_shapes_kernel_specialization_strategy int: " << v
-                                                                    << " (expected 0..2 mapping to lazy|eager|none)");
+      "Invalid dynamic_shapes_kernel_specialization_strategy int: " << v << " "
+                                                                    << format_expected_strategy(kDsStrategyNames));
   return DynamicShapesKernelSpecializationStrategy(static_cast<Value>(v));
 }
 
@@ -36,7 +70,9 @@ DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrat
     }
   }
   TORCHTRT_CHECK(
-      false, "Invalid dynamic_shapes_kernel_specialization_strategy name: " << name << " (expected lazy|eager|none)");
+      false,
+      "Invalid dynamic_shapes_kernel_specialization_strategy name: " << name << " "
+                                                                     << format_expected_name(kDsStrategyNames));
 }
 
 // ---- CudaGraphStrategy -----------------------------------------------------
@@ -44,7 +80,7 @@ DynamicShapesKernelSpecializationStrategy DynamicShapesKernelSpecializationStrat
 CudaGraphStrategy CudaGraphStrategy::from_underlying(int64_t v) {
   TORCHTRT_CHECK(
       v >= 0 && static_cast<size_t>(v) < std::size(kCgStrategyNames),
-      "Invalid cuda_graph_strategy int: " << v << " (expected 0..1 mapping to disabled|whole_graph_capture)");
+      "Invalid cuda_graph_strategy int: " << v << " " << format_expected_strategy(kCgStrategyNames));
   return CudaGraphStrategy(static_cast<Value>(v));
 }
 
@@ -54,7 +90,7 @@ CudaGraphStrategy CudaGraphStrategy::from_string(std::string_view name) {
       return CudaGraphStrategy(static_cast<Value>(i));
     }
   }
-  TORCHTRT_CHECK(false, "Invalid cuda_graph_strategy name: " << name << " (expected disabled|whole_graph_capture)");
+  TORCHTRT_CHECK(false, "Invalid cuda_graph_strategy name: " << name << " " << format_expected_name(kCgStrategyNames));
 }
 
 // ---- RuntimeCacheHandle methods ---------------------------------------------
