@@ -62,6 +62,8 @@ void TRTRuntimeConfig::ensure_initialized(TORCHTRT_UNUSED nvinfer1::ICudaEngine*
 
   if (!config->setCudaGraphStrategy(static_cast<nvinfer1::CudaGraphStrategy>(settings_.cuda_graph_strategy))) {
     LOG_WARNING("Failed to set CUDA graph strategy; continuing with default.");
+  } else {
+    LOG_DEBUG("CUDA graph strategy set to " << settings_.cuda_graph_strategy.to_string());
   }
 #endif
 #endif // TRT_HAS_IRUNTIME_CONFIG
