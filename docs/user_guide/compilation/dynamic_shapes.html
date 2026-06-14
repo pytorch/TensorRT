@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=84daf132"></script>
+    <script src="../../_static/documentation_options.js?v=23cae1b2"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -440,6 +440,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="compilation_settings.html">CompilationSettings Reference</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Dynamic shapes with Torch-TensorRT</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/shared_dynamic_dims_example.html">Example: Sharing Dynamic Dimensions Across Inputs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="unsupported_ops.html">Handling Unsupported Operators</a></li>
 </ul>
 </details></li>
@@ -592,6 +593,44 @@ Here’s a simple example that exports a matmul layer with some restrictions on 
 <span class="n">trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
+<section id="sharing-a-dynamic-dimension-across-multiple-inputs">
+<h2>Sharing a Dynamic Dimension Across Multiple Inputs<a class="headerlink" href="#sharing-a-dynamic-dimension-across-multiple-inputs" title="Link to this heading">#</a></h2>
+<p>HuggingFace-style encoders and similar models take multiple inputs (e.g.
+<code class="docutils literal notranslate"><span class="pre">input_ids</span></code> and <code class="docutils literal notranslate"><span class="pre">attention_mask</span></code>) whose dynamic axes <strong>must be equal at
+runtime</strong>.  If you assign an independent dynamic dimension to each input,
+<code class="docutils literal notranslate"><span class="pre">torch.export</span></code> detects that the two independent symbols are forced equal by
+the model’s forward pass (e.g. a broadcast) and raises a
+<code class="docutils literal notranslate"><span class="pre">ConstraintViolationError</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input(shared_dims={axis:</span> <span class="pre">name})</span></code> solves this without any
+manual <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> work.  Axes that share the same name across inputs are
+exported as a single <code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code>, so the equality constraint is
+satisfied automatically.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyHFEncoder</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+        <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;input_ids&quot;</span><span class="p">,</span>
+        <span class="n">shared_dims</span><span class="o">=</span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">},</span>          <span class="c1"># axis 0 named &quot;B&quot;</span>
+    <span class="p">),</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+        <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;attention_mask&quot;</span><span class="p">,</span>
+        <span class="n">shared_dims</span><span class="o">=</span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">},</span>          <span class="c1"># same name → same Dim</span>
+    <span class="p">),</span>
+<span class="p">]</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The same name on the same axis index across different inputs produces one
+shared <code class="docutils literal notranslate"><span class="pre">Dim</span></code>; different names produce independent <code class="docutils literal notranslate"><span class="pre">Dim</span></code>s.  Multiple axes
+can be shared simultaneously with <code class="docutils literal notranslate"><span class="pre">shared_dims={0:</span> <span class="pre">&quot;B&quot;,</span> <span class="pre">1:</span> <span class="pre">&quot;S&quot;}</span></code>.</p>
+<p>See the full runnable example: <span class="xref std std-ref">shared_dynamic_dims</span>.</p>
 </section>
 <section id="dynamic-shapes-using-torch-compile-jit">
 <h2>Dynamic shapes using torch.compile (JIT)<a class="headerlink" href="#dynamic-shapes-using-torch-compile-jit" title="Link to this heading">#</a></h2>
@@ -819,6 +858,7 @@ using <code class="docutils literal notranslate"><span class="pre">torch.export.
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamic-shapes-using-torch-export-aot">Dynamic shapes using torch.export (AOT)</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#under-the-hood">Under the hood</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#custom-dynamic-shape-constraints">Custom Dynamic Shape Constraints</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sharing-a-dynamic-dimension-across-multiple-inputs">Sharing a Dynamic Dimension Across Multiple Inputs</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamic-shapes-using-torch-compile-jit">Dynamic shapes using torch.compile (JIT)</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#saving-and-loading-models-with-dynamic-shapes">Saving and Loading Models with Dynamic Shapes</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#method-1-automatic-inference-from-torch-tensorrt-input">Method 1: Automatic Inference from torch_tensorrt.Input</a></li>

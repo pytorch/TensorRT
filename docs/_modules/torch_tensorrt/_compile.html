@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=84daf132"></script>
+    <script src="../../_static/documentation_options.js?v=23cae1b2"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -483,7 +483,17 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Any</span><span class="p">,</span>
+    <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">Dict</span><span class="p">,</span>
+    <span class="n">List</span><span class="p">,</span>
+    <span class="n">Optional</span><span class="p">,</span>
+    <span class="n">Sequence</span><span class="p">,</span>
+    <span class="n">Set</span><span class="p">,</span>
+    <span class="n">Tuple</span><span class="p">,</span>
+    <span class="n">Union</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
@@ -528,6 +538,7 @@ document.write(`
     <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_device</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._tracer</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">build_dim_registry</span><span class="p">,</span>
         <span class="n">get_dynamic_shapes_args</span><span class="p">,</span>
         <span class="n">get_dynamic_shapes_kwargs</span><span class="p">,</span>
     <span class="p">)</span>
@@ -774,7 +785,7 @@ document.write(`
         <span class="k">return</span> <span class="n">compiled_fx_module</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">dynamo</span><span class="p">:</span>
         <span class="c1"># Prepare torch and torchtrt inputs</span>
-        <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">kwarg_inputs</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not both be None.&quot;</span><span class="p">)</span>
 
         <span class="k">elif</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -782,15 +793,17 @@ document.write(`
                 <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span>
+            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span>  <span class="c1"># type: ignore[assignment]</span>
 
         <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_inputs</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
-            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
+        <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
+            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>
 
         <span class="n">torchtrt_arg_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span>
         <span class="n">torchtrt_kwarg_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">)</span>
@@ -880,7 +893,7 @@ document.write(`
             <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
         <span class="p">)</span>
 
-    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>  <span class="c1"># type: ignore[assignment]</span>
 
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -982,7 +995,7 @@ document.write(`
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
             <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
         <span class="p">)</span>
-    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">arg_inputs</span> <span class="ow">or</span> <span class="n">inputs</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">arg_inputs</span> <span class="ow">or</span> <span class="n">inputs</span>  <span class="c1"># type: ignore[assignment]</span>
 
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">target_ir</span> <span class="o">=</span> <span class="n">_get_target_fe</span><span class="p">(</span><span class="n">module_type</span><span class="p">,</span> <span class="n">ir</span><span class="p">)</span>
@@ -1311,8 +1324,13 @@ document.write(`
                     <span class="s2">&quot;The explicit dynamic_shapes parameter takes precedence and Input shape specifications will be ignored.&quot;</span>
                 <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">inferred_dynamic_shapes</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_args</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">)</span>
-            <span class="n">inferred_dynamic_shapes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">))</span>
+            <span class="n">dim_registry</span> <span class="o">=</span> <span class="n">build_dim_registry</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="p">)</span>
+            <span class="n">inferred_dynamic_shapes</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_args</span><span class="p">(</span>
+                <span class="n">module</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">,</span> <span class="n">dim_registry</span>
+            <span class="p">)</span>
+            <span class="n">inferred_dynamic_shapes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">)</span>
+            <span class="p">)</span>
 
             <span class="k">if</span> <span class="n">inferred_dynamic_shapes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="n">inferred_dynamic_shapes</span>
@@ -1320,8 +1338,8 @@ document.write(`
                     <span class="sa">f</span><span class="s2">&quot;Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: </span><span class="si">{</span><span class="n">dynamic_shapes</span><span class="si">}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
 
-        <span class="n">arg_tensors</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">()))</span>  <span class="c1"># type: ignore[arg-type]</span>
-        <span class="n">kwarg_tensors</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">())</span>  <span class="c1"># type: ignore[assignment]</span>
+        <span class="n">arg_tensors</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">()))</span>
+        <span class="n">kwarg_tensors</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">())</span>
 
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Mixed case: some inputs are Tensors, some are Input objects</span>

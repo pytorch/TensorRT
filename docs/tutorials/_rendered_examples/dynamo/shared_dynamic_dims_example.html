@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Torch Compile Advanced Usage &#8212; Torch-TensorRT</title>
+    <title>Sharing Dynamic Dimensions Across Inputs &#8212; Torch-TensorRT</title>
   
   
   
@@ -52,7 +52,7 @@
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/dynamo/shared_dynamic_dims_example';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
@@ -61,8 +61,8 @@
         </script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Compiling Exported Programs with Torch-TensorRT" href="../../../user_guide/compilation/dynamo_export.html" />
-    <link rel="prev" title="TensorRT Backend for torch.compile" href="../../../user_guide/compilation/torch_compile.html" />
+    <link rel="next" title="Handling Unsupported Operators" href="../../../user_guide/compilation/unsupported_ops.html" />
+    <link rel="prev" title="Compiling Models with Dynamic Input Shapes" href="compile_with_dynamic_inputs.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -438,12 +438,12 @@ document.write(`
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="../../../user_guide/compilation/index.html">Compilation</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/compilation_settings.html">CompilationSettings Reference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
 <li class="toctree-l2"><a class="reference internal" href="compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="shared_dynamic_dims_example.html">Example: Sharing Dynamic Dimensions Across Inputs</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Example: Sharing Dynamic Dimensions Across Inputs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/unsupported_ops.html">Handling Unsupported Operators</a></li>
 </ul>
 </details></li>
@@ -510,7 +510,7 @@ document.write(`
     
     <li class="breadcrumb-item"><a href="../../../user_guide/compilation/index.html" class="nav-link">Compilation</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page">Torch...</li>
+    <li class="breadcrumb-item active" aria-current="page">Sharing...</li>
   </ul>
 </nav>
 </div>
@@ -527,9 +527,10 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="Torch-Compile-Advanced-Usage">
-<h1>Torch Compile Advanced Usage<a class="headerlink" href="#Torch-Compile-Advanced-Usage" title="Link to this heading">#</a></h1>
-<p>This interactive script is intended as an overview of the process by which <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(...,</span> <span class="pre">ir=&quot;torch_compile&quot;,</span> <span class="pre">...)</span></code> works, and how it integrates with the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> API.</p>
+  <section id="Sharing-Dynamic-Dimensions-Across-Inputs">
+<h1>Sharing Dynamic Dimensions Across Inputs<a class="headerlink" href="#Sharing-Dynamic-Dimensions-Across-Inputs" title="Link to this heading">#</a></h1>
+<p>When a model takes multiple inputs whose dynamic axes must be <strong>equal at runtime</strong> — for example, HuggingFace-style encoders where <code class="docutils literal notranslate"><span class="pre">input_ids</span></code> and <code class="docutils literal notranslate"><span class="pre">attention_mask</span></code> are both shaped <code class="docutils literal notranslate"><span class="pre">[batch,</span> <span class="pre">seq_len]</span></code> — naively assigning an independent dynamic dimension to each input causes <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> to raise a <code class="docutils literal notranslate"><span class="pre">ConstraintViolationError</span></code>. The exporter detects that the two independent symbols are forced equal by the model’s forward pass (e.g. a broadcast) and rejects the export.</p>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input(shared_dims={axis:</span> <span class="pre">name})</span></code> solves this: axes that share the same name across inputs are exported as a single <code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code>, so the equality constraint is satisfied automatically. All dynamic-shape intent lives on the <code class="docutils literal notranslate"><span class="pre">Input</span></code> objects — no separate <code class="docutils literal notranslate"><span class="pre">dynamic_shapes</span></code> argument or <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> knowledge is required at the call site.</p>
 <section id="Imports-and-Model-Definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#Imports-and-Model-Definition" title="Link to this heading">#</a></h2>
 <div class="nbinput nblast docutils container">
@@ -537,129 +538,167 @@ document.write(`
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
+import torch.nn as nn
 import torch_tensorrt
+from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 </pre></div>
 </div>
 </div>
+<p>Define a HuggingFace-style encoder whose two inputs share the batch axis. The <code class="docutils literal notranslate"><span class="pre">embed</span> <span class="pre">*</span> <span class="pre">mask</span></code> broadcast forces <code class="docutils literal notranslate"><span class="pre">input_ids.shape[0]</span> <span class="pre">==</span> <span class="pre">attention_mask.shape[0]</span></code> at every forward call — exactly the pattern that triggers <code class="docutils literal notranslate"><span class="pre">ConstraintViolationError</span></code> when the batch axis is exported as two independent <code class="docutils literal notranslate"><span class="pre">Dim</span></code> objects.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># We begin by defining a model
-class Model(torch.nn.Module):
-    def __init__(self) -&gt; None:
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>class SharedDimEncoder(nn.Module):
+    def __init__(self, vocab: int = 1024, hidden: int = 64):
         super().__init__()
-        self.relu = torch.nn.ReLU()
+        self.embed = nn.Embedding(vocab, hidden)
+        self.proj = nn.Linear(hidden, hidden)
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor):
-        x_out = self.relu(x)
-        y_out = self.relu(y)
-        x_y_out = x_out + y_out
-        return torch.mean(x_y_out)
+    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor):
+        x = self.embed(input_ids)  # [B, S, hidden]
+        mask = attention_mask.unsqueeze(-1).to(x.dtype)  # [B, S, 1]
+        return self.proj(x * mask)  # [B, S, hidden]
+
+
+model = SharedDimEncoder().cuda().eval()
 </pre></div>
 </div>
 </div>
 </section>
-<section id="Compilation-with-torch.compile-Using-Default-Settings">
-<h2>Compilation with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> Using Default Settings<a class="headerlink" href="#Compilation-with-torch.compile-Using-Default-Settings" title="Link to this heading">#</a></h2>
+<section id="Without-shared_dims-—-raises-ConstraintViolationError">
+<h2>Without <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> — raises <code class="docutils literal notranslate"><span class="pre">ConstraintViolationError</span></code><a class="headerlink" href="#Without-shared_dims-—-raises-ConstraintViolationError" title="Link to this heading">#</a></h2>
+<p>Using independent <code class="docutils literal notranslate"><span class="pre">Input</span></code> objects like this would fail at export time:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">16</span><span class="p">),</span> <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">16</span><span class="p">),</span> <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">16</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">16</span><span class="p">),</span> <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">16</span><span class="p">),</span> <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">16</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="c1"># torch.export mints independent symbols s0, s1 for the batch axis of</span>
+<span class="c1"># each input.  The broadcast forces Eq(s0, s1), which the exporter rejects.</span>
+</pre></div>
+</div>
+<p>%% With <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> — correct approach (positional inputs) ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^</p>
+<p>Annotate the batch axis (axis 0) with the same name <code class="docutils literal notranslate"><span class="pre">&quot;B&quot;</span></code> on both inputs. Torch-TensorRT creates a single shared <code class="docutils literal notranslate"><span class="pre">torch.export.Dim(&quot;B&quot;)</span></code> for that axis so the equality constraint is satisfied up front.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Define sample float inputs and initialize model
-sample_inputs = [torch.rand((5, 7)).cuda(), torch.rand((5, 7)).cuda()]
-model = Model().cuda().eval()
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Next, we compile the model using torch.compile
-# For the default settings, we can simply call torch.compile
-# with the backend &quot;torch_tensorrt&quot;, and run the model on an
-# input to cause compilation, as so:
-optimized_model = torch.compile(model, backend=&quot;torch_tensorrt&quot;, dynamic=False)
-with torch.no_grad():
-    optimized_model(*sample_inputs)
-</pre></div>
-</div>
-</div>
-</section>
-<section id="Compilation-with-torch.compile-Using-Custom-Settings">
-<h2>Compilation with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> Using Custom Settings<a class="headerlink" href="#Compilation-with-torch.compile-Using-Custom-Settings" title="Link to this heading">#</a></h2>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># First, we use Torch utilities to clean up the workspace
-# after the previous compile invocation
-torch._dynamo.reset()
-
-# Define sample half inputs and initialize model
-sample_inputs_half = [
-    torch.rand((5, 7)).half().cuda(),
-    torch.rand((5, 7)).half().cuda(),
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>inputs = [
+    torch_tensorrt.Input(
+        min_shape=(1, 16),
+        opt_shape=(4, 16),
+        max_shape=(8, 16),
+        dtype=torch.int64,
+        name=&quot;input_ids&quot;,
+        shared_dims={0: &quot;B&quot;},
+    ),
+    torch_tensorrt.Input(
+        min_shape=(1, 16),
+        opt_shape=(4, 16),
+        max_shape=(8, 16),
+        dtype=torch.int64,
+        name=&quot;attention_mask&quot;,
+        shared_dims={0: &quot;B&quot;},
+    ),
 ]
-model_half = Model().cuda().eval()
+
+trt_model = torch_tensorrt.compile(
+    model,
+    ir=&quot;dynamo&quot;,
+    inputs=inputs,
+    min_block_size=1,
+    cache_built_engines=False,
+    reuse_cached_engines=False,
+)
 </pre></div>
 </div>
 </div>
+<p>Verify correctness at multiple batch sizes within the declared range.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># If we want to customize certain options in the backend,
-# but still use the torch.compile call directly, we can provide
-# custom options to the backend via the &quot;options&quot; keyword
-# which takes in a dictionary mapping options to values.
-#
-# For accepted backend options, see the CompilationSettings dataclass:
-# py/torch_tensorrt/dynamo/_settings.py
-backend_kwargs = {
-    &quot;min_block_size&quot;: 2,
-    &quot;torch_executed_ops&quot;: {&quot;torch.ops.aten.sub.Tensor&quot;},
-    &quot;optimization_level&quot;: 4,
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>for batch_size in (4, 2, 1):
+    ids = torch.randint(0, 1024, (batch_size, 16), dtype=torch.int64, device=&quot;cuda&quot;)
+    mask = torch.ones((batch_size, 16), dtype=torch.int64, device=&quot;cuda&quot;)
+
+    with torch.no_grad():
+        ref = model(ids, mask)
+        out = trt_model(ids, mask)
+
+    cos_sim = cosine_similarity(ref, out)
+    assert (
+        cos_sim &gt; COSINE_THRESHOLD
+    ), f&quot;Numerical mismatch at batch_size={batch_size}: cos_sim={cos_sim:.4f}&quot;
+    print(f&quot;batch_size={batch_size}  cos_sim={cos_sim:.6f}  ✓&quot;)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="With-shared_dims-—-kwarg-inputs">
+<h2>With <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> — kwarg inputs<a class="headerlink" href="#With-shared_dims-—-kwarg-inputs" title="Link to this heading">#</a></h2>
+<p>The same feature works with <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code>, which is the natural form for HuggingFace models whose <code class="docutils literal notranslate"><span class="pre">forward</span></code> signature uses keyword arguments.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>kwarg_inputs = {
+    &quot;input_ids&quot;: torch_tensorrt.Input(
+        min_shape=(1, 16),
+        opt_shape=(4, 16),
+        max_shape=(8, 16),
+        dtype=torch.int64,
+        name=&quot;input_ids&quot;,
+        shared_dims={0: &quot;B&quot;},
+    ),
+    &quot;attention_mask&quot;: torch_tensorrt.Input(
+        min_shape=(1, 16),
+        opt_shape=(4, 16),
+        max_shape=(8, 16),
+        dtype=torch.int64,
+        name=&quot;attention_mask&quot;,
+        shared_dims={0: &quot;B&quot;},
+    ),
 }
 
-# Run the model on an input to cause compilation, as so:
-optimized_model_custom = torch.compile(
-    model_half,
-    backend=&quot;torch_tensorrt&quot;,
-    options=backend_kwargs,
-    dynamic=False,
+trt_model_kwargs = torch_tensorrt.compile(
+    model,
+    ir=&quot;dynamo&quot;,
+    kwarg_inputs=kwarg_inputs,
+    min_block_size=1,
+    cache_built_engines=False,
+    reuse_cached_engines=False,
 )
+
+ids = torch.randint(0, 1024, (4, 16), dtype=torch.int64, device=&quot;cuda&quot;)
+mask = torch.ones((4, 16), dtype=torch.int64, device=&quot;cuda&quot;)
+
 with torch.no_grad():
-    optimized_model_custom(*sample_inputs_half)
+    ref = model(input_ids=ids, attention_mask=mask)
+    out = trt_model_kwargs(input_ids=ids, attention_mask=mask)
+
+cos_sim = cosine_similarity(ref, out)
+assert cos_sim &gt; COSINE_THRESHOLD, f&quot;kwarg path mismatch: cos_sim={cos_sim:.4f}&quot;
+print(f&quot;kwarg_inputs path  cos_sim={cos_sim:.6f}  ✓&quot;)
 </pre></div>
 </div>
 </div>
 </section>
-<section id="Cleanup">
-<h2>Cleanup<a class="headerlink" href="#Cleanup" title="Link to this heading">#</a></h2>
+<section id="Sharing-multiple-axes">
+<h2>Sharing multiple axes<a class="headerlink" href="#Sharing-multiple-axes" title="Link to this heading">#</a></h2>
+<p>If both batch and sequence length are dynamic and must be shared, annotate both axes on each input:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">shared_dims</span><span class="o">=</span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;S&quot;</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>The same name on the same axis across different inputs produces one shared <code class="docutils literal notranslate"><span class="pre">Dim</span></code>; different names on different axes produce independent <code class="docutils literal notranslate"><span class="pre">Dim</span></code><span class="math">\s</span>.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Finally, we use Torch utilities to clean up the workspace
-torch._dynamo.reset()
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(&quot;\nAll checks passed.&quot;)
 </pre></div>
 </div>
 </div>
-</section>
-<section id="Cuda-Driver-Error-Note">
-<h2>Cuda Driver Error Note<a class="headerlink" href="#Cuda-Driver-Error-Note" title="Link to this heading">#</a></h2>
-<p>Occasionally, upon exiting the Python runtime after Dynamo compilation with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt</span></code>, one may encounter a Cuda Driver Error. This issue is related to <a class="github reference external" href="https://github.com/NVIDIA/TensorRT/issues/2052">NVIDIA/TensorRT#2052</a> and can be resolved by wrapping the compilation/inference in a function and using a scoped call, as in:</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>::
-</pre></div>
-</div>
-<blockquote>
-<div><dl class="simple">
-<dt>if __name__ == ‘__main__’:</dt><dd><p>compile_engine_and_infer()</p>
-</dd>
-</dl>
-</div></blockquote>
 </section>
 </section>
 
@@ -674,20 +713,20 @@ torch._dynamo.reset()
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../../../user_guide/compilation/torch_compile.html"
+       href="compile_with_dynamic_inputs.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p>
+        <p class="prev-next-title">Compiling Models with Dynamic Input Shapes</p>
       </div>
     </a>
     <a class="right-next"
-       href="../../../user_guide/compilation/dynamo_export.html"
+       href="../../../user_guide/compilation/unsupported_ops.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Compiling Exported Programs with Torch-TensorRT</p>
+        <p class="prev-next-title">Handling Unsupported Operators</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -710,10 +749,9 @@ torch._dynamo.reset()
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Imports-and-Model-Definition">Imports and Model Definition</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Compilation-with-torch.compile-Using-Default-Settings">Compilation with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> Using Default Settings</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Compilation-with-torch.compile-Using-Custom-Settings">Compilation with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> Using Custom Settings</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Cleanup">Cleanup</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Cuda-Driver-Error-Note">Cuda Driver Error Note</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Without-shared_dims-—-raises-ConstraintViolationError">Without <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> — raises <code class="docutils literal notranslate"><span class="pre">ConstraintViolationError</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#With-shared_dims-—-kwarg-inputs">With <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> — kwarg inputs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Sharing-multiple-axes">Sharing multiple axes</a></li>
 </ul>
   </nav></div>
 
@@ -721,7 +759,7 @@ torch._dynamo.reset()
 
   
   <div class="tocsection editthispage">
-    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.ipynb">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/dynamo/shared_dynamic_dims_example.ipynb">
       <i class="fa-solid fa-pencil"></i>
       
       
@@ -736,7 +774,7 @@ torch._dynamo.reset()
   <div class="sidebar-secondary-item">
 
   <div class="tocsection sourcelink">
-    <a href="../../../_sources/tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.ipynb.txt">
+    <a href="../../../_sources/tutorials/_rendered_examples/dynamo/shared_dynamic_dims_example.ipynb.txt">
       <i class="fa-solid fa-file-lines"></i> Show Source
     </a>
   </div>
