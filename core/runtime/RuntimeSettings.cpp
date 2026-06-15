@@ -32,7 +32,7 @@ std::string join_string_views(std::string_view sep, std::array<std::string_view,
     return {};
   }
   std::ostringstream os;
-  os << *std::cbegin(parts);
+  os << parts.front();
   for (auto it = std::next(std::cbegin(parts)); it != std::cend(parts); ++it) {
     os << sep << *it;
   }
