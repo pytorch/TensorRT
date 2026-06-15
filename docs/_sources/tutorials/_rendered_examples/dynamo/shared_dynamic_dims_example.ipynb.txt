@@ -1,0 +1,140 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# Sharing Dynamic Dimensions Across Inputs\n\nWhen a model takes multiple inputs whose dynamic axes must be **equal at\nruntime** \u2014 for example, HuggingFace-style encoders where ``input_ids`` and\n``attention_mask`` are both shaped ``[batch, seq_len]`` \u2014 naively assigning an\nindependent dynamic dimension to each input causes ``torch.export`` to raise a\n``ConstraintViolationError``.  The exporter detects that the two independent\nsymbols are forced equal by the model's forward pass (e.g. a broadcast) and\nrejects the export.\n\n``torch_tensorrt.Input(shared_dims={axis: name})`` solves this: axes that share\nthe same name across inputs are exported as a single ``torch.export.Dim``, so\nthe equality constraint is satisfied automatically.  All dynamic-shape intent\nlives on the ``Input`` objects \u2014 no separate ``dynamic_shapes`` argument or\n``torch.export`` knowledge is required at the call site.\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Imports and Model Definition\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import torch\nimport torch.nn as nn\nimport torch_tensorrt\nfrom torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Define a HuggingFace-style encoder whose two inputs share the batch axis.\nThe ``embed * mask`` broadcast forces ``input_ids.shape[0] ==\nattention_mask.shape[0]`` at every forward call \u2014 exactly the pattern that\ntriggers ``ConstraintViolationError`` when the batch axis is exported as two\nindependent ``Dim`` objects.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "class SharedDimEncoder(nn.Module):\n    def __init__(self, vocab: int = 1024, hidden: int = 64):\n        super().__init__()\n        self.embed = nn.Embedding(vocab, hidden)\n        self.proj = nn.Linear(hidden, hidden)\n\n    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor):\n        x = self.embed(input_ids)  # [B, S, hidden]\n        mask = attention_mask.unsqueeze(-1).to(x.dtype)  # [B, S, 1]\n        return self.proj(x * mask)  # [B, S, hidden]\n\n\nmodel = SharedDimEncoder().cuda().eval()"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Without ``shared_dims`` \u2014 raises ``ConstraintViolationError``\n\nUsing independent ``Input`` objects like this would fail at export time:\n\n```python\ninputs = [\n    torch_tensorrt.Input(min_shape=(1,16), opt_shape=(4,16), max_shape=(8,16), dtype=torch.int64),\n    torch_tensorrt.Input(min_shape=(1,16), opt_shape=(4,16), max_shape=(8,16), dtype=torch.int64),\n]\n# torch.export mints independent symbols s0, s1 for the batch axis of\n# each input.  The broadcast forces Eq(s0, s1), which the exporter rejects.\n```\n%%\nWith ``shared_dims`` \u2014 correct approach (positional inputs)\n^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nAnnotate the batch axis (axis 0) with the same name ``\"B\"`` on both inputs.\nTorch-TensorRT creates a single shared ``torch.export.Dim(\"B\")`` for that\naxis so the equality constraint is satisfied up front.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "inputs = [\n    torch_tensorrt.Input(\n        min_shape=(1, 16),\n        opt_shape=(4, 16),\n        max_shape=(8, 16),\n        dtype=torch.int64,\n        name=\"input_ids\",\n        shared_dims={0: \"B\"},\n    ),\n    torch_tensorrt.Input(\n        min_shape=(1, 16),\n        opt_shape=(4, 16),\n        max_shape=(8, 16),\n        dtype=torch.int64,\n        name=\"attention_mask\",\n        shared_dims={0: \"B\"},\n    ),\n]\n\ntrt_model = torch_tensorrt.compile(\n    model,\n    ir=\"dynamo\",\n    inputs=inputs,\n    min_block_size=1,\n    cache_built_engines=False,\n    reuse_cached_engines=False,\n)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Verify correctness at multiple batch sizes within the declared range.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "for batch_size in (4, 2, 1):\n    ids = torch.randint(0, 1024, (batch_size, 16), dtype=torch.int64, device=\"cuda\")\n    mask = torch.ones((batch_size, 16), dtype=torch.int64, device=\"cuda\")\n\n    with torch.no_grad():\n        ref = model(ids, mask)\n        out = trt_model(ids, mask)\n\n    cos_sim = cosine_similarity(ref, out)\n    assert (\n        cos_sim > COSINE_THRESHOLD\n    ), f\"Numerical mismatch at batch_size={batch_size}: cos_sim={cos_sim:.4f}\"\n    print(f\"batch_size={batch_size}  cos_sim={cos_sim:.6f}  \u2713\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## With ``shared_dims`` \u2014 kwarg inputs\n\nThe same feature works with ``kwarg_inputs``, which is the natural form for\nHuggingFace models whose ``forward`` signature uses keyword arguments.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "kwarg_inputs = {\n    \"input_ids\": torch_tensorrt.Input(\n        min_shape=(1, 16),\n        opt_shape=(4, 16),\n        max_shape=(8, 16),\n        dtype=torch.int64,\n        name=\"input_ids\",\n        shared_dims={0: \"B\"},\n    ),\n    \"attention_mask\": torch_tensorrt.Input(\n        min_shape=(1, 16),\n        opt_shape=(4, 16),\n        max_shape=(8, 16),\n        dtype=torch.int64,\n        name=\"attention_mask\",\n        shared_dims={0: \"B\"},\n    ),\n}\n\ntrt_model_kwargs = torch_tensorrt.compile(\n    model,\n    ir=\"dynamo\",\n    kwarg_inputs=kwarg_inputs,\n    min_block_size=1,\n    cache_built_engines=False,\n    reuse_cached_engines=False,\n)\n\nids = torch.randint(0, 1024, (4, 16), dtype=torch.int64, device=\"cuda\")\nmask = torch.ones((4, 16), dtype=torch.int64, device=\"cuda\")\n\nwith torch.no_grad():\n    ref = model(input_ids=ids, attention_mask=mask)\n    out = trt_model_kwargs(input_ids=ids, attention_mask=mask)\n\ncos_sim = cosine_similarity(ref, out)\nassert cos_sim > COSINE_THRESHOLD, f\"kwarg path mismatch: cos_sim={cos_sim:.4f}\"\nprint(f\"kwarg_inputs path  cos_sim={cos_sim:.6f}  \u2713\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Sharing multiple axes\n\nIf both batch and sequence length are dynamic and must be shared, annotate\nboth axes on each input:\n\n```python\nshared_dims={0: \"B\", 1: \"S\"}\n```\nThe same name on the same axis across different inputs produces one shared\n``Dim``; different names on different axes produce independent ``Dim``\\s.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "print(\"\\nAll checks passed.\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.15"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}

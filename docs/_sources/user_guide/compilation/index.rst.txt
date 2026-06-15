@@ -13,4 +13,5 @@ How Torch-TensorRT compiles models: the JIT ``torch.compile`` path, the AOT
    compilation_settings
    dynamic_shapes
    Example: Compiling Models with Dynamic Input Shapes <../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs>
+   Example: Sharing Dynamic Dimensions Across Inputs <../../tutorials/_rendered_examples/dynamo/shared_dynamic_dims_example>
    unsupported_ops

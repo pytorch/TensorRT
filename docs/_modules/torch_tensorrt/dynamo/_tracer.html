@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=84daf132"></script>
+    <script src="../../../_static/documentation_options.js?v=6ce3a501"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -543,7 +543,7 @@ document.write(`
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
             <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
         <span class="p">)</span>
-    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">arg_inputs</span>
 
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -551,9 +551,12 @@ document.write(`
     <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_device</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">,</span> <span class="n">default_device</span><span class="p">()))</span>
     <span class="n">torch_arg_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
     <span class="n">torch_kwarg_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
-    <span class="c1"># Constructing dynamic shape list as a nested dict</span>
-    <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_args</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">)</span>
-    <span class="n">dynamic_shapes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">))</span>
+    <span class="c1"># Build dynamic shapes from the Input objects. Inputs carrying shared_dims</span>
+    <span class="c1"># share a Dim across inputs via the registry; the rest get an independent</span>
+    <span class="c1"># per-input Dim.</span>
+    <span class="n">dim_registry</span> <span class="o">=</span> <span class="n">build_dim_registry</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="p">)</span>
+    <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_args</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">)</span>
+    <span class="n">dynamic_shapes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">))</span>
     <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
         <span class="n">mod</span><span class="p">,</span>
         <span class="nb">tuple</span><span class="p">(</span><span class="n">torch_arg_inputs</span><span class="p">),</span>
@@ -566,49 +569,109 @@ document.write(`
 
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]]:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_collect_inputs</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Input</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flatten an arg/kwarg input structure into a list of Input objects.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">Input</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">obj</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">collected</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Input</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">collected</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">_collect_inputs</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">collected</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+        <span class="n">collected</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">:</span>
+            <span class="n">collected</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">_collect_inputs</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">collected</span>
+    <span class="k">return</span> <span class="p">[]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_dim_registry</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a ``{name: torch.export.Dim}`` registry from Input.shared_dims.</span>
+
+<span class="sd">    The same name appearing on multiple inputs yields a single shared ``Dim``</span>
+<span class="sd">    instance, so ``torch.export`` treats those axes as one symbol. Conflicting</span>
+<span class="sd">    (min, max) ranges for the same name are rejected.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">registry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">bounds</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">inp</span> <span class="ow">in</span> <span class="n">_collect_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span> <span class="o">+</span> <span class="n">_collect_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">):</span>
+        <span class="n">shared_dims</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="s2">&quot;shared_dims&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">shared_dims</span> <span class="ow">or</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">!=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+        <span class="n">min_shape</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span>
+        <span class="n">max_shape</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">axis</span><span class="p">,</span> <span class="n">dim_name</span> <span class="ow">in</span> <span class="n">shared_dims</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">min_shape</span><span class="p">[</span><span class="n">axis</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_shape</span><span class="p">[</span><span class="n">axis</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">dim_name</span> <span class="ow">in</span> <span class="n">bounds</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">bounds</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span> <span class="o">!=</span> <span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Dimension name &#39;</span><span class="si">{</span><span class="n">dim_name</span><span class="si">}</span><span class="s2">&#39; is used with conflicting ranges &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">bounds</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span><span class="w"> </span><span class="n">hi</span><span class="p">)</span><span class="si">}</span><span class="s2">. A shared named dimension &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;must have identical (min, max) on every input that uses it.&quot;</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">bounds</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span>
+                <span class="n">registry</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">Dim</span><span class="p">(</span><span class="n">dim_name</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="n">lo</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="n">hi</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">registry</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_dynamic_shapes_kwargs</span><span class="p">(</span>
+    <span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]]:</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
         <span class="n">dynamic_shapes_kwarg</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">inputs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="n">dynamic_shapes_kwarg</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+            <span class="n">dynamic_shapes_kwarg</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">dynamic_shapes_kwarg</span>
 
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">Input</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">get_dynamic_shapes</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">get_dynamic_shapes</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">)</span>
 
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
         <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
-            <span class="n">dynamic_shapes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">get_dynamic_shapes</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+            <span class="n">dynamic_shapes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">get_dynamic_shapes</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">dynamic_shapes</span>
 
     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">get_dynamic_shapes_args</span><span class="p">(</span><span class="n">mod</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_dynamic_shapes_args</span><span class="p">(</span>
+    <span class="n">mod</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
     <span class="c1"># dynamic_shape is a dict and cannot work without keys. Here we use position argument name</span>
     <span class="c1"># in forward function as the name</span>
     <span class="n">args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">signature</span><span class="p">(</span><span class="n">mod</span><span class="o">.</span><span class="n">forward</span><span class="p">)</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
     <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="nb">input</span><span class="p">,</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">args</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">)]):</span>
-        <span class="n">dynamic_shapes</span><span class="p">[</span><span class="n">input_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_dynamic_shapes</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+        <span class="n">dynamic_shapes</span><span class="p">[</span><span class="n">input_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_dynamic_shapes</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">dynamic_shapes</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">get_dynamic_shapes</span><span class="p">(</span><span class="nb">input</span><span class="p">:</span> <span class="n">Input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_dynamic_shapes</span><span class="p">(</span>
+    <span class="nb">input</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">Input</span><span class="p">):</span>
         <span class="c1"># If the input is torch.Tensor, no dynamic is needed. Return empty dict</span>
         <span class="k">return</span> <span class="p">{}</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">dynamic_dims</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">if</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
             <span class="n">min_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span>
             <span class="n">opt_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span>
             <span class="n">max_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span>
+            <span class="n">shared_dims</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="s2">&quot;shared_dims&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
             <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">opt_shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">max_shape</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)):</span>
                 <span class="k">if</span> <span class="n">min_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">==</span> <span class="n">opt_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">==</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]:</span>
                     <span class="k">continue</span>
+                <span class="k">elif</span> <span class="n">dim_registry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">shared_dims</span><span class="p">:</span>
+                    <span class="c1"># Named axis: reuse the shared Dim so axes with the same</span>
+                    <span class="c1"># name across inputs become a single exported symbol.</span>
+                    <span class="n">dynamic_dims</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">dim_registry</span><span class="p">[</span><span class="n">shared_dims</span><span class="p">[</span><span class="n">dim</span><span class="p">]]</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">dynamic_dims</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">Dim</span><span class="p">(</span>
                         <span class="nb">input</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">dim</span><span class="p">),</span>

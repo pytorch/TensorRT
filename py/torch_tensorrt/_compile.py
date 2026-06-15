@@ -7,7 +7,17 @@ import logging
 import platform
 import warnings
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 import torch
 from torch_tensorrt._enums import dtype
@@ -52,6 +62,7 @@ if ENABLED_FEATURES.dynamo_frontend:
     )
     from torch_tensorrt.dynamo._defaults import default_device
     from torch_tensorrt.dynamo._tracer import (
+        build_dim_registry,
         get_dynamic_shapes_args,
         get_dynamic_shapes_kwargs,
     )
@@ -296,7 +307,7 @@ def compile(
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
-        if arg_inputs is None and inputs is None:
+        if arg_inputs is None and inputs is None and not kwarg_inputs:
             raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
         elif arg_inputs is not None and inputs is not None:
@@ -304,15 +315,17 @@ def compile(
                 "'arg_inputs' and 'inputs' should not be used at the same time."
             )
         if inputs is not None:
-            arg_inputs = inputs
+            arg_inputs = inputs  # type: ignore[assignment]
 
         if kwarg_inputs is None:
             kwarg_inputs = {}
 
         from torch_tensorrt.dynamo.utils import prepare_inputs
 
-        if not isinstance(arg_inputs, collections.abc.Sequence):
-            arg_inputs = [arg_inputs]  # type: ignore
+        if arg_inputs is None:
+            arg_inputs = []
+        elif not isinstance(arg_inputs, collections.abc.Sequence):
+            arg_inputs = [arg_inputs]
 
         torchtrt_arg_inputs = prepare_inputs(arg_inputs)
         torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
@@ -401,7 +414,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs or arg_inputs  # type: ignore[assignment]
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -501,7 +514,7 @@ def convert_method_to_trt_engine(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = arg_inputs or inputs
+    arg_inputs = arg_inputs or inputs  # type: ignore[assignment]
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
@@ -821,8 +834,13 @@ def save(
                     "The explicit dynamic_shapes parameter takes precedence and Input shape specifications will be ignored."
                 )
         else:
-            inferred_dynamic_shapes = get_dynamic_shapes_args(module, arg_inputs)
-            inferred_dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
+            dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
+            inferred_dynamic_shapes = get_dynamic_shapes_args(
+                module, arg_inputs, dim_registry
+            )
+            inferred_dynamic_shapes.update(
+                get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry)
+            )
 
             if inferred_dynamic_shapes is not None:
                 dynamic_shapes = inferred_dynamic_shapes
@@ -830,8 +848,8 @@ def save(
                     f"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: {dynamic_shapes}"
                 )
 
-        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))  # type: ignore[arg-type]
-        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())  # type: ignore[assignment]
+        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))
+        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())
 
     else:
         # Mixed case: some inputs are Tensors, some are Input objects
