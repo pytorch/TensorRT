@@ -163,10 +163,12 @@ class RuntimeCache:
        ``RuntimeCache(path=..., autosave_on_del=True)`` for with-block-style
        autosave on hand-built handles.
 
-    The internal ``_handle`` is either :class:`_RuntimeCacheHandle`
-    (python rt) or ``torch.classes.tensorrt.RuntimeCacheHandle`` (cpp rt,
-    used directly). Both satisfy :class:`_RuntimeCacheHandleProtocol`;
-    the facade forwards without branching.
+    The internal ``_handle`` is auto-picked at construction based on
+    ``ENABLED_FEATURES.torch_tensorrt_runtime``: the cpp-rt torchbind
+    ``torch.classes.tensorrt.RuntimeCacheHandle`` when the C++ runtime is
+    loaded, the python :class:`_RuntimeCacheHandle` otherwise. Both
+    satisfy :class:`_RuntimeCacheHandleProtocol`; the facade forwards
+    without branching.
 
     **Identity-based equality.** Two handles wrap distinct underlying
     ``IRuntimeCache`` instances even when they share a path, and the
@@ -178,15 +180,19 @@ class RuntimeCache:
         self,
         path: str = "",
         autosave_on_del: bool = False,
-        torchbind_handle: Any = None,
     ) -> None:
-        # ``is not None`` (not truthy) because ``torchbind_handle`` is a
-        # ``torch.ScriptObject`` whose ``__len__`` is unimplemented; ``bool()``
-        # on it raises ``NotImplementedError``.
-        if torchbind_handle is not None:
-            # Cpp-rt: use the torchbind class directly as the handle. It
-            # satisfies _RuntimeCacheHandleProtocol structurally.
-            self._handle: _RuntimeCacheHandleProtocol = torchbind_handle
+        # Pick the backing that matches the active runtime. The torchbind
+        # class ``torch.classes.tensorrt.RuntimeCacheHandle`` is registered by
+        # the C++ shared library; if the .so isn't loaded
+        # (``ENABLED_FEATURES.torch_tensorrt_runtime is False``) it doesn't
+        # exist as an attribute, so we fall back to the pure-Python
+        # ``_RuntimeCacheHandle``. Both satisfy
+        # :class:`_RuntimeCacheHandleProtocol`, so the facade methods forward
+        # without branching on which backing won.
+        if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+            self._handle: _RuntimeCacheHandleProtocol = (
+                torch.classes.tensorrt.RuntimeCacheHandle(path)
+            )
         else:
             self._handle = _RuntimeCacheHandle(path=path)
         self.autosave_on_del = autosave_on_del
@@ -393,7 +399,6 @@ class _RuntimeCacheContextManager:
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
             TorchTensorRTModule,
         )
-        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
         from torch_tensorrt.runtime._runtime_config import runtime_config
 
         # 1. Find any TorchTensorRTModule under the targets; first one wins.
@@ -411,22 +416,18 @@ class _RuntimeCacheContextManager:
                 "under the target(s)."
             )
 
-        # 2. Build the handle in its pending state on both runtimes. Disk
-        # bytes go through ``handle.load*`` into pending storage; the first
-        # engine's ``_apply_settings`` (python rt) or cpp ``ensure_initialized``
+        # 2. Build the handle in its pending state on both runtimes. The
+        # facade auto-picks the torchbind sibling on cpp rt and the
+        # pure-Python handle on python-only rt. Disk bytes go through
+        # ``handle.load*`` into pending storage; the first engine's
+        # ``_apply_settings`` (python rt) or cpp ``ensure_initialized``
         # (cpp rt) materializes the underlying ``IRuntimeCache`` and drains
         # the pending bytes atomically.
         #
-        # ``autosave_on_del=False`` in both cases -- the CM saves explicitly
-        # on ``__exit__``; letting ``__del__`` also save would double-write
-        # when ``rc`` falls out of scope after the with-block.
-        if isinstance(bootstrap_module.engine, TRTEngine):
-            self.handle = RuntimeCache(path=self.path, autosave_on_del=False)
-        else:
-            tb = torch.classes.tensorrt.RuntimeCacheHandle(self.path)
-            self.handle = RuntimeCache(
-                torchbind_handle=tb, path=self.path, autosave_on_del=False
-            )
+        # ``autosave_on_del=False`` -- the CM saves explicitly on
+        # ``__exit__``; letting ``__del__`` also save would double-write when
+        # ``rc`` falls out of scope after the with-block.
+        self.handle = RuntimeCache(path=self.path, autosave_on_del=False)
         self._load_into(self.handle)
         self._inner_cm = runtime_config(list(self._targets), runtime_cache=self.handle)
         self._inner_cm.__enter__()
@@ -494,26 +495,10 @@ def _to_torchbind_handle(
     if isinstance(rc, torch.ScriptObject):
         return rc
     if isinstance(rc, RuntimeCache):
-        # Reuse an existing torchbind sibling so the C++ engine sees the
-        # same underlying pointer across calls. Falling through to construct
-        # a fresh torchbind would orphan the existing one.
-        if rc.is_cpp_runtime():
-            return rc._handle  # the torchbind object directly
-        # Mixed-runtime hazard: a python-rt handle with a live ``IRuntimeCache``
-        # crossing into the cpp runtime would silently drop the cache (the
-        # cpp engine would attach a fresh torchbind below). Reject so the
-        # user picks a deliberate fix.
-        if rc.has_cache():
-            raise RuntimeError(
-                "Cannot attach a Python-side RuntimeCache (with a live "
-                "pybind IRuntimeCache) to a C++ runtime engine: the cache would "
-                "be orphaned. Reconstruct the handle on the C++ side, or "
-                "serialize/deserialize the cache bytes explicitly."
-            )
-        # Python-rt handle, pre-materialization: synthesize a torchbind from
-        # the (possibly empty) path. The cpp side will load disk bytes via
-        # its own deserialize once materialized.
-        return torch.classes.tensorrt.RuntimeCacheHandle(rc.path) if rc.path else None
+        # The facade auto-picks the torchbind sibling on cpp rt (see
+        # ``RuntimeCache.__init__``), so any ``RuntimeCache`` constructed in
+        # this process is already cpp-backed. Unwrap directly.
+        return rc._handle
     # Truthy-string check: ``""`` would construct a no-op torchbind handle.
     if isinstance(rc, str) and rc:
         return torch.classes.tensorrt.RuntimeCacheHandle(rc)

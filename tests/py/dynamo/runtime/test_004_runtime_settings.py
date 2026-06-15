@@ -401,30 +401,5 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
         self.assertIn("TRT-RTX-only", str(cm.exception))
 
 
-class TestToTorchbindHandleOrphanGuard(TestCase):
-    """H1 regression: ``_to_torchbind_handle`` must reject a Python-side
-    ``RuntimeCache`` carrying a live pybind cache but no torchbind
-    sibling crossing into the C++ runtime, rather than silently creating a
-    fresh torchbind and orphaning the user's cache."""
-
-    @unittest.skipIf(
-        not ENABLED_FEATURES.torch_tensorrt_runtime,
-        "Orphan guard fires only on the C++ runtime dispatch path",
-    )
-    def test_orphan_pybind_cache_raises(self):
-        from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
-
-        # Force the orphan-hazard state: a pybind-backed handle whose
-        # underlying python ``_RuntimeCacheHandle`` reports has_cache()=True
-        # crossing into the cpp dispatch path. Whitebox: poke the internal
-        # ``_cache`` slot with a sentinel object since the guard only checks
-        # ``has_cache()``, not the cache content itself.
-        rc = RuntimeCache(path="")
-        rc._handle._cache = object()  # whitebox: simulate materialized state
-        with self.assertRaises(RuntimeError) as cm:
-            _to_torchbind_handle(rc)
-        self.assertIn("orphan", str(cm.exception).lower())
-
-
 if __name__ == "__main__":
     run_tests()

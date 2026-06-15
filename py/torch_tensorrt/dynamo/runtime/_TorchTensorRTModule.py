@@ -324,15 +324,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if old is not None and old.path == rc and self._wrapper_still_attached(old):
             return rs.merge(runtime_cache=old)
 
-        # Branch 3: build a fresh managed wrapper for this path.
-        # ``autosave_on_del=True`` is how implicit caches persist across runs.
-        # On cpp rt, also attach the torchbind sibling so the cpp engine can
-        # hold a reference to the same underlying ``IRuntimeCache``.
-        if ENABLED_FEATURES.torch_tensorrt_runtime:
-            tb = torch.classes.tensorrt.RuntimeCacheHandle(rc)
-            new = RuntimeCache(torchbind_handle=tb, path=rc, autosave_on_del=True)
-        else:
-            new = RuntimeCache(path=rc, autosave_on_del=True)
+        # Branch 3: build a fresh managed wrapper for this path. The facade
+        # auto-picks the torchbind sibling on cpp rt and the pure-Python
+        # handle on python-only rt. ``autosave_on_del=True`` is how implicit
+        # caches persist across runs.
+        new = RuntimeCache(path=rc, autosave_on_del=True)
         # Explicitly load bytes here (which lands either in the runtime cache
         # or pending bytes) as this cache is managed by this module, so a
         # correct initial state is set.
