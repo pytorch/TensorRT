@@ -3,6 +3,7 @@ from typing import Optional
 
 import torch
 from torch.fx import GraphModule, Node
+from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 
 from .pass_utils import clean_up_graph_after_modifications
 
@@ -68,14 +69,10 @@ def normalize_negative_slice_stop(
             if positive_offset is None:
                 continue
 
-            with gm.graph.inserting_before(node):
-                dim_size = gm.graph.call_function(
-                    torch.ops.aten.sym_size.int, args=(input_node, dim)
-                )
+            with SubgraphBuilder(gm.graph, node.prev) as b:
+                dim_size = b(torch.ops.aten.sym_size.int, input_node, dim)
                 # A negative symbolic bound -n becomes dim_size - n.
-                normalized_bound = gm.graph.call_function(
-                    operator.sub, args=(dim_size, positive_offset)
-                )
+                normalized_bound = b(operator.sub, dim_size, positive_offset)
 
             args[bound_index] = normalized_bound
             rewritten = True
