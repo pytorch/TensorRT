@@ -6,7 +6,7 @@ requires = [
     "ninja>=1.11.0",
     "pyyaml>=6.0",
     "cffi>=1.15.1",
-    "torch>=2.13.0.dev,<2.14.0",
+    "torch>=2.13.0,<2.14.0",
     "pybind11==2.6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -90,7 +90,7 @@ test = [
 test-ext = [
     "timm>=1.0.3",
     "transformers>=5.0.0",
-    "torchvision>=0.27.0.dev,<0.28.0",
+    "torchvision>=0.27.0,<0.28.0",
     "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
 ]
 
@@ -161,10 +161,10 @@ conflicts = [
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-nightly-cu130" },
+    { index = "pytorch-test-cu130" },
 ]
 torchvision = [
-    { index = "pytorch-nightly-cu130" },
+    { index = "pytorch-test-cu130" },
 ]
 
 [[tool.uv.index]]
