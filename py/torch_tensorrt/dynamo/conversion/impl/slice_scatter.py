@@ -177,7 +177,7 @@ def slice_scatter(
 
     if start is None:
         start = 0
-    if start < 0 and isinstance(dim_size, int):
+    if isinstance(start, int) and start < 0 and isinstance(dim_size, int):
         start = dim_size + start
     if end is None:
         end = dim_size
