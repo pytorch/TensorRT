@@ -86,8 +86,10 @@ cc_library(
         "DeviceList.cpp",
         "Platform.cpp",
         "RTDevice.cpp",
+        "RuntimeSettings.cpp",
         "TRTEngine.cpp",
         "TRTEngineProfiler.cpp",
+        "TRTRuntimeConfig.cpp",
         "execute_engine.cpp",
         "runtime.cpp",
         "runtime_utils.cpp",
@@ -95,12 +97,28 @@ cc_library(
     hdrs = [
         "Platform.h",
         "RTDevice.h",
-        "TensorRTBindingNames.h",
+        "RuntimeSettings.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
+        "TRTRuntimeConfig.h",
+        "TensorRTBindingNames.h",
         "runtime.h",
     ],
     copts = if_torch_nccl(["-DUSE_C10D_NCCL"]),
+    defines = select({
+        # nvinfer1::IRuntimeConfig (and the matching ICudaEngine::createRuntimeConfig
+        # / createExecutionContext(IRuntimeConfig*) overloads) was introduced in
+        # TensorRT 10.11. The TensorRT shipped with the Jetpack l4t-r36.4 toolchain
+        # (@tensorrt_l4t) predates 10.11 and does not export this type. Every other
+        # configuration here (RTX, SBSA, Windows, default x86_64 Linux) is on a
+        # TensorRT >= 10.11 bundle, so it gets the macro.
+        #
+        # Gate every IRuntimeConfig-using site in core/runtime with
+        # `#ifdef TRT_HAS_IRUNTIME_CONFIG`; the Jetpack path falls back to the
+        # legacy createExecutionContext() no-arg overload.
+        ":jetpack": [],
+        "//conditions:default": ["TRT_HAS_IRUNTIME_CONFIG"],
+    }),
     linkopts = [
         "-lstdc++fs",
     ],
@@ -135,9 +153,11 @@ cc_library(
     hdrs = [
         "Platform.h",
         "RTDevice.h",
-        "TensorRTBindingNames.h",
+        "RuntimeSettings.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
+        "TRTRuntimeConfig.h",
+        "TensorRTBindingNames.h",
         "runtime.h",
     ],
     deps = [
@@ -151,9 +171,11 @@ filegroup(
     srcs = [
         "Platform.h",
         "RTDevice.h",
-        "TensorRTBindingNames.h",
+        "RuntimeSettings.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
+        "TRTRuntimeConfig.h",
+        "TensorRTBindingNames.h",
         "runtime.h",
     ],
     visibility = ["//visibility:public"],

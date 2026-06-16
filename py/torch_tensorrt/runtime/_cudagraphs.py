@@ -64,14 +64,32 @@ class _CudagraphsContextManager(object):
     Used to enable cudagraphs as a context manager
     """
 
-    def __init__(self, compiled_module: torch.nn.Module) -> None:
+    def __init__(
+        self,
+        compiled_module: torch.nn.Module,
+        cuda_graph_strategy: Optional[str] = None,
+    ) -> None:
         global _PY_RT_CUDAGRAPHS
         self.old_mode = _PY_RT_CUDAGRAPHS
         self.compiled_module = compiled_module
+        self._cuda_graph_strategy = cuda_graph_strategy
+        self._inner_cm: Any = None
         self.cudagraphs_module: Optional[CudaGraphsTorchTensorRTModule] = None
         self.old_module = None
 
     def __enter__(self) -> Union[torch.nn.Module, torch.fx.GraphModule]:
+        # Apply the RTX cuda-graph strategy BEFORE the wrapper's ``warm_up``
+        # materializes the engine's ``IExecutionContext``. Open the
+        # ``runtime_config`` CM here so the strategy is live for the next
+        # ``get_cuda_graph_module`` call.
+        if self._cuda_graph_strategy is not None:
+            from torch_tensorrt.runtime._runtime_config import runtime_config
+
+            self._inner_cm = runtime_config(
+                self.compiled_module,
+                cuda_graph_strategy=self._cuda_graph_strategy,
+            )
+            self._inner_cm.__enter__()
 
         if isinstance(self.compiled_module, torch_tensorrt.MutableTorchTensorRTModule):
             self.old_module = self.compiled_module.gm
@@ -93,6 +111,11 @@ class _CudagraphsContextManager(object):
             self.cudagraphs_module._reset_captured_graph()
         if self.old_module:  # MutableTorchTRTModule
             self.compiled_module.gm = self.old_module
+        # Restore prior strategy state on the engines (after the wrapper is
+        # gone). Reverse order would leave the wrapper attached to engines
+        # whose settings have already been restored.
+        if self._inner_cm is not None:
+            self._inner_cm.__exit__(*args)
 
 
 def get_cuda_graph_module(
@@ -141,5 +164,26 @@ def get_cuda_graph_module(
 
 def enable_cudagraphs(
     compiled_module: Union[torch.fx.GraphModule, torch.nn.Module],
+    *,
+    cuda_graph_strategy: Optional[str] = None,
 ) -> _CudagraphsContextManager:
-    return _CudagraphsContextManager(compiled_module)
+    """Wrap ``compiled_module`` for outer torch.cuda.CUDAGraph capture/replay.
+
+    ``cuda_graph_strategy`` (TRT-RTX-only) collapses the formerly-nested
+    ``runtime_config(..., cuda_graph_strategy=...)`` + ``enable_cudagraphs``
+    pair into a single context manager. The strategy is applied state-only
+    before the wrapper's ``warm_up`` materializes the engine's
+    ``IExecutionContext`` and restored on exit -- one
+    ``createExecutionContext`` call total.
+    """
+    if (
+        cuda_graph_strategy is not None
+        and not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
+    ):
+        raise RuntimeError(
+            "`cuda_graph_strategy` is TRT-RTX-only; this is a non-RTX build. "
+            "Drop the kwarg or build against TensorRT-RTX."
+        )
+    return _CudagraphsContextManager(
+        compiled_module, cuda_graph_strategy=cuda_graph_strategy
+    )
