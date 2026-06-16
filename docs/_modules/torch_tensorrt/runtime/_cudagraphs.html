@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=8ef620a9"></script>
+    <script src="../../../_static/documentation_options.js?v=5663fe15"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -549,14 +549,32 @@ document.write(`
 <span class="sd">    Used to enable cudagraphs as a context manager</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">compiled_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">compiled_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">cuda_graph_strategy</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">global</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span> <span class="o">=</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span> <span class="o">=</span> <span class="n">compiled_module</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_graph_strategy</span> <span class="o">=</span> <span class="n">cuda_graph_strategy</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inner_cm</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">old_module</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">]:</span>
+        <span class="c1"># Apply the RTX cuda-graph strategy BEFORE the wrapper&#39;s ``warm_up``</span>
+        <span class="c1"># materializes the engine&#39;s ``IExecutionContext``. Open the</span>
+        <span class="c1"># ``runtime_config`` CM here so the strategy is live for the next</span>
+        <span class="c1"># ``get_cuda_graph_module`` call.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_graph_strategy</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">runtime_config</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_inner_cm</span> <span class="o">=</span> <span class="n">runtime_config</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="p">,</span>
+                <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_cuda_graph_strategy</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_inner_cm</span><span class="o">.</span><span class="fm">__enter__</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="p">,</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">old_module</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="o">.</span><span class="n">gm</span>
@@ -578,6 +596,11 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_module</span><span class="p">:</span>  <span class="c1"># MutableTorchTRTModule</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="o">.</span><span class="n">gm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_module</span>
+        <span class="c1"># Restore prior strategy state on the engines (after the wrapper is</span>
+        <span class="c1"># gone). Reverse order would leave the wrapper attached to engines</span>
+        <span class="c1"># whose settings have already been restored.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inner_cm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_inner_cm</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">get_cuda_graph_module</span><span class="p">(</span>
@@ -628,8 +651,29 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/runtime.html#torch_tensorrt.runtime.enable_cudagraphs">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">enable_cudagraphs</span><span class="p">(</span>
     <span class="n">compiled_module</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">cuda_graph_strategy</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_CudagraphsContextManager</span><span class="p">:</span>
-    <span class="k">return</span> <span class="n">_CudagraphsContextManager</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">)</span></div>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wrap ``compiled_module`` for outer torch.cuda.CUDAGraph capture/replay.</span>
+
+<span class="sd">    ``cuda_graph_strategy`` (TRT-RTX-only) collapses the formerly-nested</span>
+<span class="sd">    ``runtime_config(..., cuda_graph_strategy=...)`` + ``enable_cudagraphs``</span>
+<span class="sd">    pair into a single context manager. The strategy is applied state-only</span>
+<span class="sd">    before the wrapper&#39;s ``warm_up`` materializes the engine&#39;s</span>
+<span class="sd">    ``IExecutionContext`` and restored on exit -- one</span>
+<span class="sd">    ``createExecutionContext`` call total.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">cuda_graph_strategy</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;`cuda_graph_strategy` is TRT-RTX-only; this is a non-RTX build. &quot;</span>
+            <span class="s2">&quot;Drop the kwarg or build against TensorRT-RTX.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">_CudagraphsContextManager</span><span class="p">(</span>
+        <span class="n">compiled_module</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="n">cuda_graph_strategy</span>
+    <span class="p">)</span></div>
 
 </pre></div>
 
