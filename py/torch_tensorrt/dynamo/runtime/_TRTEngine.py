@@ -23,7 +23,7 @@ import torch.distributed as dist
 import torch_tensorrt
 from torch._library.opaque_object import register_opaque_type
 from torch._opaque_base import OpaqueBase
-from torch_tensorrt._enums import dtype
+from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -420,9 +420,23 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
     def _setup_engine(self) -> None:
         multi_gpu_device_check()
+        if self.serialized_target_platform == str(Platform.UNKNOWN):
+            raise RuntimeError(
+                "The serialized TensorRT engine target platform is unknown. "
+                "Torch-TensorRT cannot verify that the engine matches the loaded TensorRT runtime platform."
+            )
+
+        current_platform = str(Platform.current_platform())
+        if self.serialized_target_platform != current_platform:
+            raise RuntimeError(
+                "TensorRT engine was not built to target the loaded TensorRT runtime platform "
+                f"(target: {self.serialized_target_platform}, current: {current_platform})"
+            )
+
         self.runtime = trt.Runtime(TRT_LOGGER)
         self.cuda_engine = self.runtime.deserialize_cuda_engine(self.serialized_engine)
-        assert self.cuda_engine is not None, "Failed to deserialize TensorRT engine"
+        if self.cuda_engine is None:
+            raise RuntimeError("Unable to deserialize the TensorRT engine")
 
         if self.cuda_engine.streamable_weights_size > 0:
             budget_bytes = self.cuda_engine.get_weight_streaming_automatic_budget()
@@ -719,7 +733,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.output_tensors_are_unowned = enabled
 
     def are_output_tensors_unowned(self) -> bool:
-        return self.output_tensors_are_unowned
+        return bool(self.output_tensors_are_unowned)
 
     # --- profiling / inspection ---
 
@@ -882,7 +896,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         ):
             # Captured CUDA graph was recorded against the old stream.
             self.runtime_states.context_changed = True
-        return caller_on_default
+        return bool(caller_on_default)
+
+    def _active_streams(self) -> Tuple[torch.cuda.Stream, torch.cuda.Stream]:
+        assert self._engine_stream is not None
+        assert self._caller_stream is not None
+        return self._engine_stream, self._caller_stream
 
     def _execute_standard(
         self, contiguous_inputs: List[torch.Tensor]
@@ -913,6 +932,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # cudagraph recapture (set_runtime_states consumes and resets the
         # flag).
         caller_on_default = self._prepare_streams(contiguous_inputs)
+        engine_stream, caller_stream = self._active_streams()
         shape_changed = self.validate_input_shapes(contiguous_inputs)
         (
             need_cudagraphs_record,
@@ -970,8 +990,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         with self._profile_section("TRTEngine:TensorRTRuntime"):
             if caller_on_default:
-                self._engine_stream.wait_stream(self._caller_stream)
-            with torch.cuda.stream(self._engine_stream):
+                engine_stream.wait_stream(caller_stream)
+            with torch.cuda.stream(engine_stream):
                 if self.resource_allocation_strategy:
                     self._dynamic_workspace = torch.empty(
                         self.cuda_engine.device_memory_size_v2,
@@ -985,22 +1005,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                         self.cudagraph = torch.cuda.CUDAGraph()
                         if self._profile_execution:
                             self.cudagraph.enable_debug_mode()
-                        with torch.cuda.graph(
-                            self.cudagraph, stream=self._engine_stream
-                        ):
-                            self.context.execute_async_v3(
-                                self._engine_stream.cuda_stream
-                            )
+                        with torch.cuda.graph(self.cudagraph, stream=engine_stream):
+                            self.context.execute_async_v3(engine_stream.cuda_stream)
                         if self._profile_execution:
                             self.cudagraph.debug_dump(
                                 f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
                             )
                     self.cudagraph.replay()  # type: ignore[union-attr]
                 else:
-                    self.context.execute_async_v3(self._engine_stream.cuda_stream)
+                    self.context.execute_async_v3(engine_stream.cuda_stream)
 
             if caller_on_default:
-                self._caller_stream.wait_stream(self._engine_stream)
+                caller_stream.wait_stream(engine_stream)
 
         if self.use_pre_allocated_outputs and (
             self.output_tensors_are_unowned
@@ -1040,14 +1056,15 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                     )
 
         caller_on_default = self._prepare_streams(contiguous_inputs)
+        engine_stream, caller_stream = self._active_streams()
 
         with self._profile_section("TRTEngine:TensorRTRuntime"):
             if caller_on_default:
-                self._engine_stream.wait_stream(self._caller_stream)
-            with torch.cuda.stream(self._engine_stream):
-                self.context.execute_async_v3(self._engine_stream.cuda_stream)
+                engine_stream.wait_stream(caller_stream)
+            with torch.cuda.stream(engine_stream):
+                self.context.execute_async_v3(engine_stream.cuda_stream)
             if caller_on_default:
-                self._caller_stream.wait_stream(self._engine_stream)
+                caller_stream.wait_stream(engine_stream)
 
         outputs = []
         assert self.output_allocator is not None

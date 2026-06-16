@@ -123,9 +123,14 @@ TRTEngine::TRTEngine(
     const std::string& serialized_metadata,
     const ResourceAllocationStrategy resource_allocation_strategy) {
   TORCHTRT_CHECK(
+      target_platform._platform != Platform::PlatformEnum::kUNKNOWN,
+      "The serialized TensorRT engine target platform is unknown. Torch-TensorRT cannot verify that the engine "
+      "matches the loaded TensorRT runtime platform. Rebuild or reserialize the engine with a Torch-TensorRT version "
+      "that records a supported target platform.");
+  TORCHTRT_CHECK(
       is_supported_on_current_platform(target_platform),
-      "This engine was not built to run on this platform (built for: " << target_platform << ", current platform: "
-                                                                       << get_current_platform() << ")");
+      "This engine was not built to run on the loaded TensorRT runtime platform (built for: "
+          << target_platform << ", current runtime platform: " << get_current_platform() << ")");
   this->target_platform = target_platform;
 
   this->hardware_compatible = hardware_compatible;
