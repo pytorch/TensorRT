@@ -9,6 +9,7 @@ from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
 import torch
+import torch.utils._pytree as pytree
 from torch.export import ExportedProgram
 from torch.fx.node import Target
 from torch.utils._sympy.numbers import int_oo
