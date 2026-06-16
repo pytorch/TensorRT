@@ -183,7 +183,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 else self.engine.are_output_tensors_unowned()
             ),
         }
-
         engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
         engine_info[ABI_TARGET_IDX] = (
             torch.ops.tensorrt.ABI_VERSION()
