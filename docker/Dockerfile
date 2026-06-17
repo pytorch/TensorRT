@@ -2,9 +2,9 @@
 
 # Base image starts with CUDA
 #TODO: cuda version
-ARG BASE_IMG=nvidia/cuda:13.0.0-devel-ubuntu22.04
+ARG BASE_IMG=nvidia/cuda:13.2.0-devel-ubuntu24.04
 FROM ${BASE_IMG} as base
-ENV BASE_IMG=nvidia/cuda:13.0.0-devel-ubuntu22.04
+ENV BASE_IMG=nvidia/cuda:13.2.0-devel-ubuntu24.04
 
 ARG TENSORRT_VERSION
 ENV TENSORRT_VERSION=${TENSORRT_VERSION}
@@ -15,8 +15,10 @@ ENV PYTHON_VERSION=${PYTHON_VERSION}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install basic dependencies
-RUN apt-get update && apt-get install -y build-essential manpages-dev wget zlib1g software-properties-common git libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget ca-certificates curl llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev mecab-ipadic-utf8
+# Install basic dependencies (pyenv build deps from
+# https://github.com/pyenv/pyenv/wiki#suggested-build-environment;
+# libncurses-dev replaces libncurses5-dev on 24.04).
+RUN apt-get update && apt-get install -y build-essential manpages-dev wget zlib1g software-properties-common git libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev ca-certificates curl llvm libncurses-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev mecab-ipadic-utf8
 
 # Install PyEnv and desired Python version
 ENV HOME="/root"
@@ -31,8 +33,10 @@ RUN pyenv install -v ${PYTHON_VERSION}
 RUN pyenv global ${PYTHON_VERSION}
 
 # Install TensorRT + dependencies
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
-RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
+# The CUDA 24.04 base image already ships /etc/apt/sources.list.d/cuda-*.list
+# and /usr/share/keyrings/cuda-archive-keyring.gpg pointing at the same NVIDIA
+# repo we'd otherwise add, so no extra keyring step is needed (apt-key was
+# removed on 24.04 and a duplicate signed-by entry would conflict).
 RUN apt-get update && TENSORRT_MAJOR_VERSION=`echo ${TENSORRT_VERSION} | cut -d '.' -f 1` && \
     apt-get install -y libnvinfer${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* \
                        libnvinfer-plugin${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* \
@@ -40,6 +44,7 @@ RUN apt-get update && TENSORRT_MAJOR_VERSION=`echo ${TENSORRT_VERSION} | cut -d 
                        libnvinfer-headers-dev=${TENSORRT_VERSION}.* \
                        libnvinfer-headers-plugin-dev=${TENSORRT_VERSION}.* \
                        libnvinfer-plugin-dev=${TENSORRT_VERSION}.* \
+                       libnvinfer-safe-headers-dev=${TENSORRT_VERSION}.* \
                        libnvonnxparsers${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* \
                        libnvonnxparsers-dev=${TENSORRT_VERSION}.*
 
@@ -54,8 +59,9 @@ ARG ARCH="x86_64"
 ARG TARGETARCH="amd64"
 
 RUN apt-get update && \
-    apt-get install -y python3-setuptools && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
+    apt-get install -y python3-setuptools
+# Keyring was already installed in the base stage at
+# /usr/share/keyrings/cuda-archive-keyring.gpg, no re-fetch needed.
 
 RUN apt-get update &&\
     apt-get install -y --no-install-recommends locales ninja-build &&\
