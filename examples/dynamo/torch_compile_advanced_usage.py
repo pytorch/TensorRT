@@ -76,7 +76,6 @@ backend_kwargs = {
     "min_block_size": 2,
     "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
     "optimization_level": 4,
-    "use_python_runtime": False,
 }
 
 # Run the model on an input to cause compilation, as so:

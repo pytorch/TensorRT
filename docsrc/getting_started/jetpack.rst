@@ -106,21 +106,31 @@ Build Environment Setup
       # Can only install the torch and torchvision wheel from the JPL repo which is built specifically for JetPack 6.2
       python -m pip install torch==2.8.0 torchvision==0.23.0  --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
 
-4. **Build the Wheel**:
+4. **Clone the Repository**:
+
+   .. code-block:: sh
+
+      git clone https://github.com/pytorch/TensorRT.git
+      cd TensorRT
+
+5. **Build the Wheel**:
+
+   .. note::
+      Compiling with Bazel on shared-memory edge devices like the Jetson Nano or Orin can cause out-of-memory (OOM) crashes. To avoid this, limit Bazel's CPU and memory usage by adding limits in your ``.bazelrc`` (e.g., adding ``build --jobs=2``) or by creating a temporary swapfile.
 
    .. code-block:: sh
 
       python setup.py bdist_wheel --jetpack
 
-5. **Install the Wheel**:
+6. **Install the Wheel**:
 
    .. code-block:: sh
 
-   # you will be able to find the wheel in the dist directory
-   cd dist
-   python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_aarch64.whl
+      # you will be able to find the wheel in the dist directory
+      cd dist
+      python -m pip install torch_tensorrt-*.whl
 
-6. **Verify installation by importing in Python**:
+7. **Verify installation by importing in Python**:
 
 .. code-block:: python
 

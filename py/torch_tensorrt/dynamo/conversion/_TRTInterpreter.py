@@ -486,7 +486,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         sd = {k: v.to(torch_device) for k, v in self.module.state_dict().items()}
         weight_name_map: dict[str, Any] = {}
         weight_refit_map = self.ctx.weight_refit_map
-        constant_mapping = {k: v for k, v in weight_refit_map.items() if v.size == 1}
+        constant_mapping = {k: v for k, v in weight_refit_map.items() if v.numel() == 1}
         net = self.ctx.net
         for i in range(net.num_layers):
             layer = net[i]

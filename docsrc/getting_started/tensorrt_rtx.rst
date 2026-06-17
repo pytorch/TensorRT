@@ -1,168 +1,205 @@
 .. _Torch-TensorRT-RTX:
 
-Torch-TensorRT-RTX
-=====================
+Torch-TensorRT for RTX
+########################
 
-Overview
---------
+Torch-TensorRT supports TensorRT for RTX, which builds on the proven
+performance of the NVIDIA TensorRT inference library, and simplifies the
+deployment of AI models on NVIDIA RTX GPUs across desktops, laptops, and
+workstations.
 
-TensorRT-RTX
+TensorRT for RTX is a drop-in replacement for NVIDIA TensorRT in applications
+targeting NVIDIA RTX GPUs (Turing or newer). It
+introduces a Just-In-Time (JIT) optimizer in the runtime that compiles
+improved inference engines directly on the end-user's RTX-accelerated PC in
+under 30 seconds. This eliminates the need for lengthy pre-compilation steps
+and enables rapid engine generation, improved application portability, and
+cutting-edge inference performance.
+
+Currently, Torch-TensorRT only supports TensorRT-RTX for experimental purposes;
+Torch-TensorRT by default uses standard TensorRT during the build and run. For
+detailed information about TensorRT-RTX itself, see the
+`TensorRT-RTX documentation <https://docs.nvidia.com/deeplearning/tensorrt-rtx/latest/index.html>`_.
+
+Precompiled Binaries
+---------------------
+
+Dependencies
+~~~~~~~~~~~~~~
+
+You need to have CUDA, PyTorch, and an NVIDIA RTX GPU (Turing or newer)
+to use Torch-TensorRT for RTX.
+
+    * https://developer.nvidia.com/cuda
+    * https://pytorch.org
+
+
+Installing Torch-TensorRT for RTX
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can install the python package using
+
+.. code-block:: sh
+
+    python -m pip install torch torch-tensorrt-rtx
+
+Packages are uploaded for Linux on x86 and Windows.
+
+
+Installing Nightly Builds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Torch-TensorRT for RTX distributes nightlies targeting the PyTorch nightly.
+These can be installed from the PyTorch nightly package index (separated by
+CUDA version):
+
+.. code-block:: sh
+
+    python -m pip install --pre torch torch_tensorrt_rtx --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+
+
+Import Test
 ~~~~~~~~~~~~
 
-TensorRT for RTX builds on the proven performance of the NVIDIA TensorRT inference library, and simplifies the deployment of AI models on NVIDIA RTX GPUs across desktops, laptops, and workstations.
-
-TensorRT for RTX is a drop-in replacement for NVIDIA TensorRT in applications targeting NVIDIA RTX GPUs from Turing through Blackwell generations. It introduces a Just-In-Time (JIT) optimizer in the runtime that compiles improved inference engines directly on the end-user’s RTX-accelerated PC in under 30 seconds. This eliminates the need for lengthy pre-compilation steps and enables rapid engine generation, improved application portability, and cutting-edge inference performance.
-
-For detailed information about TensorRT-RTX, refer to:
-
-* `TensorRT-RTX Documentation <https://docs.nvidia.com/deeplearning/tensorrt-rtx/latest/index.html>`_
-
-Currently, Torch-TensorRT only supports TensorRT-RTX for experimental purposes.
-Torch-TensorRT by default uses standard TensorRT during the build and run.
-
-To use TensorRT-RTX:
-
-- Build the wheel with the ``--use-rtx`` flag or set ``USE_TRT_RTX=true``.
-- During runtime, set the ``USE_TRT_RTX=true`` environment variable to invoke TensorRT-RTX.
-
-Prerequisites
--------------
-
-Clone the Repository
-~~~~~~~~~~~~~~~~~~~~~
-
-First, clone the Torch-TensorRT repository:
+After installation, verify the import succeeds:
 
 .. code-block:: sh
 
-   git clone https://github.com/pytorch/TensorRT.git
-   cd TensorRT
-
-Install System Dependencies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**In Linux:**
-
-Install Python development headers (required for building Python extensions):
-
-.. code-block:: sh
-
-   # For Python 3.12 (adjust version number based on your Python version)
-   sudo apt install python3.12-dev
-
-Install CUDA Toolkit
-~~~~~~~~~~~~~~~~~~~~
-
-Download and install the CUDA Toolkit from the `NVIDIA Developer website <https://developer.nvidia.com/cuda-downloads>`_. Also download the Nvidia driver if necessary.
-_Note: If you are on Windows, but in Linux via WSL, you do not need to install drivers in Linux. WSL will automatically use the drivers installed in Windows._
-
-**Important:** Check the required CUDA version in the `MODULE.bazel <https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel>`_ file. You must install the exact CUDA toolkit version specified there (for example, at the time of writing, CUDA 13.0 is required).
-
-After installation, set the ``CUDA_HOME`` environment variable:
-
-.. code-block:: sh
-
-   export CUDA_HOME=/usr/local/cuda
-   # Add this to your ~/.bashrc or ~/.zshrc to make it persistent
-
-Install Python Dependencies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**It is strongly recommended to use a virtual environment** to avoid conflicts with system packages:
-
-.. code-block:: sh
-
-   # Install venv
-   apt install python3.12-venv
-
-   # Create a virtual environment
-   python -m venv .venv
-
-   # Activate the virtual environment
-   source .venv/bin/activate  # On Linux/Mac
-   # OR on Windows:
-   # .venv\Scripts\activate
-
-Before building, install the required Python packages:
-
-.. code-block:: sh
-
-   # Install setuptools (provides distutils)
-   pip install setuptools
-
-   # Install PyTorch
-   # Note: If you are building Torch-TensorRT at tip-of-tree, you need to install the latest PyTorch nightly build rather than the stable release. See below for details.
-   # Do not 'pip install torch torchvision' which will install the stable release of PyTorch, only install the nightly build.
-   # See below for details.
-
-   # Install PyTorch nightly build (check CUDA version in MODULE.bazel)
-   # Replace cuXXX with your CUDA version (e.g., cu130 for CUDA 13.0)
-   pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cuXXX
-
-   # Install additional build dependencies
-   pip install pyyaml numpy
+    python -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
 
 .. note::
 
-   The PyTorch version requirement is defined in `pyproject.toml <https://github.com/pytorch/TensorRT/blob/main/pyproject.toml>`_ (build requirements) and `setup.py <https://github.com/pytorch/TensorRT/blob/main/setup.py>`_ (runtime requirements). If you encounter version-related errors during installation, refer to these files for the exact version constraints.
+   The Python import path is ``torch_tensorrt`` regardless of which flavor of
+   TensorRT (``tensorrt`` or ``tensorrt_rtx``) is installed (the flavor is determined
+   by the wheel name: ``torch-tensorrt`` vs. ``torch-tensorrt-rtx``).
+
+
+Example: RTX-Only Features
+--------------------------
+
+The following minimal example compiles a toy convolutional model with dynamic
+input shapes and applies three TensorRT-RTX-only runtime knobs **after**
+compile, via ``mod.runtime_settings``:
+
+* ``runtime_cache`` — path to an on-disk cache of JIT-compiled kernels. The
+  cache is populated on first use and reloaded on subsequent runs, so
+  repeated invocations of the same compiled module skip JIT compilation. The
+  default is a per-user file under the system temp directory; set this to a
+  persistent path (e.g. somewhere under your project) to share the cache
+  across runs.
+* ``dynamic_shapes_kernel_specialization_strategy`` — controls how
+  TensorRT-RTX specializes kernels for the current runtime shape. Accepts
+  ``"lazy"`` (default; use a generic fallback kernel while a
+  shape-specialized kernel compiles asynchronously), ``"eager"`` (block on
+  the current shape until the specialized kernel is ready), or ``"none"``
+  (always use the generic kernel).
+* ``cuda_graph_strategy`` — whether TensorRT-RTX captures and replays the
+  engine internally as a CUDA graph. Accepts ``"disabled"`` (default) or
+  ``"whole_graph_capture"`` (capture the engine's forward and replay on
+  subsequent calls — lower per-call CPU overhead, fixed input shapes
+  required).
+
+All three fields are no-ops on standard-TensorRT builds; they only take
+effect when the ``torch_tensorrt_rtx`` wheel is installed.
+
+.. code-block:: python
+
+    import torch
+    import torch.nn as nn
+    import torch_tensorrt
+    from torch_tensorrt.runtime import RuntimeSettings
+
+
+    class ToyConv(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(3, 16, kernel_size=3, padding=1)
+            self.relu = nn.ReLU()
+
+        def forward(self, x):
+            return self.relu(self.conv(x))
+
+
+    model = ToyConv().eval().cuda()
+
+    inputs = [
+        torch_tensorrt.Input(
+            min_shape=(1, 3, 224, 224),
+            opt_shape=(4, 3, 224, 224),
+            max_shape=(8, 3, 224, 224),
+            dtype=torch.float32,
+        )
+    ]
+
+    compiled = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        inputs=inputs,
+        enabled_precisions={torch.float32},
+        use_python_runtime=True,
+    )
+
+    # RTX-only: persist JIT-compiled kernels across runs, eagerly specialize
+    # for the current input shape, and let TensorRT-RTX capture+replay the
+    # engine internally as a CUDA graph. Apply before first execute so the
+    # engine's IExecutionContext picks the settings up on its single, lazy
+    # create.
+    compiled.runtime_settings = RuntimeSettings(
+        runtime_cache="/tmp/my_rtx_cache.bin",
+        dynamic_shapes_kernel_specialization_strategy="eager",
+        cuda_graph_strategy="whole_graph_capture",
+    )
+
+    out = compiled(torch.randn(4, 3, 224, 224).cuda())
+    print(out.shape)
 
 .. note::
 
-   Remember to activate the virtual environment (``source .venv/bin/activate``) whenever you work with this project or run the build commands.
+   To both flip ``cuda_graph_strategy`` *and* wrap the module for outer
+   ``torch.cuda.CUDAGraph`` capture in a single context manager, prefer
+   ``with torch_tensorrt.runtime.enable_cudagraphs(compiled, cuda_graph_strategy="whole_graph_capture") as wrapped:``
+   — see :ref:`runtime_settings` for the full pattern.
 
-Install Bazel
-~~~~~~~~~~~~~
+For temporary (scoped) overrides, shared caches across multiple modules,
+combining a cuda-graph capture strategy with ``enable_cudagraphs``, and other
+advanced patterns, see :ref:`runtime_settings`.
 
-Bazel is required to build the wheel with TensorRT-RTX.
 
-**In Linux:**
+Compiling From Source
+----------------------
 
-.. code-block:: sh
+The standard build prerequisites (Bazel, CUDA, Python, PyTorch nightly) are
+unchanged for the TensorRT-RTX build — see :ref:`installing-deps` in the main
+installation guide for those. Only the RTX-specific deltas are listed below.
 
-   curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-amd64 \
-    -o bazelisk \
-    && mv bazelisk /usr/bin/bazel \
-    && chmod +x /usr/bin/bazel
+RTX-Specific Dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**In Windows:**
-
-.. code-block:: sh
-
-   choco install bazelisk -y
-
-Install TensorRT-RTX Tarball
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-TensorRT-RTX tarball can be downloaded from https://developer.nvidia.com/tensorrt-rtx.
-Currently, Torch-TensorRT uses TensorRT-RTX version **1.4.0.76**.
+Download the TensorRT-RTX tarball from https://developer.nvidia.com/tensorrt-rtx.
+Torch-TensorRT currently uses TensorRT-RTX version **1.5.0.114**.
 
 Once downloaded:
 
-**In Linux:**
-
-Make sure you add the lib path to the ``LD_LIBRARY_PATH`` environment variable.
+**On Linux**, add the tarball ``lib`` directory to ``LD_LIBRARY_PATH``:
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.4.0.76
-    export LD_LIBRARY_PATH=/your_local_download_path/TensorRT-RTX-1.4.0.76/lib:$LD_LIBRARY_PATH
-    echo $LD_LIBRARY_PATH | grep TensorRT-RTX
+    # If TensorRT-RTX is extracted in /your_local_download_path/TensorRT-RTX-1.5.0.114
+    export LD_LIBRARY_PATH=/your_local_download_path/TensorRT-RTX-1.5.0.114/lib:$LD_LIBRARY_PATH
 
-**In Windows:**
-
-Make sure you add the lib path to the Windows system variable ``PATH``.
+**On Windows**, add the tarball ``lib`` directory to the system ``PATH``:
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.4.0.76
-    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.4.0.76\lib"
+    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.5.0.114
+    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.5.0.114\lib"
     echo %PATH% | findstr TensorRT-RTX
 
 Install TensorRT-RTX Wheel
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 `tensorrt_rtx` wheel is published on PyPI.
-During `torch_tensorrt_rtx` wheel installation, 
+During `torch_tensorrt_rtx` wheel installation,
 it will automatically install the `tensorrt_rtx` wheel.
 
 Build Torch-TensorRT with TensorRT-RTX
@@ -184,35 +221,30 @@ Then build the wheel:
 
 .. code-block:: sh
 
-    # If you have previously built with standard TensorRT, make sure to clean the build environment,
-    # otherwise it will use the existing .so built with standard TensorRT, which is not compatible with TensorRT-RTX.
     python setup.py clean
     bazel clean --expunge
-    # Remove everything under build directory
     rm -rf build/*
 
-    # Build wheel with TensorRT-RTX
-    python setup.py bdist_wheel --use-rtx
+Then build and install the wheel:
 
-    # Install the wheel (note: the wheel filename uses underscores, not hyphens, and should contain the word 'rtx')
+.. code-block:: sh
+
+    USE_TRT_RTX=true python -m pip wheel . --no-deps -w dist/
+
+    # Note: the wheel filename uses underscores, not hyphens, and contains 'rtx'.
     python -m pip install dist/torch_tensorrt_rtx-*.whl
 
-Quick Start
------------
-
-.. code-block:: python
-
-    python examples/dynamo/torch_compile_resnet_example.py
 
 Troubleshooting
 ---------------
 
 Common Issues
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 **Missing distutils module**
 
-If you encounter ``ModuleNotFoundError: No module named 'distutils'``, install setuptools:
+If you encounter ``ModuleNotFoundError: No module named 'distutils'``, install
+setuptools:
 
 .. code-block:: sh
 
@@ -220,7 +252,8 @@ If you encounter ``ModuleNotFoundError: No module named 'distutils'``, install s
 
 **Missing CUDA_HOME environment variable**
 
-If you encounter ``OSError: CUDA_HOME environment variable is not set``, set the CUDA_HOME path:
+If you encounter ``OSError: CUDA_HOME environment variable is not set``, set
+the ``CUDA_HOME`` path:
 
 .. code-block:: sh
 
@@ -228,17 +261,24 @@ If you encounter ``OSError: CUDA_HOME environment variable is not set``, set the
 
 **CUDA version mismatch**
 
-If you encounter errors about CUDA paths not existing (e.g., ``/usr/local/cuda-X.Y/ does not exist``), ensure you have the correct CUDA version installed. Check the required version in `MODULE.bazel <https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel>`_. You may need to:
+If you encounter errors about CUDA paths not existing (e.g.,
+``/usr/local/cuda-X.Y/ does not exist``), ensure you have the correct CUDA
+version installed. Check the required version in
+`MODULE.bazel <https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel>`_.
+You may need to:
 
 1. Update your NVIDIA drivers
-2. Download and install the specific CUDA toolkit version required by MODULE.bazel
+2. Download and install the specific CUDA toolkit version required by ``MODULE.bazel``
 3. Clean and rebuild after installing the correct version
 
 **PyTorch version mismatch**
 
-If you encounter an error like ``ERROR: No matching distribution found for torch<X.Y.Z,>=X.Y.Z.dev`` (for example, ``torch<2.11.0,>=2.10.0.dev``), you need to install a compatible PyTorch nightly version.
-
-First, check the exact version constraint in `pyproject.toml <https://github.com/pytorch/TensorRT/blob/main/pyproject.toml>`_, then install with that constraint:
+If you encounter an error like
+``ERROR: No matching distribution found for torch<X.Y.Z,>=X.Y.Z.dev`` (for
+example, ``torch<2.11.0,>=2.10.0.dev``), install a compatible PyTorch nightly.
+First check the exact version constraint in
+`pyproject.toml <https://github.com/pytorch/TensorRT/blob/main/pyproject.toml>`_,
+then install with that constraint:
 
 .. code-block:: sh
 
@@ -246,24 +286,27 @@ First, check the exact version constraint in `pyproject.toml <https://github.com
     # and MODULE.bazel specifies CUDA 13.0 (cu130):
     pip install --pre "torch>=2.12.0.dev,<2.13.0" torchvision --index-url https://download.pytorch.org/whl/nightly/cu130
 
-Replace the version constraint and CUDA version (cuXXX) according to your project's requirements.
+Replace the version constraint and CUDA version (cuXXX) according to your
+project's requirements.
 
 **Missing Python development headers**
 
-If you encounter ``fatal error: Python.h: No such file or directory``, install the Python development package:
+If you encounter ``fatal error: Python.h: No such file or directory``, install
+the Python development package:
 
 .. code-block:: sh
 
     # For Python 3.12 (adjust version based on your Python)
     sudo apt install python3.12-dev
 
+
 Verifying TensorRT-RTX Linkage
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you encounter load or link errors, check if `tensorrt_rtx` is linked correctly.
-If not, clean up the environment and rebuild.
+If you encounter load or link errors, check that ``tensorrt_rtx`` is linked
+correctly. If not, clean the environment and rebuild.
 
-**In Linux:**
+**Linux:**
 
 .. code-block:: sh
 
@@ -276,7 +319,7 @@ If not, clean up the environment and rebuild.
     # Verify libtensorrt_rtx.so.1 is linked, and libnvinfer.so.10 is NOT
     ldd $trt_install_path/lib/libtorchtrt.so
 
-**In Windows:**
+**Windows:**
 
 .. code-block:: sh
 

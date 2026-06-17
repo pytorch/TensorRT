@@ -26,7 +26,6 @@ class TestLowRankInputs(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -57,7 +56,6 @@ class TestLowRankInputs(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -92,7 +90,6 @@ class TestLowRankInputs(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=True,
             offload_module_to_cpu=True,
         )
         fx_graph.cuda()

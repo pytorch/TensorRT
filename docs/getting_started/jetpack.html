@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0d6c091b"></script>
+    <script src="../_static/documentation_options.js?v=5663fe15"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -58,7 +58,7 @@
         </script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Torch-TensorRT-RTX" href="tensorrt_rtx.html" />
+    <link rel="next" title="Torch-TensorRT for RTX" href="tensorrt_rtx.html" />
     <link rel="prev" title="Installation" href="installation.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -433,7 +433,7 @@ document.write(`
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">Torch-TensorRT in JetPack</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tensorrt_rtx.html">Torch-TensorRT-RTX</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tensorrt_rtx.html">Torch-TensorRT for RTX</a></li>
 </ul>
 </div>
 </nav></div>
@@ -582,18 +582,27 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 </pre></div>
 </div>
 </li>
+<li><p><strong>Clone the Repository</strong>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/pytorch/TensorRT.git
+<span class="nb">cd</span><span class="w"> </span>TensorRT
+</pre></div>
+</div>
+</li>
 <li><p><strong>Build the Wheel</strong>:</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Compiling with Bazel on shared-memory edge devices like the Jetson Nano or Orin can cause out-of-memory (OOM) crashes. To avoid this, limit Bazel’s CPU and memory usage by adding limits in your <code class="docutils literal notranslate"><span class="pre">.bazelrc</span></code> (e.g., adding <code class="docutils literal notranslate"><span class="pre">build</span> <span class="pre">--jobs=2</span></code>) or by creating a temporary swapfile.</p>
+</div>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>setup.py<span class="w"> </span>bdist_wheel<span class="w"> </span>--jetpack
 </pre></div>
 </div>
 </li>
 <li><p><strong>Install the Wheel</strong>:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># you will be able to find the wheel in the dist directory</span>
+<span class="nb">cd</span><span class="w"> </span>dist
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch_tensorrt-*.whl
 </pre></div>
 </div>
-<p># you will be able to find the wheel in the dist directory
-cd dist
-python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_aarch64.whl</p>
 </li>
 <li><p><strong>Verify installation by importing in Python</strong>:</p></li>
 </ol>
@@ -634,7 +643,7 @@ python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_aarc
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Torch-TensorRT-RTX</p>
+        <p class="prev-next-title">Torch-TensorRT for RTX</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

@@ -7,7 +7,6 @@ import torch
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx import GraphModule, Node
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
-
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -1142,19 +1141,20 @@ class ComplexGraphRewriter:
 
     @_complex_unpacker(torch.ops.aten.acosh.default)
     def _rewrite_acosh(self, node: Node) -> bool:
-        # acosh(z) = log(z + sqrt(z² - 1))
+        # acosh(z) = log(z + sqrt(z+1) * sqrt(z-1))
+        # The factored sqrt form matches torch.acosh's principal branch
+        # (C99 cacosh convention). The simpler log(z + sqrt(z² - 1)) would
+        # pick the opposite Riemann sheet whenever Re(z) < 0.
         inp = node.args[0]
         with SubgraphBuilder(self.gm.graph, node) as b:
             re, im = self._inline_select_re_im(b, inp)
-            re2 = b(torch.ops.aten.mul.Tensor, re, re)
-            im2 = b(torch.ops.aten.mul.Tensor, im, im)
-            z2_re = b(torch.ops.aten.sub.Tensor, re2, im2)
-            re_im = b(torch.ops.aten.mul.Tensor, re, im)
-            z2_im = b(torch.ops.aten.mul.Tensor, re_im, 2.0)
-            w_re = b(torch.ops.aten.sub.Scalar, z2_re, 1.0)  # w = z²-1
-            sq_re, sq_im = self._inline_complex_sqrt(b, w_re, z2_im)
-            sum_re = b(torch.ops.aten.add.Tensor, re, sq_re)
-            sum_im = b(torch.ops.aten.add.Tensor, im, sq_im)
+            zp1_re = b(torch.ops.aten.add.Scalar, re, 1.0)
+            zm1_re = b(torch.ops.aten.sub.Scalar, re, 1.0)
+            sp_re, sp_im = self._inline_complex_sqrt(b, zp1_re, im)
+            sm_re, sm_im = self._inline_complex_sqrt(b, zm1_re, im)
+            prod_re, prod_im = self._inline_complex_mul(b, sp_re, sp_im, sm_re, sm_im)
+            sum_re = b(torch.ops.aten.add.Tensor, re, prod_re)
+            sum_im = b(torch.ops.aten.add.Tensor, im, prod_im)
             log_re, log_im = self._inline_complex_log(b, sum_re, sum_im)
             out = self._inline_cat_re_im(b, log_re, log_im)
             node.replace_all_uses_with(out)

@@ -41,6 +41,7 @@ curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelis
     && mv bazelisk-linux-${BAZEL_PLATFORM} /usr/bin/bazel \
     && chmod +x /usr/bin/bazel
 
+
 pip uninstall -y torch torchvision
 
 if [[ ${IS_JETPACK} == true ]]; then

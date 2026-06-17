@@ -46,7 +46,6 @@ inputs = [torch.rand((100, 3, 224, 224)).to("cuda")]
 
 settings = {
     "ir": "dynamo",
-    "use_python_runtime": False,
     "immutable_weights": False,
     "lazy_engine_init": True,
     "dynamically_allocate_resources": True,

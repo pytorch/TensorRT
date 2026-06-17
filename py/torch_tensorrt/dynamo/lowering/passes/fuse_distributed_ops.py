@@ -1,5 +1,6 @@
+# mypy: disallow-untyped-decorators=False
+
 import logging
-from typing import Any
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -12,9 +13,14 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 logger = logging.getLogger(__name__)
 
 
-# TODO: @apbose make these actual torch custom ops, should allow aot_export
-def tensorrt_fused_nccl_all_gather_op(
-    inp: Any, group_size: int, group_name: str
+# Registered as torch.library custom ops so the resulting OpOverloads are valid
+# call_function targets for FX graphs that get wrapped in torch.export.ExportedProgram
+# (torch._export.verifier._check_valid_op rejects plain Python functions).
+
+
+@torch.library.custom_op("tensorrt::fused_nccl_all_gather", mutates_args=())
+def _fused_nccl_all_gather_impl(
+    inp: torch.Tensor, group_size: int, group_name: str
 ) -> torch.Tensor:
     return torch.ops._c10d_functional.wait_tensor.default(
         torch.ops._c10d_functional.all_gather_into_tensor.default(
@@ -23,8 +29,15 @@ def tensorrt_fused_nccl_all_gather_op(
     )
 
 
-def tensorrt_fused_nccl_reduce_scatter_op(
-    inp: Any, reduce_op: str, group_size: int, group_name: str
+@_fused_nccl_all_gather_impl.register_fake
+def _(inp: torch.Tensor, group_size: int, group_name: str) -> torch.Tensor:
+    out_shape = (inp.shape[0] * group_size,) + tuple(inp.shape[1:])
+    return inp.new_empty(out_shape)
+
+
+@torch.library.custom_op("tensorrt::fused_nccl_reduce_scatter", mutates_args=())
+def _fused_nccl_reduce_scatter_impl(
+    inp: torch.Tensor, reduce_op: str, group_size: int, group_name: str
 ) -> torch.Tensor:
     return torch.ops._c10d_functional.wait_tensor.default(
         torch.ops._c10d_functional.reduce_scatter_tensor.default(
@@ -33,12 +46,36 @@ def tensorrt_fused_nccl_reduce_scatter_op(
     )
 
 
-def tensorrt_fused_nccl_all_reduce_op(
-    inp: Any, reduce_op: str, group_name: str
+@_fused_nccl_reduce_scatter_impl.register_fake
+def _(
+    inp: torch.Tensor, reduce_op: str, group_size: int, group_name: str
+) -> torch.Tensor:
+    out_shape = (inp.shape[0] // group_size,) + tuple(inp.shape[1:])
+    return inp.new_empty(out_shape)
+
+
+@torch.library.custom_op("tensorrt::fused_nccl_all_reduce", mutates_args=())
+def _fused_nccl_all_reduce_impl(
+    inp: torch.Tensor, reduce_op: str, group_name: str
 ) -> torch.Tensor:
     return torch.ops._c10d_functional.wait_tensor.default(
         torch.ops._c10d_functional.all_reduce.default(inp, reduce_op, group_name)
     )
+
+
+@_fused_nccl_all_reduce_impl.register_fake
+def _(inp: torch.Tensor, reduce_op: str, group_name: str) -> torch.Tensor:
+    return torch.empty_like(inp)
+
+
+# Public aliases — used as FX node targets in the fuse pass, as converter keys
+# in custom_ops_converters.py, and in test equality checks. Each is the
+# torch._ops.OpOverload created by the custom_op decoration above.
+tensorrt_fused_nccl_all_gather_op = torch.ops.tensorrt.fused_nccl_all_gather.default
+tensorrt_fused_nccl_reduce_scatter_op = (
+    torch.ops.tensorrt.fused_nccl_reduce_scatter.default
+)
+tensorrt_fused_nccl_all_reduce_op = torch.ops.tensorrt.fused_nccl_all_reduce.default
 
 
 def fuse_distributed_ops(

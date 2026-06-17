@@ -68,6 +68,19 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.shape_key: Optional[str] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
+        self._owned_pool_stream: Optional[torch.cuda.Stream] = None
+        # Bind to the device of the wrapped module's first CUDA parameter so
+        # multi-GPU deployments cache the right default stream.
+        target = next(
+            (p.device for p in self.compiled_module.parameters() if p.is_cuda),
+            None,
+        )
+        self._target_device = (
+            target
+            if target is not None
+            else torch.device("cuda", torch.cuda.current_device())
+        )
+        self._default_stream = torch.cuda.default_stream(self._target_device)
         self.warm_up()
 
     def warm_up(self) -> None:
@@ -114,6 +127,54 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def set_use_output_allocator(self, enable: bool) -> None:
         self.use_output_allocator_outputs = enable
 
+    def _check_monolithic_capturability(self, stream: torch.cuda.Stream) -> None:
+        """Verify every TRT submodule is safe for monolithic stream capture.
+
+        Whole-graph CUDA graph mode wraps mixed TRT + PyTorch ops in a
+        single outer ``torch.cuda.CUDAGraph`` capture. On TRT-RTX, each
+        engine must opt out of RTX-native CUDA graphs (which would
+        interfere with the outer capture) and must pass the
+        ``IExecutionContext.is_stream_capturable`` check. Raises
+        ``RuntimeError`` if any TRT engine is not monolithically
+        capturable. No-op on non-RTX builds.
+        """
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            return
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        for name, mod in self.compiled_module.named_modules():
+            if not (
+                isinstance(mod, TorchTensorRTModule)
+                and isinstance(mod.engine, TRTEngine)
+            ):
+                continue
+            engine = mod.engine
+            if not engine._is_monolithic_capturable(stream):
+                raise RuntimeError(
+                    f"CUDA graph capture failed: TRT submodule '{name}' is "
+                    "not monolithically capturable (lazy kernel "
+                    "specialization or non-capturable stream). Whole-graph "
+                    "CUDA graph mode with mixed TRT + PyTorch ops requires "
+                    "all TRT engines to be capturable. Consider using "
+                    "cuda_graph_strategy='whole_graph_capture' with "
+                    "set_cudagraphs_mode(True) instead of enable_cudagraphs()."
+                )
+            # Disable RTX-native CUDA graphs on this engine so they don't
+            # interfere with the outer monolithic capture.
+            if engine._rtx_native_cudagraphs:
+                disabled = engine.runtime_settings.merge(cuda_graph_strategy="disabled")
+                engine.update_runtime_settings(disabled)
+                engine._rtx_native_cudagraphs = False
+                logger.info(
+                    f"Disabled RTX-native CUDA graphs for '{name}' "
+                    "(using outer monolithic capture instead)"
+                )
+
     def forward(
         self, *args: Any, **kwargs: Any
     ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
@@ -121,7 +182,29 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
         if cudagraphs_enabled:
             shape_changed = self.validate_input_shapes(inputs)
-            need_cudagraphs_record = shape_changed or self.is_weight_streaming_set
+
+            current_device = (
+                inputs[0].device
+                if inputs and inputs[0].is_cuda
+                else self._target_device
+            )
+            default_stream = self._default_stream
+            previous_engine_stream = self._engine_stream
+            self._caller_stream = torch.cuda.current_stream(current_device)
+            caller_on_default = self._caller_stream == default_stream
+            if caller_on_default:
+                if self._owned_pool_stream is None:
+                    self._owned_pool_stream = torch.cuda.Stream(self._target_device)
+                self._engine_stream = self._owned_pool_stream
+            else:
+                # Honor caller's non-default stream so its scheduling choice (e.g. SM
+                # partitioning via a CUDA Green Context) is preserved end to end.
+                self._engine_stream = self._caller_stream
+            stream_changed = self._engine_stream != previous_engine_stream
+
+            need_cudagraphs_record = (
+                shape_changed or self.is_weight_streaming_set or stream_changed
+            )
             if need_cudagraphs_record:
                 self._reset_captured_graph()
                 self._input_buffers = [None] * len(inputs)
@@ -172,23 +255,19 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     self._input_buffers, self.compiled_module._in_spec
                 )
 
-            self._caller_stream = torch.cuda.current_stream()
-            if (
-                self._engine_stream == torch.cuda.default_stream()
-                or self._engine_stream is None
-            ):
-                self._engine_stream = torch.cuda.Stream()
-
-            self._engine_stream.wait_stream(self._caller_stream)
+            if caller_on_default:
+                self._engine_stream.wait_stream(self._caller_stream)
 
             with torch.cuda.stream(self._engine_stream):
                 if need_cudagraphs_record:
+                    self._check_monolithic_capturability(self._engine_stream)
                     self.cudagraph = torch.cuda.CUDAGraph()
                     with torch.cuda.graph(self.cudagraph, stream=self._engine_stream):
                         self._output_buffers = self.compiled_module(*args, **kwargs)
 
                 self.cudagraph.replay()  # type: ignore
-            self._caller_stream.wait_stream(self._engine_stream)
+            if caller_on_default:
+                self._caller_stream.wait_stream(self._engine_stream)
 
             if isinstance(self._output_buffers, (list, tuple)):
                 output_buffers = self._output_buffers

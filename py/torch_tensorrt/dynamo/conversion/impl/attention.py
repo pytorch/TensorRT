@@ -1,7 +1,10 @@
 import logging
 from typing import Optional, Tuple, Union
 
+import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -10,9 +13,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     prepend_ones,
 )
-
-import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -186,7 +186,25 @@ def scaled_dot_product_attention(
         )
         scale_factor = impl.elementwise.div(
             ctx, target, source_ir, f"{name}_div_1_sqrt_q_dim", 1, sqrt_q_dim
-        )
+        )  # fp32
+
+        # For TRT version < 11.0, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to torch.nn.functional.scaled_dot_product_attention
+        # NVBug: https://nvbugspro.nvidia.com/bug/6047232
+        if scale_factor.dtype != query.dtype:
+            if key.shape[-2] >= 512 and is_causal:
+                if is_tensorrt_version_supported("11.0"):
+                    scale_factor = cast_trt_tensor(
+                        ctx,
+                        scale_factor,
+                        query.dtype,
+                        name + "_cast_scale_factor",
+                        target,
+                        source_ir,
+                    )
+                else:
+                    _LOGGER.warning(
+                        "For TRT 10.x, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to `torch.nn.functional.scaled_dot_product_attention` in FP16/BF16. Thus, we use FP32 for the scale factor. If you want to use the accurate dtype, please set `decompose_attention=True` or upgrade to TRT 11.0 or later."
+                    )
     else:
         scale_factor = get_trt_tensor(ctx, scale, f"{name}_scale_factor", query.dtype)
 
@@ -309,7 +327,25 @@ def scaled_dot_product_flash_attention(
         )
         scale_factor = impl.elementwise.div(
             ctx, target, source_ir, f"{name}_div_1_sqrt_q_dim", 1, sqrt_q_dim
-        )
+        )  # fp32
+
+        # For TRT version < 11.0, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to torch.nn.functional.scaled_dot_product_attention
+        # NVBug: https://nvbugspro.nvidia.com/bug/6047232
+        if scale_factor.dtype != query.dtype:
+            if key.shape[-2] >= 512 and is_causal:
+                if is_tensorrt_version_supported("11.0"):
+                    scale_factor = cast_trt_tensor(
+                        ctx,
+                        scale_factor,
+                        query.dtype,
+                        name + "_cast_scale_factor",
+                        target,
+                        source_ir,
+                    )
+                else:
+                    _LOGGER.warning(
+                        "For TRT 10.x, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to `torch.nn.functional.scaled_dot_product_attention` in FP16/BF16. Thus, we use FP32 for the scale factor. If you want to use the accurate dtype, please set `decompose_attention=True` or upgrade to TRT 11.0 or later."
+                    )
     else:
         scale_factor = get_trt_tensor(ctx, scale, f"{name}_scale_factor", query.dtype)
 
@@ -359,7 +395,25 @@ def scaled_dot_product_efficient_attention(
         )
         scale_factor = impl.elementwise.div(
             ctx, target, source_ir, f"{name}_div_1_sqrt_q_dim", 1, sqrt_q_dim
-        )
+        )  # fp32
+
+        # For TRT version < 11.0, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to torch.nn.functional.scaled_dot_product_attention
+        # NVBug: https://nvbugspro.nvidia.com/bug/6047232
+        if scale_factor.dtype != query.dtype:
+            if key.shape[-2] >= 512 and is_causal:
+                if is_tensorrt_version_supported("11.0"):
+                    scale_factor = cast_trt_tensor(
+                        ctx,
+                        scale_factor,
+                        query.dtype,
+                        name + "_cast_scale_factor",
+                        target,
+                        source_ir,
+                    )
+                else:
+                    _LOGGER.warning(
+                        "For TRT 10.x, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to `torch.nn.functional.scaled_dot_product_attention` in FP16/BF16. Thus, we use FP32 for the scale factor. If you want to use the accurate dtype, please set `decompose_attention=True` or upgrade to TRT 11.0 or later."
+                    )
     else:
         scale_factor = get_trt_tensor(ctx, scale, f"{name}_scale_factor", query.dtype)
 
@@ -382,11 +436,10 @@ def scaled_dot_product_efficient_attention(
         and isinstance(key.shape[1], int)
         and key.shape[1] > 0
     ):
-        shape_layer = ctx.net.add_shape(key)
-        shape_layer.name = name + "_key_shape"
         shuffle = ctx.net.add_shuffle(scaled_query)
-        shuffle.set_input(1, shape_layer.get_output(0))
-        shuffle.name = name + "_fix_head_dim"
+        shuffle.name = name + "_fix_query_num_heads"
+        shuffle.zero_is_placeholder = True
+        shuffle.reshape_dims = (0, key.shape[1], 0, 0)
         scaled_query = shuffle.get_output(0)
 
     mask_tensor = None

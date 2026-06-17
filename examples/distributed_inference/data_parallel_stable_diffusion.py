@@ -40,7 +40,6 @@ pipe.unet = torch.compile(  # %%
     options={
         "truncate_long_and_double": True,
         "precision": torch.float16,
-        "use_python_runtime": True,
     },
     dynamic=False,
 )

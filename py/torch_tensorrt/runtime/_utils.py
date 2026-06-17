@@ -1,8 +1,17 @@
 import logging
-from typing import List, Optional, Tuple
+from typing import Optional, Protocol, Tuple
 
 import torch
 import torch_tensorrt
+
+
+class _ComparableDeviceProps(Protocol):
+    """Enough for multi-device checks; may be ``_CudaDeviceProperties`` or a simple namespace."""
+
+    major: int
+    minor: int
+    name: object
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +36,7 @@ def _is_switch_required(
     curr_device_id: int,
     engine_device_id: int,
     curr_device_properties: torch._C._CudaDeviceProperties,
-    engine_device_properties: torch._C._CudaDeviceProperties,
+    engine_device_properties: _ComparableDeviceProps,
 ) -> bool:
     """Determines whether a device switch is required based on input device parameters"""
     # Device Capabilities disagree
@@ -66,7 +75,7 @@ def _is_switch_required(
 def _select_rt_device(
     curr_device_id: int,
     engine_device_id: int,
-    engine_device_properties: torch._C._CudaDeviceProperties,
+    engine_device_properties: _ComparableDeviceProps,
 ) -> Tuple[int, torch._C._CudaDeviceProperties]:
     """Wraps compatible device check and raises error if none are found"""
     new_target_device_opt = _get_most_compatible_device(
@@ -83,7 +92,7 @@ def _select_rt_device(
 def _get_most_compatible_device(
     curr_device_id: int,
     engine_device_id: int,
-    engine_device_properties: torch._C._CudaDeviceProperties,
+    engine_device_properties: _ComparableDeviceProps,
 ) -> Optional[Tuple[int, torch._C._CudaDeviceProperties]]:
     """Selects a runtime device based on compatibility checks"""
     all_devices = [

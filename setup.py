@@ -99,6 +99,13 @@ RELEASE = False
 CI_BUILD = False
 USE_TRT_RTX = False
 
+EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
+EXTRAS_REQUIRE = {
+    "executorch": [EXECUTORCH_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT],
+}
+
+
 if "--use-rtx" in sys.argv:
     USE_TRT_RTX = True
     sys.argv.remove("--use-rtx")
@@ -245,6 +252,10 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=rtx")
         print("TensorRT RTX build")
 
+    if IS_DLFW_CI:
+        cmd.append("--config=dlfw")
+        print("DLFW build")
+
     if IS_JETPACK:
         cmd.append("--config=jetpack")
         print("Jetpack build")
@@ -259,11 +270,44 @@ def build_libtorchtrt_cxx11_abi(
         else:
             cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
 
+    env = os.environ.copy()
+    if "TORCH_PATH" not in env:
+        stable_torch_path = resolve_torch_path()
+        if stable_torch_path is not None:
+            env["TORCH_PATH"] = stable_torch_path
+            print(f"Using TORCH_PATH={stable_torch_path}")
+
     print(f"building libtorchtrt {cmd=}")
-    status_code = subprocess.run(cmd).returncode
+    status_code = subprocess.run(cmd, env=env).returncode
 
     if status_code != 0:
         sys.exit(status_code)
+
+
+def resolve_torch_path():
+    explicit_torch_path = os.environ.get("TORCH_PATH")
+    if explicit_torch_path:
+        return explicit_torch_path
+
+    version_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    for env_var in ("CONDA_PREFIX", "VIRTUAL_ENV"):
+        prefix = os.environ.get(env_var)
+        if not prefix:
+            continue
+
+        candidate = os.path.join(prefix, "lib", version_dir, "site-packages", "torch")
+        if os.path.isdir(os.path.join(candidate, "include", "c10")) and os.path.isdir(
+            os.path.join(candidate, "lib")
+        ):
+            return candidate
+
+    torch_path = os.path.dirname(torch.__file__)
+    if os.path.isdir(os.path.join(torch_path, "include", "c10")) and os.path.isdir(
+        os.path.join(torch_path, "lib")
+    ):
+        return torch_path
+
+    return None
 
 
 def gen_version_file():
@@ -310,7 +354,12 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
         os.system(
             "tar -xzf "
             + dir_path
-            + "/../bazel-bin/libtorchtrt.tar.gz --strip-components=1 -C "
+            + "/../bazel-bin/libtorchtrt.tar.gz "
+            + "--exclude='torch_tensorrt/src' "
+            + "--exclude='torch_tensorrt/src/*' "
+            + "--exclude='torch_tensorrt/examples' "
+            + "--exclude='torch_tensorrt/examples/*' "
+            + "--strip-components=1 -C "
             + dir_path
             + "/torch_tensorrt"
         )
@@ -399,8 +448,8 @@ class EditableWheelCommand(editable_wheel):
             editable_wheel.run(self)
         else:
             build_libtorchtrt_cxx11_abi(develop=True, rt_only=NO_TS)
-            gen_version_file()
             copy_libtorchtrt(rt_only=NO_TS)
+            gen_version_file()
             editable_wheel.run(self)
 
 
@@ -474,6 +523,7 @@ dynamo_packages = [
     "torch_tensorrt",
     "torch_tensorrt.distributed",
     "torch_tensorrt.distributed.run",
+    "torch_tensorrt.kernels",
     "torch_tensorrt.dynamo",
     "torch_tensorrt.dynamo.backend",
     "torch_tensorrt.dynamo.conversion",
@@ -491,6 +541,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.tools",
+    "torch_tensorrt.executorch",
     "torch_tensorrt.runtime",
 ]
 
@@ -510,6 +561,7 @@ dynamo_package_dir = {
     "torch_tensorrt": "py/torch_tensorrt",
     "torch_tensorrt.distributed": "py/torch_tensorrt/distributed",
     "torch_tensorrt.distributed.run": "py/torch_tensorrt/distributed/run",
+    "torch_tensorrt.kernels": "py/torch_tensorrt/kernels",
     "torch_tensorrt.dynamo": "py/torch_tensorrt/dynamo",
     "torch_tensorrt.dynamo.backend": "py/torch_tensorrt/dynamo/backend",
     "torch_tensorrt.dynamo.conversion": "py/torch_tensorrt/dynamo/conversion",
@@ -527,6 +579,7 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
+    "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
 
@@ -559,6 +612,7 @@ if _FX_FE_AVAIL:
     )
 
 package_data = {}
+executorch_header_package_data = ["include/torch_tensorrt/executorch/*.h"]
 
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (
@@ -654,6 +708,7 @@ if not (PY_ONLY or NO_TS):
                     dir_path + "torch_tensorrt/csrc",
                     dir_path + "torch_tensorrt/include",
                     dir_path + "/../",
+                    dir_path + "/../cpp/include",
                     "/usr/local/cuda",
                 ]
                 + (
@@ -724,6 +779,7 @@ if not (PY_ONLY or NO_TS):
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
+                *executorch_header_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/conversion/*.h",
                 "include/torch_tensorrt/core/conversion/conversionctx/*.h",
@@ -753,6 +809,7 @@ elif NO_TS:
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
+                *executorch_header_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/runtime/*.h",
                 "lib/*",
@@ -780,8 +837,8 @@ def get_sbsa_requirements(base_requirements):
         # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
         # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
         return requirements + [
-            "torch>=2.13.0.dev,<2.14.0",
-            "tensorrt>=10.16.1,<10.17.0",
+            "torch>=2.14.0.dev,<2.15.0",
+            "tensorrt>=11.0.0,<11.1.0",
         ]
 
 
@@ -791,31 +848,33 @@ def get_x86_64_requirements(base_requirements):
     if IS_DLFW_CI:
         return requirements
     else:
-        requirements = requirements + ["torch>=2.13.0.dev,<2.14.0"]
+        requirements = requirements + [
+            "torch>=2.14.0.dev,<2.15.0",
+        ]
         if USE_TRT_RTX:
             return requirements + [
-                "tensorrt_rtx>=1.4.0.76",
+                "tensorrt_rtx>=1.5.0.114,<1.6.0.0",
             ]
         else:
             requirements = requirements + [
-                "tensorrt>=10.16.1,<10.17.0",
+                "tensorrt>=11.0.0,<11.1.0",
             ]
             cuda_version = torch.version.cuda
             if cuda_version.startswith("12"):
-                # directly use tensorrt>=10.14.1,<10.15.0 in cu12* env, it will pull both tensorrt_cu12 and tensorrt_cu13
-                # which will cause the conflict due to cuda-toolkit 13 is also pulled in, so we need to specify tensorrt_cu12 here
+                # In cu12* envs, keep the CUDA-specific TensorRT wheels explicit so the default CUDA 13
+                # TensorRT dependency path is not pulled in as well.
                 tensorrt_prefix = "tensorrt-cu12"
                 requirements = requirements + [
-                    f"{tensorrt_prefix}>=10.16.1,<10.17.0",
-                    f"{tensorrt_prefix}-bindings>=10.16.1,<10.17.0",
-                    f"{tensorrt_prefix}-libs>=10.16.1,<10.17.0",
+                    f"{tensorrt_prefix}>=11.0.0,<11.1.0",
+                    f"{tensorrt_prefix}-bindings>=11.0.0,<11.1.0",
+                    f"{tensorrt_prefix}-libs>=11.0.0,<11.1.0",
                 ]
             elif cuda_version.startswith("13"):
                 tensorrt_prefix = "tensorrt-cu13"
                 requirements = requirements + [
-                    f"{tensorrt_prefix}>=10.16.1,<10.17.0",
-                    f"{tensorrt_prefix}-bindings>=10.16.1,<10.17.0",
-                    f"{tensorrt_prefix}-libs>=10.16.1,<10.17.0",
+                    f"{tensorrt_prefix}>=11.0.0,<11.1.0",
+                    f"{tensorrt_prefix}-bindings>=11.0.0,<11.1.0",
+                    f"{tensorrt_prefix}-libs>=11.0.0,<11.1.0",
                 ]
             else:
                 raise ValueError(f"Unsupported CUDA version: {cuda_version}")
@@ -856,6 +915,7 @@ setup(
     },
     zip_safe=False,
     install_requires=get_requirements(),
+    extras_require=EXTRAS_REQUIRE,
     packages=packages,
     package_dir=package_dir,
     include_package_data=False,

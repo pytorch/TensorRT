@@ -2,7 +2,7 @@ import unittest
 
 import torch
 import torch_tensorrt
-from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 
@@ -27,9 +27,7 @@ class TestConvertModuleToTrtEngine(unittest.TestCase):
         )
 
         # Inference on TRT Engine
-        py_trt_module = PythonTorchTensorRTModule(
-            trt_engine_str, ["a", "b"], ["output0"]
-        )
+        py_trt_module = TorchTensorRTModule(trt_engine_str, ["a", "b"], ["output0"])
         trt_output = py_trt_module(input_data_0, input_data_1).cpu()
 
         # Inference on PyTorch model

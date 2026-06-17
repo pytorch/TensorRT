@@ -1,6 +1,6 @@
 import logging
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 from torch._decomp import register_decomposition
@@ -190,28 +190,35 @@ def slice_scatter_decomposition(
     input_tensor: torch.Tensor,
     src_tensor: torch.Tensor,
     dim: int,
-    start: Optional[int] = None,
-    end: Optional[int] = None,
-    step: Optional[int] = None,
+    start: Optional[Union[int, torch.SymInt]] = None,
+    end: Optional[Union[int, torch.SymInt]] = None,
+    step: Optional[Union[int, torch.SymInt]] = 1,
 ) -> torch.Tensor:
     dim_size = input_tensor.shape[dim]
     device_input_tensor = input_tensor.device
 
-    start = 0 if start is None else start  # Ensure start is int
-    start = get_positive_dim(start, input_tensor.shape[dim])
-    if end is None:  # Ensure end is int
-        end = dim_size
-    end = (
-        get_positive_dim(end, input_tensor.shape[dim]) if isinstance(end, int) else end
-    )
-    if step is None:
-        step = 1
+    if start is None:
+        start = 0
+    else:
+        start = get_positive_dim(start, dim_size)
 
-    # step == 0 is not a valid torch case
-    if start == 0 and end == dim_size and step == 1:
+    if end is None:
+        end = dim_size
+    else:
+        end = get_positive_dim(end, dim_size)
+
+    # step == 0 is not a valid torch case where start, end, dim_size, and step could be symbolic
+    if (
+        isinstance(start, int)
+        and isinstance(end, int)
+        and isinstance(step, int)
+        and start == 0
+        and end == dim_size
+        and step == 1
+    ):
         return src_tensor
 
-    # Ensure start, end, and step are all integers
+    # Ensure start, end, and step are all integers or SymInts
     assert isinstance(start, (int, torch.SymInt)), "start must be an int or SymInt"
     assert isinstance(end, (int, torch.SymInt)), "end must be an int or SymInt"
     assert isinstance(step, (int, torch.SymInt)), "step must be an int or SymInt"

@@ -64,7 +64,7 @@ class TestHashFunction(TestCase):
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_reexport_is_equal(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        pyt_model = models.resnet18(weights=None).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
         batch = torch.export.Dim("batch", min=1, max=200)
 
@@ -104,7 +104,7 @@ class TestHashFunction(TestCase):
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_input_shape_change_is_not_equal(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        pyt_model = models.resnet18(weights=None).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
         batch = torch.export.Dim("batch", min=1, max=200)
 
@@ -144,7 +144,7 @@ class TestHashFunction(TestCase):
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_engine_settings_is_not_equal(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        pyt_model = models.resnet18(weights=None).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
         batch = torch.export.Dim("batch", min=1, max=200)
 
@@ -232,7 +232,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=True,
                 min_block_size=1,
                 immutable_weights=False,
                 cache_built_engines=cache_built_engines,
@@ -268,11 +267,6 @@ class TestEngineCache(TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
-    @unittest.skipIf(
-        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
-        "There is bug in refit, so we skip the test for now",
-    )
     def test_dynamo_compile_with_custom_engine_cache(self):
         model = models.resnet18(pretrained=True).eval().to("cuda")
 
@@ -306,7 +300,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=True,
                 min_block_size=1,
                 immutable_weights=False,
                 cache_built_engines=cache_built_engines,
@@ -342,11 +335,6 @@ class TestEngineCache(TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
-    @unittest.skipIf(
-        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
-        "There is bug in refit, so we skip the test for now",
-    )
     def test_dynamo_compile_change_input_shape(self):
         """Runs compilation 3 times, the cache should miss each time"""
         model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -363,7 +351,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 torch.export.export(model, args=inputs),
                 inputs=inputs,
-                use_python_runtime=False,
                 min_block_size=1,
                 immutable_weights=False,
                 cache_built_engines=True,
@@ -423,7 +410,6 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -487,7 +473,6 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -542,7 +527,6 @@ class TestEngineCache(TestCase):
                 model,
                 inputs=inputs,
                 **{
-                    "use_python_runtime": True,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,
@@ -583,7 +567,6 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": True,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,
@@ -657,11 +640,6 @@ class TestEngineCache(TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
-    @unittest.skipIf(
-        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
-        "There is bug in refit, so we skip the test for now",
-    )
     def test_caching_small_model(self):
         from torch_tensorrt.dynamo._refit import refit_module_weights
 
@@ -682,7 +660,6 @@ class TestEngineCache(TestCase):
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
             inputs,
-            use_python_runtime=True,
             min_block_size=1,
             immutable_weights=False,
             cache_built_engines=False,
@@ -733,7 +710,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=True,
                 min_block_size=1,
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
@@ -909,7 +885,6 @@ class TestEngineCache(TestCase):
         trt_gm = torch_trt.dynamo.compile(
             llama2_ep,
             inputs=[input_ids],
-            use_python_runtime=True,
             min_block_size=1,
             immutable_weights=False,
             truncate_double=True,
@@ -961,7 +936,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 llama2_ep,
                 inputs=[input_ids],
-                use_python_runtime=True,
                 min_block_size=1,
                 truncate_double=True,
                 device=DEVICE,

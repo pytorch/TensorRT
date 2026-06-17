@@ -55,11 +55,11 @@ def _get_distributed_rank_and_world_size() -> Tuple[int, int]:
         dist_rank = dist.get_rank()
         dist_world_size = dist.get_world_size()
 
-        env_world_size = os.environ.get("WORLD_SIZE")
-        env_rank = os.environ.get("RANK")
-        if env_world_size is not None and env_rank is not None:
-            env_world_size = int(env_world_size)
-            env_rank = int(env_rank)
+        env_world_size_str = os.environ.get("WORLD_SIZE")
+        env_rank_str = os.environ.get("RANK")
+        if env_world_size_str is not None and env_rank_str is not None:
+            env_world_size = int(env_world_size_str)
+            env_rank = int(env_rank_str)
             if env_world_size != dist_world_size or env_rank != dist_rank:
                 raise RuntimeError(
                     f"RANK/WORLD_SIZE env vars ({env_rank}/{env_world_size}) conflict with "
@@ -320,7 +320,7 @@ def nccl_reduce_scatter_native(
 
     Returns:
         Output tensor after reduce_scatter operation
-        reduce_op: Reduction operation ("sum", "prod", "min", "max", "avg")
+        reduce_op: Reduction operation ("sum", "min", "max", "avg", "product")
 
     Example (with SUM reduction):
         Input on rank 0: [1, 2, 3, 4]  shape=(4,)
@@ -341,13 +341,12 @@ def nccl_reduce_scatter_native(
     # Get the input tensor
     input_tensor = plug_inputs[0]
 
-    # Map string reduction op to TensorRT ReduceOperation enum
     reduce_op_map = {
         "sum": trt.ReduceOperation.SUM,
-        "prod": trt.ReduceOperation.PROD,
         "min": trt.ReduceOperation.MIN,
         "max": trt.ReduceOperation.MAX,
         "avg": trt.ReduceOperation.AVG,
+        "product": trt.ReduceOperation.PROD,
     }
 
     if reduce_op.lower() not in reduce_op_map:
@@ -359,7 +358,6 @@ def nccl_reduce_scatter_native(
     trt_reduce_op = reduce_op_map[reduce_op.lower()]
 
     try:
-        # Explicit rank array to ensure TRT performs the scatter across all ranks.
         groups = np.arange(world_size, dtype=np.int64)
 
         layer = ctx.net.add_dist_collective(
@@ -414,7 +412,7 @@ def nccl_all_reduce_native(
         Output tensor after all_reduce operation
 
     Args:
-        reduce_op: Reduction operation ("sum", "prod", "min", "max", "avg")
+        reduce_op: Reduction operation ("sum", "min", "max", "avg", "product")
 
     Example (with SUM reduction):
         Input on rank 0: [1, 2, 3, 4]  shape=(4,)
@@ -437,10 +435,10 @@ def nccl_all_reduce_native(
 
     reduce_op_map = {
         "sum": trt.ReduceOperation.SUM,
-        "prod": trt.ReduceOperation.PROD,
         "min": trt.ReduceOperation.MIN,
         "max": trt.ReduceOperation.MAX,
         "avg": trt.ReduceOperation.AVG,
+        "product": trt.ReduceOperation.PROD,
     }
 
     if reduce_op.lower() not in reduce_op_map:

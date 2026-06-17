@@ -4,7 +4,6 @@ import pickle
 import shutil
 import unittest
 
-import tensorrt as trt
 import torch
 import torch_tensorrt as torch_trt
 from torch.testing._internal.common_utils import TestCase
@@ -12,6 +11,8 @@ from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_eng
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+import tensorrt as trt  # isort: skip  # must import after torch_tensorrt to resolve tensorrt_rtx alias
 
 assertions = unittest.TestCase()
 
@@ -34,7 +35,6 @@ class TestWeightStrippedEngine(TestCase):
         exp_program = torch.export.export(pyt_model, example_inputs)
 
         settings = {
-            "use_python_runtime": False,
             "min_block_size": 1,
             "immutable_weights": False,
             "strip_engine_weights": False,
@@ -79,11 +79,10 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     def test_compile_weight_stripped_engine(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        pyt_model = models.resnet18(weights=None).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
 
         settings = {
-            "use_python_runtime": False,
             "min_block_size": 1,
             "immutable_weights": False,
             "strip_engine_weights": True,
@@ -112,7 +111,7 @@ class TestWeightStrippedEngine(TestCase):
     )
     def test_weight_stripped_engine_sizes(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        example_inputs = (torch.randn((2, 3, 224, 224)).to("cuda"),)
         exp_program = torch.export.export(pyt_model, example_inputs)
         weight_included_engine = convert_exported_program_to_serialized_trt_engine(
             exp_program,
@@ -157,19 +156,18 @@ class TestWeightStrippedEngine(TestCase):
     )
     def test_weight_stripped_engine_results(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        example_inputs = (torch.randn((2, 3, 224, 224)).to("cuda"),)
         # Mark the dim0 of inputs as dynamic
         batch = torch.export.Dim("batch", min=1, max=200)
         exp_program = torch.export.export(
             pyt_model, args=example_inputs, dynamic_shapes={"x": {0: batch}}
         )
 
-        inputs = [torch.rand((128, 3, 224, 224)).to("cuda")]
+        inputs = [torch.rand((2, 3, 224, 224)).to("cuda")]
 
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
             tuple(inputs),
-            use_python_runtime=True,
             min_block_size=1,
             immutable_weights=False,
             strip_engine_weights=True,
@@ -193,7 +191,6 @@ class TestWeightStrippedEngine(TestCase):
             pyt_model,
             backend="tensorrt",
             options={
-                "use_python_runtime": False,
                 "min_block_size": 1,
                 "immutable_weights": False,
                 "cache_built_engines": False,
@@ -239,7 +236,6 @@ class TestWeightStrippedEngine(TestCase):
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
             tuple(example_inputs),
-            use_python_runtime=True,
             min_block_size=1,
             immutable_weights=False,
             strip_engine_weights=False,
@@ -272,15 +268,12 @@ class TestWeightStrippedEngine(TestCase):
         not importlib.util.find_spec("torchvision"),
         "torchvision is not installed",
     )
-    @unittest.skipIf(
-        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
-        "There is bug in refit, so we skip the test for now",
-    )
     def test_dynamo_compile_with_refittable_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
-        exp_program = torch.export.export(pyt_model, args=example_inputs)
+        # Use the same inputs for both export and compile to avoid a
+        # static-shape mismatch between the exported program and the engine.
+        inputs = [torch.randn((100, 3, 224, 224)).to("cuda")]
+        exp_program = torch.export.export(pyt_model, args=tuple(inputs))
 
         engine_cache_dir = (
             "/tmp/test_dynamo_compile_with_refittable_weight_stripped_engine"
@@ -296,7 +289,6 @@ class TestWeightStrippedEngine(TestCase):
         # The 2nd and 3rd iterations are to measure the compilation time with engine caching.
         # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
         # The 3rd iteration should be faster than the 1st iteration because it loads the cached engine.
-        inputs = [torch.rand((128, 3, 224, 224)).to("cuda")]
         results = []
         times = []
         start = torch.cuda.Event(enable_timing=True)
@@ -316,7 +308,6 @@ class TestWeightStrippedEngine(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=True,
                 min_block_size=1,
                 immutable_weights=False,
                 cache_built_engines=cache_built_engines,
@@ -399,7 +390,6 @@ class TestWeightStrippedEngine(TestCase):
                 pyt_model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -475,7 +465,6 @@ class TestWeightStrippedEngine(TestCase):
                 pyt_model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": True,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,
@@ -517,7 +506,6 @@ class TestWeightStrippedEngine(TestCase):
             inputs=tuple(inputs),
             min_block_size=1,
             immutable_weights=False,
-            use_python_runtime=True,
             strip_engine_weights=True,
             refit_identical_engine_weights=False,
         )
@@ -543,25 +531,19 @@ class TestWeightStrippedEngine(TestCase):
     )
     def test_two_TRTRuntime_in_refitting(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        example_inputs = (torch.randn((2, 3, 224, 224)).to("cuda"),)
         batch = torch.export.Dim("batch", min=1, max=200)
         exp_program = torch.export.export(
             pyt_model, args=example_inputs, dynamic_shapes={"x": {0: batch}}
         )
-        inputs = [torch.rand((128, 3, 224, 224)).to("cuda")]
+        inputs = [torch.rand((2, 3, 224, 224)).to("cuda")]
 
         pyt_results = pyt_model(*inputs)
 
         for i in range(2):
-            if i == 0:
-                use_python_runtime = True
-            else:
-                use_python_runtime = False
-
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=use_python_runtime,
                 min_block_size=1,
                 immutable_weights=False,
                 strip_engine_weights=True,
@@ -576,7 +558,7 @@ class TestWeightStrippedEngine(TestCase):
             cos_sim = cosine_similarity(pyt_results, refitted_output)
             assertions.assertTrue(
                 cos_sim > COSINE_THRESHOLD,
-                msg=f"{'PythonTorchTensorRTModule' if use_python_runtime else 'TorchTensorRTModule'} outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+                msg=f"iteration {i}: TorchTensorRTModule outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
             )
 
     @unittest.skip("Waiting for implementation")
@@ -600,7 +582,6 @@ class TestWeightStrippedEngine(TestCase):
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
             tuple(example_inputs),
-            use_python_runtime=True,
             min_block_size=1,
             immutable_weights=False,
             strip_engine_weights=True,
@@ -652,7 +633,6 @@ class TestWeightStrippedEngine(TestCase):
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
             inputs,
-            use_python_runtime=True,
             min_block_size=1,
             immutable_weights=False,
             cache_built_engines=False,
@@ -692,7 +672,6 @@ class TestWeightStrippedEngine(TestCase):
             pyt_model,
             backend="tensorrt",
             options={
-                "use_python_runtime": False,
                 "min_block_size": 1,
                 "immutable_weights": False,
                 "cache_built_engines": False,

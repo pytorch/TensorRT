@@ -1,6 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <fstream>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -13,7 +14,10 @@
 #include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
+#include "core/runtime/RuntimeSettings.h"
 #include "core/runtime/TRTEngineProfiler.h"
+#include "core/runtime/TRTRuntimeConfig.h"
+#include "core/runtime/TensorRTBindingNames.h"
 #include "core/util/prelude.h"
 
 // TensorRT 10.16+ has native NCCL collective support via IExecutionContext::setCommunicator()
@@ -45,7 +49,8 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>, // Platform
     std::tuple<std::string, std::string>, // Resource Allocation Strategy
-    std::tuple<std::string, std::string>>; // requires_native_multidevice
+    std::tuple<std::string, std::string> // requires_native_multidevice
+    >;
 
 struct TorchTRTRuntimeStates {
   // Indicates whether CUDAGraphs were enabled in the previous execute_engine
@@ -119,7 +124,6 @@ struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
   std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
-  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
   bool output_tensors_are_unowned = false;
   std::string name;
@@ -149,7 +153,8 @@ struct TRTEngine : torch::CustomClassHolder {
       bool requires_output_allocator = false,
       const std::string& serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
-          TRTEngine::ResourceAllocationStrategy::kStatic);
+          TRTEngine::ResourceAllocationStrategy::kStatic,
+      RuntimeSettings runtime_settings = RuntimeSettings{});
 
   TRTEngine(std::vector<std::string> serialized_info);
 
@@ -164,7 +169,8 @@ struct TRTEngine : torch::CustomClassHolder {
       bool requires_output_allocator = false,
       const std::string& serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
-          TRTEngine::ResourceAllocationStrategy::kStatic);
+          TRTEngine::ResourceAllocationStrategy::kStatic,
+      RuntimeSettings runtime_settings = RuntimeSettings{});
 
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
@@ -181,12 +187,17 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t get_streamable_device_memory_budget();
   int64_t get_automatic_device_memory_budget();
   std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
-  void set_pre_allocated_outputs(bool enable);
   void set_output_tensors_as_unowned(bool enable);
   bool are_output_tensors_unowned();
+  void clear_active_input_tensors();
+  void reset_active_input_tensors();
+  // Mark active input tensor allocations as used by a CUDA stream so the CUDA
+  // caching allocator does not recycle their storage while that stream may still
+  // access it.
+  void record_active_input_tensor_stream_usage(const c10::cuda::CUDAStream& stream);
   TorchTRTRuntimeStates runtime_states;
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
-  static const char BINDING_DELIM = '%';
+  static constexpr char BINDING_DELIM = kBindingNameDelimiter;
 
   // Serde re-export functionality
   FlattenedState __obj_flatten__();
@@ -196,8 +207,17 @@ struct TRTEngine : torch::CustomClassHolder {
   at::cuda::CUDAGraph cudagraph = {};
   at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
-  std::vector<at::Tensor> input_buffers = {};
-  std::vector<at::Tensor> output_buffers = {};
+  at::cuda::CUDAStream default_stream = c10::cuda::getDefaultCUDAStream();
+  at::cuda::CUDAStream owned_pool_stream = c10::cuda::getDefaultCUDAStream();
+  std::vector<at::Tensor> cudagraph_input_staging_buffers = {};
+  std::vector<at::Tensor> cudagraph_output_staging_buffers = {};
+
+  // Per-call formatted input buffers. In standard mode these are bound
+  // directly to TRT; in CUDA graph mode they are async-copy sources for
+  // persistent CUDA graph input staging buffers.
+  std::vector<at::Tensor> active_input_tensors = {};
+  std::list<std::vector<int64_t>> active_shape_tensor_values = {};
+
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
@@ -257,6 +277,65 @@ struct TRTEngine : torch::CustomClassHolder {
   ResourceAllocationStrategy resource_allocation_strategy = kStatic;
   void set_resource_allocation_strategy(ResourceAllocationStrategy new_strategy);
   ResourceAllocationStrategy get_resource_allocation_strategy();
+
+  // Owns the canonical `RuntimeSettings` plus the live `IRuntimeConfig` derived
+  // from them.
+  TRTRuntimeConfig runtime_cfg;
+
+  [[nodiscard]] RuntimeSettings const& runtime_settings() const noexcept {
+    return runtime_cfg.settings();
+  }
+
+  // Setter. Returns true iff the settings actually changed -- consumers can
+  // read the diff result to decide whether to invalidate dependent state. On
+  // change, invalidates the live ``IRuntimeConfig`` (the next ``exec_ctx()``
+  // getter call rebuilds with the new settings).
+  [[nodiscard]] bool runtime_settings(RuntimeSettings new_settings);
+
+  // Whether the engine has any input binding with a dynamic dimension. Computed
+  // once during construction; used by `is_monolithic_capturable`.
+  bool has_dynamic_inputs = false;
+
+  // Monolithic-capturability check used when this engine is wrapped by an outer whole-graph
+  // capture (e.g. CudaGraphsTorchTensorRTModule). Non-RTX builds always return true.
+  bool is_monolithic_capturable(cudaStream_t stream) const;
+
+  // Disable TensorRT-RTX native CUDA graph capture on this engine (one-shot, invoked when
+  // an outer stream capture is detected around execute_engine). No-op on non-RTX or when
+  // already disabled.
+  void disable_rtx_native_cudagraphs();
+
+  // Obtains the execution context. Materializes it lazily on first call using
+  // the current settings from ``runtime_cfg`` and subsequent calls return the
+  // cached instance until invalidated.
+  // Returns a raw pointer owned by the internal ``shared_ptr``; do not store
+  // across an invalidate. Returned pointer is never null (the underlying
+  // factory throws if creation fails).
+  nvinfer1::IExecutionContext* exec_ctx();
+
+  // Drop the live execution context without recreating. The next ``exec_ctx()``
+  // call rebuilds from the current ``runtime_cfg`` settings.
+  void invalidate_exec_ctx() noexcept;
+
+  // True iff the execution context has been materialized. Probes WITHOUT
+  // triggering creation; for tests/introspection.
+  [[nodiscard]] bool has_exec_ctx() const noexcept;
+
+  [[nodiscard]] int64_t num_execution_contexts_created() const noexcept {
+    return num_execution_contexts_created_;
+  }
+
+ private:
+  // Backing storage for the execution context. External code reaches it only
+  // through ``exec_ctx()`` / ``invalidate_exec_ctx()`` / ``has_exec_ctx()``.
+  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx_;
+
+  // Single entry point that (re)creates exec_ctx_ via runtime_cfg.create_execution_context.
+  // Bumps ``num_execution_contexts_created_``. Called from ``exec_ctx()`` when
+  // the cached context is null.
+  void recreate_execution_context();
+
+  int64_t num_execution_contexts_created_ = 0;
 };
 
 } // namespace runtime

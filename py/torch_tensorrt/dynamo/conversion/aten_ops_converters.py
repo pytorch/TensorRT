@@ -597,8 +597,10 @@ def index_has_bool_indices(
 # case and is checked first via HIGH priority.
 @dynamo_tensorrt_converter(
     torch.ops.aten.index.Tensor,
-    capability_validator=lambda node, settings: index_dtype_validator(node, settings)
-    and not index_has_bool_indices(node, settings),
+    capability_validator=lambda node, settings: (
+        index_dtype_validator(node, settings)
+        and not index_has_bool_indices(node, settings)
+    ),
     priority=ConverterPriority.HIGH,
     supports_dynamic_shapes=True,
     requires_output_allocator=False,
@@ -629,9 +631,11 @@ def aten_ops_index(
 # output shapes, so an output allocator is required.
 @dynamo_tensorrt_converter(
     torch.ops.aten.index.Tensor,
-    capability_validator=lambda node, settings: index_dtype_validator(node, settings)
-    and index_nonbool_validator(node, settings)
-    and index_has_bool_indices(node, settings),
+    capability_validator=lambda node, settings: (
+        index_dtype_validator(node, settings)
+        and index_nonbool_validator(node, settings)
+        and index_has_bool_indices(node, settings)
+    ),
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
@@ -1154,9 +1158,11 @@ def aten_ops_index_put_accumulate(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
-    capability_validator=lambda node, settings: index_dtype_validator(node, settings)
-    and index_nonbool_validator(node, settings)
-    and not args_bounds_check(node.args, 3, False),
+    capability_validator=lambda node, settings: (
+        index_dtype_validator(node, settings)
+        and index_nonbool_validator(node, settings)
+        and not args_bounds_check(node.args, 3, False)
+    ),
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
@@ -1368,8 +1374,8 @@ def to_copy_dtype_validator(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.clone.default,
-    capability_validator=lambda node, settings: not is_only_operator_on_placeholder(
-        node, settings
+    capability_validator=lambda node, settings: (
+        not is_only_operator_on_placeholder(node, settings)
     ),
     supports_dynamic_shapes=True,
 )
@@ -2757,45 +2763,28 @@ def aten_ops_le(
 def convolution_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Reject unsupported convolution variants on TensorRT-RTX.
-
-    Falls back to PyTorch for:
-    1. Depthwise convolutions in BF16 (no kernel support on TRT-RTX).
-    2. Grouped 3D deconvolutions (crash on TRT-RTX).
+    """Reject transposed convolutions (deconvolutions) that combine
+    stride > 1 with dilation > 1 on TensorRT-RTX — there is no kernel
+    for this case and the build fails with "Strided & Dilated Deconv
+    are currently not supported". Applies to 1D / 2D / 3D ConvTranspose;
+    regular convolutions are unaffected.
     """
     if not ENABLED_FEATURES.tensorrt_rtx:
         return True
 
-    if (input_meta := getattr(node.args[0], "meta", {}).get("tensor_meta")) is None:
-        return True
-
-    groups = args_bounds_check(node.args, 8)
-    is_grouped = groups is not None and groups > 1
-    is_transposed = bool(args_bounds_check(node.args, 6))
-    is_3d = input_meta.shape is not None and len(input_meta.shape) == 5
-    is_bf16 = input_meta.dtype == torch.bfloat16
-
-    # WAR: Grouped 3D deconvolutions crash on TRT-RTX (any dtype).
-    if is_transposed and is_grouped and is_3d:
+    if (
+        args_bounds_check(node.args, 6)  # transposed?
+        and (stride := args_bounds_check(node.args, 3))
+        and (dilation := args_bounds_check(node.args, 5))
+        and any(s > 1 for s in stride)
+        and any(d > 1 for d in dilation)
+    ):
         _LOGGER.debug(
-            "Grouped 3D deconvolution '%s' (groups=%d) is not supported on "
-            "TensorRT-RTX. Falling back to PyTorch for this layer.",
+            "Strided + dilated deconvolution '%s' is not supported on "
+            "TensorRT-RTX. Falling back to PyTorch.",
             node.name,
-            groups,
         )
         return False
-
-    # WAR: Depthwise convolutions in BF16 are not supported on TRT-RTX.
-    if is_bf16 and is_grouped:
-        if (
-            weight_meta := getattr(node.args[1], "meta", {}).get("tensor_meta")
-        ) is not None and groups == weight_meta.shape[0]:
-            _LOGGER.debug(
-                "Depthwise convolution '%s' with BF16 is not supported on "
-                "TensorRT-RTX. Falling back to PyTorch for this layer.",
-                node.name,
-            )
-            return False
 
     return True
 
@@ -3578,14 +3567,14 @@ def aten_ops_copy(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    src = args[1]
+    dest, src = args[0], args[1]
     return impl.cast.to_copy(
         ctx,
         target,
         SourceIR.ATEN,
         name,
         src,
-        src.dtype,
+        dest.dtype,
         force_layer=True,
     )
 
@@ -3961,7 +3950,11 @@ def aten_ops_linear(
     )
 
 
-def _attention_qkv_shapes_supported(node: Node) -> bool:
+def scaled_dot_product_attention_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    enable_gqa = node.kwargs.get("enable_gqa", False)
+
     query_shape, key_shape, value_shape = None, None, None
     if "val" in node.args[0].meta:
         query_shape = node.args[0].meta["val"].size()
@@ -3980,36 +3973,44 @@ def _attention_qkv_shapes_supported(node: Node) -> bool:
         )
         return False
 
-    # TensorRT IAttention layer supports different sequence lengths for query and key/value
-    # ([B, Nq, Sq, H] vs [B, Nkv, Skv, H]), but K and V must still agree on all dims.
-    seq_dim = len(query_shape) - 2
-    for dim, (query_dim, key_dim, value_dim) in enumerate(
-        zip(query_shape, key_shape, value_shape)
-    ):
-        if dim == seq_dim:
-            if key_dim != value_dim:
-                _LOGGER.debug(
-                    "key and value must have the same sequence length. Please try setting decompose_attention=True in the compilation settings."
-                )
-                return False
-        else:
-            if query_dim != key_dim or query_dim != value_dim or key_dim != value_dim:
-                _LOGGER.debug(
-                    "query, key, and value differ on a non-sequence dimension. Please try setting decompose_attention=True in the compilation settings."
-                )
-                return False
-    return True
-
-
-def scaled_dot_product_attention_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    if node.kwargs.get("enable_gqa", False):
+    if key_shape != value_shape:
         _LOGGER.debug(
-            "enable_gqa is not yet supported by the converter. Please try setting decompose_attention=True in the compilation settings."
+            "key and value have different shapes, which is not supported. Please try setting decompose_attention=True in the compilation settings."
         )
         return False
-    return _attention_qkv_shapes_supported(node)
+
+    ndim = len(query_shape)
+    num_heads_dim = 1
+    seq_len_dim = ndim - 2
+    if enable_gqa:
+        # IAttentionLayer natively supports GQA: Q and K/V may differ on the
+        # head dim (dim 1) as long as Hq is divisible by Hkv.
+        # Check batch (dim 0) and head_dim (last dim) match;
+        # skip seq_len (dim -2) for decode phase and num_heads (dim 1).
+        for i in range(ndim):
+            if i in (num_heads_dim, seq_len_dim):
+                continue
+            if query_shape[i] != key_shape[i]:
+                _LOGGER.debug(
+                    f"GQA: query and key mismatch on dim {i} when enable_gqa=True."
+                )
+                return False
+        num_q_heads = query_shape[num_heads_dim]
+        num_kv_heads = key_shape[num_heads_dim]
+        if num_q_heads % num_kv_heads != 0:
+            _LOGGER.debug(
+                f"GQA: num_q_heads={num_q_heads} is not divisible by num_kv_heads={num_kv_heads} when enable_gqa=True."
+            )
+            return False
+    else:
+        # IAttentionLayer supports decode-phase (seq_q != seq_k).
+        # Check all dims except the seq_len dim.
+        if any(query_shape[i] != key_shape[i] for i in range(ndim) if i != seq_len_dim):
+            _LOGGER.debug(
+                "query and key have incompatible shapes (batch, num_heads, or head_dim mismatch). Please try setting decompose_attention=True in the compilation settings."
+            )
+            return False
+    return True
 
 
 @dynamo_tensorrt_converter(
@@ -4047,7 +4048,64 @@ def scaled_dot_product_flash_attention_validator(
     if args_bounds_check(node.args, 5, False):
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
-    return _attention_qkv_shapes_supported(node)
+
+    query_shape, key_shape, value_shape = None, None, None
+    if "val" in node.args[0].meta:
+        query_shape = node.args[0].meta["val"].size()
+    if "val" in node.args[1].meta:
+        key_shape = node.args[1].meta["val"].size()
+    if "val" in node.args[2].meta:
+        value_shape = node.args[2].meta["val"].size()
+
+    # If shape metadata is unavailable, defer to runtime/converter checks.
+    if query_shape is None or key_shape is None or value_shape is None:
+        return True
+
+    if len(query_shape) != len(key_shape) or len(query_shape) != len(value_shape):
+        _LOGGER.debug(
+            "query, key, and value must have the same rank. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+
+    if key_shape != value_shape:
+        _LOGGER.debug(
+            "key and value have different shapes, which is not supported. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+
+    ndim = len(query_shape)
+    num_heads_dim = 1
+    seq_len_dim = ndim - 2
+    num_q_heads = query_shape[num_heads_dim]
+    num_kv_heads = key_shape[num_heads_dim]
+    is_gqa = num_q_heads != num_kv_heads
+    if is_gqa:
+        # IAttentionLayer natively supports GQA: Q and K/V may differ on the
+        # head dim (dim 1) as long as Hq is divisible by Hkv.
+        # Check batch (dim 0) and head_dim (last dim) match;
+        # skip seq_len (dim -2) for decode phase and num_heads (dim 1).
+        for i in range(ndim):
+            if i in (num_heads_dim, seq_len_dim):
+                continue
+            if query_shape[i] != key_shape[i]:
+                _LOGGER.debug(
+                    f"GQA: query and key mismatch on dim {i} when enable_gqa=True."
+                )
+                return False
+        if num_q_heads % num_kv_heads != 0:
+            _LOGGER.debug(
+                f"GQA: num_q_heads={num_q_heads} is not divisible by num_kv_heads={num_kv_heads} when enable_gqa=True."
+            )
+            return False
+    else:
+        # IAttentionLayer supports decode-phase (seq_q != seq_k).
+        # Check all dims except the seq_len dim.
+        if any(query_shape[i] != key_shape[i] for i in range(ndim) if i != seq_len_dim):
+            _LOGGER.debug(
+                "query and key have incompatible shapes (batch, num_heads, or head_dim mismatch). Please try setting decompose_attention=True in the compilation settings."
+            )
+            return False
+    return True
 
 
 @dynamo_tensorrt_converter(
@@ -4084,7 +4142,51 @@ def scaled_dot_product_efficient_attention_validator(
     if args_bounds_check(node.args, 4, False):
         _LOGGER.debug("compute_log_sumexp is not yet supported.")
         return False
-    return _attention_qkv_shapes_supported(node)
+
+    query_shape, key_shape, value_shape = None, None, None
+    if "val" in node.args[0].meta:
+        query_shape = node.args[0].meta["val"].size()
+    if "val" in node.args[1].meta:
+        key_shape = node.args[1].meta["val"].size()
+    if "val" in node.args[2].meta:
+        value_shape = node.args[2].meta["val"].size()
+
+    # If shape metadata is unavailable, defer to runtime/converter checks.
+    if query_shape is None or key_shape is None or value_shape is None:
+        return True
+
+    if len(query_shape) != len(key_shape) or len(query_shape) != len(value_shape):
+        _LOGGER.debug(
+            "query, key, and value must have the same rank. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+
+    if key_shape != value_shape:
+        _LOGGER.debug(
+            "key and value have different shapes, which is not supported. Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+
+    # Note1: GQA (Hq != Hkv) is intentionally not supported here.
+    # PyTorch's eager _scaled_dot_product_efficient_attention kernel rejects
+    # non-equal head counts at runtime, so no valid reference output exists for comparison.
+    # In practice, GQA models on CUDA dispatch to _scaled_dot_product_flash_attention (FP16/BF16)
+    # or decompose into matmul+_safe_softmax (FP32) — this op never appears with GQA shapes in
+    # a real FX graph.  GQA is handled by the flash attention validator instead.
+    #
+    # Note2: IAttentionLayer does support decode-phase (seq_q != seq_k), so only the
+    # sequence dimension is skipped in the shape check below.
+    seq_len_dim = len(query_shape) - 2
+    if any(
+        query_shape[i] != key_shape[i]
+        for i in range(len(query_shape))
+        if i != seq_len_dim  # skip the seq_len dim
+    ):
+        _LOGGER.debug(
+            "query and key have incompatible shapes (batch, num_heads, or head_dim mismatch). Please try setting decompose_attention=True in the compilation settings."
+        )
+        return False
+    return True
 
 
 @dynamo_tensorrt_converter(
@@ -4119,31 +4221,11 @@ def aten_ops_scaled_dot_product_efficient_attention(
 def scaled_dot_product_cudnn_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    if args_bounds_check(node.args, 4, False):
-        _LOGGER.debug("compute_log_sumexp is not yet supported.")
-        return False
-
     if args_bounds_check(node.args, 7, False):
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
 
-    query_shape, key_shape, value_shape = None, None, None
-    if "val" in node.args[0].meta:
-        query_shape = node.args[0].meta["val"].size()
-    if "val" in node.args[1].meta:
-        key_shape = node.args[1].meta["val"].size()
-    if "val" in node.args[2].meta:
-        value_shape = node.args[2].meta["val"].size()
-    if (
-        query_shape != key_shape
-        or query_shape != value_shape
-        or key_shape != value_shape
-    ):
-        _LOGGER.debug(
-            "query, key, and value have different shapes. Please try setting decompose_attention=True in the compilation settings."
-        )
-        return False
-    return True
+    return scaled_dot_product_efficient_attention_validator(node, settings)
 
 
 @dynamo_tensorrt_converter(

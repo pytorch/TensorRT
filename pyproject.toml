@@ -6,7 +6,7 @@ requires = [
     "ninja>=1.11.0",
     "pyyaml>=6.0",
     "cffi>=1.15.1",
-    "torch>=2.13.0.dev,<2.14.0",
+    "torch>=2.14.0.dev,<2.15.0",
     "pybind11==2.6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -76,19 +76,22 @@ debug = [
 ]
 
 test = [
-    "pytest",
-    "pytest-xdist",
-    "pytest-forked>=1.6.0",
-    "parameterized>=0.2.0",
     "expecttest==0.1.6",
+    "networkx",
+    "numpy",
+    "parameterized>=0.2.0",
+    "pytest>=8.2.1",
+    "pytest-forked>=1.6.0",
+    "pytest-xdist>=3.6.1",
+    "pyyaml",
+    "setuptools",
 ]
 
 test-ext = [
     "timm>=1.0.3",
     "transformers>=5.0.0",
-    "torchvision>=0.27.0.dev,<0.28.0",
+    "torchvision>=0.28.0.dev,<0.29.0",
     "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
-    #"nvidia-modelopt[hf]@git+https://github.com/NVIDIA/Model-Optimizer.git; python_version >'3.10' and python_version <'3.14'"
 ]
 
 docs = [
@@ -102,7 +105,13 @@ docs = [
     "pillow",
 ]
 
-quantization = ["nvidia-modelopt[hf]>=0.43.0"]
+quantization = [
+    "nvidia-modelopt[hf]>=0.43.0; python_version > '3.9' and python_version < '3.13'",
+]
+
+# Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
+# which compiles user-supplied CUDA C++ kernels via NVRTC.
+kernels = ["cuda-python"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"

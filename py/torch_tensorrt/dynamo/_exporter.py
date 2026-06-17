@@ -19,6 +19,7 @@ from torch.export.exported_program import (
     OutputSpec,
     TensorArgument,
 )
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
 
 
@@ -489,16 +490,12 @@ def inline_trt_modules(
                 engine_info = trt_module._pack_engine_info()
                 engine_bytes = engine_info[ENGINE_IDX]
                 engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
-                # insert the no_placeholder node in the graph which should be replaced to the actual execute_engine node while load in the windows
                 trt_node = gm.graph.call_function(
                     torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
                     (trt_module_node.args, *engine_info),
                 )
             else:
-                # for the normal workflow: use the execute_engine node
                 engine_name = f"{name}_engine"
-                # TODO: THROWS SOME WARNING ABOUT A LACK OF UNDERLYING REFERENCE TO THE OWNING GRAPH MODULE
-                # SAYS THERES 3 OPTIONS, SUBMODULE, PARAMETER, OR BUFFER, BUFFER SEEMS THE BEST BUT I THINK ITS KEYED TO TENSORS
                 setattr(gm, engine_name, trt_module.engine)
                 engine_node = gm.graph.get_attr(engine_name)
 
@@ -506,13 +503,9 @@ def inline_trt_modules(
                     torch.ops.tensorrt.execute_engine.default,
                     (trt_module_node.args, engine_node),
                 )
-                # meta["val"] should be a lighter version of a tensor. For eg: it should be a FakeTensor (with output shape and dtype properties)
-                # Lighter version of a custom_obj is not defined clearly. meta["val"] does not have any type expectations but
-                # for custom object nodes, it should be CustomObjArgument
                 engine_node.meta["val"] = CustomObjArgument(
                     name=engine_node.name, class_fqn=""
                 )
-            # set trt_node.meta with trt_module_node.meta
             assert num_outputs > 0
             trt_node.meta["val"] = trt_module_node.meta["val"]
 
@@ -557,7 +550,12 @@ def replace_execute_engine_no_op_node(
             packed_engine_info[ENGINE_IDX] = base64.b64decode(
                 engine_bytes.encode("utf-8")
             )
-            trt_engine = torch.classes.tensorrt.Engine(tuple(packed_engine_info))
+            if ENABLED_FEATURES.torch_tensorrt_runtime:
+                trt_engine = torch.classes.tensorrt.Engine(tuple(packed_engine_info))
+            else:
+                from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+                trt_engine = TRTEngine(packed_engine_info)
             setattr(gm, engine_name, trt_engine)
             engine_node = gm.graph.get_attr(engine_name)
 

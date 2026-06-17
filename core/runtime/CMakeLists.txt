@@ -9,11 +9,13 @@ set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/execute_engine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/register_jit_hooks.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Platform.cpp"
 )
 
 set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TensorRTBindingNames.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.h"
@@ -28,6 +30,7 @@ target_sources(${lib_name}
 target_include_directories(${lib_name}
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/cpp/include>"
 )
 
 target_link_libraries(${lib_name}

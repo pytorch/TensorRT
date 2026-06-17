@@ -1,71 +1,48 @@
 #include <codecvt>
 
 #include "core/runtime/Platform.h"
+#include "core/runtime/RuntimeSettings.h"
 #include "core/runtime/runtime.h"
 #include "core/util/macros.h"
+
+// serialize_bindings / base64_encode / base64_decode are defined in
+// runtime_utils.cpp so the ExecuTorch backend can link them without
+// pulling in the torch::class_ registration below.
 
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
-std::string serialize_bindings(const std::vector<std::string>& bindings) {
-  std::stringstream ss;
-  for (size_t i = 0; i < bindings.size() - 1; i++) {
-    ss << bindings[i] << TRTEngine::BINDING_DELIM;
-  }
-  ss << bindings[bindings.size() - 1];
-
-  std::string serialized_binding_info = ss.str();
-
-  LOG_DEBUG("Serialized Binding Info: " << serialized_binding_info);
-
-  return serialized_binding_info;
-}
-
-static const std::string sym_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; //=
-std::string base64_encode(const std::string& in) {
-  std::string out;
-  int64_t val = 0, valb = -6;
-  for (unsigned char c : in) {
-    val = (val << 8) + c;
-    valb += 8;
-    while (valb >= 0) {
-      out.push_back(sym_table[(val >> valb) & 0x3F]);
-      valb -= 6;
-    }
-  }
-  if (valb > -6) {
-    out.push_back(sym_table[((val << 8) >> (valb + 8)) & 0x3F]);
-  };
-  while (out.size() % 4) {
-    out.push_back('=');
-  }
-  return out;
-}
-
-std::string base64_decode(const std::string& in) {
-  std::string out;
-  std::vector<int> T(256, -1);
-  for (int i = 0; i < 64; i++) {
-    T[sym_table[i]] = i;
-  }
-
-  int64_t val = 0, valb = -8;
-  for (unsigned char c : in) {
-    if (T[c] == -1) {
-      break;
-    }
-    val = (val << 6) + T[c];
-    valb += 6;
-    if (valb >= 0) {
-      out.push_back(char((val >> valb) & 0xFF));
-      valb -= 8;
-    }
-  }
-  return out;
-}
-
 namespace {
+
+// Register `RuntimeCacheHandle` as a torchbind class so Python can pass the same
+// underlying `IRuntimeCache` to both Python and C++ engine backends. File I/O on
+// the handle is the Python side's responsibility; the C++ struct only holds the
+// shared_ptr and an informational path string. The method bodies (and the
+// `#ifdef TRT_MAJOR_RTX` they entail) live in RuntimeSettings.cpp -- this file
+// is registration-only.
+static auto TORCHTRT_UNUSED RuntimeCacheHandleRegistration =
+    torch::class_<RuntimeCacheHandle>("tensorrt", "RuntimeCacheHandle")
+        .def(torch::init<std::string>())
+        .def_readwrite("path", &RuntimeCacheHandle::path)
+        .def("serialize", &RuntimeCacheHandle::serialize)
+        .def("deserialize", &RuntimeCacheHandle::deserialize)
+        .def("has_cache", &RuntimeCacheHandle::has_cache)
+        // ``def_pickle`` registers ``__getstate__`` / ``__setstate__`` so the
+        // handle can survive ``deepcopy`` / ``torch.export.save`` paths that
+        // walk Python attributes (e.g. ``TorchTensorRTModule._implicit_cache_handle``).
+        // We persist only the ``path`` string: the underlying ``IRuntimeCache``
+        // is CPU-side state that can't cross a process boundary anyway, and
+        // ``_resolve_runtime_cache`` re-warms from disk on the deserialized
+        // path through the standard load -> pending_warm_bytes flow.
+        .def_pickle(
+            // __getstate__
+            [](c10::intrusive_ptr<RuntimeCacheHandle> const& self) -> std::string { return self->path; },
+            // __setstate__
+            [](std::string path) -> c10::intrusive_ptr<RuntimeCacheHandle> {
+              return c10::make_intrusive<RuntimeCacheHandle>(std::move(path));
+            });
+
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
 //     auto input_vec = inputs.vec();
@@ -93,6 +70,13 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("reset_captured_graph", &TRTEngine::reset_captured_graph)
         .def("set_output_tensors_as_unowned", &TRTEngine::set_output_tensors_as_unowned)
         .def("are_output_tensors_unowned", &TRTEngine::are_output_tensors_unowned)
+        // Lambda wrapper because torchbind's ``def`` template lacks a
+        // ``const noexcept`` member-function specialization; routing through a
+        // plain function pointer would force us to drop the ``noexcept`` on
+        // ``num_execution_contexts_created`` itself.
+        .def(
+            "num_execution_contexts_created",
+            [](const c10::intrusive_ptr<TRTEngine>& self) -> int64_t { return self->num_execution_contexts_created(); })
         .def(
             "use_dynamically_allocated_resources",
             [](const c10::intrusive_ptr<TRTEngine>& self, bool dynamic) -> void {
@@ -100,7 +84,25 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
                   dynamic ? TRTEngine::ResourceAllocationStrategy::kDynamic
                           : TRTEngine::ResourceAllocationStrategy::kStatic);
             })
+        .def(
+            "update_runtime_settings",
+            [](const c10::intrusive_ptr<TRTEngine>& self,
+               int64_t dynamic_shapes_kernel_specialization_strategy,
+               int64_t cuda_graph_strategy,
+               c10::optional<c10::intrusive_ptr<RuntimeCacheHandle>> runtime_cache) -> void {
+              // Strategies cross the Py->C++ boundary as ints; ``c10::optional``
+              // lets TorchBind accept Python ``None`` for the cache (translated
+              // to a possibly-null ``intrusive_ptr``).
+              RuntimeSettings rs;
+              rs.dynamic_shapes_kernel_specialization_strategy =
+                  DynamicShapesKernelSpecializationStrategy::from_underlying(
+                      dynamic_shapes_kernel_specialization_strategy);
+              rs.cuda_graph_strategy = CudaGraphStrategy::from_underlying(cuda_graph_strategy);
+              rs.runtime_cache = runtime_cache.has_value() ? std::move(*runtime_cache) : nullptr;
+              (void)self->runtime_settings(std::move(rs));
+            })
         .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
+        .def_readwrite("pre_allocated_outputs", &TRTEngine::pre_allocated_outputs)
         .def_readwrite("use_output_allocator_outputs", &TRTEngine::use_output_allocator_outputs)
         .def_property(
             "device_memory_budget",

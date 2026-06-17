@@ -1,0 +1,993 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>torch_tensorrt.kernels &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=5663fe15"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'py_api/kernels';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="torchtrtc" href="../cli/torchtrtc.html" />
+    <link rel="prev" title="torch_tensorrt.runtime" href="runtime.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Python API</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dynamo.html">torch_tensorrt.dynamo</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">torch_tensorrt.runtime</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">torch_tensorrt.kernels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ptq.html">torch_tensorrt.ts.ptq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fx.html">torch_tensorrt.fx</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../cpp_api.html">C++ API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__executorch_backend.html">Namespace torch_tensorrt::executorch_backend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__executorch_backend__detail.html">Namespace torch_tensorrt::executorch_backend::detail</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1Device.html">Struct Device</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html">Struct EngineHandle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html">Struct TensorRTBlobHeader</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1GraphInputs.html">Struct GraphInputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1Input.html">Struct Input</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.html">Class CudaStreamGuard</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">Enum EngineCapability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">Function torch_tensorrt::dump_build_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">Function torch_tensorrt::get_build_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">Function torch_tensorrt::logging::get_is_colored_output_on</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">Function torch_tensorrt::logging::get_logging_prefix</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1a0c012cb374addd90eb1f42eaec570650.html">Function torch_tensorrt::logging::get_reportable_log_level</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.html">Function torch_tensorrt::logging::log</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.html">Function torch_tensorrt::logging::set_is_colored_output_on</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1af8f3443813315af7901903d25dd495cc.html">Function torch_tensorrt::logging::set_logging_prefix</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html">Function torch_tensorrt::logging::set_reportable_log_level</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384.html">Function torch_tensorrt::set_device</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.html">Function torch_tensorrt::torchscript::check_method_operator_support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html">Function torch_tensorrt::torchscript::compile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html">Function torch_tensorrt::torchscript::convert_method_to_trt_engine</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9.html">Function torch_tensorrt::torchscript::embed_engine_in_new_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a18d295a837ac71add5578860b55e5502.html">Define STR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html">Define TORCH_TENSORRT_MAJOR_VERSION</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html">Define TORCH_TENSORRT_MINOR_VERSION</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html">Define TORCH_TENSORRT_PATCH_VERSION</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html">Define TORCH_TENSORRT_VERSION</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html">Define TORCHTRT_API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html">Define TORCHTRT_HIDDEN</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html">Define XSTR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/typedef_TensorRTBackend_8h_1acdb398aaccae05cc399de3a885797c13.html">Typedef torch_tensorrt::executorch_backend::TRTUniquePtr</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../api_reference.html" class="nav-link">API Reference</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Python API</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">torch_tensor...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="torch-tensorrt-kernels">
+<span id="torch-tensorrt-kernels-py"></span><h1>torch_tensorrt.kernels<a class="headerlink" href="#torch-tensorrt-kernels" title="Link to this heading">#</a></h1>
+<section id="torch-tensorrt-kernels-experimental">
+<span id="module-torch_tensorrt.kernels"></span><h2>torch_tensorrt.kernels  (experimental)<a class="headerlink" href="#torch-tensorrt-kernels-experimental" title="Link to this heading">#</a></h2>
+<p>Register custom CUDA C++ kernels — compiled at runtime with NVRTC via
+<strong>cuda-python</strong> — as TensorRT Quick Deployable Plugins (QDP). Tensor-only
+declarative kernels use AOT plugin launches when available; kernels with
+<code class="docutils literal notranslate"><span class="pre">ScalarInput</span></code> use TensorRT’s QDP JIT path so runtime scalar attributes can
+be forwarded by value.</p>
+<p>The module exposes a single registration entry point for source kernels:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">cuda_kernel_op</span></code> — fully declarative for the common cases, with optional</dt><dd><p>overrides for everything else. Describe the kernel via <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">KernelSpec</span></code>
+(inputs, outputs, extras, launch geometry) and the meta / eager / aot
+functions plus the PyTorch schema are derived for you. For shape-changing
+kernels, multi-output kernels, or anything outside the declarative DSL,
+pass <code class="docutils literal notranslate"><span class="pre">meta_fn=</span></code> / <code class="docutils literal notranslate"><span class="pre">eager_fn=</span></code> / <code class="docutils literal notranslate"><span class="pre">aot_fn=</span></code> / <code class="docutils literal notranslate"><span class="pre">schema=</span></code> keyword
+arguments and the corresponding <code class="docutils literal notranslate"><span class="pre">KernelSpec</span></code> fields become optional.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">ptx_op</span></code> — register a kernel from pre-compiled PTX bytes. Skips NVRTC</dt><dd><p>entirely; you supply <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">aot_fn</span></code> directly.
+Useful when the PTX comes from an external compiler (Triton, a cached
+NVRTC output, etc.).</p>
+</dd>
+</dl>
+<p>Minimal example — declarative <code class="docutils literal notranslate"><span class="pre">cuda_kernel_op</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="n">torch</span><span class="p">,</span><span class="w"> </span><span class="n">torch_tensorrt</span>
+<span class="k">import</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">kernels</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">ttk</span>
+
+<span class="n">cu_code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;&quot;&quot;</span>
+<span class="k">extern</span><span class="w"> </span><span class="s">&quot;C&quot;</span><span class="w"> </span><span class="n">__global__</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">my_relu</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="o">*</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="o">*</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">blockIdx</span><span class="p">.</span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">blockDim</span><span class="p">.</span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">threadIdx</span><span class="p">.</span><span class="n">x</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0.f</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mf">0.f</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="s">&quot;&quot;&quot;</span>
+
+<span class="n">ttk</span><span class="p">.</span><span class="n">cuda_kernel_op</span><span class="p">(</span>
+<span class="w">    </span><span class="s">&quot;myns::relu&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ttk</span><span class="p">.</span><span class="n">KernelSpec</span><span class="p">(</span>
+<span class="w">        </span><span class="n">kernel_source</span><span class="o">=</span><span class="n">cu_code</span><span class="p">,</span>
+<span class="w">        </span><span class="n">kernel_name</span><span class="o">=</span><span class="s">&quot;my_relu&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">ttk</span><span class="p">.</span><span class="n">InputDecl</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">)],</span>
+<span class="w">        </span><span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="n">ttk</span><span class="p">.</span><span class="n">OutputDecl</span><span class="p">(</span><span class="s">&quot;y&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">shape</span><span class="o">=</span><span class="n">ttk</span><span class="p">.</span><span class="n">SameAs</span><span class="p">(</span><span class="mi">0</span><span class="p">))],</span>
+<span class="w">        </span><span class="n">extras</span><span class="o">=</span><span class="p">[</span><span class="n">ttk</span><span class="p">.</span><span class="n">Numel</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">)],</span>
+<span class="w">        </span><span class="n">geometry</span><span class="o">=</span><span class="n">ttk</span><span class="p">.</span><span class="n">Elementwise</span><span class="p">(</span><span class="n">block</span><span class="o">=</span><span class="p">(</span><span class="mi">256</span><span class="p">,),</span><span class="w"> </span><span class="n">layout</span><span class="o">=</span><span class="s">&quot;flat&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="p">),</span>
+<span class="w">    </span><span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="n">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>For a shape-changing kernel, leave <code class="docutils literal notranslate"><span class="pre">outputs</span></code> / <code class="docutils literal notranslate"><span class="pre">geometry</span></code> off the
+<code class="docutils literal notranslate"><span class="pre">KernelSpec</span></code> and pass hand-written <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">aot_fn</span></code>
+to <code class="docutils literal notranslate"><span class="pre">cuda_kernel_op</span></code> directly — see <code class="docutils literal notranslate"><span class="pre">examples/dynamo/cuda_kernel_op.py</span></code>.</p>
+</section>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This module is <strong>experimental</strong>.  It requires <code class="docutils literal notranslate"><span class="pre">cuda-python</span></code> at runtime
+and TensorRT <code class="docutils literal notranslate"><span class="pre">&gt;=10.7.0</span></code> (and not <code class="docutils literal notranslate"><span class="pre">10.14.x</span></code>) for Quick Deployable
+Plugin (QDP) support.  Install <code class="docutils literal notranslate"><span class="pre">cuda-python</span></code> with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span>
+<span class="pre">cuda-python</span></code>.</p>
+</div>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">kernels</span></code> module registers NVRTC-compiled CUDA C++ kernels as
+TensorRT Quick Deployable Plugins. Tensor-only declarative kernels use
+Ahead-of-Time (AOT) plugin launches when available; kernels with
+<code class="docutils literal notranslate"><span class="pre">ScalarInput</span></code> compile through TensorRT’s QDP JIT path because QDP AOT
+extra arguments currently support symbolic integer expressions, not
+arbitrary runtime floats.</p>
+<p>A single function — <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">cuda_kernel_op()</span></code> — handles both the declarative
+case (drive everything from a <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">KernelSpec</span></code> dataclass) and the
+override case (supply <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">aot_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">schema</span></code>
+keyword arguments when the declarative DSL doesn’t cover your kernel).
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">ptx_op()</span></code> is a parallel entry point for kernels that are already
+compiled to PTX bytes.</p>
+</section>
+<section id="entry-points">
+<h2>Entry points<a class="headerlink" href="#entry-points" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.cuda_kernel_op">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">cuda_kernel_op</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">op_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#torch_tensorrt.kernels.KernelSpec" title="torch_tensorrt.kernels._dsl.KernelSpec"><span class="pre">KernelSpec</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eager_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aot_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">schema</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">supports_dynamic_shapes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">requires_output_allocator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">priority</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ConverterPriority</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">ConverterPriority.STANDARD</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability_validator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_ops.html#cuda_kernel_op"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.cuda_kernel_op" title="Link to this definition">#</a></dt>
+<dd><p>Register a CUDA kernel as a TensorRT QDP plugin end-to-end.</p>
+<p>Two paths share one entry point:</p>
+<ul class="simple">
+<li><p><strong>Declarative</strong> — pass a fully-populated <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">KernelSpec</span></code> and the
+meta fn, eager fn, AOT fn, and PyTorch schema are all derived for you.
+Covers Elementwise / Reduction kernels out of the box.</p></li>
+<li><p><strong>Override</strong> — pass any of <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> / <code class="docutils literal notranslate"><span class="pre">aot_fn</span></code> /
+<code class="docutils literal notranslate"><span class="pre">schema</span></code> as keyword arguments and the corresponding <code class="docutils literal notranslate"><span class="pre">KernelSpec</span></code>
+fields become optional. Use this for shape-changing kernels,
+multi-output kernels, or anything outside the declarative DSL.</p></li>
+</ul>
+<p>Override rules (validated at registration time):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> provided → <code class="docutils literal notranslate"><span class="pre">spec.outputs</span></code> may be omitted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> and <code class="docutils literal notranslate"><span class="pre">aot_fn</span></code> both provided → <code class="docutils literal notranslate"><span class="pre">spec.geometry</span></code> may be omitted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">schema</span></code> provided → falls back to inferring from <code class="docutils literal notranslate"><span class="pre">spec.inputs</span></code> /
+<code class="docutils literal notranslate"><span class="pre">spec.outputs</span></code> if both exist, else from <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> type hints.</p></li>
+</ul>
+<p>The kernel must follow the calling convention
+<code class="docutils literal notranslate"><span class="pre">(input_ptrs...,</span> <span class="pre">scalar_inputs...,</span> <span class="pre">extras...,</span> <span class="pre">output_ptrs...)</span></code>.</p>
+</dd></dl>
+
+<section id="kernelspec-dsl">
+<h3>KernelSpec DSL<a class="headerlink" href="#kernelspec-dsl" title="Link to this heading">#</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.KernelSpec">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">KernelSpec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kernel_source:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_name:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs:</span> <span class="pre">~typing.Sequence[~torch_tensorrt.kernels._dsl.InputDecl</span> <span class="pre">|</span> <span class="pre">~torch_tensorrt.kernels._dsl.ScalarInput]</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outputs:</span> <span class="pre">~typing.Sequence[~torch_tensorrt.kernels._dsl.OutputDecl]</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extras:</span> <span class="pre">~typing.Sequence[~torch_tensorrt.kernels._dsl.Numel</span> <span class="pre">|</span> <span class="pre">~torch_tensorrt.kernels._dsl.DimSize]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">geometry:</span> <span class="pre">~torch_tensorrt.kernels._dsl.Elementwise</span> <span class="pre">|</span> <span class="pre">~torch_tensorrt.kernels._dsl.Reduction</span> <span class="pre">|</span> <span class="pre">~torch_tensorrt.kernels._dsl.Custom</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_paths:</span> <span class="pre">~typing.List[str]</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compile_std:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'c++17'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arch_override:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#KernelSpec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.KernelSpec" title="Link to this definition">#</a></dt>
+<dd><p>Declarative description of a CUDA kernel.</p>
+<p>Kernel signature convention: the <code class="docutils literal notranslate"><span class="pre">__global__</span></code> function receives
+arguments in this fixed order — input pointers, then extras in
+<code class="docutils literal notranslate"><span class="pre">extras</span></code> order, then output pointers.</p>
+<p>All DSL fields beyond <code class="docutils literal notranslate"><span class="pre">kernel_source</span></code> / <code class="docutils literal notranslate"><span class="pre">kernel_name</span></code> are optional.
+Whichever fields are populated drive auto-derivation of the matching
+meta / eager / aot / schema artifacts; whatever is missing must be
+supplied as an override keyword argument to <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">cuda_kernel_op()</span></code>.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.InputDecl">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">InputDecl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#InputDecl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.InputDecl" title="Link to this definition">#</a></dt>
+<dd><p>Tensor kernel input.</p>
+<p>The corresponding kernel argument is a <code class="docutils literal notranslate"><span class="pre">T*</span></code> (data pointer) at the input
+pointer position in the calling convention.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.ScalarInput">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">ScalarInput</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">py_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#ScalarInput"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.ScalarInput" title="Link to this definition">#</a></dt>
+<dd><p>Scalar (non-tensor) kernel input — e.g. <code class="docutils literal notranslate"><span class="pre">float</span> <span class="pre">alpha</span></code> or <code class="docutils literal notranslate"><span class="pre">int</span> <span class="pre">k</span></code>.</p>
+<p>Scalars are forwarded by value to the kernel at the input position
+(after all preceding tensor/scalar inputs, before extras and output
+pointers).  <code class="docutils literal notranslate"><span class="pre">py_type</span></code> must be <code class="docutils literal notranslate"><span class="pre">float</span></code>, <code class="docutils literal notranslate"><span class="pre">int</span></code>, or <code class="docutils literal notranslate"><span class="pre">bool</span></code>.</p>
+</dd></dl>
+
+<p><code class="docutils literal notranslate"><span class="pre">ScalarInput</span></code> values are represented as TensorRT plugin attributes during
+compilation and are forwarded by value to the CUDA kernel.  Tensor-only
+<code class="docutils literal notranslate"><span class="pre">cuda_kernel_op</span></code> registrations use AOT plugin launches; registrations with
+<code class="docutils literal notranslate"><span class="pre">ScalarInput</span></code> use QDP JIT plugin execution so scalar floats / ints / bools can
+be passed correctly.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.OutputDecl">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">OutputDecl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="s"><span class="pre">'str'</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="s"><span class="pre">'ShapeRel'</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype_from</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="s"><span class="pre">'Optional[str]'</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#OutputDecl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.OutputDecl" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<section id="shape-relations">
+<h4>Shape relations<a class="headerlink" href="#shape-relations" title="Link to this heading">#</a></h4>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.SameAs">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">SameAs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#SameAs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.SameAs" title="Link to this definition">#</a></dt>
+<dd><p>Output has the same shape as the referenced tensor input.</p>
+<p><code class="docutils literal notranslate"><span class="pre">input_idx</span></code> may be either the integer position into the <em>tensor</em>-only
+input list (<code class="docutils literal notranslate"><span class="pre">ScalarInput</span></code> entries are skipped) or the <code class="docutils literal notranslate"><span class="pre">name</span></code> of a
+tensor input declared via <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">InputDecl</span></code>. The name form is preferred
+because it stays correct when the input list is reordered.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.ReduceDims">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">ReduceDims</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keepdim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#ReduceDims"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.ReduceDims" title="Link to this definition">#</a></dt>
+<dd><p>Output = the referenced tensor input with <code class="docutils literal notranslate"><span class="pre">dims</span></code> removed.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">keepdim=True</span></code> those axes are kept with size 1 instead of removed.
+Negative axes are allowed. <code class="docutils literal notranslate"><span class="pre">input_idx</span></code> accepts either the integer
+position into the tensor-only input list or the input <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+</dd></dl>
+
+</section>
+<section id="extra-scalar-args">
+<h4>Extra scalar args<a class="headerlink" href="#extra-scalar-args" title="Link to this heading">#</a></h4>
+<p>Extras are passed to the kernel between the input and output pointer
+lists in <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">KernelSpec</span></code> order.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.Numel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">Numel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#Numel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.Numel" title="Link to this definition">#</a></dt>
+<dd><p>Pass <code class="docutils literal notranslate"><span class="pre">inputs[input_name].numel()</span></code> as an <code class="docutils literal notranslate"><span class="pre">int</span></code> extra.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.DimSize">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">DimSize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#DimSize"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.DimSize" title="Link to this definition">#</a></dt>
+<dd><p>Pass <code class="docutils literal notranslate"><span class="pre">inputs[input_name].shape[axis]</span></code> as an <code class="docutils literal notranslate"><span class="pre">int</span></code> extra.</p>
+<p>Negative <code class="docutils literal notranslate"><span class="pre">axis</span></code> allowed.</p>
+</dd></dl>
+
+</section>
+<section id="launch-geometry">
+<h4>Launch geometry<a class="headerlink" href="#launch-geometry" title="Link to this heading">#</a></h4>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.Elementwise">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">Elementwise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">block</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">(256,)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'flat'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'nd'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'flat'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#Elementwise"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.Elementwise" title="Link to this definition">#</a></dt>
+<dd><p>One thread per output element.</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">layout=&quot;flat&quot;</span></code>: 1D launch over the flattened output <code class="docutils literal notranslate"><span class="pre">numel</span></code>.</dt><dd><p><code class="docutils literal notranslate"><span class="pre">block</span> <span class="pre">=</span> <span class="pre">(bx,)</span></code> → <code class="docutils literal notranslate"><span class="pre">grid</span> <span class="pre">=</span> <span class="pre">(cdiv(numel(out),</span> <span class="pre">bx),)</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">layout=&quot;nd&quot;</span></code>: the trailing <code class="docutils literal notranslate"><span class="pre">len(block)</span></code> axes of the output are</dt><dd><p>block-parallelized; any leading axes are folded into <code class="docutils literal notranslate"><span class="pre">grid_z</span></code>.
+<code class="docutils literal notranslate"><span class="pre">block[0]</span></code> maps to the last (innermost) axis, matching CUDA’s
+convention that <code class="docutils literal notranslate"><span class="pre">grid_x</span></code> / <code class="docutils literal notranslate"><span class="pre">block_x</span></code> varies fastest.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.Reduction">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">Reduction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reduce_dims</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">256</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#Reduction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.Reduction" title="Link to this definition">#</a></dt>
+<dd><p>One block per output element; block threads cooperate across the
+reduction axes. <code class="docutils literal notranslate"><span class="pre">reduce_dims</span></code> are axes of the <strong>input</strong> (not output)
+that are collapsed. Grid = <code class="docutils literal notranslate"><span class="pre">numel(output)</span></code>, block = <code class="docutils literal notranslate"><span class="pre">block_size</span></code>.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.Custom">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">Custom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_dsl.html#Custom"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.Custom" title="Link to this definition">#</a></dt>
+<dd><p>Escape hatch. <code class="docutils literal notranslate"><span class="pre">fn(inputs,</span> <span class="pre">outputs,</span> <span class="pre">tactic)</span></code> returns the same shape
+as today’s hand-written aot_fn: <code class="docutils literal notranslate"><span class="pre">(KernelLaunchParams,</span> <span class="pre">SymExprs)</span></code>.</p>
+</dd></dl>
+
+</section>
+</section>
+<section id="override-path">
+<h3>Override path<a class="headerlink" href="#override-path" title="Link to this heading">#</a></h3>
+<p>Pass any of the optional keyword arguments to <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">cuda_kernel_op()</span></code> to
+bypass the corresponding auto-derivation:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> — fake/meta impl: shape + dtype inference for tracing.
+When supplied, <code class="docutils literal notranslate"><span class="pre">spec.outputs</span></code> may be omitted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> — CUDA device impl invoked when the op runs in PyTorch
+eager. Same positional signature as <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">aot_fn</span></code> — TensorRT AOT impl with signature
+<code class="docutils literal notranslate"><span class="pre">(inputs,</span> <span class="pre">outputs,</span> <span class="pre">tactic)</span> <span class="pre">-&gt;</span> <span class="pre">(KernelLaunchParams,</span> <span class="pre">SymExprs</span> <span class="pre">|</span> <span class="pre">None)</span></code>.
+When both <code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> and <code class="docutils literal notranslate"><span class="pre">aot_fn</span></code> are supplied, <code class="docutils literal notranslate"><span class="pre">spec.geometry</span></code>
+may be omitted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">schema</span></code> — explicit Torch schema (for example
+<code class="docutils literal notranslate"><span class="pre">&quot;(Tensor</span> <span class="pre">x,</span> <span class="pre">float</span> <span class="pre">alpha)</span> <span class="pre">-&gt;</span> <span class="pre">Tensor&quot;</span></code>). Falls back to deriving from
+<code class="docutils literal notranslate"><span class="pre">spec.inputs</span></code> / <code class="docutils literal notranslate"><span class="pre">spec.outputs</span></code> if both are present, else to
+inferring from <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> type hints.</p></li>
+</ul>
+<p>Use the override path for shape-changing kernels, multi-output kernels,
+or anything that doesn’t fit the Elementwise / Reduction conventions.</p>
+</section>
+</section>
+<section id="pre-compiled-ptx-entry-point">
+<h2>Pre-compiled PTX entry point<a class="headerlink" href="#pre-compiled-ptx-entry-point" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.ptx_op">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">ptx_op</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">op_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eager_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aot_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">supports_dynamic_shapes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">requires_output_allocator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">priority</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ConverterPriority</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">ConverterPriority.STANDARD</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability_validator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">schema</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_ops.html#ptx_op"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.ptx_op" title="Link to this definition">#</a></dt>
+<dd><p>Register a pre-compiled PTX kernel as a TensorRT QDP plugin.</p>
+<p>Use this when the PTX comes from an external compiler (Triton, a cached
+NVRTC output, etc.) and NVRTC compilation should be skipped.</p>
+</dd></dl>
+
+</section>
+<section id="kernel-signature-convention">
+<h2>Kernel signature convention<a class="headerlink" href="#kernel-signature-convention" title="Link to this heading">#</a></h2>
+<p>All entry points assume the <code class="docutils literal notranslate"><span class="pre">__global__</span></code> kernel takes its arguments in
+the fixed order:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">input_ptrs</span><span class="p">...,</span><span class="w"> </span><span class="n">extras</span><span class="p">...,</span><span class="w"> </span><span class="n">output_ptrs</span><span class="p">...)</span>
+</pre></div>
+</div>
+<p>Pointers are <code class="docutils literal notranslate"><span class="pre">void*</span></code> cast to the appropriate element type.  Extras
+follow the order declared in <a href="#id1"><span class="problematic" id="id2">:attr:`KernelSpec.extras`</span></a> for the
+declarative path, or the order your <code class="docutils literal notranslate"><span class="pre">aot_fn</span></code> builds for the override
+path.</p>
+</section>
+<section id="error-behavior">
+<h2>Error behavior<a class="headerlink" href="#error-behavior" title="Link to this heading">#</a></h2>
+<p><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">cuda_kernel_op()</span></code> validates the <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">KernelSpec</span></code> at registration
+time and raises <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">ValueError</span></code> for the common authoring mistakes:</p>
+<ul class="simple">
+<li><p>Empty or duplicate-named <code class="docutils literal notranslate"><span class="pre">inputs</span></code> / <code class="docutils literal notranslate"><span class="pre">outputs</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ReduceDims(input_idx=...)</span></code> or <code class="docutils literal notranslate"><span class="pre">SameAs(input_idx=...)</span></code> where the
+reference is an out-of-range integer or a name that is not a tensor input.
+Both forms are accepted: an integer position into the tensor-only input
+list, or the input <code class="docutils literal notranslate"><span class="pre">name</span></code> (preferred — survives input reordering).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Numel</span></code> / <code class="docutils literal notranslate"><span class="pre">DimSize</span></code> referencing a name that is not an input.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dtype_from</span></code> pointing at an unknown input.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Elementwise(layout='flat')</span></code> with a multi-dimensional block tuple.</p></li>
+<li><p>Invalid block sizes, <code class="docutils literal notranslate"><span class="pre">block_size</span></code> in <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">Reduction</span></code>, or a
+non-callable <a href="#id3"><span class="problematic" id="id4">:attr:`Custom.fn`</span></a>.</p></li>
+<li><p>A DSL field is missing and the corresponding override keyword argument
+was not supplied (e.g. <code class="docutils literal notranslate"><span class="pre">outputs</span></code> omitted without a <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code>).</p></li>
+</ul>
+<p>Shape-dependent errors — for example
+<code class="docutils literal notranslate"><span class="pre">Elementwise(layout='nd',</span> <span class="pre">block=(16,</span> <span class="pre">16))</span></code> invoked against a 1-D
+output — are raised at launch time in a clear <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> because
+the offending ranks are only known when concrete tensors arrive.</p>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="runtime.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">torch_tensorrt.runtime</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../cli/torchtrtc.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">torchtrtc</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-tensorrt-kernels-experimental">torch_tensorrt.kernels  (experimental)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#entry-points">Entry points</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.cuda_kernel_op"><code class="docutils literal notranslate"><span class="pre">cuda_kernel_op()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kernelspec-dsl">KernelSpec DSL</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.KernelSpec"><code class="docutils literal notranslate"><span class="pre">KernelSpec</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.InputDecl"><code class="docutils literal notranslate"><span class="pre">InputDecl</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.ScalarInput"><code class="docutils literal notranslate"><span class="pre">ScalarInput</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.OutputDecl"><code class="docutils literal notranslate"><span class="pre">OutputDecl</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#shape-relations">Shape relations</a><ul class="nav section-nav flex-column">
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.SameAs"><code class="docutils literal notranslate"><span class="pre">SameAs</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.ReduceDims"><code class="docutils literal notranslate"><span class="pre">ReduceDims</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#extra-scalar-args">Extra scalar args</a><ul class="nav section-nav flex-column">
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.Numel"><code class="docutils literal notranslate"><span class="pre">Numel</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.DimSize"><code class="docutils literal notranslate"><span class="pre">DimSize</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#launch-geometry">Launch geometry</a><ul class="nav section-nav flex-column">
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.Elementwise"><code class="docutils literal notranslate"><span class="pre">Elementwise</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.Reduction"><code class="docutils literal notranslate"><span class="pre">Reduction</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.Custom"><code class="docutils literal notranslate"><span class="pre">Custom</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#override-path">Override path</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pre-compiled-ptx-entry-point">Pre-compiled PTX entry point</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.ptx_op"><code class="docutils literal notranslate"><span class="pre">ptx_op()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#kernel-signature-convention">Kernel signature convention</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#error-behavior">Error behavior</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/py_api/kernels.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/py_api/kernels.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

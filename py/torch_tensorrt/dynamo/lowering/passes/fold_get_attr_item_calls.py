@@ -7,7 +7,13 @@ logger = logging.getLogger(__name__)
 
 # Identity ops that produce an alias / copy of their single input.
 # Removing them before folding means .item() nodes will see placeholder/get_attr directly.
-_IDENTITY_METHODS = frozenset({"clone", "contiguous", "detach", "to"})
+#
+# NOTE: ``"to"`` is intentionally excluded here. ``Tensor.to(dtype=...)`` (or
+# ``device=...``) is not an identity — stripping it silently drops dtype casts
+# such as the ``softmax(..., dtype=fp32).to(bf16)`` pattern used in HuggingFace
+# attention, leaving fp32 softmax feeding a bf16 matmul and triggering a
+# ``Float vs BFloat16`` mismatch at AOT meta-bmm dispatch.
+_IDENTITY_METHODS = frozenset({"clone", "contiguous", "detach"})
 _IDENTITY_FUNCTIONS = frozenset(
     {
         torch.ops.aten.clone.default,

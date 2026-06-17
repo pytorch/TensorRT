@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Python Runtime &#8212; Torch-TensorRT</title>
+    <title>Python vs C++ runtime &#8212; Torch-TensorRT</title>
   
   
   
@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=0d6c091b"></script>
+    <script src="../../_static/documentation_options.js?v=5663fe15"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -465,6 +465,8 @@ document.write(`
 
 
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -494,7 +496,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">Python Runtime</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Python vs C++ runtime</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -569,7 +571,7 @@ document.write(`
     
     <li class="breadcrumb-item"><a href="index.html" class="nav-link">Runtime Optimization</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page">Python Runtime</li>
+    <li class="breadcrumb-item active" aria-current="page">Python vs...</li>
   </ul>
 </nav>
 </div>
@@ -586,21 +588,26 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="python-runtime">
-<span id="id1"></span><h1>Python Runtime<a class="headerlink" href="#python-runtime" title="Link to this heading">#</a></h1>
-<p>Torch-TensorRT provides two runtime backends for executing compiled TRT engines
-inside a PyTorch graph:</p>
+  <section id="python-vs-c-runtime">
+<span id="python-runtime"></span><h1>Python vs C++ runtime<a class="headerlink" href="#python-vs-c-runtime" title="Link to this heading">#</a></h1>
+<p>Torch-TensorRT uses a single module type, <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.runtime.TorchTensorRTModule</span></code>,
+to run TensorRT engines inside PyTorch. The <strong>execution path</strong> (which code actually drives
+TensorRT execution) is selected automatically:</p>
 <ul class="simple">
-<li><p><strong>C++ runtime</strong> (default) — <code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> backed by a C++ TorchBind class.
-Fully serializable, supports CUDAGraphs, multi-device safe.</p></li>
-<li><p><strong>Python runtime</strong> — <code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code> backed entirely by the TRT Python
-API. Simpler to instrument for debugging but <strong>not serializable</strong> to
-<code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code>.</p></li>
+<li><p><strong>C++ path</strong> — <code class="docutils literal notranslate"><span class="pre">torch.classes.tensorrt.Engine</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.ops.tensorrt.execute_engine</span></code>.
+Used when the Torch-TensorRT C++ extension (<code class="docutils literal notranslate"><span class="pre">libtorchtrt</span></code> / runtime <code class="docutils literal notranslate"><span class="pre">.so</span></code>) is loaded:
+TorchScript-friendly, and integrates with the full C++ runtime stack.</p></li>
+<li><p><strong>Python path</strong> — Internal <code class="docutils literal notranslate"><span class="pre">TRTEngine</span></code> (<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.runtime._TRTEngine</span></code>)
+plus <code class="docutils literal notranslate"><span class="pre">tensorrt::execute_engine</span></code> registered from Python when the C++ runtime is not
+available (use <code class="docutils literal notranslate"><span class="pre">PYTHON_ONLY=1</span></code> when building Torch-TensorRT). Useful for minimal installs and for Python-level debugging.</p></li>
 </ul>
+<p>Both the C++ and Python paths are invoked through the same <code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> class,
+which dispatches to the appropriate runtime engine based on the build of Torch-TensorRT (Full build or PYTHON_ONLY build).</p>
 <hr class="docutils" />
-<section id="when-to-use-the-python-runtime">
-<h2>When to Use the Python Runtime<a class="headerlink" href="#when-to-use-the-python-runtime" title="Link to this heading">#</a></h2>
-<p>Use <code class="docutils literal notranslate"><span class="pre">use_python_runtime=True</span></code> when:</p>
+<section id="when-the-python-runtime-is-used">
+<h2>When the Python runtime is used<a class="headerlink" href="#when-the-python-runtime-is-used" title="Link to this heading">#</a></h2>
+<p>The Python engine implementation is chosen automatically when the C++ Torch-TensorRT library
+is not installed (enabled by setting <code class="docutils literal notranslate"><span class="pre">PYTHON_ONLY=1</span></code> when building Torch-TensorRT). You may still prefer that setup when:</p>
 <ul class="simple">
 <li><p>You need to run on a machine where the C++ Torch-TensorRT library is not installed
 (e.g., a minimal CI container with only the Python wheel).</p></li>
@@ -610,64 +617,71 @@ API. Simpler to instrument for debugging but <strong>not serializable</strong> t
 </ul>
 <p>Use the default C++ runtime in all other cases, especially:</p>
 <ul class="simple">
-<li><p>When saving a compiled module to disk (<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code>).</p></li>
 <li><p>When using CUDAGraphs for low-latency inference.</p></li>
 <li><p>In production deployments.</p></li>
 </ul>
 </section>
 <hr class="docutils" />
-<section id="enabling-the-python-runtime">
-<h2>Enabling the Python Runtime<a class="headerlink" href="#enabling-the-python-runtime" title="Link to this heading">#</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<section id="compile-and-run">
+<h2>Compile and run<a class="headerlink" href="#compile-and-run" title="Link to this heading">#</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code>, <code class="docutils literal notranslate"><span class="pre">torch.compile(...,</span> <span class="pre">backend=&quot;tensorrt&quot;,</span> <span class="pre">...)</span></code>, or
+construct <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.runtime.TorchTensorRTModule</span></code> directly. The module picks C++
+vs Python execution based on the build of Torch-TensorRT (Full build or Python-only build).</p>
+</section>
+<hr class="docutils" />
+<section id="serialization">
+<h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> are serializable in both the C++ and Python paths.
+.. code-block::python</p>
+<blockquote>
+<div><p>torch_tensorrt.save(trt_module, trt_ep_path, retrace=True)
+trt_module = torch_tensorrt.load(trt_ep_path).module()</p>
+</div></blockquote>
+</section>
+<section id="cross-serialization-python-and-c">
+<h2>Cross-serialization (Python and C++)<a class="headerlink" href="#cross-serialization-python-and-c" title="Link to this heading">#</a></h2>
+<p>One of the key features of <code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> is seamless cross serialization:
+<strong>you can serialize an engine using the Python runtime and load it using the C++ runtime, or vice versa</strong>.
+The engine file format and all core metadata are fully compatible across runtimes and platforms, ensuring flexibility for production and development workflows.</p>
+<p>For example, you can:</p>
+<ul>
+<li><p><strong>Build and serialize in Python</strong>, then deploy by loading the module in a C++-enabled environment (e.g. in TorchScript or when the C++ extension is present):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># In an environment with only Python runtime (PYTHON_ONLY=1)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_module</span><span class="p">,</span> <span class="s2">&quot;trt_module.ep&quot;</span><span class="p">)</span>
 
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">exported_program</span><span class="p">,</span>
-    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="c1"># --- Later, or on a different machine with C++ runtime enabled ---</span>
+<span class="n">trt_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_module.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">trt_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Or via <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span>
-    <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;tensorrt&quot;</span><span class="p">,</span>
-    <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;use_python_runtime&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
-<span class="p">)</span>
-</pre></div>
-</div>
+</li>
+<li><p><strong>Build in C++ runtime environment</strong>, save the engine, and then load it in a Python-only deployment or debugging context, with no changes needed.</p></li>
+</ul>
+<p>This interoperability allows you to train, compile, and debug using the Python path,
+but deploy for maximum performance using the C++ runtime—or test and profile using Python tools with modules built from C++.
+<strong>No extra conversion is required and the serialization format is shared across both backends.</strong></p>
 </section>
 <hr class="docutils" />
 <section id="limitations">
 <h2>Limitations<a class="headerlink" href="#limitations" title="Link to this heading">#</a></h2>
-<ul>
-<li><p><strong>Not serializable</strong>: <code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code> cannot be saved via
-<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code> as an <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> or loaded back. The module is
-Python-only in-process.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># This will raise an error with use_python_runtime=True:</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;model.ep&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
-</pre></div>
-</div>
-</li>
-<li><p><strong>No C++ deployment</strong>: The compiled module cannot be exported to AOTInductor or used
-in a C++ application without re-compiling with the C++ runtime.</p></li>
+<ul class="simple">
 <li><p><strong>CUDAGraphs</strong>: Whole-graph CUDAGraphs work with the Python runtime, but the
 per-submodule CUDAGraph recording in <code class="docutils literal notranslate"><span class="pre">CudaGraphsTorchTensorRTModule</span></code> is
 only available with the C++ runtime.</p></li>
 </ul>
 </section>
 <hr class="docutils" />
-<section id="pythontorchtensorrtmodule-direct-instantiation">
-<h2><code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code> Direct Instantiation<a class="headerlink" href="#pythontorchtensorrtmodule-direct-instantiation" title="Link to this heading">#</a></h2>
-<p>You can instantiate <code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code> directly from raw engine bytes,
-for example when integrating a TRT engine built outside of Torch-TensorRT:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">PythonTorchTensorRTModule</span>
+<section id="torchtensorrtmodule-from-raw-engine-bytes">
+<h2><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> from raw engine bytes<a class="headerlink" href="#torchtensorrtmodule-from-raw-engine-bytes" title="Link to this heading">#</a></h2>
+<p>You can build a module directly from a serialized TensorRT engine (for example, an engine
+produced outside Torch-TensorRT):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompilationSettings</span>
 
-<span class="c1"># Load raw engine bytes (e.g., from trtexec output or torch_tensorrt.dynamo.convert_*)</span>
 <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;model.engine&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
 
-<span class="n">module</span> <span class="o">=</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">(</span>
+<span class="n">module</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="p">(</span>
     <span class="n">serialized_engine</span><span class="o">=</span><span class="n">engine_bytes</span><span class="p">,</span>
     <span class="n">input_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span>
     <span class="n">output_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;output&quot;</span><span class="p">],</span>
@@ -678,18 +692,17 @@ for example when integrating a TRT engine built outside of Torch-TensorRT:</p>
 <span class="n">output</span> <span class="o">=</span> <span class="n">module</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 </pre></div>
 </div>
-<p><strong>Constructor arguments:</strong></p>
+<p><strong>Constructor arguments</strong> (see class docstring for full detail):</p>
 <dl class="simple">
-<dt><code class="docutils literal notranslate"><span class="pre">serialized_engine</span></code> (<code class="docutils literal notranslate"><span class="pre">bytes</span></code>)</dt><dd><p>The raw serialized TRT engine bytes.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">serialized_engine</span></code> (<code class="docutils literal notranslate"><span class="pre">bytes</span></code>)</dt><dd><p>Raw serialized TRT engine.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">input_binding_names</span></code> (<code class="docutils literal notranslate"><span class="pre">List[str]</span></code>)</dt><dd><p>TRT input binding names in the order they are passed to <code class="docutils literal notranslate"><span class="pre">forward()</span></code>.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">input_binding_names</span></code> / <code class="docutils literal notranslate"><span class="pre">output_binding_names</span></code> (<code class="docutils literal notranslate"><span class="pre">List[str]</span></code>)</dt><dd><p>TRT input binding names in the order they are passed to <code class="docutils literal notranslate"><span class="pre">forward()</span></code>.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">output_binding_names</span></code> (<code class="docutils literal notranslate"><span class="pre">List[str]</span></code>)</dt><dd><p>TRT output binding names in the order they should be returned.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">output_binding_names</span></code> (<code class="docutils literal notranslate"><span class="pre">List[str]</span></code>)</dt><dd><p>TRT output binding names in the order they are returned from <code class="docutils literal notranslate"><span class="pre">forward()</span></code>.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">name</span></code> (<code class="docutils literal notranslate"><span class="pre">str</span></code>, optional)</dt><dd><p>Human-readable name for the module (used in logging).</p>
+<dt><code class="docutils literal notranslate"><span class="pre">name</span></code> (<code class="docutils literal notranslate"><span class="pre">str</span></code>, optional)</dt><dd><p>Name for logging and serialization.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">settings</span></code> (<code class="docutils literal notranslate"><span class="pre">CompilationSettings</span></code>, optional)</dt><dd><p>The compilation settings used to build the engine. Used to determine device
-placement and other runtime behaviors.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">settings</span></code> (<code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo._settings.CompilationSettings</span></code>, optional)</dt><dd><p>Device and runtime options (must match how the engine was built).</p>
 </dd>
 <dt><code class="docutils literal notranslate"><span class="pre">weight_name_map</span></code> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>, optional)</dt><dd><p>Mapping of TRT weight names to PyTorch state dict names. Required for refit
 support via <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.refit_module_weights()</span></code>.</p>
@@ -700,11 +713,14 @@ support via <code class="xref cpp cpp-func docutils literal notranslate"><span c
 </dl>
 </section>
 <hr class="docutils" />
-<section id="runtime-selection-logic">
-<h2>Runtime Selection Logic<a class="headerlink" href="#runtime-selection-logic" title="Link to this heading">#</a></h2>
-<p>When <code class="docutils literal notranslate"><span class="pre">use_python_runtime</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (auto-select), Torch-TensorRT tries to import
-the C++ TorchBind class. If the C++ extension is not available it silently falls back to
-the Python runtime. Pass <code class="docutils literal notranslate"><span class="pre">True</span></code> or <code class="docutils literal notranslate"><span class="pre">False</span></code> to force a specific runtime.</p>
+<section id="runtime-selection-summary">
+<h2>Runtime selection summary<a class="headerlink" href="#runtime-selection-summary" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> uses the C++ engine path when the Torch-TensorRT extension is loaded;
+otherwise it uses the Python <code class="docutils literal notranslate"><span class="pre">TRTEngine</span></code> path.</p></li>
+<li><p>If the C++ extension is <strong>not</strong> built, only the Python path is available.</p></li>
+<li><p>To use the Python runtime, set <code class="docutils literal notranslate"><span class="pre">PYTHON_ONLY=1</span></code> when building Torch-TensorRT.</p></li>
+</ul>
 </section>
 </section>
 
@@ -754,11 +770,13 @@ the Python runtime. Pass <code class="docutils literal notranslate"><span class=
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#when-to-use-the-python-runtime">When to Use the Python Runtime</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#enabling-the-python-runtime">Enabling the Python Runtime</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#when-the-python-runtime-is-used">When the Python runtime is used</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compile-and-run">Compile and run</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#serialization">Serialization</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cross-serialization-python-and-c">Cross-serialization (Python and C++)</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#limitations">Limitations</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pythontorchtensorrtmodule-direct-instantiation"><code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code> Direct Instantiation</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-selection-logic">Runtime Selection Logic</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torchtensorrtmodule-from-raw-engine-bytes"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> from raw engine bytes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-selection-summary">Runtime selection summary</a></li>
 </ul>
   </nav></div>
 

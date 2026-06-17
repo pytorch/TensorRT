@@ -24,12 +24,9 @@ import psutil
 import sympy
 import tensorrt as trt
 import torch
-from torch._subclasses.fake_tensor import FakeTensor
-from torch._subclasses.fake_tensor import FakeScriptObject
+from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._sympy.numbers import int_oo
-
-from packaging import version
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -39,6 +36,8 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
+
+from packaging import version
 
 from .types import TRTDataType
 
@@ -105,7 +104,7 @@ COMPLEX_TO_REAL_DTYPE: Dict[torch.dtype, torch.dtype] = {
     torch.complex128: torch.float64,
 }
 
-COMPLEX_DTYPES: frozenset = frozenset(COMPLEX_TO_REAL_DTYPE)
+COMPLEX_DTYPES: frozenset = frozenset(COMPLEX_TO_REAL_DTYPE)  # type: ignore[type-arg]
 
 
 def unified_dtype_converter(
@@ -145,37 +144,6 @@ def deallocate_module(module: torch.fx.GraphModule) -> None:
     module.to(CPU_DEVICE)
     torch.cuda.empty_cache()
     gc.collect()
-
-
-def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:
-    """Parses a user-provided input argument regarding Python runtime
-
-    Automatically handles cases where the user has not specified a runtime (None)
-
-    Returns True if the Python runtime should be used, False if the C++ runtime should be used
-    """
-    using_python_runtime = use_python_runtime
-    reason = ""
-
-    # Runtime was manually specified by the user
-    if using_python_runtime is not None:
-        reason = "as requested by user"
-    # Runtime was not manually specified by the user, automatically detect runtime
-    else:
-        try:
-            from torch_tensorrt.dynamo.runtime import TorchTensorRTModule  # noqa: F401
-
-            using_python_runtime = False
-            reason = "since C++ dependency was detected as present"
-        except ImportError:
-            using_python_runtime = True
-            reason = "since import failed, C++ dependency not installed"
-
-    logger.info(
-        f"Using {'Python-only' if using_python_runtime else 'Default'} Torch-TRT Runtime ({reason})"
-    )
-
-    return using_python_runtime
 
 
 def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> float:
@@ -624,6 +592,15 @@ def parse_dynamo_kwargs(
         if "options" in kwargs and len(kwargs) == 1:
             kwargs = kwargs["options"]
 
+        if "use_python_runtime" in kwargs:
+            warnings.warn(
+                'torch.compile option "use_python_runtime" was removed; use '
+                "the Python runtime is now selected automatically when the C++ extension is unavailable.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            kwargs = {k: v for k, v in kwargs.items() if k != "use_python_runtime"}
+
         if "truncate_long_and_double" in kwargs:
             if (
                 "truncate_double" in kwargs
@@ -648,9 +625,6 @@ def parse_dynamo_kwargs(
         valid_attrs = {attr.name for attr in fields(settings)}
         valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
         settings = replace(settings, **valid_kwargs)
-
-    # Parse input runtime specification
-    settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
 
     # Ensure device is a torch_tensorrt Device
     settings.device = to_torch_tensorrt_device(settings.device)

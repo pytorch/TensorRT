@@ -2,6 +2,7 @@
 import importlib
 import platform
 import unittest
+from random import weibullvariate
 from typing import Optional
 
 import pytest
@@ -30,7 +31,7 @@ if importlib.util.find_spec("transformers"):
     "torchvision is not installed",
 )
 def test_resnet18(ir):
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(weights=None).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
     compile_spec = {
@@ -109,7 +110,7 @@ def test_resnet18_multiprocess(ir):
     "torchvision is not installed",
 )
 def test_resnet18_cpu_offload(ir):
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(weights=None).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
     compile_spec = {
@@ -154,7 +155,7 @@ def test_resnet18_cpu_offload(ir):
     "Windows cu130 has access violation issue with this test case, skip it for now",
 )
 def test_resnet18_torch_exec_ops(ir):
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(weights=None).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
     compile_spec = {
@@ -389,7 +390,7 @@ def test_bert_base_uncased_cpu_offload(ir):
     "torchvision is not installed",
 )
 def test_resnet18_half(ir):
-    model = models.resnet18(pretrained=True).eval().to("cuda").half()
+    model = models.resnet18(weights=None).eval().to("cuda").half()
     input = torch.randn((1, 3, 224, 224)).to("cuda").half()
 
     compile_spec = {
@@ -498,7 +499,6 @@ def test_cosmos_true_div(ir):
             use_fp32_acc=False,
             device="cuda:0",
             disable_tf32=True,
-            use_python_runtime=True,
             min_block_size=1,
         )
         trt_output = trt_model(hidden_states)
@@ -596,56 +596,6 @@ def test_bf16_fallback_model(ir):
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"BF16 fallback model TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-    )
-
-    # Clean up model env
-    torch._dynamo.reset()
-
-
-@pytest.mark.unit
-@unittest.skipIf(
-    not torchtrt.ENABLED_FEATURES.tensorrt_rtx,
-    "Grouped 3D deconv fallback WAR is TensorRT-RTX specific",
-)
-def test_grouped_deconv3d_fallback(ir):
-    """Grouped 3D deconvolutions fall back to PyTorch on TRT-RTX.
-
-    The convolution_capability_validator rejects grouped ConvTranspose3d ops
-    so that the partitioner keeps them in PyTorch while other ops run on TRT.
-    """
-
-    class MyModule(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.conv = torch.nn.Conv3d(3, 16, 3, padding=1)
-            self.relu = torch.nn.ReLU()
-            self.deconv = torch.nn.ConvTranspose3d(16, 16, 3, padding=1, groups=16)
-
-        def forward(self, x):
-            out = self.conv(x)
-            out = self.relu(out)
-            out = self.deconv(out)
-            return out
-
-    model = MyModule().eval().cuda()
-    input = torch.randn((1, 3, 16, 16, 16), device="cuda")
-
-    compile_spec = {
-        "inputs": [torchtrt.Input(input.shape, dtype=torch.float32)],
-        "device": torchtrt.Device("cuda:0"),
-        "ir": ir,
-        "pass_through_build_failures": True,
-        "min_block_size": 1,
-        "cache_built_engines": False,
-        "reuse_cached_engines": False,
-    }
-
-    trt_mod = torchtrt.compile(model, **compile_spec)
-    cos_sim = cosine_similarity(model(input), trt_mod(input))
-
-    assertions.assertTrue(
-        cos_sim > COSINE_THRESHOLD,
-        msg=f"Grouped 3D deconv fallback model TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env

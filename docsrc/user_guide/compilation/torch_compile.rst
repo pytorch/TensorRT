@@ -42,8 +42,7 @@ Custom Setting Usage
                                              "debug": True,
                                              "min_block_size": 2,
                                              "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
-                                             "optimization_level": 4,
-                                             "use_python_runtime": False,})
+                                             "optimization_level": 4,})
 
 .. note:: Supported precisions include FP32, FP16, BF16, INT8, FP8, and FP4. INT8/FP8 quantization requires the `ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library and a quantized model. FP4 requires TensorRT >= 10.8.0.
 

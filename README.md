@@ -5,9 +5,9 @@ Torch-TensorRT
 <h4> Easily achieve the best inference performance for any PyTorch model on the NVIDIA platform. </h4>
 
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
-[![pytorch](https://img.shields.io/badge/PyTorch-2.13-green)](https://download.pytorch.org/whl/nightly/cu130)
-[![cuda](https://img.shields.io/badge/CUDA-13.0-green)](https://developer.nvidia.com/cuda-downloads)
-[![trt](https://img.shields.io/badge/TensorRT-10.16.1-green)](https://github.com/nvidia/tensorrt)
+[![pytorch](https://img.shields.io/badge/PyTorch-2.14-green)](https://download.pytorch.org/whl/nightly/cu132)
+[![cuda](https://img.shields.io/badge/CUDA-13.2-green)](https://developer.nvidia.com/cuda-downloads)
+[![trt](https://img.shields.io/badge/TensorRT-11.0.0-green)](https://github.com/nvidia/tensorrt)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
 [![Linux x86-64 Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml)
 [![Linux SBSA Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml)
@@ -27,7 +27,7 @@ pip install torch-tensorrt
 
 Nightly versions of Torch-TensorRT are published on the PyTorch package index
 ```bash
-pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu130
+pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu130 --extra-index-url https://pypi.org/simple
 ```
 
 Torch-TensorRT is also distributed in the ready-to-run [NVIDIA NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) which has all dependencies with the proper versions and example notebooks included.
@@ -121,9 +121,9 @@ auto results = trt_mod.forward({input_tensor});
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 8.1.1
-- Libtorch 2.13.0.dev (latest nightly)
-- CUDA 13.0 (CUDA 12.6 on Jetson)
-- TensorRT 10.16.1.11 (TensorRT 10.3 on Jetson)
+- Libtorch 2.14.0.dev (latest nightly)
+- CUDA 13.2 (CUDA 12.6 on Jetson)
+- TensorRT 11.0.0.114 (TensorRT 10.3 on Jetson)
 
 ## Deprecation Policy
 

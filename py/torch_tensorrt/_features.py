@@ -45,7 +45,7 @@ linked_file_runtime = os.path.join(
 linked_file_full_path = os.path.join(trtorch_dir, linked_file)
 linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
 
-_TENSORRT_RTX = tensorrt._package_name == "tensorrt_rtx"
+_TENSORRT_RTX = getattr(tensorrt, "_package_name", "") == "tensorrt_rtx"
 _TS_FE_AVAIL = os.path.isfile(linked_file_full_path)
 _TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_path)
 _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
@@ -68,10 +68,8 @@ if _TENSORRT_RTX:
 elif importlib.util.find_spec("tensorrt.plugin") and importlib.util.find_spec(
     "tensorrt.plugin._lib"
 ):
-    # there is a bug in tensorrt 10.14.* and 10.15.* that causes the plugin to not work, disable it for now
-    if tensorrt.__version__.startswith("10.15.") or tensorrt.__version__.startswith(
-        "10.14."
-    ):
+    # TensorRT 10.14.* has a known bug that breaks QDP plugins; 10.15.+ works.
+    if tensorrt.__version__.startswith("10.14."):
         _QDP_PLUGIN_AVAIL = False
     else:
         _QDP_PLUGIN_AVAIL = True

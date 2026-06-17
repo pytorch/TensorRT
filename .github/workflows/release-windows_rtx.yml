@@ -1,4 +1,4 @@
-name: Release Windows wheels artifacts
+name: Release RTX Windows wheels artifacts
 
 on:
   push:

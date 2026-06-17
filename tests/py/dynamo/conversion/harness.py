@@ -6,14 +6,12 @@ import unittest
 from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import torch
-import torch_tensorrt
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
-from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._tracer import get_dynamic_shapes_args
@@ -27,7 +25,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.lowering.passes import remove_num_users_is_0_nodes
-from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -109,58 +107,6 @@ def get_use_dynamo_tracer(use_dynamo_tracer: Any) -> bool:
         return False
 
 
-# this method is only used in our converter test to infer the module output dtypes via dummy inference
-# which is due to fx.symbolic_trace does not have the meta['val'] info in the node
-# TODO: lan to remove this once our converter test is moved from fx.symbolic_trace to dynamo trace
-def infer_module_output_dtypes_for_test(
-    module: torch.fx.GraphModule,
-    inputs: Sequence[Input],
-    device: Device,
-    kwarg_inputs: Optional[dict[str, Any]] = None,
-    truncate_double: bool = False,
-) -> List[dtype]:
-    """
-    This function performs model inference to determine the output dtypes
-    and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
-    If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
-    """
-    # TODO: We can also determine output dtypes from the module.graph based on node metadata.
-    # However, our converter tests use fx.symbolic_trace which sometimes does not provide metadata,
-    # so we stick to the model inference approach currently.
-    with unset_fake_temporarily():
-        # Get the device on which the model exists
-        # For large models, this can be done on CPU to save GPU memory allocation for TRT.
-        device = get_model_device(module)
-        torch_inputs = get_torch_inputs(inputs, device)
-        if kwarg_inputs is None:
-            kwarg_inputs = {}
-        torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
-        module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
-        if not isinstance(module_outputs, (list, tuple)):
-            module_outputs = [module_outputs]
-
-    # Int64 outputs can sometimes be generated from within other operators
-    # such as aten.sum - such outputs can be truncated
-    output_dtypes = []
-    for output in module_outputs:
-        output_ = output
-        # We don't need to check if output is nested here because the input module will be flattened
-        if not isinstance(output, torch.Tensor):
-            if isinstance(output, str):
-                raise ValueError(
-                    f"Received an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
-                )
-            else:
-                output_ = torch.tensor(output)
-
-        if truncate_double and output_.dtype == dtype.float64:
-            output_dtypes.append(dtype.float32)
-        else:
-            output_dtypes.append(dtype._from(output_.dtype))
-
-    return output_dtypes
-
-
 def fetch_attr(mod, target):
     """
     Fetch an attribute from the ``Module`` hierarchy of ``mod.module``.
@@ -197,7 +143,7 @@ class TRTTestCase(TestCase):
         atol=ATOL,
         check_dtype=True,
         pyt_inputs=None,
-        rt_cls=PythonTorchTensorRTModule,
+        rt_cls=TorchTensorRTModule,
     ):
         with torch.no_grad():
             cuda_inputs = []
@@ -208,7 +154,7 @@ class TRTTestCase(TestCase):
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
             _LOGGER.info(f"Interpreter run time(s): {sec}")
-            serialized_engine = interpreter_result.engine.serialize()
+            serialized_engine = bytes(interpreter_result.engine.serialize())
             trt_mod = rt_cls(
                 serialized_engine=serialized_engine,
                 input_binding_names=list(interpreter_result.input_names),
@@ -269,7 +215,7 @@ class TRTTestCase(TestCase):
         interpreter,
         comparators: List[Tuple[Callable, List]],
         fp16_mode=False,
-        rt_cls=PythonTorchTensorRTModule,
+        rt_cls=TorchTensorRTModule,
     ):
         """
         Runs the test and compares the result using the provided comparators.
@@ -292,7 +238,7 @@ class TRTTestCase(TestCase):
                 self.assert_has_op(mod, expected_ops)
 
             interpreter_result = interpreter.run()
-            serialized_engine = interpreter_result.engine.serialize()
+            serialized_engine = bytes(interpreter_result.engine.serialize())
             trt_mod = rt_cls(
                 serialized_engine=serialized_engine,
                 input_binding_names=list(interpreter_result.input_names),
@@ -421,6 +367,7 @@ class DispatchTestCase(TRTTestCase):
         int32_reqd=False,
         immutable_weights=True,
         decompose_attention=False,
+        attn_bias_is_causal=True,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -431,6 +378,7 @@ class DispatchTestCase(TRTTestCase):
             truncate_double=True,
             immutable_weights=immutable_weights,
             decompose_attention=decompose_attention,
+            attn_bias_is_causal=attn_bias_is_causal,
         )
 
         mod = self.generate_graph(

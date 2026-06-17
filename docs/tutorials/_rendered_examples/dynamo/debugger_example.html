@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0d6c091b"></script>
+    <script src="../../../_static/documentation_options.js?v=5663fe15"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -522,7 +522,6 @@ model = models.resnet18(pretrained=False).to(&quot;cuda&quot;).eval()
 exp_program = torch.export.export(model, tuple(inputs))
 workspace_size = 20 &lt;&lt; 30
 min_block_size = 0
-use_python_runtime = False
 torch_executed_ops = {}
 
 with torch_trt.dynamo.Debugger(
@@ -539,7 +538,6 @@ with torch_trt.dynamo.Debugger(
     trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
-        use_python_runtime=use_python_runtime,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         immutable_weights=False,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum, auto
-from typing import Any, Optional, Type, Union
+from typing import Any, Optional, Type, Union, cast
 
 import numpy as np
 import tensorrt as trt
@@ -1385,7 +1385,15 @@ class Platform(Enum):
         Returns:
             Platform: Current platform
         """
+        # Prefer the compiled runtime's platform: it reflects the ABI engines are
+        # built for (and checked against), which platform.machine() gets wrong under emulation.
+        if ENABLED_FEATURES.torch_tensorrt_runtime:
+            return cls._from_serialized_rt_platform(
+                torch.ops.tensorrt.get_current_platform()
+            )
+
         import platform
+        import sysconfig
 
         if platform.system().lower().startswith("linux"):
             # linux
@@ -1396,23 +1404,39 @@ class Platform(Enum):
 
         elif platform.system().lower().startswith("windows"):
             # Windows...
-            if platform.machine().lower().startswith("amd64"):
+            machine = platform.machine().lower()
+            python_platform = sysconfig.get_platform().lower()
+            if (
+                machine.startswith("amd64")
+                or machine.startswith("x86_64")
+                or python_platform in ("win-amd64", "win_amd64")
+            ):
                 return Platform.WIN_X86_64
 
         return Platform.UNKNOWN
 
     def __str__(self) -> str:
-        return str(self.name)
+        # Make it compatible with C++ runtime
+        return self.name.lower()
 
     @needs_torch_tensorrt_runtime  # type: ignore
     def _to_serialized_rt_platform(self) -> str:
-        val: str = torch.ops.tensorrt._platform_unknown()
-
         if self == Platform.LINUX_X86_64:
-            val = torch.ops.tensorrt._platform_linux_x86_64()
+            return cast(str, torch.ops.tensorrt._platform_linux_x86_64())
         elif self == Platform.LINUX_AARCH64:
-            val = torch.ops.tensorrt._platform_linux_aarch64()
+            return cast(str, torch.ops.tensorrt._platform_linux_aarch64())
         elif self == Platform.WIN_X86_64:
-            val = torch.ops.tensorrt._platform_win_x86_64()
+            return cast(str, torch.ops.tensorrt._platform_win_x86_64())
 
-        return val
+        return cast(str, torch.ops.tensorrt._platform_unknown())
+
+    @classmethod
+    def _from_serialized_rt_platform(cls, val: str) -> Platform:
+        # Inverse of _to_serialized_rt_platform; compared against the runtime ops so the two stay in lockstep.
+        if val == torch.ops.tensorrt._platform_linux_x86_64():
+            return cls.LINUX_X86_64
+        elif val == torch.ops.tensorrt._platform_linux_aarch64():
+            return cls.LINUX_AARCH64
+        elif val == torch.ops.tensorrt._platform_win_x86_64():
+            return cls.WIN_X86_64
+        return cls.UNKNOWN

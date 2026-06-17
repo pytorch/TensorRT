@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -42,6 +43,22 @@ typedef enum {
   REQUIRES_NATIVE_MULTIDEVICE_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
+
+inline constexpr std::array<const char*, SERIALIZATION_LEN> kSerializedInfoIndexNames = {{
+    "ABI_TARGET_IDX",
+    "NAME_IDX",
+    "DEVICE_IDX",
+    "ENGINE_IDX",
+    "INPUT_BINDING_NAMES_IDX",
+    "OUTPUT_BINDING_NAMES_IDX",
+    "HW_COMPATIBLE_IDX",
+    "SERIALIZED_METADATA_IDX",
+    "TARGET_PLATFORM_IDX",
+    "REQUIRES_OUTPUT_ALLOCATOR_IDX",
+    "RESOURCE_ALLOCATION_STRATEGY_IDX",
+    "REQUIRES_NATIVE_MULTIDEVICE_IDX",
+}};
+// For adding new serialized info indices, update above and update /dynamo/runtime/_serialized_engine_layout.py
 
 std::string base64_encode(const std::string& in);
 std::string base64_decode(const std::string& in);

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0d6c091b"></script>
+    <script src="../_static/documentation_options.js?v=5663fe15"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -622,9 +622,8 @@ runtime modules handle the conversion:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">prepare_inputs</span></code> (<code class="docutils literal notranslate"><span class="pre">dynamo/utils.py</span></code>) — builds the <code class="docutils literal notranslate"><span class="pre">Input</span></code> spec with the
 <code class="docutils literal notranslate"><span class="pre">view_as_real</span></code> shape/dtype but retains the original complex tensor in
 <code class="docutils literal notranslate"><span class="pre">inp.torch_tensor</span></code> for tracing.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">_PythonTorchTensorRTModule.forward</span></code> — applies <code class="docutils literal notranslate"><span class="pre">torch.view_as_real(i).contiguous()</span></code>
-for each complex input before feeding it to the engine.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">_TorchTensorRTModule.forward</span></code> — same <code class="docutils literal notranslate"><span class="pre">view_as_real</span></code> conversion.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.forward</span></code> — applies <code class="docutils literal notranslate"><span class="pre">torch.view_as_real(i).contiguous()</span></code>
+for each complex input before feeding tensors to <code class="docutils literal notranslate"><span class="pre">execute_engine</span></code> / <code class="docutils literal notranslate"><span class="pre">execute_engine_python</span></code>.</p></li>
 </ul>
 </section>
 <section id="key-implementation-invariants">
