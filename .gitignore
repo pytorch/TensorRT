@@ -67,7 +67,7 @@ bazel-tensorrt
 *.cache
 *cifar-10-batches-py*
 bazel-project
-build/
+/build/
 wheelhouse/
 *_status.json
 tests/py/dynamo/models/*.ts
