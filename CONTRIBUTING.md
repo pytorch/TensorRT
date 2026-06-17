@@ -8,6 +8,18 @@ Do try to fill an issue with your feature or bug before filling a PR (op support
 
 Our build system relies on `bazel` (https://bazel.build/). Though there are many ways to install `bazel`, the preferred method is to use `bazelisk` (https://github.com/bazelbuild/bazelisk) which makes it simple to set up the correct version of bazel on the fly. Additional development dependencies can be installed via the `requirements-dev.txt` file.
 
+#### Editor / clangd setup (optional)
+
+For C++ code intelligence (go-to-definition, accurate diagnostics, completions) in any clangd-based editor — e.g. VSCode with the [clangd extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd), Cursor, Neovim, Emacs — generate a Bazel-aware compilation database:
+
+```sh
+bazel run //:refresh_compile_commands
+```
+
+This writes `compile_commands.json` at the workspace root (gitignored). Re-run it after pulling changes that materially affect the build graph (new targets, new headers, dependency bumps). The repo's `.clangd` file picks up the database automatically.
+
+This is opt-in: developers who don't use clangd are unaffected, and the underlying `hedron_compile_commands` extractor is declared as a Bazel `dev_dependency`, so it does not enter the dep graph of consumers building against torch_tensorrt.
+
 #### Communication
 
 The primary location for discussion is GitHub issues and Github discussions. This is the best place for questions about the project and discussion about specific issues.

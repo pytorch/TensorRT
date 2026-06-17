@@ -1,3 +1,4 @@
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
@@ -316,4 +317,22 @@ alias(
         ":windows": ":libtorchtrt_runtime_zip",
         "//conditions:default": ":libtorchtrt_runtime_tar",
     }),
+)
+
+# ---------------------------------------------------------------------------
+# Developer tooling
+# ---------------------------------------------------------------------------
+# Generates `compile_commands.json` at the workspace root for clangd-based
+# editors. Output is gitignored. Run on first checkout and after material
+# build-graph changes:
+#     bazel run //:refresh_compile_commands
+# See CONTRIBUTING.md ("Editor / clangd setup") for details.
+refresh_compile_commands(
+    name = "refresh_compile_commands",
+    tags = ["manual"],
+    targets = [
+        "//core/...",
+        "//cpp/...",
+        "//tests/...",
+    ],
 )
