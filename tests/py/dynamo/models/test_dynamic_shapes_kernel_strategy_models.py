@@ -6,6 +6,18 @@ import torch_tensorrt as torchtrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+from torch_tensorrt.runtime import RuntimeSettings
+
+
+def _apply_runtime_settings(compiled, rs):
+    """Walk a compiled module and apply RuntimeSettings to every TRT submodule."""
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        TorchTensorRTModule,
+    )
+
+    for _, m in compiled.named_modules():
+        if isinstance(m, TorchTensorRTModule):
+            m.runtime_settings = rs
 
 
 @unittest.skipIf(
@@ -37,7 +49,10 @@ class TestDynamicShapesKernelStrategyModels(TestCase):
             ],
             use_python_runtime=True,
             min_block_size=1,
-            dynamic_shapes_kernel_specialization_strategy=strategy,
+        )
+        _apply_runtime_settings(
+            compiled,
+            RuntimeSettings(dynamic_shapes_kernel_specialization_strategy=strategy),
         )
         ref_output = model(input_tensor)
         trt_output = compiled(input_tensor)
@@ -102,7 +117,10 @@ class TestDynamicShapesKernelStrategyDynamic(TestCase):
             ],
             use_python_runtime=True,
             min_block_size=1,
-            dynamic_shapes_kernel_specialization_strategy=strategy,
+        )
+        _apply_runtime_settings(
+            compiled,
+            RuntimeSettings(dynamic_shapes_kernel_specialization_strategy=strategy),
         )
 
         for batch_size in (1, 4, 8):

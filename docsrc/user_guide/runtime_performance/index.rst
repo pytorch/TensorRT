@@ -9,6 +9,7 @@ correctly, handle unsupported operators, and deploy on specialized hardware (DLA
 
    runtime
    runtime_api
+   runtime_settings
    using_dla
    saving_models
    serialized_engine

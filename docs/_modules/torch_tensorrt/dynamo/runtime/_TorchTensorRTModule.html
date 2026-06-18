@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=8ef620a9"></script>
+    <script src="../../../../_static/documentation_options.js?v=30e77a8e"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -506,6 +506,7 @@ document.write(`
     <span class="n">serialize_binding_names</span><span class="p">,</span>
     <span class="n">serialize_device_info</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeSettings</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -609,6 +610,13 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span>
+
+        <span class="c1"># Per-engine runtime mode controls.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span><span class="p">:</span> <span class="n">RuntimeSettings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">()</span>
+        <span class="c1"># Engine-implicit ``RuntimeCache``: built lazily when the user</span>
+        <span class="c1"># passes a path string via ``runtime_settings`` (the module owns the</span>
+        <span class="c1"># wrapper; the engine just holds a reference).</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">symbolic_shape_expressions</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_native_multidevice</span> <span class="o">=</span> <span class="n">requires_native_multidevice</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="p">(</span>
@@ -705,8 +713,9 @@ document.write(`
         <span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_NATIVE_MULTIDEVICE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
             <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requires_native_multidevice</span><span class="p">)</span>
         <span class="p">)</span>
-        <span class="c1"># rank/world_size are runtime facts; queried from ProcessGroup at execution time</span>
-
+        <span class="c1"># rank/world_size are runtime facts; queried from ProcessGroup at execution time.</span>
+        <span class="c1"># RuntimeSettings are intentionally NOT serialized: they&#39;re per-engine, in-memory</span>
+        <span class="c1"># init values, not part of the engine&#39;s identity (see pytorch/TensorRT#4310).</span>
         <span class="k">return</span> <span class="n">engine_info</span>
 
 <div class="viewcode-block" id="TorchTensorRTModule.get_engine">
@@ -754,6 +763,112 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span>
         <span class="p">)</span>
 
+    <span class="c1"># --- runtime-settings dispatch ----------------------------------------</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">runtime_settings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeSettings</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The current ``RuntimeSettings``. Snapshot used by ``runtime_config`` CM enter/exit.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span>
+
+    <span class="nd">@runtime_settings</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">runtime_settings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply ``RuntimeSettings`` to this engine (or stash for ``setup_engine``).&quot;&quot;&quot;</span>
+        <span class="c1"># 1. Normalize: path-string -&gt; managed handle; everything else passes through.</span>
+        <span class="n">rs_resolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_runtime_cache</span><span class="p">(</span><span class="n">rs</span><span class="p">)</span>
+        <span class="c1"># 2. Push to the engine if it exists; if not we stash for later.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_send_to_engine</span><span class="p">(</span><span class="n">rs_resolved</span><span class="p">)</span>
+        <span class="c1"># 3. Store the resolved form so reads agree with what the engine sees.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span> <span class="o">=</span> <span class="n">rs_resolved</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeSettings</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Normalize ``rs.runtime_cache`` to ``None`` | ``RuntimeCache`` (never a path str).</span>
+
+<span class="sd">        Manages the ``_implicit_cache_handle`` slot as a side effect: builds a</span>
+<span class="sd">        fresh wrapper for a new path, reuses the existing one for the same</span>
+<span class="sd">        path, releases it (with save-on-swap) for non-path inputs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeCache</span>
+
+        <span class="n">rc</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">runtime_cache</span>
+
+        <span class="c1"># Branch 1: not a non-empty path string (None / empty / handle / torchbind).</span>
+        <span class="c1"># Caller owns the handle&#39;s lifecycle -- release ours, pass rs through.</span>
+        <span class="c1"># Guard: if ``rc`` IS our managed wrapper (e.g. setup_engine re-applying</span>
+        <span class="c1"># a resolved rs), this is a no-op self-passback, not a release.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">rc</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">rc</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">rc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_set_managed_handle</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">rs</span>
+
+        <span class="c1"># Branch 2: same path + wrapper still usable -&gt; reuse. Keeps the CM</span>
+        <span class="c1"># enter/exit cycle cheap (no teardown/rebuild loses in-memory kernels).</span>
+        <span class="n">old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span>
+        <span class="k">if</span> <span class="n">old</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">old</span><span class="o">.</span><span class="n">path</span> <span class="o">==</span> <span class="n">rc</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wrapper_still_attached</span><span class="p">(</span><span class="n">old</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">rs</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">old</span><span class="p">)</span>
+
+        <span class="c1"># Branch 3: build a fresh managed wrapper for this path. The facade</span>
+        <span class="c1"># auto-picks the torchbind sibling on cpp rt and the pure-Python</span>
+        <span class="c1"># handle on python-only rt. ``autosave_on_del=True`` is how implicit</span>
+        <span class="c1"># caches persist across runs.</span>
+        <span class="n">new</span> <span class="o">=</span> <span class="n">RuntimeCache</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">rc</span><span class="p">,</span> <span class="n">autosave_on_del</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># Explicitly load bytes here (which lands either in the runtime cache</span>
+        <span class="c1"># or pending bytes) as this cache is managed by this module, so a</span>
+        <span class="c1"># correct initial state is set.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">new</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Failed to warm-load implicit runtime cache from </span><span class="si">{</span><span class="n">rc</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_managed_handle</span><span class="p">(</span><span class="n">new</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rs</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">new</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_set_managed_handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Install ``new`` as the implicit handle; save the prior wrapper if displaced.</span>
+
+<span class="sd">        Save errors are swallowed (logged) so a transient disk failure during</span>
+<span class="sd">        a settings swap can&#39;t crash the user&#39;s assignment.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span>
+        <span class="k">if</span> <span class="n">old</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">old</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">new</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">old</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Failed to save prior implicit runtime cache on swap: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span> <span class="o">=</span> <span class="n">new</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_wrapper_still_attached</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">w</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Is ``w`` reusable for the current runtime? Python rt always</span>
+<span class="sd">        accepts; cpp rt needs the torchbind sibling live (else the cpp</span>
+<span class="sd">        engine has no way to hold the same underlying ``IRuntimeCache``).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span> <span class="ow">or</span> <span class="n">w</span><span class="o">.</span><span class="n">is_cpp_runtime</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_send_to_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Push ``rs`` to whichever engine flavor is attached.&quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">_to_torchbind_handle</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+            <span class="n">_CUDA_GRAPH_STRATEGY_MAP</span><span class="p">,</span>
+            <span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span> <span class="n">TRTEngine</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">update_runtime_settings</span><span class="p">(</span><span class="n">rs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Strategies cross the boundary as ints (TorchBind ``int64_t``,</span>
+            <span class="c1"># mirroring the nvinfer1 enum integers on the cpp side).</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">update_runtime_settings</span><span class="p">(</span>
+                <span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span><span class="p">[</span>
+                    <span class="n">rs</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span>
+                <span class="p">],</span>
+                <span class="n">_CUDA_GRAPH_STRATEGY_MAP</span><span class="p">[</span><span class="n">rs</span><span class="o">.</span><span class="n">cuda_graph_strategy</span><span class="p">],</span>
+                <span class="n">_to_torchbind_handle</span><span class="p">(</span><span class="n">rs</span><span class="o">.</span><span class="n">runtime_cache</span><span class="p">),</span>
+            <span class="p">)</span>
+
 <div class="viewcode-block" id="TorchTensorRTModule.setup_engine">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.setup_engine">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">setup_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -768,15 +883,19 @@ document.write(`
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
 
-        <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">())</span>
-        <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
             <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">TRTEngine</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">(),</span>
                 <span class="n">profile_execution</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span><span class="p">,</span>
             <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">())</span>
+
+        <span class="c1"># Re-apply via the setter: resolves any path-string runtime_cache,</span>
+        <span class="c1"># dispatches to the engine, and writes back the resolved form.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span>
 
         <span class="c1"># requires_native_multidevice is set by the C++ constructor from the serialized REQUIRES_NATIVE_MULTIDEVICE_IDX field.</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">requires_native_multidevice</span><span class="p">:</span>
@@ -826,8 +945,9 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">get_extra_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SerializedTorchTensorRTModuleFmt</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">engine_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">],</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">))</span>
-            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">])</span>
+            <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">))</span>
+            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
                 <span class="n">engine_info</span><span class="p">,</span>
@@ -836,8 +956,9 @@ document.write(`
             <span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">:</span>
             <span class="n">engine_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">],</span> <span class="nb">bytes</span><span class="p">)</span>
-            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">])</span>
+            <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
                 <span class="n">engine_info</span><span class="p">,</span>
@@ -871,18 +992,29 @@ document.write(`
             <span class="p">)</span>
 
             <span class="n">serialized_metadata</span> <span class="o">=</span> <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">]</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+            <span class="c1"># ``_pack_engine_info`` packs the metadata as a ``str``</span>
+            <span class="c1"># (base64-of-pickle.dumps decoded to utf-8); ``decode_metadata``</span>
+            <span class="c1"># expects the same. The assertion was inherited from an older</span>
+            <span class="c1"># bytes-typed format and never updated.</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
             <span class="n">metadata</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;weight_name_map&quot;</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;inout_symexprs&quot;</span><span class="p">]</span>
 
-            <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># RuntimeSettings are NOT serialized; restore defaults. Caller can</span>
+            <span class="c1"># reapply via ``mod.runtime_settings = ...`` (per submodule) or a CM after load.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">()</span>
+            <span class="c1"># Mirror the settings reset on the implicit cache handle so a</span>
+            <span class="c1"># stale wrapper from prior use doesn&#39;t survive load_state_dict and</span>
+            <span class="c1"># silently write the fresh engine&#39;s cache bytes to the old path.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
 
                 <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">TRTEngine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">set_output_tensors_as_unowned</span><span class="p">(</span>
                 <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;output_tensors_are_unowned&quot;</span><span class="p">]</span>
