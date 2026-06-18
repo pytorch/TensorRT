@@ -115,9 +115,12 @@ jobs:
             pre-script: ${{ matrix.pre-script }}
             script: |
                 set -euo pipefail
+                # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+                # for the rerun regex; see tests/py/ci_helpers.sh.
+                source tests/py/ci_helpers.sh
                 pushd .
                 cd tests/py/dynamo
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
                 popd
 
     L0-dynamo-core-tests:
@@ -145,13 +148,16 @@ jobs:
             pre-script: ${{ matrix.pre-script }}
             script: |
                 set -euo pipefail
+                # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+                # for the rerun regex; see tests/py/ci_helpers.sh.
+                source tests/py/ci_helpers.sh
                 pushd .
                 cd tests/py
                 cd dynamo
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/test_000_*
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_hlo_tests_results.xml hlo/
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/test_000_*
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_hlo_tests_results.xml hlo/
                 popd
 
     L0-py-core-tests:
@@ -179,9 +185,12 @@ jobs:
             pre-script: ${{ matrix.pre-script }}
             script: |
                 set -euo pipefail
+                # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+                # for the rerun regex; see tests/py/ci_helpers.sh.
+                source tests/py/ci_helpers.sh
                 pushd .
                 cd tests/py/core
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
                 popd
 
     L0-torchscript-tests:
@@ -209,13 +218,16 @@ jobs:
             pre-script: ${{ matrix.pre-script }}
             script: |
                 set -euo pipefail
+                # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+                # for the rerun regex; see tests/py/ci_helpers.sh.
+                source tests/py/ci_helpers.sh
                 pushd .
                 cd tests/modules
                 python hub.py
                 popd
                 pushd .
                 cd tests/py/ts
-                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
+                trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
                 popd
 
     L1-dynamo-core-tests:
@@ -251,12 +263,15 @@ jobs:
             pre-script: ${{ matrix.pre-script }}
             script: |
                 set -euo pipefail
+                # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+                # for the rerun regex; see tests/py/ci_helpers.sh.
+                source tests/py/ci_helpers.sh
                 pushd .
                 cd tests/py/dynamo
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_partitioning_tests_results.xml partitioning/test_001_*
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_partitioning_tests_results.xml partitioning/test_001_*
 
-                python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_hlo_tests_results.xml hlo/
+                trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_hlo_tests_results.xml hlo/
                 popd
 
     L1-dynamo-compile-tests:
@@ -270,7 +285,7 @@ jobs:
                 L0-py-core-tests,
                 L0-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -292,9 +307,12 @@ jobs:
             pre-script: ${{ matrix.pre-script }}
             script: |
                 set -euo pipefail
+                # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+                # for the rerun regex; see tests/py/ci_helpers.sh.
+                source tests/py/ci_helpers.sh
                 pushd .
                 cd tests/py/dynamo/
-                python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
+                trt_pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
                 popd
 
     L1-torch-compile-tests:
@@ -308,7 +326,7 @@ jobs:
                 L0-py-core-tests,
                 L0-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -330,11 +348,14 @@ jobs:
             pre-script: ${{ matrix.pre-script }}
             script: |
                 set -euo pipefail
+                # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+                # for the rerun regex; see tests/py/ci_helpers.sh.
+                source tests/py/ci_helpers.sh
                 pushd .
                 cd tests/py/dynamo/
-                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
-                python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-                python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+                trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
+                trt_pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+                trt_pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
                 popd
 
     L1-torchscript-tests:
@@ -348,7 +369,7 @@ jobs:
                 L0-py-core-tests,
                 L0-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -370,13 +391,16 @@ jobs:
             pre-script: ${{ matrix.pre-script }}
             script: |
                 set -euo pipefail
+                # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+                # for the rerun regex; see tests/py/ci_helpers.sh.
+                source tests/py/ci_helpers.sh
                 pushd .
                 cd tests/modules
                 python hub.py
                 popd
                 pushd .
                 cd tests/py/ts
-                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml   models/
+                trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml   models/
                 popd
 
     L2-torch-compile-tests:
@@ -390,7 +414,7 @@ jobs:
                 L1-dynamo-core-tests,
                 L1-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -429,7 +453,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -468,7 +492,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -508,7 +532,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -558,7 +582,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -600,7 +624,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -637,6 +661,98 @@ jobs:
                 python -m torch_tensorrt.distributed.run --nproc_per_node=2 distributed/test_native_nccl.py --multirank
                 python -m torch_tensorrt.distributed.run --nproc_per_node=2 distributed/test_export_save_load.py --multirank
                 popd
+
+    # Single rollup status that summarises every other job. Mark this one
+    # as the required check in branch protection — reviewers see a single
+    # ✅/❌ instead of 50 matrix entries. Click-through still surfaces the
+    # individual job logs.
+    #
+    # ``if: always()`` makes the rollup run even if upstream jobs failed,
+    # were skipped, or were cancelled (so we always render a check). The
+    # body fails the rollup iff any direct ``needs`` ended in 'failure';
+    # 'skipped' (label-gated) and 'success' both count as healthy.
+    ci-rollup:
+        name: CI / Linux x86_64
+        if: ${{ always() }}
+        needs:
+            [
+                build,
+                L0-dynamo-converter-tests,
+                L0-dynamo-core-tests,
+                L0-py-core-tests,
+                L0-torchscript-tests,
+                L1-dynamo-core-tests,
+                L1-dynamo-compile-tests,
+                L1-torch-compile-tests,
+                L1-torchscript-tests,
+                L2-torch-compile-tests,
+                L2-dynamo-compile-tests,
+                L2-dynamo-core-tests,
+                L2-dynamo-plugin-tests,
+                L2-torchscript-tests,
+                L2-dynamo-distributed-tests,
+            ]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Aggregate job results
+              env:
+                  RESULTS: ${{ toJSON(needs) }}
+              run: |
+                  set -euo pipefail
+                  # Emit two surfaces:
+                  #   * stdout / job exit code  → drives the green/red rollup
+                  #     status that branch protection keys on.
+                  #   * $GITHUB_STEP_SUMMARY    → the markdown that renders
+                  #     on the workflow run page, with a per-job result table.
+                  python3 - <<'PY'
+                  import json, os, sys
+                  needs = json.loads(os.environ["RESULTS"])
+                  by_result = {"success": [], "failure": [], "skipped": [], "cancelled": []}
+                  for name, info in needs.items():
+                      by_result.setdefault(info.get("result") or "unknown", []).append(name)
+                  failed = sorted(by_result["failure"])
+                  passed = sorted(by_result["success"])
+                  skipped = sorted(by_result["skipped"])
+                  cancelled = sorted(by_result["cancelled"])
+
+                  # --- stdout: short pass/fail summary for the log tab ---
+                  print(f"PASS:      {len(passed)}")
+                  print(f"FAIL:      {len(failed)}")
+                  print(f"SKIPPED:   {len(skipped)} (label-gated or never started)")
+                  print(f"CANCELLED: {len(cancelled)}")
+                  if failed:
+                      print()
+                      print("Failed jobs:")
+                      for name in failed:
+                          print(f"  - {name}")
+
+                  # --- step summary: markdown table for reviewers ---
+                  summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+                  if summary_path:
+                      icon = {"success": "✅", "failure": "❌", "skipped": "⏭️", "cancelled": "🚫"}
+                      with open(summary_path, "a", encoding="utf-8") as f:
+                          f.write("# CI / Linux x86_64 — rollup\n\n")
+                          f.write(
+                              f"**{len(passed)}** passed · "
+                              f"**{len(failed)}** failed · "
+                              f"**{len(skipped)}** skipped · "
+                              f"**{len(cancelled)}** cancelled\n\n"
+                          )
+                          f.write("| Result | Job |\n|---|---|\n")
+                          for status in ("failure", "cancelled", "skipped", "success"):
+                              for name in sorted(by_result.get(status, [])):
+                                  f.write(f"| {icon.get(status, '?')} {status} | `{name}` |\n")
+                          if failed:
+                              f.write(
+                                  "\n> Click into a failed job above to see "
+                                  "the rendered test table (via `pytest-results-action`) "
+                                  "and the `::warning::Reproduce locally with: ...` hint "
+                                  "near the bottom of the log.\n"
+                              )
+
+                  if failed:
+                      sys.exit(1)
+                  PY
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}

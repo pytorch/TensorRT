@@ -51,6 +51,18 @@ We use the PyTorch Slack for communication about core development, integration w
 
 - Document hacks, we can discuss it only if we can find it
 
+### Controlling CI scope via PR labels
+
+A full CI run is ~150 jobs across {Python 3.10–3.13} × {CUDA 13.0, 13.2} × {build, L0, L1, L2}. To keep PR feedback fast we let you shape what runs via labels — apply them in the PR's right sidebar and re-push (or close/reopen) to re-trigger:
+
+| Label | Effect |
+|---|---|
+| `ci: only-l0` | Skip L1 and L2 jobs. Useful for docs / build-system changes where only smoke matters. |
+| `ci: skip-l2` | Run L0 + L1, skip L2 (the slow model-level suites). |
+| `Force All Tests[L0+L1+L2]` | Pre-existing — force every tier to run even if an earlier tier failed. Used when investigating cascading failures. |
+
+PRs without any of these labels run the default set: build + L0 + L1 + L2, with L1/L2 gated on the previous tier's success so a fundamental build break doesn't waste 30 min of test capacity.
+
 ### Commits and PRs
 
 - Try to keep pull requests focused (multiple pull requests are okay). Typically PRs should focus on a single issue or a small collection of closely related issue.

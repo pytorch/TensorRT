@@ -82,6 +82,15 @@ test = [
     "parameterized>=0.2.0",
     "pytest>=8.2.1",
     "pytest-forked>=1.6.0",
+    # Emits ``::error file=...,line=...::`` annotations on test failure so
+    # GitHub renders them inline on the PR's Files Changed tab. Inert when
+    # ``GITHUB_ACTIONS`` is unset (local runs are unaffected).
+    "pytest-github-actions-annotate-failures>=0.2.0",
+    # pytest-rerunfailures lets CI retry tests that hit known transient
+    # CUDA / cudagraphs / engine-deserialization failures (see L0/L1
+    # ``--only-rerun`` regex in the workflows) without papering over real
+    # bugs in numerical / model-accuracy suites where it is omitted.
+    "pytest-rerunfailures>=14.0",
     "pytest-xdist>=3.6.1",
     "pyyaml",
     "setuptools",
