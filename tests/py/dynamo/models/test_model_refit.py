@@ -832,8 +832,8 @@ def test_refit_multiple_engine_without_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @unittest.skipIf(
-    torch_trt.ENABLED_FEATURES.tensorrt_rtx and sys.platform == "win32",
-    "cumsum refit errors out on TensorRT-RTX on Windows",
+    torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+    "cumsum is not supported on TensorRT-RTX (build_serialized_network returns None on Linux as well as Windows)",
 )
 @pytest.mark.unit
 def test_refit_cumsum():

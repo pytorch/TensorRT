@@ -110,8 +110,10 @@ quantization = [
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
-# which compiles user-supplied CUDA C++ kernels via NVRTC.
-kernels = ["cuda-python"]
+# which compiles user-supplied CUDA C++ kernels via NVRTC. The high-level
+# launch/compile API (``cuda.core``) lives in cuda-core; cuda-python's
+# bindings are still pulled in for the lower-level driver/runtime shims.
+kernels = ["cuda-python", "cuda-core"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"

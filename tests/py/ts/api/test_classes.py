@@ -342,11 +342,17 @@ class TestTorchTensorRTModule(unittest.TestCase):
                 "%26 : Tensor = aten::matmul(%x.1, %25)_myl0_0",
                 "%31 : Tensor = aten::matmul(%28, %30)_myl0_1"
             ],
-            "Bindings": [
+            "I/O Tensors": [
                 "input_0",
                 "output_0"
             ]
         }
+
+        The engine-input/output list key in TensorRT's
+        ``IEngineInspector`` JSON was renamed from ``Bindings`` to
+        ``I/O Tensors`` (TensorRT dropped the implicit "binding" terminology);
+        accept whichever the linked TensorRT emits so the test works across
+        versions.
         """
 
         import json
@@ -365,14 +371,20 @@ class TestTorchTensorRTModule(unittest.TestCase):
             TestTorchTensorRTModule._get_trt_mod(via_ts=True),
         ):
             trt_json = json.loads(trt_mod.get_layer_info())
-            [
-                self.assertTrue(k in trt_json.keys(), f"Key {k} is missing")
-                for k in ["Layers", "Bindings"]
-            ]
+            self.assertIn("Layers", trt_json.keys(), "Key Layers is missing")
+            io_key = next(
+                (k for k in ("I/O Tensors", "Bindings") if k in trt_json.keys()),
+                None,
+            )
+            self.assertIsNotNone(
+                io_key, "Neither 'I/O Tensors' nor 'Bindings' key is present"
+            )
             self.assertTrue(
                 len(trt_json["Layers"]) == num_layers
             ), "Not enough layers found"
-            self.assertTrue(len(trt_json["Bindings"]) == 2, "Not enough bindings found")
+            self.assertTrue(
+                len(trt_json[io_key]) == 2, "Not enough I/O tensors found"
+            )
 
 
 if __name__ == "__main__":
