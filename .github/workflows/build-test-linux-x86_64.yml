@@ -538,8 +538,11 @@ jobs:
                 python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
                 popd
                 pushd .
-                # cuda-python is an optional runtime dep for the torch_tensorrt.kernels QDP layer.
-                python -m pip install cuda-python
+                # The torch_tensorrt.kernels QDP layer needs cuda-core's high-level
+                # ``cuda.core`` API (Device / Program / launch). NVIDIA split this
+                # out of the old cuda-python umbrella into the cuda-core distribution
+                # for CUDA 13+, so installing cuda-python alone is no longer enough.
+                python -m pip install cuda-python cuda-core
                 cd tests/py/kernels
                 python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_kernels_test_results.xml .
                 popd
