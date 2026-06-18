@@ -202,3 +202,67 @@ def test_resolve_lifted_custom_obj_unwraps_fake_script_object():
     resolved = _resolve_lifted_custom_obj(ep, _stub_node("obj_engine"))
     assert not isinstance(resolved, FakeScriptObject)
     assert isinstance(resolved, _Real)
+
+
+# --- per-partition target_device (TensorRTPartitioner) -----------------------
+# These exercise the partitioner directly, so they need ExecuTorch installed;
+# they run in the dedicated executorch CI job and skip elsewhere.
+
+
+@pytest.mark.unit
+def test_resolve_target_device_uses_partition_engine(monkeypatch):
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
+    from torch_tensorrt.executorch import partitioner as P
+
+    part = P.TensorRTPartitioner()
+    engine_node = object()
+    monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [engine_node])
+    info = ["0"] * (DEVICE_IDX + 1)
+    info[DEVICE_IDX] = "2"
+    monkeypatch.setattr(P, "_get_engine_info_for_node", lambda ep, n: info)
+
+    partition = types.SimpleNamespace(id=0, nodes=[engine_node])
+    assert part._resolve_target_device_for_partition(object(), partition) == b"cuda:2"
+
+
+@pytest.mark.unit
+def test_resolve_target_device_falls_back_when_not_one_engine(monkeypatch):
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.executorch import partitioner as P
+
+    part = P.TensorRTPartitioner()
+    partition = types.SimpleNamespace(id=1, nodes=[])
+
+    monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [])
+    assert part._resolve_target_device_for_partition(object(), partition) == b"cuda:0"
+
+    monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [object(), object()])
+    assert part._resolve_target_device_for_partition(object(), partition) == b"cuda:0"
+
+
+@pytest.mark.unit
+def test_per_partition_distinct_target_devices(monkeypatch):
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
+    from torch_tensorrt.executorch import partitioner as P
+
+    part = P.TensorRTPartitioner()
+    # Each partition's engine node carries its own device id as its value.
+    monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [nodes[0]])
+
+    def fake_info(ep, node):
+        info = ["0"] * (DEVICE_IDX + 1)
+        info[DEVICE_IDX] = str(node)
+        return info
+
+    monkeypatch.setattr(P, "_get_engine_info_for_node", fake_info)
+    d0 = part._resolve_target_device_for_partition(
+        object(), types.SimpleNamespace(id=0, nodes=["0"])
+    )
+    d1 = part._resolve_target_device_for_partition(
+        object(), types.SimpleNamespace(id=1, nodes=["1"])
+    )
+    assert d0 == b"cuda:0"
+    assert d1 == b"cuda:1"
+    assert d0 != d1

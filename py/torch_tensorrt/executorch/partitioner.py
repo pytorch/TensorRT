@@ -12,11 +12,12 @@ from executorch.exir.backend.partitioner import (
 )
 from executorch.exir.backend.utils import tag_constant_data
 from torch.export import ExportedProgram
-from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner
+from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
 from torch_tensorrt.executorch.backend import (
     TensorRTBackend,
-    _get_engine_info_from_edge_program,
+    _get_engine_info_for_node,
+    _get_engine_nodes_in,
     _parse_device_id,
 )
 from torch_tensorrt.executorch.operator_support import TensorRTOperatorSupport
@@ -77,27 +78,34 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
             compile_specs=self.compile_specs,
         )
 
-    def _resolve_target_device(self, exported_program: ExportedProgram) -> bytes:
-        """Best-effort ``target_device`` for the delegate-boundary TensorSpecs.
+    def _resolve_target_device_for_partition(
+        self, exported_program: ExportedProgram, partition: Partition
+    ) -> bytes:
+        """Best-effort ``target_device`` for one partition's delegate boundary.
 
-        Reuses the backend's own engine-info extraction so the device index
-        cannot drift from the runtime blob. Any extraction failure -- no single
-        engine node (zero or multiple TRT partitions) or an unreadable index --
-        falls back to ``cuda:0``; per-partition multi-GPU labeling is left to a
-        follow-up.
+        Derives the device from this partition's own TRT engine node, so a
+        coalesced multi-engine graph labels each delegate with its correct GPU
+        instead of stamping every partition with a single whole-program value.
+        Any extraction failure falls back to ``cuda:0``.
         """
         try:
-            engine_info = _get_engine_info_from_edge_program(exported_program)
+            engine_nodes = _get_engine_nodes_in(partition.nodes)
+            if len(engine_nodes) != 1:
+                raise RuntimeError(
+                    f"expected exactly 1 engine node in partition "
+                    f"{getattr(partition, 'id', '?')}, found {len(engine_nodes)}"
+                )
+            engine_info = _get_engine_info_for_node(exported_program, engine_nodes[0])
             return f"cuda:{_parse_device_id(engine_info[DEVICE_IDX])}".encode()
         except Exception as e:
             # Broad by design: any extraction failure must fall back, not abort
             # the export. Warn so a non-default GPU silently labeled cuda:0 stays
             # diagnosable.
             logger.warning(
-                "Could not derive target_device from the TensorRT engine (%s); "
-                "falling back to cuda:0. A non-default GPU engine may be "
-                'mislabeled -- pin it via CompileSpec("target_device", '
+                "Could not derive target_device for partition %s (%s); falling "
+                'back to cuda:0. Pin it via CompileSpec("target_device", '
                 'b"cuda:<index>").',
+                getattr(partition, "id", "?"),
                 e,
             )
             return b"cuda:0"
@@ -110,26 +118,26 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
         )
         partition_list = capability_partitioner.propose_partitions()
 
-        if self._has_explicit_target_device:
-            delegation_spec = self.delegation_spec
-        else:
-            delegation_spec = DelegationSpec(
-                backend_id=TensorRTBackend.__name__,
-                compile_specs=self.compile_specs
-                + [
-                    CompileSpec(
-                        _TARGET_DEVICE_COMPILE_SPEC_KEY,
-                        self._resolve_target_device(exported_program),
-                    )
-                ],
-            )
-
         partition_tags: Dict[str, DelegationSpec] = {}
         for partition in partition_list:
             tag = f"tensorrt_{partition.id}"
             for node in partition.nodes:
                 node.meta["delegation_tag"] = tag
-            partition_tags[tag] = delegation_spec
+            if self._has_explicit_target_device:
+                partition_tags[tag] = self.delegation_spec
+            else:
+                partition_tags[tag] = DelegationSpec(
+                    backend_id=TensorRTBackend.__name__,
+                    compile_specs=self.compile_specs
+                    + [
+                        CompileSpec(
+                            _TARGET_DEVICE_COMPILE_SPEC_KEY,
+                            self._resolve_target_device_for_partition(
+                                exported_program, partition
+                            ),
+                        )
+                    ],
+                )
 
         tag_constant_data(exported_program)
 
