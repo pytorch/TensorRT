@@ -199,6 +199,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
 
+        # Enable TRT's native multi-device runtime preview feature when the
+        # Torch-TRT runtime was built with NCCL collectives support. Without
+        # this, IBuilder::buildEngineWithConfig() rejects networks that contain
+        # IDistCollectiveLayer with "PreviewFeature::kMULTIDEVICE_RUNTIME_10_16
+        # is not enabled in the builder config".
+        if ENABLED_FEATURES.native_trt_collectives and hasattr(
+            trt.PreviewFeature, "MULTIDEVICE_RUNTIME_10_16"
+        ):
+            builder_config.set_preview_feature(
+                trt.PreviewFeature.MULTIDEVICE_RUNTIME_10_16, True
+            )
+
         if self._debugger_config and self._debugger_config.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
 

@@ -104,8 +104,7 @@ cc_library(
         "TensorRTBindingNames.h",
         "runtime.h",
     ],
-    copts = if_torch_nccl(["-DUSE_C10D_NCCL"]),
-    defines = select({
+    defines = if_torch_nccl(["USE_C10D_NCCL"]) + select({
         # nvinfer1::IRuntimeConfig (and the matching ICudaEngine::createRuntimeConfig
         # / createExecutionContext(IRuntimeConfig*) overloads) was introduced in
         # TensorRT 10.11. The TensorRT shipped with the Jetpack l4t-r36.4 toolchain
