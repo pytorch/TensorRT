@@ -135,7 +135,7 @@ def is_platform_supported_for_trtllm() -> bool:
         return True
 
     except Exception as e:
-        logger.warning(f"Failed to detect CUDA version: {e}")
+        logger.info(f"Failed to detect CUDA version: {e}")
         return False
 
     return True
@@ -236,7 +236,7 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
         wheel_path.unlink(missing_ok=True)
         logger.debug(f"Deleted wheel file: {wheel_path}")
     except Exception as e:
-        logger.warning(f"Could not delete wheel file {wheel_path}: {e}")
+        logger.info(f"Could not delete wheel file {wheel_path}: {e}")
     if not plugin_lib_path.exists():
         logger.error(
             f"Plugin library not found at expected location: {plugin_lib_path}"
@@ -356,7 +356,7 @@ def load_tensorrt_llm_for_nccl() -> bool:
             "on",
         )
         if not use_trtllm_plugin:
-            logger.warning(
+            logger.info(
                 "Neither TRTLLM_PLUGIN_PATH is set nor is it directed to download the shared library. Please set either of the two to use TRT-LLM libraries in torchTRT"
             )
             return False
