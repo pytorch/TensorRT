@@ -588,14 +588,12 @@ jobs:
 
     L2-dynamo-distributed-tests:
         name: ${{ matrix.display-name }}
+        # NOTE: intentionally does NOT depend on the L1-* jobs so that the
+        # distributed tests run irrespective of L1 pass/fail status.
         needs:
             [
                 filter-matrix,
                 build,
-                L1-dynamo-core-tests,
-                L1-dynamo-compile-tests,
-                L1-torch-compile-tests,
-                L1-torchscript-tests,
             ]
         if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
         strategy:
