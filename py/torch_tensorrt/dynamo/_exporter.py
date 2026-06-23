@@ -215,29 +215,6 @@ def lift(
     return gm, graph_signature, state_dict, constants
 
 
-def get_duplicate_nodes(
-    gm: torch.fx.GraphModule, submodule: torch.fx.GraphModule
-) -> Tuple[Sequence[Any], Sequence[Any]]:
-    """
-    We check if there are duplicate nodes when we copy submodule graph into gm.
-    Handle the case where the subgraph input placeholders are same as
-    gm placeholders. This happens when the first submodule in the graph is
-    a pytorch submodule
-    """
-    submodule_placeholder_inputs = [
-        node for node in submodule.graph.nodes if node.op == "placeholder"
-    ]
-    submodule_input_node_names = [node.name for node in submodule_placeholder_inputs]
-    gm_node_names = [node.name for node in gm.graph.nodes]
-    submodule_duplicate_inputs = [
-        node for node in submodule_placeholder_inputs if node.name in gm_node_names
-    ]
-    gm_duplicate_inputs = [
-        node for node in gm.graph.nodes if node.name in submodule_input_node_names
-    ]
-    return submodule_duplicate_inputs, gm_duplicate_inputs
-
-
 def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """
     Inline a submodule within the parent graph (gm). All `call_module` nodes
@@ -251,47 +228,34 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         if gm_node.op == "call_module" and "_run_on_gpu" in gm_node.name:
             submodule = getattr(gm, gm_node.name)
             with gm.graph.inserting_before(gm_node):
-                # Get inputs of submodule node which are most likely outputs of a previous TRT node
-                # or a placeholder of the main graph
+                # Inputs of the submodule node in the parent graph, in order.
+                # These are the actual producer nodes (e.g. a previous TRT
+                # engine's getitem) and are already topologically before gm_node.
                 submodule_inputs = gm_node.args
-
-                submodule_duplicate_inputs, gm_duplicate_inputs = get_duplicate_nodes(
-                    gm, submodule
+                submodule_placeholders = [
+                    node for node in submodule.graph.nodes if node.op == "placeholder"
+                ]
+                assert len(submodule_placeholders) == len(submodule_inputs), (
+                    f"Submodule {gm_node.name} has {len(submodule_placeholders)} "
+                    f"placeholders but the call node provides "
+                    f"{len(submodule_inputs)} inputs."
                 )
-                assert len(submodule_duplicate_inputs) == len(gm_duplicate_inputs)
-                # Avoid creating new copies of duplicate inputs by creating a mapping
-                val_map = {}
-                for i in range(len(submodule_duplicate_inputs)):
-                    val_map[submodule_duplicate_inputs[i]] = gm_duplicate_inputs[i]
 
-                # Copy all nodes in the submodule into gm and
-                # store the output node of this submodule which is now present in gm
+                # Map each submodule placeholder directly to the corresponding
+                # parent input node (positional). Relying on the call-node args
+                # rather than matching by node name is essential: inline_trt_modules
+                # may have created/renamed getitem nodes so a placeholder's name
+                # now collides with an unrelated (and possibly later-defined) node,
+                # which would otherwise wire the body to the wrong producer and
+                # break topological ordering.
+                val_map: Dict[Any, Any] = dict(
+                    zip(submodule_placeholders, submodule_inputs)
+                )
+
+                # Copy the submodule body into gm. Placeholders are pre-seeded in
+                # val_map so graph_copy wires copied nodes to the real inputs
+                # instead of duplicating placeholder nodes.
                 submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
-
-                # Get their references (since we copied) in the parent graph (gm)
-                if len(submodule_duplicate_inputs) == 0:
-                    submodule_placeholder_input_names = [
-                        node.name
-                        for node in submodule.graph.nodes
-                        if node.op == "placeholder"
-                    ]
-                    gm_added_placeholder_inputs = [
-                        node
-                        for node in gm.graph.nodes
-                        if node.name in submodule_placeholder_input_names
-                    ]
-
-                    assert len(submodule_inputs) == len(gm_added_placeholder_inputs)
-
-                    # Replace the added placeholder inputs with original inputs to this submodule node
-                    for idx in range(len(gm_added_placeholder_inputs)):
-                        gm_added_placeholder_inputs[idx].replace_all_uses_with(
-                            submodule_inputs[idx]
-                        )
-
-                    # Erase the placeholder input nodes in the gm
-                    for idx in range(len(gm_added_placeholder_inputs)):
-                        gm.graph.erase_node(gm_added_placeholder_inputs[idx])
 
                 # Replace the pytorch submodule node (call_module) with the inlined subgraph output
                 # Special handling when submodule returns multiple outputs (tuple)
