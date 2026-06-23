@@ -315,7 +315,7 @@ def compile(
                 "'arg_inputs' and 'inputs' should not be used at the same time."
             )
         if inputs is not None:
-            arg_inputs = inputs  # type: ignore[assignment]
+            arg_inputs = inputs
 
         if kwarg_inputs is None:
             kwarg_inputs = {}
@@ -414,7 +414,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs  # type: ignore[assignment]
+    arg_inputs = inputs or arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -514,7 +514,7 @@ def convert_method_to_trt_engine(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = arg_inputs or inputs  # type: ignore[assignment]
+    arg_inputs = arg_inputs or inputs
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
@@ -558,7 +558,7 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(
+        return dynamo_convert_exported_program_to_serialized_trt_engine(  # type: ignore[no-any-return]
             exp_program,
             arg_inputs=tuple(normalized_arg_inputs),
             kwarg_inputs=torchtrt_kwarg_inputs,
@@ -1406,14 +1406,31 @@ def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> Non
     """
     import base64
 
+    import torch.export.pt2_archive.constants as pt2_archive_constants
     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
     from torch_tensorrt.dynamo.runtime._TRTEngine import (
         EngineSerializer,
         TRTEngine,
     )
 
+    # OPAQUE_OBJ_FILENAME_PREFIX was introduced in the Opaque Object Serialization PR:
+    # https://github.com/pytorch/pytorch/pull/181676. Its presence on the (pre-existing)
+    # constants module gates whether opaque object serialization is supported.
+    opaque_obj_serialization_supported = hasattr(
+        pt2_archive_constants, "OPAQUE_OBJ_FILENAME_PREFIX"
+    )
+
     for fqn, constant in list(exp_program.constants.items()):
         if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):
+            if not opaque_obj_serialization_supported:
+                if isinstance(constant, torch._C.ScriptObject):
+                    # Serialize the TRT Engine with C++ script object later
+                    continue
+                else:
+                    raise RuntimeError(
+                        "Opaque object serialization is not supported in this version of PyTorch. Therefore, Python TRT Engine cannot be serialized. "
+                        + "Please upgrade to the latest version of PyTorch or use C++ runtime to serialize the TRT Engine."
+                    )
 
             state = constant.__getstate__()
             if len(state) == 2 and (
