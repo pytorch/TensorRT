@@ -1,5 +1,6 @@
 import os
 import json
+import re
 
 from github import Github
 import subprocess
@@ -25,8 +26,10 @@ output = subprocess.run(
 comment = """Code conforms to C++ style guidelines"""
 approval = "APPROVE"
 if output.returncode != 0:
+    lint_output = output.stdout.decode("utf-8")
+    lint_output = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", lint_output)
     comment = """There are some changes that do not conform to C++ style guidelines:\n ```diff\n{}```""".format(
-        output.stdout.decode("utf-8")
+        lint_output
     )
     approval = "REQUEST_CHANGES"
 
