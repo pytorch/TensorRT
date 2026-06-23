@@ -272,7 +272,7 @@ class TRTTestCase(TestCase):
                     cuda_inputs.append(i.cuda())
 
                 mod.eval()
-                interpreter.run(precision=torch.float)
+                interpreter.run()
 
     def assert_has_op(self, mod, ops):
         ops_in_mod = set()
@@ -359,7 +359,6 @@ class DispatchTestCase(TRTTestCase):
         inputs,
         rtol=RTOL,
         atol=ATOL,
-        precision=dtype.f32,
         check_dtype=True,
         use_dynamo_tracer=None,
         enable_passes=False,
@@ -368,6 +367,8 @@ class DispatchTestCase(TRTTestCase):
         immutable_weights=True,
         decompose_attention=False,
         attn_bias_is_causal=True,
+        require_full_compilation=False,
+        disable_tf32=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -379,6 +380,8 @@ class DispatchTestCase(TRTTestCase):
             immutable_weights=immutable_weights,
             decompose_attention=decompose_attention,
             attn_bias_is_causal=attn_bias_is_causal,
+            require_full_compilation=require_full_compilation,
+            disable_tf32=disable_tf32,
         )
 
         mod = self.generate_graph(
@@ -444,6 +447,13 @@ class DispatchTestCase(TRTTestCase):
             compilation_settings=compilation_settings,
         )
 
+        if require_full_compilation:
+            missing = interp.validate_conversion()
+            self.assertTrue(
+                len(missing) == 0,
+                f"require_full_compilation=True but the following ops don't have TRT converter: {missing}",
+            )
+
         super().run_test(
             mod,
             trt_inputs,
@@ -460,7 +470,6 @@ class DispatchTestCase(TRTTestCase):
         inputs,
         expected_ops,
         comparators: List[Tuple[Callable, List]],
-        precision=torch.float,
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
