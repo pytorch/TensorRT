@@ -128,7 +128,6 @@ include-package-data = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests/py"]
-addopts = "-n auto --dist=loadfile"
 norecursedirs = [
     "bazel-*",
     ".venv",
