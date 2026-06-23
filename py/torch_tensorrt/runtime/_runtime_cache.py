@@ -22,13 +22,17 @@ module).
 
 from __future__ import annotations
 
+import atexit
 import logging
 import os
 import shutil
 import threading
+import weakref
+from functools import partial
 from typing import (
     IO,
     Any,
+    Callable,
     Optional,
     Protocol,
     Sequence,
@@ -140,6 +144,14 @@ class _RuntimeCacheHandle:
             return self._cache
 
 
+def _autosave_at_exit(ref: "weakref.ref[RuntimeCache]") -> None:
+    """Module-level so the atexit closure only holds a weakref, not a bound
+    method (see :meth:`RuntimeCache.__init__` for full rationale)."""
+    rc = ref()
+    if rc is not None:
+        rc._autosave_if_enabled()
+
+
 class RuntimeCache:
     """User-facing handle for the TensorRT-RTX runtime kernel cache.
 
@@ -181,6 +193,11 @@ class RuntimeCache:
         path: str = "",
         autosave_on_del: bool = False,
     ) -> None:
+        # Set the atexit-token slot first so ``__del__`` can safely read it
+        # even if a later step in ``__init__`` raises and leaves the object
+        # partially constructed.
+        self._atexit_token: Optional[Callable[..., None]] = None
+
         # Pick the backing that matches the active runtime. The torchbind
         # class ``torch.classes.tensorrt.RuntimeCacheHandle`` is registered by
         # the C++ shared library; if the .so isn't loaded
@@ -196,6 +213,17 @@ class RuntimeCache:
         else:
             self._handle = _RuntimeCacheHandle(path=path)
         self.autosave_on_del = autosave_on_del
+
+        # Engine-implicit handles must save before ``sys.meta_path`` is torn
+        # down at interpreter exit -- ``__del__`` then hits ``ImportError``
+        # from the torchbind property and the lazy ``filelock`` import.
+        # ``atexit`` fires before that teardown. ``partial`` over a
+        # ``weakref`` keeps the registration non-owning, so mid-program GC
+        # still runs ``__del__`` normally.
+        if autosave_on_del:
+            self._atexit_token = atexit.register(
+                partial(_autosave_at_exit, weakref.ref(self))
+            )
 
     @property
     def path(self) -> str:
@@ -300,15 +328,32 @@ class RuntimeCache:
                 except OSError:
                     pass
 
-    def __del__(self) -> None:
-        # Best-effort autosave for engine-implicit handles. The CM disables
-        # this (``autosave_on_del=False``) since it saves on ``__exit__``;
-        # user-constructed handles default to disabled so save timing stays
-        # under the user's control. ``__del__`` can fire during interpreter
-        # shutdown when imports/filesystem ops fail unpredictably -- swallow.
-        if self.autosave_on_del and self.path:
-            try:
+    def _autosave_if_enabled(self) -> None:
+        """Idempotent autosave shared by ``__del__`` and the atexit hook.
+        Flips ``autosave_on_del`` off; swallows any exception so a
+        shutdown-time ``ImportError`` never leaks as
+        ``Exception ignored in __del__``.
+        """
+        try:
+            if self.autosave_on_del and self.path:
+                self.autosave_on_del = False
                 self.save()
+        except Exception:
+            pass
+
+    def __del__(self) -> None:
+        # Mid-program GC path. The companion ``_autosave_at_exit`` hook
+        # covers the case where the handle survives until interpreter exit;
+        # whichever path runs first flips ``autosave_on_del`` off so the
+        # other no-ops.
+        self._autosave_if_enabled()
+
+        # Drop our atexit hook so the registry does not accumulate dead
+        # entries across many engine-implicit handles in long-running
+        # processes (each entry holds a now-dead weakref).
+        if self._atexit_token is not None:
+            try:
+                atexit.unregister(self._atexit_token)
             except Exception:
                 pass
 

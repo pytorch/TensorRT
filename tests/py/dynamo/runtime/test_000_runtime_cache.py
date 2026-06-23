@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import torch
 import torch_tensorrt as torchtrt
@@ -333,6 +334,98 @@ class TestRuntimeCacheAutosave(TestCase):
                 os.path.exists(path),
                 "User-built handle with autosave_on_del=False should not save on GC",
             )
+
+    def test_del_swallows_shutdown_import_error_on_path(self):
+        """During interpreter shutdown ``self.path`` (a property that forwards
+        to ``self._handle.path``) can raise ``ImportError`` from a lazy import
+        triggered on a torn-down ``sys.meta_path``. ``__del__`` must wrap the
+        entire body in try/except so this does not surface as a noisy
+        ``Exception ignored in __del__``.
+        """
+        import sys
+
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
+
+        handle = RuntimeCache(path="/nonexistent/path", autosave_on_del=True)
+
+        class _Boom:
+            @property
+            def path(self) -> str:
+                raise ImportError(
+                    "sys.meta_path is None, Python is likely shutting down"
+                )
+
+        handle._handle = _Boom()
+
+        # An exception escaping ``__del__`` reaches the interpreter via
+        # ``sys.unraisablehook`` rather than ordinary stderr. Swap the hook
+        # for a Mock so the call (if any) is recorded and the contract --
+        # "nothing leaks" -- maps to ``assert_not_called``.
+        with patch.object(sys, "unraisablehook") as mock_hook:
+            del handle
+            gc.collect()
+            mock_hook.assert_not_called()
+
+    def test_atexit_hook_saves_via_weakref(self):
+        """``_autosave_at_exit`` resolves the weakref and invokes ``save()``,
+        and flips ``autosave_on_del`` off so a subsequent ``__del__`` no-ops.
+        """
+        import weakref
+
+        from torch_tensorrt.runtime._runtime_cache import (
+            RuntimeCache,
+            _autosave_at_exit,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = RuntimeCache(path=path, autosave_on_del=True)
+
+            with patch.object(handle, "save") as mock_save:
+                _autosave_at_exit(weakref.ref(handle))
+                mock_save.assert_called_once()
+            self.assertFalse(
+                handle.autosave_on_del,
+                "atexit hook must flip autosave_on_del off so __del__ skips",
+            )
+
+    def test_atexit_hook_no_op_on_dead_weakref(self):
+        """If the handle was already collected mid-program, the atexit hook
+        sees a dead weakref and does nothing -- no exceptions, no save."""
+        import weakref
+
+        from torch_tensorrt.runtime._runtime_cache import _autosave_at_exit
+
+        class _WeakrefableDummy:
+            pass
+
+        ref: weakref.ref = weakref.ref(_WeakrefableDummy())
+        gc.collect()
+        self.assertIsNone(ref(), "sentinel must be collected by gc")
+
+        # Must not raise even though ref() is dead.
+        _autosave_at_exit(ref)
+
+    def test_atexit_token_unregistered_after_del(self):
+        """``__del__`` removes the handle's atexit hook so the registry does
+        not accumulate dead entries across many engine-implicit handles in
+        long-running processes."""
+        import atexit
+
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
+
+        handle = RuntimeCache(path="/nonexistent/path", autosave_on_del=True)
+        token = handle._atexit_token
+        self.assertIsNotNone(token)
+
+        # Spy on ``atexit.unregister`` to verify ``__del__`` cleaned up. Using
+        # a mock avoids depending on private CPython implementation details
+        # of the atexit registry (no ``atexit._exithandlers`` in modern
+        # Python).
+        with patch.object(atexit, "unregister") as mock_unregister:
+            del handle
+            gc.collect()
+            mock_unregister.assert_called_once_with(token)
 
 
 @unittest.skipIf(
