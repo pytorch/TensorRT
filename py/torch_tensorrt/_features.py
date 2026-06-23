@@ -236,7 +236,10 @@ def needs_native_collectives(f: Callable[..., Any]) -> Callable[..., Any]:
             return f(*args, **kwargs)
         else:
             raise NotImplementedError(
-                "TensorRT 11+ is required for native NCCL collectives"
+                f"Native TensorRT NCCL collectives are unavailable. "
+                f"Detected TensorRT {tensorrt.version}; native collectives require TRT 10.16+ "
+                f"with a runtime built with NCCL support. Set USE_NATIVE_TRT_COLLECTIVES=0 to fall back "
+                f"to the TensorRT-LLM plugin path."
             )
 
     return wrapper
