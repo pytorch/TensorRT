@@ -241,8 +241,19 @@ def expand(
             "Cannot expand to shape with rank smaller than original tensor."
         )
 
-    # After the above padding, the shape and tensor rank must be equal
-    assert len(input_t.shape) == shape_rank
+    # After the above padding, the shape and tensor rank must be equal.
+    # Safely check rank (len(...) may fail on symbolic shapes).
+    try:
+        current_rank = len(input_t.shape)
+    except Exception:
+        current_rank = initial_tensor_rank
+
+    if current_rank != shape_rank:
+        raise RuntimeError(
+            f"expand lowering: expected input rank {shape_rank} after padding, but got {current_rank}. "
+            "This may indicate symbolic or dynamic dimensions causing a rank mismatch."
+        )
+
 
     # Configure the start, strides and output shape tensors
     start = tuple([0] * shape_rank)
