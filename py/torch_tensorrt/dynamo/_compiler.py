@@ -52,6 +52,7 @@ from torch_tensorrt.dynamo.utils import (
     prepare_inputs,
     to_torch_device,
     to_torch_tensorrt_device,
+    validate_optimization_profiles,
 )
 
 logger = logging.getLogger(__name__)
@@ -741,6 +742,7 @@ def compile(
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
+
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
@@ -1045,6 +1047,24 @@ def compile_module(
         submodule_node_dict[node.name] = node
 
     preserve_module_specs(original_in_spec, original_out_spec, partitioned_module)
+
+    # Multi-profile propagation: build the map from export source
+    # symbols to per-profile bounds once, from the top-level inputs, then reuse
+    # it to attach the same profiles (by index) to every TRT submodule's inputs.
+    top_level_inputs: List[Input] = list(sample_arg_inputs)
+    if isinstance(sample_kwarg_inputs, dict):
+        top_level_inputs.extend(sample_kwarg_inputs.values())
+    num_profiles = validate_optimization_profiles(top_level_inputs)
+    profile_source_bounds = None
+    if num_profiles:
+        logger.info(
+            f"Building engine(s) with {num_profiles} "
+            "optimization profiles (selected by index)"
+        )
+        profile_source_bounds = partitioning.build_profile_source_bounds(
+            partitioned_module, top_level_inputs, num_profiles
+        )
+
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
     # Iterate over all components that can be accelerated
@@ -1102,8 +1122,14 @@ def compile_module(
             ]
         )
 
-        # Get the submodule inputs for min, opt, max shapes of the graph inputs
-        submodule_inputs = partitioning.construct_submodule_inputs(submodule)
+        # Get the submodule inputs for min, opt, max shapes of the graph inputs.
+        # With multi-profile compile, propagate the profiles (by index) to each
+        # submodule input by symbolic substitution.
+        submodule_inputs = partitioning.construct_submodule_inputs(
+            submodule,
+            profile_source_bounds=profile_source_bounds,
+            num_profiles=num_profiles,
+        )
 
         assert submodule_inputs is not None
 

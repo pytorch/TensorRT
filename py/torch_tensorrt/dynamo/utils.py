@@ -187,6 +187,7 @@ def get_torch_tensor(
     if input.is_shape_tensor:
         # TODO: All the shape tensors we've encountered so far are plain integers.
         # Validate this assumption on more models.
+        assert isinstance(input.shape, dict)
         return input.shape["opt_shape"][0]
 
     if len(mode) > 0:
@@ -449,6 +450,69 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional
         min_max_opt["opt"] = int(var_val)
 
     return min_max_opt
+
+
+def validate_optimization_profiles(input_specs: Sequence[Input]) -> int:
+    """Validate multi-profile inputs and return the number of profiles.
+
+    ``Input.profiles`` is an ordered list; the list index is the TRT
+    optimization-profile index selected at runtime. Every dynamic input that
+    declares ``profiles`` must declare the *same number* of profiles.
+    Static inputs (or dynamic inputs without profiles) are allowed and reuse
+    their single shape in every profile.
+
+    Returns the number of *declared* optimization profiles, i.e. ``0`` when no
+    input declares ``profiles`` (the multi-profile feature is unused and the
+    actual profile count is decided downstream: ``0`` for fully static engines,
+    ``1`` for dynamic ones).
+    """
+    num_profiles = 0
+    for inp in input_specs:
+        profiles = getattr(inp, "profiles", None)
+        if not profiles:
+            continue
+        if num_profiles == 0:
+            num_profiles = len(profiles)
+        elif len(profiles) != num_profiles:
+            raise ValueError(
+                "All inputs declaring optimization profiles must declare the same "
+                f"number of profiles, found both {num_profiles} and {len(profiles)}."
+            )
+    return num_profiles
+
+
+def extract_var_range_info_for_profile(
+    symbolic_integer: torch.SymInt,
+    symbol_values: Dict[str, int],
+) -> int:
+    """Evaluate a symbolic dimension at a single profile corner.
+
+    ``symbol_values`` maps source symbol name (e.g. ``"s0"``) to the concrete
+    integer value of that symbol at one corner (min / opt / max) of a profile.
+    The intermediate ``SymInt`` expression (e.g. ``s0/4``) is evaluated by
+    substituting those values. Shape ops in export produce affine expressions
+    that are monotonic in each source symbol, so per-corner substitution is
+    exact.
+    """
+    node = symbolic_integer.node
+    expr = node.expr
+    # A fully-static expression may already be a Python/sympy integer.
+    if isinstance(expr, int):
+        return int(expr)
+    free_symbols: Any = getattr(expr, "free_symbols", set())
+    substitution = {
+        sym: symbol_values[sym.name]
+        for sym in free_symbols
+        if getattr(sym, "name", None) in symbol_values
+    }
+    evaluated = expr.xreplace(substitution) if substitution else expr
+    if getattr(evaluated, "free_symbols", set()):
+        # A free symbol was missing from symbol_values; caller should fall back.
+        raise KeyError(
+            f"Could not fully evaluate symbolic dim {expr} with symbol values "
+            f"{symbol_values} (unresolved free symbols remain)."
+        )
+    return int(evaluated)
 
 
 def unwrap_tensor_shape(

@@ -101,22 +101,21 @@ void setup_input_tensors(
   compiled_engine->reset_active_input_tensors();
 
   for (size_t i = 0; i < inputs.size(); i++) {
-    std::string name = compiled_engine->in_binding_names[i];
+    const auto& binding = compiled_engine->input_binding_infos[i];
+    const auto& name = binding.name;
 
     TORCHTRT_CHECK(
         inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
 
-    auto expected_type = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
     TORCHTRT_CHECK(
-        inputs[i].dtype() == expected_type,
-        "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
+        inputs[i].dtype() == binding.expected_type,
+        "Expected input tensors to have type " << binding.expected_type << ", found type " << inputs[i].dtype());
 
     auto dims = core::util::toDims(inputs[i].sizes());
     auto shape = core::util::toVec(dims);
-    bool is_shape_tensor = compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str());
-    LOG_DEBUG("Input Name: " << name << " Shape: " << dims << " isShapeInferenceIO: " << is_shape_tensor);
+    LOG_DEBUG("Input Name: " << name << " Shape: " << dims << " isShapeInferenceIO: " << binding.is_shape_tensor);
 
-    if (is_shape_tensor) {
+    if (binding.is_shape_tensor) {
       // Shape tensor inputs are casted to int64 explicitly.
       // Refer to
       // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
@@ -260,8 +259,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
     }
 
-    bool shape_changed = _validate_shapes(inputs, compiled_engine);
-
+    // Resolve the execution stream first so the optimization-profile switch below
+    // is issued on the same stream the engine will actually enqueue on. This keeps
+    // the switch consistent with execution and, for a default-stream caller, keeps
+    // it on the pool stream instead of serializing the device on the default stream.
     auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
     auto default_stream = compiled_engine->default_stream;
     auto previous_engine_stream = compiled_engine->engine_stream;
@@ -277,6 +278,18 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     if (cudagraphs_enabled && compiled_engine->engine_stream != previous_engine_stream) {
       // Captured CUDA graph was recorded against the old stream; force re-record.
       compiled_engine->runtime_states.context_changed = true;
+    }
+
+    // Validate shapes first so auto-selection is skipped entirely when the input
+    // shape is unchanged: the previously selected profile still fits, so it stays
+    // active. When the shape did change, auto_select_profile keeps the active
+    // profile if it still fits (no-op) or switches otherwise. A switch sets
+    // context_changed (consumed by set_runtime_states regardless of order), and
+    // shape_changed is already true here, so the cudagraph record/reset below
+    // still fires. Only auto-selection runs per call; manual pins are eager.
+    bool shape_changed = _validate_shapes(inputs, compiled_engine);
+    if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
+      compiled_engine->auto_select_profile(inputs);
     }
 
     // Whether cudagraphs needs to record the graph on this pass
@@ -439,6 +452,28 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   };
 
   auto run_output_allocator = [&]() {
+    // Resolve the execution stream first so the optimization-profile switch below
+    // is issued on the same stream the engine will actually enqueue on.
+    auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
+    auto default_stream = compiled_engine->default_stream;
+    compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
+    bool caller_on_default = (compiled_engine->caller_stream == default_stream);
+    if (caller_on_default) {
+      compiled_engine->engine_stream = compiled_engine->owned_pool_stream;
+    } else {
+      // Honor caller's non-default stream so its scheduling choice (e.g. SM
+      // partitioning via a CUDA Green Context) is preserved end to end.
+      compiled_engine->engine_stream = compiled_engine->caller_stream;
+    }
+
+    // Validate shapes first so auto-selection is skipped entirely when the input
+    // shape is unchanged: the previously selected profile still fits, so it
+    // stays active. When the shape did change, auto_select_profile keeps the
+    // active profile if it still fits (no-op) or switches otherwise.
+    bool shape_changed = _validate_shapes(inputs, compiled_engine);
+    if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
+      compiled_engine->auto_select_profile(inputs);
+    }
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
       if (compiled_engine->profile_execution) {
@@ -465,18 +500,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
       }
       create_output_allocator(compiled_engine);
-    }
-
-    auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
-    auto default_stream = compiled_engine->default_stream;
-    compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
-    bool caller_on_default = (compiled_engine->caller_stream == default_stream);
-    if (caller_on_default) {
-      compiled_engine->engine_stream = compiled_engine->owned_pool_stream;
-    } else {
-      // Honor caller's non-default stream so its scheduling choice (e.g. SM
-      // partitioning via a CUDA Green Context) is preserved end to end.
-      compiled_engine->engine_stream = compiled_engine->caller_stream;
     }
 
     compiled_engine->record_active_input_tensor_stream_usage(compiled_engine->engine_stream);
