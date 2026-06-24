@@ -15,7 +15,10 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_all_gather_op,
     tensorrt_fused_nccl_all_reduce_op,
+    tensorrt_fused_nccl_all_to_all_op,
+    tensorrt_fused_nccl_gather_op,
     tensorrt_fused_nccl_reduce_scatter_op,
+    tensorrt_fused_nccl_scatter_op,
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -27,7 +30,7 @@ if ENABLED_FEATURES.native_trt_collectives:
     @dynamo_tensorrt_converter(
         tensorrt_fused_nccl_all_gather_op, requires_native_multidevice=True
     )
-    def fused_nccl_gather(
+    def fused_nccl_all_gather(
         ctx: ConversionContext,
         target: Target,
         args: Tuple[Argument, ...],
@@ -35,7 +38,7 @@ if ENABLED_FEATURES.native_trt_collectives:
         name: str,
     ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
         """All-gather using native TensorRT DistCollective API"""
-        return impl.nccl_ops.nccl_gather_native(
+        return impl.nccl_ops.nccl_all_gather_native(
             ctx,
             target,
             SourceIR.ATEN,
@@ -86,6 +89,57 @@ if ENABLED_FEATURES.native_trt_collectives:
             reduce_op=reduce_op,
         )
 
+    @dynamo_tensorrt_converter(
+        tensorrt_fused_nccl_all_to_all_op, requires_native_multidevice=True
+    )
+    def fused_nccl_all_to_all(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
+        """All-to-all using native TensorRT DistCollective API."""
+        return impl.nccl_ops.nccl_all_to_all_native(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            [args[0]],
+        )
+
+    @dynamo_tensorrt_converter(
+        tensorrt_fused_nccl_scatter_op, requires_native_multidevice=True
+    )
+    def fused_nccl_scatter(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
+        """Scatter using native TensorRT DistCollective API."""
+        root = args[1] if len(args) > 1 else 0
+        return impl.nccl_ops.nccl_scatter_native(
+            ctx, target, SourceIR.ATEN, name, [args[0]], root=root
+        )
+
+    @dynamo_tensorrt_converter(
+        tensorrt_fused_nccl_gather_op, requires_native_multidevice=True
+    )
+    def fused_nccl_gather(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
+        """Gather using native TensorRT DistCollective API."""
+        root = args[1] if len(args) > 1 else 0
+        return impl.nccl_ops.nccl_gather_native(
+            ctx, target, SourceIR.ATEN, name, [args[0]], root=root
+        )
+
 
 # Conditionally register NCCL converters only if TensorRT-LLM plugin is available.
 # We use an `if` statement instead of @needs_trtllm_for_nccl decorator because
@@ -101,14 +155,14 @@ elif ENABLED_FEATURES.trtllm_for_nccl:
     )
 
     @dynamo_tensorrt_converter(tensorrt_fused_nccl_all_gather_op)
-    def fused_nccl_gather(
+    def fused_nccl_all_gather(
         ctx: ConversionContext,
         target: Target,
         args: Tuple[Argument, ...],
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
-        return impl.nccl_ops.nccl_gather(
+        return impl.nccl_ops.nccl_all_gather(
             ctx,
             target,
             SourceIR.ATEN,
