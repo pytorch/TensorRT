@@ -8,6 +8,7 @@ from torch_tensorrt.runtime._cudagraphs import (
     set_cudagraphs_mode,
 )
 from torch_tensorrt.runtime._multi_device_safe_mode import set_multi_device_safe_mode
+from torch_tensorrt.runtime._optimization_profile import optimization_profile
 from torch_tensorrt.runtime._output_allocator import enable_output_allocator
 from torch_tensorrt.runtime._pre_allocated_outputs import enable_pre_allocated_outputs
 from torch_tensorrt.runtime._runtime_cache import RuntimeCache, runtime_cache

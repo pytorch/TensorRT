@@ -53,6 +53,7 @@ from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
     to_torch_device,
+    validate_optimization_profiles,
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -120,12 +121,28 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 + "\n".join(f"{i}" for i in missing_ops)
             )
 
+        # Optimization profiles. Profiles are an ordered list on
+        # ``Input.profiles``; profile index i is built from each input's
+        # ``profiles[i]``. The count is derived from the input specs (submodule
+        # inputs inherit the same number of profiles via propagation). It is
+        # ``0`` when no input declares ``profiles``, in which case we fall back
+        # to the historical behavior: a single profile for dynamic inputs and
+        # none for fully static engines.
+        self.optimization_profile_count: int = validate_optimization_profiles(
+            input_specs
+        )
+        has_dynamic_input = any(
+            input_spec.shape_mode == Input._ShapeMode.DYNAMIC
+            for input_spec in input_specs
+        )
+        num_profiles = (
+            self.optimization_profile_count
+            if self.optimization_profile_count
+            else (1 if has_dynamic_input else 0)
+        )
         self.optimization_profiles: Optional[List[trt.IOptimizationProfile]] = (
-            [self.builder.create_optimization_profile()]
-            if any(
-                input_spec.shape_mode == Input._ShapeMode.DYNAMIC
-                for input_spec in input_specs
-            )
+            [self.builder.create_optimization_profile() for _ in range(num_profiles)]
+            if num_profiles > 0
             else None
         )
 
@@ -709,6 +726,36 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         return trt_node
 
+    def _per_profile_shapes(
+        self, current_input: Input
+    ) -> List[Tuple[Sequence[int], Sequence[int], Sequence[int]]]:
+        """Return ``(min, opt, max)`` shapes for each optimization profile index.
+
+        - If multiple profiles are active and the input declares ``profiles``,
+          each entry uses the input's range at that profile index.
+        - If multiple profiles are active but the input has none (static-like
+          input reused across regimes), every entry repeats the union range.
+        - If no profiles are active, there is a single entry (the union range) —
+          the historical single-profile behavior.
+        """
+        assert isinstance(current_input.shape, dict)
+        union = (
+            current_input.shape["min_shape"],
+            current_input.shape["opt_shape"],
+            current_input.shape["max_shape"],
+        )
+        if not self.optimization_profile_count:
+            return [union]
+
+        result: List[Tuple[Sequence[int], Sequence[int], Sequence[int]]] = []
+        for i in range(self.optimization_profile_count):
+            if current_input.profiles and i < len(current_input.profiles):
+                prof = current_input.profiles[i]
+                result.append((prof["min"], prof["opt"], prof["max"]))
+            else:
+                result.append(union)
+        return result
+
     def placeholder(self, target: str, args: Any, kwargs: Any) -> trt.ITensor:
         self._input_names.append(target)
         current_input = self.input_specs[self.input_specs_iter]
@@ -718,27 +765,43 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if current_input.shape_mode == Input._ShapeMode.DYNAMIC:
             assert isinstance(current_input.shape, dict)
             shape = []
-            min_shape = current_input.shape["min_shape"]
-            opt_shape = current_input.shape["opt_shape"]
-            max_shape = current_input.shape["max_shape"]
-            # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
-            assert len(min_shape) == len(opt_shape) == len(max_shape)
-            if current_input.is_shape_tensor:
-                # For shape_tensors, min/opt/max_shapes correspond to actual values
-                # of the shapes provided during runtime
-                self.optimization_profiles[0].set_shape_input(
-                    target, min_shape, opt_shape, max_shape
-                )
-                shape.append(len(opt_shape))
-            else:
-                self.optimization_profiles[0].set_shape(
-                    target, min_shape, opt_shape, max_shape
-                )
 
-                for i in range(len(min_shape)):
-                    if min_shape[i] == opt_shape[i] == max_shape[i]:
-                        shape.append(min_shape[i])
+            # Build the per-profile (min, opt, max) shapes for this input. Each
+            # TRT optimization profile index gets the input's corresponding
+            # profile range; inputs without profiles (e.g. static tensors reused
+            # across regimes) repeat their single union range in every profile.
+            per_profile_shapes = self._per_profile_shapes(current_input)
+
+            for profile_idx, opt_profile in enumerate(self.optimization_profiles):
+                min_shape, opt_shape, max_shape = per_profile_shapes[profile_idx]
+                assert len(min_shape) == len(opt_shape) == len(max_shape)
+                if current_input.is_shape_tensor:
+                    # For shape_tensors, min/opt/max_shapes correspond to actual
+                    # values of the shapes provided during runtime.
+                    opt_profile.set_shape_input(target, min_shape, opt_shape, max_shape)
+                else:
+                    opt_profile.set_shape(target, min_shape, opt_shape, max_shape)
+
+            # The INetwork input shape uses the union envelope to mark which
+            # dims are dynamic (-1). A dim is static only if it is identical
+            # across every profile's min/opt/max.
+            union_min = current_input.shape["min_shape"]
+            union_opt = current_input.shape["opt_shape"]
+            union_max = current_input.shape["max_shape"]
+            if current_input.is_shape_tensor:
+                shape.append(len(union_opt))
+            else:
+                for i in range(len(union_min)):
+                    dim_is_static = all(
+                        per_profile_shapes[p][0][i]
+                        == per_profile_shapes[p][1][i]
+                        == per_profile_shapes[p][2][i]
+                        == per_profile_shapes[0][0][i]
+                        for p in range(len(per_profile_shapes))
+                    )
+                    if dim_is_static:
+                        shape.append(union_min[i])
                     else:
                         # -1 to represent the dynamic dimension
                         shape.append(DYNAMIC_DIM)

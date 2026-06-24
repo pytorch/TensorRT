@@ -215,12 +215,69 @@ struct TRTEngine : torch::CustomClassHolder {
   // Per-call formatted input buffers. In standard mode these are bound
   // directly to TRT; in CUDA graph mode they are async-copy sources for
   // persistent CUDA graph input staging buffers.
+  struct InputBindingInfo {
+    std::string name;
+    at::ScalarType expected_type;
+    bool is_shape_tensor;
+  };
+  std::vector<InputBindingInfo> input_binding_infos = {};
   std::vector<at::Tensor> active_input_tensors = {};
   std::list<std::vector<int64_t>> active_shape_tensor_values = {};
 
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
+
+  // --- Multiple optimization profiles ---
+  // State and helpers mirror the Python runtime (TRTEngine in _TRTEngine.py) so
+  // the C++ and Python runtimes are interchangeable: the same attribute and
+  // method names are exposed via torchbind in register_jit_hooks.cpp
+  // (``num_optimization_profiles``, ``_active_profile_index``,
+  // ``_auto_select_profiles``, ``set_active_profile``). Index validation lives
+  // in the runtime-agnostic TorchTensorRTModule.resolve_profile_index.
+  int64_t num_optimization_profiles = 1; // cuda_engine->getNbOptimizationProfiles()
+  int64_t active_profile_index = 0; // profile currently loaded in exec_ctx
+  bool auto_select_profiles = false; // opt-in shape-based selection (per call)
+  // A single input dimension whose extent varies across or within optimization
+  // profiles, paired with its [min, max] range for each profile index. Dims that
+  // are a fixed identical extent in every profile are NOT stored, so selection
+  // only inspects dims that can actually distinguish profiles.
+  struct DynamicProfileDim {
+    int32_t dim_index;
+    std::vector<std::pair<int64_t, int64_t>> profile_ranges; // indexed by profile index
+  };
+  // Indexed by input binding position (parallel to ``in_binding_names``, so it
+  // reuses the same positional input -> binding mapping the rest of the runtime
+  // relies on). Each entry holds only that input's dynamic dims; shape-inference
+  // IO and all-static inputs get an empty list. Built once in
+  // setup_optimization_profiles so auto-selection does no per-call string
+  // lookups.
+  std::vector<std::vector<DynamicProfileDim>> profile_dynamic_dims;
+
+  // Cache profile count + per-profile dim ranges purely from the TRT API
+  // (getNbOptimizationProfiles / getProfileShape) so selection works for any
+  // loaded engine with no extra serialized metadata.
+  void setup_input_binding_infos();
+  void setup_optimization_profiles();
+  // Switch the active TRT optimization profile (idempotent). Manual-pin /
+  // torchbind entry point: runs outside execute_engine's stream setup, so it
+  // resolves the current stream and fully synchronizes (rare, not perf-critical).
+  void set_active_profile(int64_t profile_index);
+  // Core switch issued on ``stream`` with no host synchronize: the caller must
+  // guarantee a happens-before to the enqueue (e.g. issue on the enqueue stream).
+  // Used by auto-selection, which switches on engine_stream before enqueueV3.
+  void set_active_profile_with_stream(int64_t profile_index, const c10::cuda::CUDAStream& stream);
+  // True if every input's dynamic dims fit profile ``profile_index``'s [min, max]
+  // ranges (positional inputs[i] <-> in_binding_names[i]; static / shape-inference
+  // IO inputs are skipped).
+  bool profile_fits(int64_t profile_index, const std::vector<at::Tensor>& inputs) const;
+  // Select and activate the optimization profile for ``inputs`` and return its
+  // index. Keeps the currently active profile when it still fits (no switch, no
+  // thrashing); otherwise switches to the first fitting profile. Owns the switch
+  // so callers need no follow-up. Called internally from the execute_engine run
+  // paths (guarded by num_optimization_profiles > 1 && auto_select_profiles);
+  // manual pins are applied eagerly via set_active_profile.
+  int64_t auto_select_profile(const std::vector<at::Tensor>& inputs);
 
   // Single placeholder buffer for empty tensor inputs (allocated once, reused)
   void* empty_tensor_placeholder = nullptr;

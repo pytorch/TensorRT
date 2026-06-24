@@ -20,6 +20,7 @@ from typing import (
     ContextManager,
     Dict,
     List,
+    NamedTuple,
     Optional,
     Sequence,
     Tuple,
@@ -66,6 +67,29 @@ from torch_tensorrt.runtime._utils import (
 import tensorrt as trt  # isort: skip
 
 logger = logging.getLogger(__name__)
+
+
+class _InputBindingInfo(NamedTuple):
+    name: str
+    expected_type: torch.dtype
+    is_shape_tensor: bool
+
+
+def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
+    """Map strategy string to TRT enum. Only meaningful on TensorRT-RTX builds."""
+    return {
+        "lazy": trt.DynamicShapesKernelSpecializationStrategy.LAZY,
+        "eager": trt.DynamicShapesKernelSpecializationStrategy.EAGER,
+        "none": trt.DynamicShapesKernelSpecializationStrategy.NONE,
+    }.get(strategy_str, trt.DynamicShapesKernelSpecializationStrategy.LAZY)
+
+
+def _get_cuda_graph_strategy(strategy_str: str) -> Any:
+    """Map strategy string to TRT CudaGraphStrategy enum. Only meaningful on RTX."""
+    return {
+        "disabled": trt.CudaGraphStrategy.DISABLED,
+        "whole_graph_capture": trt.CudaGraphStrategy.WHOLE_GRAPH_CAPTURE,
+    }.get(strategy_str, trt.CudaGraphStrategy.DISABLED)
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +276,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # ``RuntimeSettings`` default; callers wanting non-defaults assign via
         # the module's ``runtime_settings`` setter after compile.
         self._trt_runtime_config: TRTRuntimeConfig = TRTRuntimeConfig(RuntimeSettings())
+        # Multiple optimization profiles. Manual selection by default:
+        # ``_active_profile_index`` is the profile currently loaded in the TRT
+        # context (default 0, reused across calls). ``_auto_select_profiles``
+        # opts into shape-based selection, re-evaluated on every forward.
+        self._active_profile_index = 0
+        self._auto_select_profiles = False
 
         self._load_serialized_info(serialized_info)
         self._setup_engine()
@@ -353,7 +383,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.resource_allocation_strategy = 0
         self._rtx_native_cudagraphs = False
         self._num_execution_contexts_created = 0
-        self._context: Optional[trt.IExecutionContext] = None
+        self._context = None
         # NCCL communicators cannot be pickled; rebind lazily on the next
         # forward pass via setup_nccl_comm().
         self._nccl_comm = None
@@ -361,6 +391,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # who want runtime-mode overrides must reapply them post-load via
         # ``mod.runtime_settings = ...`` (per ``TorchTensorRTModule``) or a runtime CM.
         self._trt_runtime_config = TRTRuntimeConfig(RuntimeSettings())
+
+        self._active_profile_index = 0
+        self._auto_select_profiles = False
 
         serialized_info = list(state[0])
         engine_field = serialized_info[ENGINE_IDX]
@@ -557,6 +590,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             dtype._from(self.cuda_engine.get_tensor_dtype(input_name)).to(torch.dtype)
             for input_name in self.in_binding_names
         ]
+        self._input_binding_infos = [
+            _InputBindingInfo(
+                input_name,
+                self.input_dtypes[idx],
+                self.cuda_engine.is_shape_inference_io(input_name),
+            )
+            for idx, input_name in enumerate(self.in_binding_names)
+        ]
         self.output_dtypes = [
             dtype._from(self.cuda_engine.get_tensor_dtype(output_name)).to(torch.dtype)
             for output_name in self.out_binding_names
@@ -570,9 +611,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             for output_name in self.out_binding_names
         ]
         self.is_shape_inference_io = {
-            input_name: self.cuda_engine.is_shape_inference_io(input_name)
-            for input_name in self.in_binding_names
+            binding.name: binding.is_shape_tensor
+            for binding in self._input_binding_infos
         }
+        self._setup_optimization_profiles()
         if self.requires_output_allocator:
             self.create_output_allocator()
 
@@ -615,6 +657,158 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         )
         self.update_runtime_settings(new_settings)
         logger.info("Switched to TRT-RTX native CUDA graphs")
+
+    def _setup_optimization_profiles(self) -> None:
+        """Cache per-profile shape ranges for the dynamic input dims from the TRT API.
+
+        Rebuilds the profile bounds via ``get_tensor_profile_shape`` so that
+        runtime profile selection works for engines compiled in-process, loaded
+        from cache, or deserialized from disk — no new serialization fields.
+        Populates:
+
+        - ``_profile_dynamic_dims``: a list indexed by input binding position
+          (parallel to ``in_binding_names``, reusing the same positional input ->
+          binding mapping the rest of the runtime relies on). Each entry is
+          ``[(dim_index, [(min, max), ...]), ...]`` storing only dims that vary
+          within a profile (``min != max``) or differ across profiles. A dim with
+          the same fixed extent in every profile cannot distinguish profiles, so
+          it is omitted (and validated later by TRT at ``set_input_shape``).
+          Shape-inference IO and all-static inputs get an empty list, so
+          auto-selection skips them by index with no name lookup.
+        """
+        self.num_optimization_profiles = self.cuda_engine.num_optimization_profiles
+        self._profile_dynamic_dims: List[List[Tuple[int, List[Tuple[int, int]]]]] = []
+
+        if self.num_optimization_profiles <= 1:
+            return
+
+        self._profile_dynamic_dims = [[] for _ in self._input_binding_infos]
+        for i, binding in enumerate(self._input_binding_infos):
+            name = binding.name
+            if binding.is_shape_tensor:
+                continue
+            # Gather [min, max] for every dim across every profile:
+            # dim -> [profile] -> (min, max).
+            per_dim: List[List[Tuple[int, int]]] = []
+            for p in range(self.num_optimization_profiles):
+                rmin, _, rmax = self.cuda_engine.get_tensor_profile_shape(name, p)
+                if not per_dim:
+                    per_dim = [[] for _ in range(len(rmin))]
+                for d, (lo, hi) in enumerate(zip(rmin, rmax)):
+                    per_dim[d].append((int(lo), int(hi)))
+            # Keep only dims that can distinguish profiles.
+            dynamic_dims: List[Tuple[int, List[Tuple[int, int]]]] = []
+            for d, ranges in enumerate(per_dim):
+                is_dynamic = any(
+                    lo != hi or (lo, hi) != ranges[0] for (lo, hi) in ranges
+                )
+                if is_dynamic:
+                    dynamic_dims.append((d, ranges))
+            self._profile_dynamic_dims[i] = dynamic_dims
+
+    # --- optimization profile selection ---
+
+    def set_active_profile(self, profile_index: int) -> None:
+        """Make ``profile_index`` the active TRT optimization profile (idempotent).
+
+        Manual-pin / public entry point: this runs outside ``_prepare_streams``'
+        stream choreography, so the switch's async copies aren't otherwise ordered
+        against the (later, separate) enqueue. Resolve the current stream and fully
+        synchronize to make the switch safe. Rare and not perf-critical. Mirrors
+        the C++ runtime.
+        """
+        stream = torch.cuda.current_stream(self._target_device)
+        self._set_active_profile_with_stream(profile_index, stream)
+        stream.synchronize()
+
+    def _set_active_profile_with_stream(
+        self, profile_index: int, stream: torch.cuda.Stream
+    ) -> None:
+        """Core profile switch issued on ``stream`` with no host synchronize.
+
+        The caller must guarantee a happens-before to the enqueue (e.g. issue on
+        the enqueue stream). Used by auto-selection, which switches on
+        ``_engine_stream`` before ``execute_async_v3``. Mirrors the C++ runtime.
+        """
+        if self.num_optimization_profiles <= 1:
+            return
+        if profile_index == self._active_profile_index:
+            return
+        self.context.set_optimization_profile_async(profile_index, stream.cuda_stream)
+        self._active_profile_index = profile_index
+        # A profile switch invalidates any captured CUDA graph and changes the
+        # context state, so force re-record / shape re-inference next run.
+        self.runtime_states.context_changed = True
+        self.reset_captured_graph()
+        self.shape_key = None
+        logger.debug(f"Switched to optimization profile index {profile_index}")
+
+    def _profile_fits(self, profile_index: int, inputs: Sequence[torch.Tensor]) -> bool:
+        """Whether every input's dynamic dims fit ``profile_index``'s ranges.
+
+        Indexed positionally by input (``inputs[i]`` <-> ``in_binding_names[i]``,
+        the same convention the rest of the runtime uses); empty entries
+        (shape-inference IO / all-static inputs) are skipped with no name lookup.
+        Static dims are not cached (they cannot distinguish profiles) and are
+        validated later by TRT at ``set_input_shape``.
+
+        Example ``_profile_dynamic_dims`` for an image input ``(1, 3, H, W)`` with
+        H/W dynamic across 3 profiles plus a fully-static second input::
+
+            self._profile_dynamic_dims = [
+                # input 0: dims 2 (H), 3 (W) vary; dims 0 (N=1) and 1 (channels=3) fixed -> omitted
+                [
+                    (2, [(224, 224), (256, 512), (256, 512)]),  # H   ranges for profiles 0,1,2
+                    (3, [(224, 224), (256, 512), (256, 512)]),  # W
+                ],
+                # input 1: fully static (and/or shape-inference IO) -> empty, skipped
+                [],
+            ]
+        """
+        num_to_check = min(len(inputs), len(self._profile_dynamic_dims))
+        for i in range(num_to_check):
+            dynamic_dims = self._profile_dynamic_dims[i]
+            if not dynamic_dims:
+                continue
+            shape = tuple(int(s) for s in inputs[i].shape)
+            for dim_index, ranges in dynamic_dims:
+                if dim_index < len(shape):
+                    lo, hi = ranges[profile_index]
+                    if not (lo <= shape[dim_index] <= hi):
+                        return False
+        return True
+
+    def _auto_select_profile(self, inputs: Sequence[torch.Tensor]) -> int:
+        """Select and activate the optimization profile for ``inputs``.
+
+        Keeps the currently active profile when it still fits, so alternating
+        shapes (e.g. decode/prefill) don't thrash between equally-valid profiles
+        (a switch invalidates the captured CUDA graph and forces shape
+        re-inference). Otherwise switches to the **first** profile whose
+        ``[min, max]`` ranges contain every input's dynamic dims, so overlapping
+        profiles resolve to the lowest matching index; pin manually via
+        ``optimization_profile(module, index)`` to force a specific profile. Owns
+        the switch (no-op when the active profile already fits) so callers need no
+        follow-up, and returns the resulting active profile index.
+        """
+        if self._profile_fits(self._active_profile_index, inputs):
+            return self._active_profile_index
+        # Switch on the engine stream so the change is ordered before the enqueue
+        # on that same stream (no host synchronize needed). _engine_stream is set
+        # by _prepare_streams on the execution paths; fall back to the current
+        # stream for out-of-band callers that haven't resolved an engine stream.
+        stream = self._engine_stream or torch.cuda.current_stream(self._target_device)
+        for p in range(self.num_optimization_profiles):
+            if self._profile_fits(p, inputs):
+                self._set_active_profile_with_stream(p, stream)
+                return p
+
+        raise RuntimeError(
+            "No optimization profile matches the input shapes "
+            f"{[tuple(t.shape) for t in inputs]}. Cached dynamic profile ranges: "
+            f"{self._profile_dynamic_dims}. Fix the input shapes or pin a profile "
+            "explicitly via optimization_profile(module, index)."
+        )
 
     # --- distributed / NCCL ---
 
@@ -798,16 +992,17 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         cudagraphs_enabled: bool,
         need_cudagraphs_record: bool,
     ) -> None:
-        for i, input_name in enumerate(self.in_binding_names):
+        for i, binding in enumerate(self._input_binding_infos):
+            input_name = binding.name
 
             assert (
-                contiguous_inputs[i].dtype == self.input_dtypes[i]
-            ), f"Dtype mismatch for input {input_name}. Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
+                contiguous_inputs[i].dtype == binding.expected_type
+            ), f"Dtype mismatch for input {input_name}. Expect {binding.expected_type}, got {contiguous_inputs[i].dtype}."
 
             if need_cudagraphs_record:
                 self._input_buffers[i] = contiguous_inputs[i].clone()
 
-            if self.is_shape_inference_io[input_name]:
+            if binding.is_shape_tensor:
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
@@ -924,7 +1119,21 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # flag).
         caller_on_default = self._prepare_streams(contiguous_inputs)
         engine_stream, caller_stream = self._active_streams()
+        # Validate shapes first so auto-selection is skipped entirely when the
+        # input shape is unchanged: the previously selected profile still fits, so
+        # it stays active. When the shape did change, _auto_select_profile keeps
+        # the active profile if it still fits (no-op) or switches otherwise; a
+        # switch sets context_changed (consumed by set_runtime_states regardless
+        # of order) and shape_changed is already true here. Manual pins are
+        # applied eagerly in set_optimization_profile, so only auto needs per-call
+        # selection.
         shape_changed = self.validate_input_shapes(contiguous_inputs)
+        if (
+            shape_changed
+            and self.num_optimization_profiles > 1
+            and self._auto_select_profiles
+        ):
+            self._auto_select_profile(contiguous_inputs)
         (
             need_cudagraphs_record,
             can_use_pre_allocated_outputs,
@@ -1032,6 +1241,23 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 "Both CUDA Graphs and dynamic output allocation are enabled, which are "
                 "incompatible runtime modes. Please disable one of the two."
             )
+
+        # Resolve the engine stream first so the optimization-profile switch below
+        # is applied after the stream is chosen (mirrors the C++ runtime ordering).
+        caller_on_default = self._prepare_streams(contiguous_inputs)
+
+        # Validate shapes first so auto-selection is skipped entirely when the
+        # input shape is unchanged: the previously selected profile still fits.
+        # When the shape did change, _auto_select_profile keeps the active profile
+        # if it still fits (no-op) or switches otherwise. Manual pins are applied
+        # eagerly, so only auto needs per-call selection.
+        shape_changed = self.validate_input_shapes(contiguous_inputs)
+        if (
+            shape_changed
+            and self.num_optimization_profiles > 1
+            and self._auto_select_profiles
+        ):
+            self._auto_select_profile(contiguous_inputs)
 
         with self._profile_section("TRTEngine:ProcessInputs"):
             self.setup_input_tensors(contiguous_inputs, False, False)
