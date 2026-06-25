@@ -41,7 +41,8 @@ jobs:
               run: |
                   set -eou pipefail
                   MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
-                  MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
+                  LIMIT_PR=${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+                  MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}" --limit-pr-builds "${LIMIT_PR}")"
                   echo "${MATRIX_BLOB}"
                   echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
@@ -453,7 +454,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -492,7 +493,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -532,7 +533,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -582,7 +583,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:
@@ -624,7 +625,7 @@ jobs:
                 L1-torch-compile-tests,
                 L1-torchscript-tests,
             ]
-        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && !contains(github.event.pull_request.labels.*.name, 'ci: skip-l2') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+        if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
         strategy:
             fail-fast: false
             matrix:

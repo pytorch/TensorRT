@@ -16,8 +16,28 @@ jetpack_cuda_versions: List[str] = ["cu126"]
 rtx_cuda_versions: List[str] = ["cu130", "cu132"]
 trt_cuda_versions: List[str] = ["cu130", "cu132"]
 
+# For PRs we build/test a single representative config to keep cycle time short.
+# Full matrix runs on main / nightly / release branches.
+PR_PYTHON_VERSION: str = "3.12"
+PR_CUDA_VERSION: str = "cu130"
+
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
+
+
+def pick_pr_representative(includes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return a single-item list for PR builds to keep cycle time short.
+
+    Prefers PR_PYTHON_VERSION + PR_CUDA_VERSION; falls back to the first
+    available item so the matrix is never empty.
+    """
+    preferred = [
+        item
+        for item in includes
+        if item.get("python_version") == PR_PYTHON_VERSION
+        and item.get("desired_cuda") == PR_CUDA_VERSION
+    ]
+    return preferred[:1] or includes[:1]
 
 
 def validate_matrix(matrix_dict: Dict[str, Any]) -> None:
@@ -125,6 +145,9 @@ def main(args: list[str]) -> None:
             options.use_rtx == "true",
         ):
             filtered_includes.append(item)
+
+    if options.limit_pr_builds == "true" and options.jetpack != "true":
+        filtered_includes = pick_pr_representative(filtered_includes)
 
     filtered_matrix_dict = {"include": filtered_includes}
     print(json.dumps(filtered_matrix_dict))
