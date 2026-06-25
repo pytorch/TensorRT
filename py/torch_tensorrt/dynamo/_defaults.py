@@ -66,6 +66,7 @@ CPU_MEMORY_BUDGET = None
 DYNAMICALLY_ALLOCATE_RESOURCES = False
 DECOMPOSE_ATTENTION = False
 ATTN_BIAS_IS_CAUSAL = True
+FALLBACK_DATA_DEPENDENT_OPS = False
 
 if platform.system() == "Linux":
     import pwd
