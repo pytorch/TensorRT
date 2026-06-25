@@ -353,7 +353,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.resource_allocation_strategy = 0
         self._rtx_native_cudagraphs = False
         self._num_execution_contexts_created = 0
-        self._context: Optional[trt.IExecutionContext] = None
+        self._context = None
         # NCCL communicators cannot be pickled; rebind lazily on the next
         # forward pass via setup_nccl_comm().
         self._nccl_comm = None
@@ -704,6 +704,11 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if self.cuda_engine.weight_streaming_budget_v2 != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
         self.invalidate_context()
+        # Eagerly rebuild if the user had profiling on, so the profiler is
+        # re-attached to the fresh context (it lives on the context object and
+        # is dropped by invalidate_context()); otherwise leave creation lazy.
+        if self._profile_execution:
+            self.enable_profiling()
         self.runtime_states.context_changed = True
 
     def reset_captured_graph(self) -> None:
