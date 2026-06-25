@@ -99,6 +99,20 @@ class _RuntimeCacheHandle:
         self._pending_warm_bytes: Optional[bytes] = None
         self._lock = threading.Lock()
 
+    def __getstate__(self) -> dict:
+        # ``threading.Lock`` is not picklable, which breaks ``copy.deepcopy``
+        # on any GraphModule that has us in its state (the cross-runtime
+        # export path calls deepcopy on the gm before re-tracing). The lock
+        # guards in-process mutations only; a freshly-deserialized cache
+        # always needs a new lock anyway.
+        state = self.__dict__.copy()
+        state.pop("_lock", None)
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        self.__dict__.update(state)
+        self._lock = threading.Lock()
+
     def serialize(self) -> torch.Tensor:
         with self._lock:
             if self._cache is None:

@@ -127,6 +127,14 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   if (args[1].isITensor()) {
     // Get the kernel tensor
     auto kernel = args[1].ITensor();
+    // Match input dtype to the (dequantized) kernel dtype; see the comment on
+    // the constant-weights path below for why TRT requires this.
+    if (in->getType() != kernel->getType()) {
+      LOG_DEBUG(
+          "Conv/deconv input type (" << in->getType() << ") differs from kernel tensor type ("
+                                     << kernel->getType() << "); casting input to match.");
+      in = castITensor(ctx, in, kernel->getType());
+    }
     auto kernel_dims = kernel->getDimensions();
 
     // Make a new Dims with only the spatial dimensions.
@@ -214,6 +222,19 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   }
 
   auto w = Weights(ctx, args[1].unwrapToTensor());
+  // TRT networks built without legacy precision builder flags require the
+  // convolution input and kernel to share a dtype (TRT validates this in
+  // IConvolutionLayer). When a user feeds e.g. an fp16 input into a module
+  // whose weights are fp32 (require_full_compilation, mixed precision), the
+  // dtypes differ; cast the input to the kernel dtype so the layer is valid.
+  // Without this the layer fails validation, produces a 0-dim output, and the
+  // downstream conversion dereferences it and crashes.
+  if (in->getType() != w.data.type) {
+    LOG_DEBUG(
+        "Conv/deconv input type (" << in->getType() << ") differs from kernel type (" << w.data.type
+                                   << "); casting input to the kernel type for a valid network.");
+    in = castITensor(ctx, in, w.data.type);
+  }
   // TODO: Remove this when conv3d with kernel size=1 bug is fixed.
   // Github issue: https://github.com/pytorch/TensorRT/issues/1445
   bool is_kernel_size_one = true;

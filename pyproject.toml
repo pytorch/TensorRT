@@ -90,7 +90,7 @@ test = [
 test-ext = [
     "timm>=1.0.3",
     "transformers>=5.0.0",
-    "torchvision>=0.28.0.dev,<0.29.0",
+    "torchvision>=0.29.0.dev,<0.30.0",
     "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
 ]
 
@@ -110,8 +110,10 @@ quantization = [
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
-# which compiles user-supplied CUDA C++ kernels via NVRTC.
-kernels = ["cuda-python"]
+# which compiles user-supplied CUDA C++ kernels via NVRTC. The high-level
+# launch/compile API (``cuda.core``) lives in cuda-core; cuda-python's
+# bindings are still pulled in for the lower-level driver/runtime shims.
+kernels = ["cuda-python", "cuda-core"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
