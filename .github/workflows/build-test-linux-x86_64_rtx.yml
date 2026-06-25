@@ -421,6 +421,7 @@ jobs:
   ci-rollup:
     name: CI / Linux x86_64 (RTX)
     if: ${{ always() }}
+    permissions: {}
     needs:
       [
         build,
