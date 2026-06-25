@@ -166,6 +166,18 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 return True
         return False
 
+    @staticmethod
+    def _requires_output_allocator(node: torch.fx.Node) -> bool:
+        # A converter that needs a TRT output allocator has a data-dependent output
+        # shape; route the node to PyTorch when fallback_data_dependent_ops is set.
+        settings = CONVERTERS.compilation_settings
+        if settings is None or not settings.fallback_data_dependent_ops:
+            return False
+        converter_packet = CONVERTERS.get(node)
+        return converter_packet is not None and converter_packet[2].get(
+            "requires_output_allocator", False
+        )
+
     def is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
@@ -174,6 +186,15 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         if self._has_complex_dtype(node):
             # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
             # so the graph breaks around the complex cluster inserted by complex_graph_detection.
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            return False
+
+        if self._requires_output_allocator(node):
+            # data-dependent output shape needs a TRT output allocator, which some
+            # runtimes cannot consume; honor the fallback and run the node in PyTorch
             if not node.is_impure():
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
