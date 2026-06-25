@@ -109,6 +109,7 @@ def cross_compile_for_windows(
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -186,6 +187,7 @@ def cross_compile_for_windows(
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -338,6 +340,7 @@ def cross_compile_for_windows(
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "fallback_data_dependent_ops": fallback_data_dependent_ops,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -460,6 +463,7 @@ def compile(
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -547,6 +551,7 @@ def compile(
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -732,6 +737,7 @@ def compile(
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "fallback_data_dependent_ops": fallback_data_dependent_ops,
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
@@ -909,6 +915,13 @@ def compile_module(
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
 
+    # fallback_data_dependent_ops runs data-dependent ops in PyTorch during
+    # partitioning, which cannot coexist with require_full_compilation.
+    if settings.fallback_data_dependent_ops and settings.require_full_compilation:
+        raise ValueError(
+            "fallback_data_dependent_ops runs data-dependent ops in PyTorch, which "
+            "is incompatible with require_full_compilation=True; enable only one."
+        )
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
 
