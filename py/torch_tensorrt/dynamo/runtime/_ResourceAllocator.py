@@ -21,7 +21,6 @@ class ResourceAllocationStrategy(torch.nn.Module):  # type: ignore[misc]
         self.dynamically_allocate_resources = dynamically_allocate_resources
 
     def __enter__(self) -> None:
-        print("Entering resource allocator context")
         for name, submodule in self.compiled_module.named_modules():
             if "_run_on_acc" in name:
                 submodule.use_dynamically_allocated_resources(
@@ -32,5 +31,5 @@ class ResourceAllocationStrategy(torch.nn.Module):  # type: ignore[misc]
         for name, submodule in self.compiled_module.named_modules():
             if "_run_on_acc" in name:
                 submodule.use_dynamically_allocated_resources(
-                    dynamically_allocate_resources=self.dynamically_allocate_resources
+                    dynamically_allocate_resources=False
                 )
