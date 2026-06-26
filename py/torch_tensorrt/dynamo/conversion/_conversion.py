@@ -33,7 +33,6 @@ class SerializedInterpreterResult(NamedTuple):
     serialized_engine: bytes
     input_names: List[str]
     output_names: List[str]
-    weight_name_map: Optional[dict[Any, Any]]
     requires_output_allocator: bool
     symbolic_shape_expressions: Dict[str, List[Dict[str, Any]]]
     requires_native_multidevice: bool
@@ -92,7 +91,6 @@ def insert_engine_to_cache(
             interpreter_result.output_names,
             inputs,
             settings,
-            interpreter_result.weight_name_map,
             interpreter_result.requires_output_allocator,
             interpreter_result.requires_native_multidevice,
         ),
@@ -130,7 +128,6 @@ def pull_cached_engine(
             output_names,
             cached_engine_inputs,
             cached_engine_compilation_settings,
-            weight_name_map,
             requires_output_allocator,
             requires_native_multidevice,
         ) = cached_data
@@ -170,7 +167,6 @@ def pull_cached_engine(
                 old_engine=engine,
                 input_list=inputs,
                 settings=settings,
-                weight_name_map=weight_name_map,
             )
 
             serialization_config = engine.create_serialization_config()
@@ -189,7 +185,6 @@ def pull_cached_engine(
             serialized_engine=serialized_engine,
             input_names=input_names,
             output_names=output_names,
-            weight_name_map=weight_name_map,
             requires_output_allocator=requires_output_allocator,
             requires_native_multidevice=requires_native_multidevice,
             symbolic_shape_expressions=symbolic_shape_expressions,
@@ -318,7 +313,6 @@ def interpret_module_to_result(
         serialized_engine=serialized_engine,
         input_names=interpreter_result.input_names,
         output_names=interpreter_result.output_names,
-        weight_name_map=interpreter_result.weight_name_map,
         requires_output_allocator=interpreter_result.requires_output_allocator,
         requires_native_multidevice=interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=symbolic_shape_expressions,
@@ -375,7 +369,6 @@ def convert_module(
         output_binding_names=list(serialized_interpreter_result.output_names),
         name=name,
         settings=settings,
-        weight_name_map=serialized_interpreter_result.weight_name_map,
         requires_output_allocator=serialized_interpreter_result.requires_output_allocator,
         requires_native_multidevice=serialized_interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
