@@ -25,7 +25,7 @@ profile is tuned independently.
 Declaring profiles
 ------------------
 
-Pass an ordered list of ``{"min", "opt", "max"}`` dicts to
+Pass an ordered list of ``{"min_shape", "opt_shape", "max_shape"}`` dicts to
 :class:`torch_tensorrt.Input` via ``profiles``. The **list index** is the
 optimization-profile index you select at runtime.
 
@@ -40,22 +40,23 @@ optimization-profile index you select at runtime.
         dtype=torch.int64,
         profiles=[
             # index 0 -> decode: seq pinned to 1 (a fully static profile)
-            {"min": (1, 1), "opt": (1, 1), "max": (1, 1)},
+            {"min_shape": (1, 1), "opt_shape": (1, 1), "max_shape": (1, 1)},
             # index 1 -> prefill: seq in [1, 512], tuned at 256
-            {"min": (1, 1), "opt": (1, 256), "max": (1, 512)},
+            {"min_shape": (1, 1), "opt_shape": (1, 256), "max_shape": (1, 512)},
         ],
     )
 
-``profiles`` is mutually exclusive with the single-shape ``min_shape`` /
-``opt_shape`` / ``max_shape`` (and ``shape``) arguments.
+When using ``profiles``, do not also pass the single-range ``min_shape`` /
+``opt_shape`` / ``max_shape`` arguments, or the static ``shape`` argument, for
+the same input. ``profiles`` already contains the shape ranges for that input.
 
 The **union envelope**
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``torch.export`` traces a model over one ``[min, opt, max]`` range, so
 ``Input`` automatically derives the **union envelope** of all profiles
-(elementwise ``min`` of every ``min`` and ``max`` of every ``max``; ``opt`` is
-taken from the first profile). Each declared profile is a subset of this
+(elementwise minimum of every ``min_shape`` and maximum of every ``max_shape``;
+``opt_shape`` is taken from the first profile). Each declared profile is a subset of this
 envelope. You export over the envelope and the individual profiles become the
 per-profile TensorRT tunings:
 

@@ -72,9 +72,9 @@ def _build_submodule_profiles(
                 p_max.append(int(dim))
         profiles.append(
             {
-                "min": tuple(p_min),
-                "opt": tuple(p_opt),
-                "max": tuple(p_max),
+                "min_shape": tuple(p_min),
+                "opt_shape": tuple(p_opt),
+                "max_shape": tuple(p_max),
             }
         )
     return profiles
@@ -308,7 +308,7 @@ def build_profile_source_bounds(
 
     For each top-level placeholder whose ``Input`` declares ``profiles``, read the
     export ``SymInt`` for each dynamic dim and record, per profile, the
-    ``min`` / ``opt`` / ``max`` value of the corresponding source symbol. The
+    ``min_shape`` / ``opt_shape`` / ``max_shape`` value of the corresponding source symbol. The
     result feeds :func:`construct_submodule_inputs` so intermediate engines
     inherit the same profiles (by index) via symbolic substitution.
 
@@ -346,12 +346,12 @@ def build_profile_source_bounds(
                     continue
                 sym_name = expr.name
                 for i, prof in enumerate(profiles):
-                    if i >= len(bounds) or d >= len(prof["min"]):
+                    if i >= len(bounds) or d >= len(prof["min_shape"]):
                         continue
                     bounds[i][sym_name] = {
-                        "min": int(prof["min"][d]),
-                        "opt": int(prof["opt"][d]),
-                        "max": int(prof["max"][d]),
+                        "min": int(prof["min_shape"][d]),
+                        "opt": int(prof["opt_shape"][d]),
+                        "max": int(prof["max_shape"][d]),
                     }
     return bounds
 

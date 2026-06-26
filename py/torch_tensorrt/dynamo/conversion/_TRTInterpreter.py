@@ -531,7 +531,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         for i in range(self.optimization_profile_count):
             if current_input.profiles and i < len(current_input.profiles):
                 prof = current_input.profiles[i]
-                result.append((prof["min"], prof["opt"], prof["max"]))
+                result.append((prof["min_shape"], prof["opt_shape"], prof["max_shape"]))
             else:
                 result.append(union)
         return result

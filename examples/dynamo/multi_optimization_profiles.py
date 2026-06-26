@@ -127,8 +127,12 @@ def make_inputs(seq_len: int):
 # and auto-selection picks the *first* profile whose ``[min, max]`` accepts the
 # input, so declaring ``decode`` first lets it win the ``seq == 1`` overlap.
 profiles = [
-    {"min": (1, 1), "opt": (1, 1), "max": (1, 1)},  # decode
-    {"min": (1, 1), "opt": (1, PREFILL_SEQ), "max": (1, MAX_SEQ)},  # prefill
+    {"min_shape": (1, 1), "opt_shape": (1, 1), "max_shape": (1, 1)},  # decode
+    {
+        "min_shape": (1, 1),
+        "opt_shape": (1, PREFILL_SEQ),
+        "max_shape": (1, MAX_SEQ),
+    },  # prefill
 ]
 multi_profile_inputs = [
     torch_tensorrt.Input(dtype=torch.int64, profiles=profiles),  # input_ids
@@ -254,7 +258,8 @@ print(
 # Summary
 # ^^^^^^^
 #
-# - Declare ``N`` profiles on an ``Input`` with ``profiles=[{min, opt, max}, ...]``
+# - Declare ``N`` profiles on an ``Input`` with
+#   ``profiles=[{min_shape, opt_shape, max_shape}, ...]``
 #   (one per dynamic model input -- here ``input_ids`` and ``position_ids``).
 # - One export + one engine; each profile gets its own TensorRT kernel tuning.
 # - Select at runtime by **index** (``optimization_profile(m, i)``) or let

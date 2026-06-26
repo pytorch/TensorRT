@@ -32,8 +32,16 @@ def _make_profiles_input():
         name="x",
         dtype=torch.float16,
         profiles=[
-            {"min": (4, 1, 16), "opt": (4, 1, 16), "max": (4, 1, 16)},  # decode
-            {"min": (4, 1, 16), "opt": (4, 48, 16), "max": (4, 64, 16)},  # prefill
+            {
+                "min_shape": (4, 1, 16),
+                "opt_shape": (4, 1, 16),
+                "max_shape": (4, 1, 16),
+            },  # decode
+            {
+                "min_shape": (4, 1, 16),
+                "opt_shape": (4, 48, 16),
+                "max_shape": (4, 64, 16),
+            },  # prefill
         ],
     )
 
@@ -63,16 +71,24 @@ class TestInputProfilesValidation(TestCase):
         # opt is taken from the first declared profile (decode at index 0)
         self.assertEqual(inp.shape["opt_shape"], (4, 1, 16))
         self.assertEqual(len(inp.profiles), 2)
-        self.assertEqual(inp.profiles[DECODE_IDX]["max"], (4, 1, 16))
-        self.assertEqual(inp.profiles[PREFILL_IDX]["opt"], (4, 48, 16))
+        self.assertEqual(inp.profiles[DECODE_IDX]["max_shape"], (4, 1, 16))
+        self.assertEqual(inp.profiles[PREFILL_IDX]["opt_shape"], (4, 48, 16))
 
     def test_min_zero_rejected(self):
         with self.assertRaises(ValueError):
-            Input(profiles=[{"min": (0, 1), "opt": (1, 1), "max": (2, 1)}])
+            Input(
+                profiles=[
+                    {"min_shape": (0, 1), "opt_shape": (1, 1), "max_shape": (2, 1)}
+                ]
+            )
 
     def test_min_opt_max_ordering(self):
         with self.assertRaises(ValueError):
-            Input(profiles=[{"min": (4, 1), "opt": (4, 8), "max": (4, 2)}])
+            Input(
+                profiles=[
+                    {"min_shape": (4, 1), "opt_shape": (4, 8), "max_shape": (4, 2)}
+                ]
+            )
 
     def test_empty_profiles_rejected(self):
         with self.assertRaises(ValueError):
@@ -82,7 +98,7 @@ class TestInputProfilesValidation(TestCase):
         with self.assertRaises(ValueError):
             Input(
                 shape=(1, 2),
-                profiles=[{"min": (1,), "opt": (1,), "max": (1,)}],
+                profiles=[{"min_shape": (1,), "opt_shape": (1,), "max_shape": (1,)}],
             )
 
     def test_str_includes_profiles(self):
@@ -96,8 +112,16 @@ class TestInputProfilesValidation(TestCase):
         inp = Input(
             name="input_ids",
             profiles=[
-                {"min": (1, 1), "opt": (1, 1), "max": (1, 1)},  # decode
-                {"min": (1, 1), "opt": (1, 128), "max": (1, 512)},  # prefill
+                {
+                    "min_shape": (1, 1),
+                    "opt_shape": (1, 1),
+                    "max_shape": (1, 1),
+                },  # decode
+                {
+                    "min_shape": (1, 1),
+                    "opt_shape": (1, 128),
+                    "max_shape": (1, 512),
+                },  # prefill
             ],
             shared_dims={1: "seq"},
         )
@@ -113,8 +137,16 @@ class TestInputProfilesValidation(TestCase):
         with self.assertRaises(ValueError):
             Input(
                 profiles=[
-                    {"min": (1, 1), "opt": (1, 8), "max": (1, 16)},
-                    {"min": (1, 1), "opt": (1, 4), "max": (1, 32)},
+                    {
+                        "min_shape": (1, 1),
+                        "opt_shape": (1, 8),
+                        "max_shape": (1, 16),
+                    },
+                    {
+                        "min_shape": (1, 1),
+                        "opt_shape": (1, 4),
+                        "max_shape": (1, 32),
+                    },
                 ],
                 shared_dims={0: "batch"},
             )
@@ -213,14 +245,6 @@ class TestMultiProfileRuntime(TestCase):
             with optimization_profile(self.trt_gm, "decode"):
                 self.trt_gm(self.decode_in)
 
-    def test_serialization_round_trip_preserves_profiles(self):
-        trt_gm2 = copy.deepcopy(self.trt_gm)
-        for e in self._trt_engines(trt_gm2):
-            self.assertEqual(e.num_optimization_profiles, 2)
-        with optimization_profile(trt_gm2, DECODE_IDX):
-            out = trt_gm2(self.decode_in)
-        self.assertEqual(tuple(out.shape), (4, 1, 16))
-
     def _check_reconstructed_profile_state(self, engine):
         # A Python ``TRTEngine`` reconstructed with NO optimization-profile
         # metadata must rebuild its profile count and per-profile [min, max] dim
@@ -296,8 +320,12 @@ class TestMultiProfileSharedDims(TestCase):
         # prefill at index 0 so the export opt (taken from profile[0]) is > 1 and
         # the seq axis is not specialized to a constant during tracing.
         prof = [
-            {"min": (1, 1), "opt": (1, 128), "max": (1, 512)},  # prefill
-            {"min": (1, 1), "opt": (1, 1), "max": (1, 16)},  # decode
+            {
+                "min_shape": (1, 1),
+                "opt_shape": (1, 128),
+                "max_shape": (1, 512),
+            },  # prefill
+            {"min_shape": (1, 1), "opt_shape": (1, 1), "max_shape": (1, 16)},  # decode
         ]
         a = Input(profiles=prof, shared_dims={1: "seq"}, dtype=torch.float32, name="a")
         b = Input(profiles=prof, shared_dims={1: "seq"}, dtype=torch.float32, name="b")

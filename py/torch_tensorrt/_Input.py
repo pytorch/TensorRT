@@ -56,9 +56,9 @@ class Input(object):
     )  #: Optional {axis_index: name} for dynamic axes. The same name across inputs is exported as one shared ``torch.export.Dim`` (e.g. a batch axis shared by ``input_ids`` and ``attention_mask``).
     #: Optional ordered optimization profiles for multi-profile engines. A list
     #: of dicts, one per profile; the list index is the TRT optimization-profile
-    #: index used to select the profile at runtime. Each entry has ``min`` /
-    #: ``opt`` / ``max`` shape tuples. ``None`` for the default zero/one-profile
-    #: behavior. ``profiles`` may be combined with ``shared_dims``: the profiles
+    #: index used to select the profile at runtime. Each entry has
+    #: ``min_shape`` / ``opt_shape`` / ``max_shape`` tuples. ``None`` for the
+    #: default zero/one-profile behavior. ``profiles`` may be combined with ``shared_dims``: the profiles
     #: define the per-profile TRT ranges while ``shared_dims`` names dynamic axes
     #: on the union envelope so they export as one shared ``torch.export.Dim``
     #: across inputs.
@@ -236,14 +236,15 @@ class Input(object):
             self.name = kwargs["name"]
 
     def _init_from_profiles(self, args: Any, kwargs: Any) -> None:
-        """Validate ``profiles`` and translate them into union min/opt/max kwargs.
+        """Validate ``profiles`` and translate them into union shape kwargs.
 
         ``profiles`` (``kwargs["profiles"]``) is an ordered list of dicts (one per
         profile); the list index is the TRT optimization-profile index selected at
-        runtime. Each entry has ``min`` / ``opt`` / ``max`` shape tuples. This
-        stores the normalized list on ``self.profiles`` and fills ``kwargs`` with
-        the elementwise union envelope (the range ``torch.export`` must cover), so
-        the regular dynamic-shape path in ``__init__`` builds the Input.
+        runtime. Each entry has ``min_shape`` / ``opt_shape`` / ``max_shape``
+        tuples. This stores the normalized list on ``self.profiles`` and fills
+        ``kwargs`` with the elementwise union envelope (the range ``torch.export``
+        must cover), so the regular dynamic-shape path in ``__init__`` builds the
+        Input.
 
         ``shared_dims`` is intentionally *not* mutually exclusive with
         ``profiles``: profiles describe the per-profile TRT shape ranges, whereas
@@ -271,7 +272,7 @@ class Input(object):
         if not isinstance(profiles, (list, tuple)) or len(profiles) == 0:
             raise ValueError(
                 "`profiles` must be a non-empty list of dicts, each with keys "
-                "'min', 'opt', 'max'. The list index is the optimization-profile "
+                "'min_shape', 'opt_shape', 'max_shape'. The list index is the optimization-profile "
                 "index used to select the profile at runtime."
             )
 
@@ -279,22 +280,22 @@ class Input(object):
         rank: Optional[int] = None
         for i, prof in enumerate(profiles):
             if not isinstance(prof, dict) or not all(
-                k in prof for k in ("min", "opt", "max")
+                k in prof for k in ("min_shape", "opt_shape", "max_shape")
             ):
                 raise ValueError(
-                    f"Profile at index {i} must be a dict with keys 'min', 'opt', 'max'"
+                    f"Profile at index {i} must be a dict with keys 'min_shape', 'opt_shape', 'max_shape'"
                 )
 
-            for field_name in ("min", "opt", "max"):
+            for field_name in ("min_shape", "opt_shape", "max_shape"):
                 if not Input._supported_input_size_type(prof[field_name]):
                     raise TypeError(
                         f"Profile at index {i} field '{field_name}' must be a List, "
                         f"tuple or torch.Size, found {type(prof[field_name])}"
                     )
 
-            min_shape = tuple(prof["min"])
-            opt_shape = tuple(prof["opt"])
-            max_shape = tuple(prof["max"])
+            min_shape = tuple(prof["min_shape"])
+            opt_shape = tuple(prof["opt_shape"])
+            max_shape = tuple(prof["max_shape"])
 
             if not (len(min_shape) == len(opt_shape) == len(max_shape)):
                 raise ValueError(
@@ -324,9 +325,9 @@ class Input(object):
 
             normalized.append(
                 {
-                    "min": min_shape,
-                    "opt": opt_shape,
-                    "max": max_shape,
+                    "min_shape": min_shape,
+                    "opt_shape": opt_shape,
+                    "max_shape": max_shape,
                 }
             )
 
@@ -337,10 +338,10 @@ class Input(object):
         # specialize at). The regular dynamic-shape path in ``__init__`` consumes
         # these to set ``self.shape`` and ``shape_mode``.
         assert rank is not None
-        union_min = [min(p["min"][d] for p in normalized) for d in range(rank)]
-        union_max = [max(p["max"][d] for p in normalized) for d in range(rank)]
+        union_min = [min(p["min_shape"][d] for p in normalized) for d in range(rank)]
+        union_max = [max(p["max_shape"][d] for p in normalized) for d in range(rank)]
         kwargs["min_shape"] = tuple(union_min)
-        kwargs["opt_shape"] = tuple(normalized[0]["opt"])
+        kwargs["opt_shape"] = tuple(normalized[0]["opt_shape"])
         kwargs["max_shape"] = tuple(union_max)
 
     def __str__(self) -> str:
