@@ -1,0 +1,766 @@
+# Reusable core for the Linux x86_64 build+test pipeline.
+#
+# Both build-test-linux-x86_64.yml (standard TensorRT) and
+# build-test-linux-x86_64_rtx.yml (TensorRT-RTX) call this with use-rtx
+# false/true. Keep ALL build/test logic here so a change lands once.
+#
+# RTX differences are expressed two ways:
+#   * Jobs that only exist for standard TRT (torchscript, distributed,
+#     executorch) are gated with ``if: ${{ !inputs.use-rtx && ... }}``.
+#   * Jobs whose pytest scope differs branch inside the script on the
+#     ``$USE_TRT_RTX`` env var that linux-test.yml exports.
+#
+# The per-job pass/fail map is bubbled up via the ``results`` output so the
+# thin caller workflows can render a single ``ci-rollup`` status check whose
+# name (e.g. "CI / Linux x86_64") stays stable for branch protection.
+name: _linux-x86_64-core
+
+on:
+  workflow_call:
+    inputs:
+      use-rtx:
+        description: "Build/test against TensorRT-RTX instead of standard TensorRT"
+        type: boolean
+        default: false
+      name-prefix:
+        description: "Display-name prefix for the build job (e.g. 'RTX - ')"
+        type: string
+        default: ""
+    outputs:
+      results:
+        description: "JSON map of {job-id: {result, outputs}} for every build/test job"
+        value: ${{ jobs.collect-results.outputs.results }}
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: linux
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  filter-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/checkout@v6
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          LIMIT_PR=${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx ${{ inputs.use-rtx }} --limit-pr-builds "${LIMIT_PR}" --matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: filter-matrix
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            package-name: torch_tensorrt
+            display-name: ${{ inputs.name-prefix }}Build Linux x86_64 torch-tensorrt whl package
+    name: ${{ matrix.display-name }}
+    uses: ./.github/workflows/build_linux.yml
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+      architecture: "x86_64"
+      use-rtx: ${{ inputs.use-rtx }}
+      pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
+
+  # Standard-TRT only: ExecuTorch static build is not part of the RTX matrix.
+  executorch-static-build:
+    needs: [filter-matrix, build]
+    if: ${{ !inputs.use-rtx }}
+    uses: ./.github/workflows/executorch-static-linux.yml
+    with:
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+
+  L0-dynamo-converter-tests:
+    name: ${{ matrix.display-name }}
+    needs: [filter-matrix, build]
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L0 dynamo converter tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L0-dynamo-converter-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+        # for the rerun regex; see tests/py/ci_helpers.sh.
+        source tests/py/ci_helpers.sh
+        # Standard TRT shards converter tests with --dist=loadscope; RTX does not.
+        DIST_FLAG=""
+        if [ "${USE_TRT_RTX:-false}" != "true" ]; then
+          DIST_FLAG="--dist=loadscope"
+        fi
+        pushd .
+        cd tests/py/dynamo
+        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml ${DIST_FLAG} --maxfail=20 conversion/
+        popd
+
+  L0-dynamo-core-tests:
+    name: ${{ matrix.display-name }}
+    needs: [filter-matrix, build]
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L0 dynamo core tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L0-dynamo-core-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+        # for the rerun regex; see tests/py/ci_helpers.sh.
+        source tests/py/ci_helpers.sh
+        pushd .
+        cd tests/py
+        cd dynamo
+        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
+        if [ "${USE_TRT_RTX:-false}" = "true" ]; then
+          # RTX runs the whole partitioning suite and skips the hlo subset.
+          trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/
+        else
+          trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/test_000_*
+        fi
+        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
+        if [ "${USE_TRT_RTX:-false}" != "true" ]; then
+          trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_hlo_tests_results.xml hlo/
+        fi
+        popd
+
+  L0-py-core-tests:
+    name: ${{ matrix.display-name }}
+    needs: [filter-matrix, build]
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L0 core python tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L0-py-core-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+        # for the rerun regex; see tests/py/ci_helpers.sh.
+        source tests/py/ci_helpers.sh
+        pushd .
+        cd tests/py/core
+        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
+        popd
+
+  # Standard-TRT only: TorchScript frontend is not exercised on RTX.
+  L0-torchscript-tests:
+    name: ${{ matrix.display-name }}
+    needs: [filter-matrix, build]
+    if: ${{ !inputs.use-rtx && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L0 torchscript tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L0-torchscript-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+        # for the rerun regex; see tests/py/ci_helpers.sh.
+        source tests/py/ci_helpers.sh
+        pushd .
+        cd tests/modules
+        python hub.py
+        popd
+        pushd .
+        cd tests/py/ts
+        trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
+        popd
+
+  L1-dynamo-core-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L0-dynamo-converter-tests,
+        L0-dynamo-core-tests,
+        L0-py-core-tests,
+        L0-torchscript-tests,
+      ]
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L1 dynamo core tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L1-dynamo-core-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+        # for the rerun regex; see tests/py/ci_helpers.sh.
+        source tests/py/ci_helpers.sh
+        pushd .
+        cd tests/py/dynamo
+        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
+        if [ "${USE_TRT_RTX:-false}" != "true" ]; then
+          trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_partitioning_tests_results.xml partitioning/test_001_*
+        fi
+        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_hlo_tests_results.xml hlo/
+        popd
+
+  L1-dynamo-compile-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L0-dynamo-converter-tests,
+        L0-dynamo-core-tests,
+        L0-py-core-tests,
+        L0-torchscript-tests,
+      ]
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L1 dynamo compile tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L1-dynamo-compile-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+        # for the rerun regex; see tests/py/ci_helpers.sh.
+        source tests/py/ci_helpers.sh
+        pushd .
+        cd tests/py/dynamo/
+        trt_pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
+        popd
+
+  L1-torch-compile-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L0-dynamo-converter-tests,
+        L0-dynamo-core-tests,
+        L0-py-core-tests,
+        L0-torchscript-tests,
+      ]
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L1 torch compile tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L1-torch-compile-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+        # for the rerun regex; see tests/py/ci_helpers.sh.
+        source tests/py/ci_helpers.sh
+        pushd .
+        cd tests/py/dynamo/
+        trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
+        trt_pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+        trt_pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+        popd
+
+  # Standard-TRT only: TorchScript frontend is not exercised on RTX.
+  L1-torchscript-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L0-dynamo-core-tests,
+        L0-dynamo-converter-tests,
+        L0-py-core-tests,
+        L0-torchscript-tests,
+      ]
+    if: "${{ !inputs.use-rtx && !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L1 torch script tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L1-torchscript-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
+        # for the rerun regex; see tests/py/ci_helpers.sh.
+        source tests/py/ci_helpers.sh
+        pushd .
+        cd tests/modules
+        python hub.py
+        popd
+        pushd .
+        cd tests/py/ts
+        trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml   models/
+        popd
+
+  L2-torch-compile-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L1-torch-compile-tests,
+        L1-dynamo-compile-tests,
+        L1-dynamo-core-tests,
+        L1-torchscript-tests,
+      ]
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 torch compile tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L2-torch-compile-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/py/dynamo/
+        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+        popd
+
+  L2-dynamo-compile-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L1-dynamo-compile-tests,
+        L1-dynamo-core-tests,
+        L1-torch-compile-tests,
+        L1-torchscript-tests,
+      ]
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 dynamo compile tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L2-dynamo-compile-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/py/dynamo/
+        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
+        popd
+
+  L2-dynamo-core-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L1-dynamo-core-tests,
+        L1-dynamo-compile-tests,
+        L1-torch-compile-tests,
+        L1-torchscript-tests,
+      ]
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 dynamo core tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L2-dynamo-core-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/py/dynamo
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
+        if [ "${USE_TRT_RTX:-false}" != "true" ]; then
+          # ExecuTorch integration is standard-TRT only.
+          python -m pip install pyyaml "executorch>=1.3.1"
+          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_executorch_tests_results.xml executorch/
+        fi
+        popd
+
+  L2-dynamo-plugin-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L1-dynamo-core-tests,
+        L1-dynamo-compile-tests,
+        L1-torch-compile-tests,
+        L1-torchscript-tests,
+      ]
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 dynamo plugin tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L2-dynamo-plugin-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        if [ "${USE_TRT_RTX:-false}" = "true" ]; then
+          # RTX only runs the automatic-plugin suite (no QDP kernels layer).
+          pushd .
+          cd tests/py/dynamo
+          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/
+          popd
+        else
+          pushd .
+          cd tests/py/dynamo
+          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
+          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
+          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
+          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
+          popd
+          pushd .
+          # The torch_tensorrt.kernels QDP layer needs cuda-core's high-level
+          # ``cuda.core`` API (Device / Program / launch). NVIDIA split this
+          # out of the old cuda-python umbrella into the cuda-core distribution
+          # for CUDA 13+, so installing cuda-python alone is no longer enough.
+          python -m pip install cuda-python cuda-core
+          cd tests/py/kernels
+          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_kernels_test_results.xml .
+          popd
+        fi
+
+  # Standard-TRT only: TorchScript frontend is not exercised on RTX.
+  L2-torchscript-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L1-dynamo-core-tests,
+        L1-dynamo-compile-tests,
+        L1-torch-compile-tests,
+        L1-torchscript-tests,
+      ]
+    if: "${{ !inputs.use-rtx && !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 torch script tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L2-torchscript-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/modules
+        python hub.py
+        popd
+        pushd .
+        cd tests/py/ts
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_ts_integrations_tests_results.xml   integrations/
+        popd
+
+  # Standard-TRT only: distributed tests need a multi-GPU runner not in the RTX matrix.
+  L2-dynamo-distributed-tests:
+    name: ${{ matrix.display-name }}
+    needs:
+      [
+        filter-matrix,
+        build,
+        L1-dynamo-core-tests,
+        L1-dynamo-compile-tests,
+        L1-torch-compile-tests,
+        L1-torchscript-tests,
+      ]
+    if: "${{ !inputs.use-rtx && !contains(github.event.pull_request.labels.*.name, 'ci: only-l0') && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci: run-l2') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && ((github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success()) }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 dynamo distributed tests
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: L2-dynamo-distributed-tests
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      use-rtx: ${{ inputs.use-rtx }}
+      runner: linux.g4dn.12xlarge.nvidia.gpu
+      script: |
+        set -euo pipefail
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        export USE_TRTLLM_PLUGINS=1
+        dnf install -y mpich mpich-devel openmpi openmpi-devel
+        pushd .
+        cd tests/py
+        cd dynamo
+        python -m pytest -ra -v --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml \
+          distributed/test_nccl_ops.py \
+          distributed/test_native_nccl.py \
+          distributed/test_export_save_load.py
+        python -m torch_tensorrt.distributed.run --nproc_per_node=2 distributed/test_native_nccl.py --multirank
+        python -m torch_tensorrt.distributed.run --nproc_per_node=2 distributed/test_export_save_load.py --multirank
+        popd
+
+  # Gather every build/test job's result into a single JSON map and expose it
+  # as the ``results`` workflow output. The thin caller workflows render this
+  # into one ``ci-rollup`` status check. ``if: always()`` so the map is
+  # produced even when upstream jobs failed / were skipped / were cancelled.
+  collect-results:
+    if: ${{ always() }}
+    permissions: {}
+    needs:
+      [
+        build,
+        L0-dynamo-converter-tests,
+        L0-dynamo-core-tests,
+        L0-py-core-tests,
+        L0-torchscript-tests,
+        L1-dynamo-core-tests,
+        L1-dynamo-compile-tests,
+        L1-torch-compile-tests,
+        L1-torchscript-tests,
+        L2-torch-compile-tests,
+        L2-dynamo-compile-tests,
+        L2-dynamo-core-tests,
+        L2-dynamo-plugin-tests,
+        L2-torchscript-tests,
+        L2-dynamo-distributed-tests,
+      ]
+    runs-on: ubuntu-latest
+    outputs:
+      results: ${{ steps.collect.outputs.results }}
+    steps:
+      - name: Collect job results
+        id: collect
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          {
+            echo "results<<RESULTS_EOF"
+            echo "${RESULTS}"
+            echo "RESULTS_EOF"
+          } >> "${GITHUB_OUTPUT}"

@@ -64,6 +64,15 @@ Apply labels in the PR's right sidebar and re-push (or close/reopen) to re-trigg
 | `ci: skip-l2` | (Legacy — no-op on PRs since L2 is now off by default; still skips L2 on main-branch push runs.) |
 | `Force All Tests[L0+L1+L2]` | Force every tier to run even if an earlier tier failed. Also enables L2 on PRs. |
 
+The Linux x86_64 standard and RTX pipelines share a single reusable workflow,
+`.github/workflows/_linux-x86_64-core.yml`. The two entry workflows
+(`build-test-linux-x86_64.yml` and `build-test-linux-x86_64_rtx.yml`) just call
+it with `use-rtx: false` / `true` and render a single rollup check
+(`CI / Linux x86_64` and `CI / Linux x86_64 (RTX)`). Edit test scope, tiers, or
+gating in the core — not the entry workflows. RTX-only differences are gated
+with `if: ${{ !inputs.use-rtx ... }}` (for standard-only jobs) or branch inside
+the script on the `$USE_TRT_RTX` env var (for divergent test scope).
+
 ### Commits and PRs
 
 - Try to keep pull requests focused (multiple pull requests are okay). Typically PRs should focus on a single issue or a small collection of closely related issue.
