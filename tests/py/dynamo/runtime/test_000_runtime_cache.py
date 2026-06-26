@@ -427,6 +427,45 @@ class TestRuntimeCacheAutosave(TestCase):
             gc.collect()
             mock_unregister.assert_called_once_with(token)
 
+    def test_pickle_round_trip_strips_atexit_token(self):
+        """Standalone ``RuntimeCache`` pickle: the unpicklable ``partial``
+        over ``weakref`` is stripped on ``__getstate__`` and a fresh atexit
+        hook is wired up by ``__setstate__`` when ``autosave_on_del`` was on.
+
+        ``_handle`` is stubbed with a picklable placeholder so that the test
+        isolates ``RuntimeCache.__getstate__/__setstate__`` from an
+        orthogonal pre-existing limitation: the python-runtime
+        ``_RuntimeCacheHandle`` carries a ``threading.Lock`` that pickle
+        can't serialize. The cpp-rt torchbind handle pickles to path-only
+        (see ``register_jit_hooks.cpp``).
+        """
+        import pickle
+        from types import SimpleNamespace
+
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
+
+        original = RuntimeCache(path="/nonexistent/path", autosave_on_del=True)
+        self.assertIsNotNone(original._atexit_token)
+
+        # Sidestep the python-rt ``threading.Lock`` so we only exercise the
+        # RuntimeCache state-transition logic.
+        original._handle = SimpleNamespace(path="/nonexistent/path")
+
+        blob = pickle.dumps(original)
+        loaded = pickle.loads(blob)
+
+        self.assertTrue(loaded.autosave_on_del)
+        self.assertEqual(loaded.path, "/nonexistent/path")
+        self.assertIsNotNone(
+            loaded._atexit_token,
+            "autosave_on_del=True must re-wire atexit on unpickle",
+        )
+        self.assertIsNot(
+            loaded._atexit_token,
+            original._atexit_token,
+            "loaded handle must own its own atexit token (fresh weakref)",
+        )
+
 
 @unittest.skipIf(
     not ENABLED_FEATURES.tensorrt_rtx,

@@ -341,6 +341,31 @@ class RuntimeCache:
         except Exception:
             pass
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Strip the unpicklable atexit token from the pickle stream.
+
+        The token is a ``partial`` over a ``weakref`` -- both of which are
+        per-process artifacts and ``weakref`` is unpicklable. The pickled
+        state carries only ``_handle`` (cpp torchbind persists path-only;
+        see ``register_jit_hooks.cpp``) and ``autosave_on_del``;
+        ``__setstate__`` reconstructs a fresh atexit hook in the loading
+        process if autosave was enabled.
+        """
+        state = self.__dict__.copy()
+        state["_atexit_token"] = None
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        # Re-register atexit autosave in the loading process if it was
+        # active in the saving one. The fresh ``weakref.ref(self)`` is
+        # bound to the *new* instance, so the loading-process GC behavior
+        # mirrors what ``__init__`` would have set up directly.
+        if self.autosave_on_del and self._atexit_token is None:
+            self._atexit_token = atexit.register(
+                partial(_autosave_at_exit, weakref.ref(self))
+            )
+
     def __del__(self) -> None:
         # Mid-program GC path. The companion ``_autosave_at_exit`` hook
         # covers the case where the handle survives until interpreter exit;
@@ -351,9 +376,19 @@ class RuntimeCache:
         # Drop our atexit hook so the registry does not accumulate dead
         # entries across many engine-implicit handles in long-running
         # processes (each entry holds a now-dead weakref).
-        if self._atexit_token is not None:
+        #
+        # Use ``getattr`` rather than direct attribute access: protocols
+        # like ``copy.deepcopy`` can crash mid-state-copy on an unrelated
+        # field (e.g. a pre-existing ``threading.Lock`` somewhere else in
+        # the object graph) and leave the new instance with only some of
+        # its attributes set. ``__init__`` never ran on that object, so
+        # ``self._atexit_token`` may simply not exist when ``__del__``
+        # fires -- ``getattr`` with a default makes that case a no-op
+        # instead of raising ``AttributeError`` to ``sys.unraisablehook``.
+        token = getattr(self, "_atexit_token", None)
+        if token is not None:
             try:
-                atexit.unregister(self._atexit_token)
+                atexit.unregister(token)
             except Exception:
                 pass
 
