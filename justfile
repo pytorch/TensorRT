@@ -1,3 +1,6 @@
+# Recipes source tests/py/ci_helpers.sh (a bash library), so run them in bash.
+set shell := ["bash", "-cu"]
+
 # List all available recipes
 default:
     @just --list
@@ -8,10 +11,17 @@ default:
 # PermissionError. Giving each user their own TMPDIR sidesteps that entirely.
 export TMPDIR := env_var_or_default("TMPDIR", "/tmp/torch_tensorrt_" + env_var_or_default("USER", "local"))
 
-# pytest xdist parallelism. CI runners use 8; a single local GPU usually can't
-# build that many TRT engines at once, so override on smaller machines:
-#   just jobs=2 l0
+# pytest xdist parallelism for the parallel suites. CI runners use 8; a single
+# local GPU usually can't build that many TRT engines at once, so override on
+# smaller machines:  just jobs=2 l0
 jobs := "auto"
+
+# Launcher + env shared by every tier recipe. The tier definitions themselves
+# live in tests/py/ci_helpers.sh — the SAME functions CI calls — so there is a
+# single source of truth for what each tier runs. We only set environment
+# policy here: PYTHON runs pytest against the already-built .venv (uv --no-sync,
+# no rebuild) and TRT_JOBS feeds the parallel suites.
+_tier := 'mkdir -p "$TMPDIR" && source tests/py/ci_helpers.sh && export PYTHON="uv run --no-sync python" TRT_JOBS="' + jobs + '" TRT_PYTEST_RERUNS=0 &&'
 
 # ── Testing ───────────────────────────────────────────────────────────────────
 
@@ -24,79 +34,41 @@ test *args:
 
 # ── CI tier reproduction ──────────────────────────────────────────────────────
 #
-# These mirror the pytest selectors in .github/workflows/_linux-x86_64-core.yml
-# (standard TensorRT variant) so you can run exactly what a CI tier runs before
-# pushing. Keep them in sync with that workflow — it is the source of truth.
-# Flags differ on purpose: no --junitxml, no reruns, parallelism via {{jobs}}.
+# Run exactly what a CI tier runs, before pushing. Each recipe calls the tier
+# function from tests/py/ci_helpers.sh — the same one .github/workflows/
+# _linux-x86_64-core.yml invokes — so local and CI cannot drift. Extra args are
+# forwarded to pytest, e.g. `just l0-core -x -k test_foo`.
+# (Standard-TensorRT scope; export USE_TRT_RTX=true before running for RTX.)
 
 # Full L0 smoke tier
 l0: l0-converter l0-core l0-py-core l0-torchscript
 
-l0-converter:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p "$TMPDIR"
-    cd tests/py/dynamo
-    uv run --no-sync pytest -ra -n {{jobs}} --dist=loadscope --maxfail=20 conversion/
+l0-converter *args:
+    {{_tier}} trt_tier_l0_converter {{args}}
 
-l0-core:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p "$TMPDIR"
-    cd tests/py/dynamo
-    uv run --no-sync pytest -ra -n {{jobs}} runtime/test_000_*
-    uv run --no-sync pytest -ra -n {{jobs}} partitioning/test_000_*
-    uv run --no-sync pytest -ra -n {{jobs}} lowering/
-    uv run --no-sync pytest -ra -n {{jobs}} hlo/
+l0-core *args:
+    {{_tier}} trt_tier_l0_core {{args}}
 
-l0-py-core:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p "$TMPDIR"
-    cd tests/py/core
-    uv run --no-sync pytest -ra -n {{jobs}} .
+l0-py-core *args:
+    {{_tier}} trt_tier_l0_py_core {{args}}
 
-l0-torchscript:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p "$TMPDIR"
-    ( cd tests/modules && uv run --no-sync python hub.py )
-    ( cd tests/py/ts && uv run pytest -ra api/ )
+l0-torchscript *args:
+    {{_tier}} trt_tier_l0_torchscript {{args}}
 
 # Full L1 tier
 l1: l1-dynamo-core l1-dynamo-compile l1-torch-compile l1-torchscript
 
-l1-dynamo-core:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p "$TMPDIR"
-    cd tests/py/dynamo
-    uv run --no-sync pytest -ra -n {{jobs}} runtime/test_001_*
-    uv run --no-sync pytest -ra -n {{jobs}} partitioning/test_001_*
-    uv run --no-sync pytest -ra -n {{jobs}} hlo/
+l1-dynamo-core *args:
+    {{_tier}} trt_tier_l1_dynamo_core {{args}}
 
-l1-dynamo-compile:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p "$TMPDIR"
-    cd tests/py/dynamo
-    uv run --no-sync pytest -ra -m critical models/
+l1-dynamo-compile *args:
+    {{_tier}} trt_tier_l1_dynamo_compile {{args}}
 
-l1-torch-compile:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p "$TMPDIR"
-    cd tests/py/dynamo
-    uv run --no-sync pytest -ra backend/
-    uv run --no-sync pytest -ra -m critical --ir torch_compile models/test_models.py
-    uv run --no-sync pytest -ra -m critical --ir torch_compile models/test_dyn_models.py
+l1-torch-compile *args:
+    {{_tier}} trt_tier_l1_torch_compile {{args}}
 
-l1-torchscript:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p "$TMPDIR"
-    ( cd tests/modules && uv run --no-sync python hub.py )
-    ( cd tests/py/ts && uv run pytest -ra models/ )
+l1-torchscript *args:
+    {{_tier}} trt_tier_l1_torchscript {{args}}
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 

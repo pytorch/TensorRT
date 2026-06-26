@@ -135,20 +135,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
-        # for the rerun regex; see tests/py/ci_helpers.sh.
-        source tests/py/ci_helpers.sh
-        # Standard TRT shards converter tests with --dist=loadscope; RTX does not.
-        DIST_FLAG=""
-        if [ "${USE_TRT_RTX:-false}" != "true" ]; then
-          DIST_FLAG="--dist=loadscope"
-        fi
-        pushd .
-        cd tests/py/dynamo
-        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml ${DIST_FLAG} --maxfail=20 conversion/
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l0_converter
   L0-dynamo-core-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
@@ -174,26 +166,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
-        # for the rerun regex; see tests/py/ci_helpers.sh.
-        source tests/py/ci_helpers.sh
-        pushd .
-        cd tests/py
-        cd dynamo
-        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
-        if [ "${USE_TRT_RTX:-false}" = "true" ]; then
-          # RTX runs the whole partitioning suite and skips the hlo subset.
-          trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/
-        else
-          trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/test_000_*
-        fi
-        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
-        if [ "${USE_TRT_RTX:-false}" != "true" ]; then
-          trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_hlo_tests_results.xml hlo/
-        fi
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l0_core
   L0-py-core-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
@@ -219,15 +197,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
-        # for the rerun regex; see tests/py/ci_helpers.sh.
-        source tests/py/ci_helpers.sh
-        pushd .
-        cd tests/py/core
-        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l0_py_core
   # Standard-TRT only: TorchScript frontend is not exercised on RTX.
   L0-torchscript-tests:
     name: ${{ matrix.display-name }}
@@ -254,19 +229,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
-        # for the rerun regex; see tests/py/ci_helpers.sh.
-        source tests/py/ci_helpers.sh
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l0_torchscript
   L1-dynamo-core-tests:
     name: ${{ matrix.display-name }}
     needs:
@@ -300,19 +268,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
-        # for the rerun regex; see tests/py/ci_helpers.sh.
-        source tests/py/ci_helpers.sh
-        pushd .
-        cd tests/py/dynamo
-        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
-        if [ "${USE_TRT_RTX:-false}" != "true" ]; then
-          trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_partitioning_tests_results.xml partitioning/test_001_*
-        fi
-        trt_pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_hlo_tests_results.xml hlo/
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l1_dynamo_core
   L1-dynamo-compile-tests:
     name: ${{ matrix.display-name }}
     needs:
@@ -346,15 +307,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
-        # for the rerun regex; see tests/py/ci_helpers.sh.
-        source tests/py/ci_helpers.sh
-        pushd .
-        cd tests/py/dynamo/
-        trt_pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l1_dynamo_compile
   L1-torch-compile-tests:
     name: ${{ matrix.display-name }}
     needs:
@@ -388,17 +346,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
-        # for the rerun regex; see tests/py/ci_helpers.sh.
-        source tests/py/ci_helpers.sh
-        pushd .
-        cd tests/py/dynamo/
-        trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
-        trt_pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-        trt_pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l1_torch_compile
   # Standard-TRT only: TorchScript frontend is not exercised on RTX.
   L1-torchscript-tests:
     name: ${{ matrix.display-name }}
@@ -433,19 +386,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        # Pull in trt_pytest (reruns + reproduce hint). One source of truth
-        # for the rerun regex; see tests/py/ci_helpers.sh.
-        source tests/py/ci_helpers.sh
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        trt_pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml   models/
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l1_torchscript
   L2-torch-compile-tests:
     name: ${{ matrix.display-name }}
     needs:
@@ -479,13 +425,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l2_torch_compile
   L2-dynamo-compile-tests:
     name: ${{ matrix.display-name }}
     needs:
@@ -519,13 +464,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l2_dynamo_compile
   L2-dynamo-core-tests:
     name: ${{ matrix.display-name }}
     needs:
@@ -559,17 +503,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
-        if [ "${USE_TRT_RTX:-false}" != "true" ]; then
-          # ExecuTorch integration is standard-TRT only.
-          python -m pip install pyyaml "executorch>=1.3.1"
-          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_executorch_tests_results.xml executorch/
-        fi
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l2_dynamo_core
   L2-dynamo-plugin-tests:
     name: ${{ matrix.display-name }}
     needs:
@@ -603,32 +542,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        if [ "${USE_TRT_RTX:-false}" = "true" ]; then
-          # RTX only runs the automatic-plugin suite (no QDP kernels layer).
-          pushd .
-          cd tests/py/dynamo
-          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/
-          popd
-        else
-          pushd .
-          cd tests/py/dynamo
-          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
-          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
-          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
-          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
-          popd
-          pushd .
-          # The torch_tensorrt.kernels QDP layer needs cuda-core's high-level
-          # ``cuda.core`` API (Device / Program / launch). NVIDIA split this
-          # out of the old cuda-python umbrella into the cuda-core distribution
-          # for CUDA 13+, so installing cuda-python alone is no longer enough.
-          python -m pip install cuda-python cuda-core
-          cd tests/py/kernels
-          python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_kernels_test_results.xml .
-          popd
-        fi
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l2_plugin
   # Standard-TRT only: TorchScript frontend is not exercised on RTX.
   L2-torchscript-tests:
     name: ${{ matrix.display-name }}
@@ -663,16 +582,12 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       use-rtx: ${{ inputs.use-rtx }}
       script: |
-        set -euo pipefail
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_ts_integrations_tests_results.xml   integrations/
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l2_torchscript
   # Standard-TRT only: distributed tests need a multi-GPU runner not in the RTX matrix.
   L2-dynamo-distributed-tests:
     name: ${{ matrix.display-name }}
@@ -708,22 +623,12 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       runner: linux.g4dn.12xlarge.nvidia.gpu
       script: |
-        set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
-        export USE_TRTLLM_PLUGINS=1
-        dnf install -y mpich mpich-devel openmpi openmpi-devel
-        pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra -v --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml \
-          distributed/test_nccl_ops.py \
-          distributed/test_native_nccl.py \
-          distributed/test_export_save_load.py
-        python -m torch_tensorrt.distributed.run --nproc_per_node=2 distributed/test_native_nccl.py --multirank
-        python -m torch_tensorrt.distributed.run --nproc_per_node=2 distributed/test_export_save_load.py --multirank
-        popd
-
+          set -euo pipefail
+          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
+          # by this workflow's caller.
+          source tests/py/ci_helpers.sh
+          trt_tier_l2_distributed
   # Gather every build/test job's result into a single JSON map and expose it
   # as the ``results`` workflow output. The thin caller workflows render this
   # into one ``ci-rollup`` status check. ``if: always()`` so the map is

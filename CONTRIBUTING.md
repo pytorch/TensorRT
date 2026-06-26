@@ -102,15 +102,19 @@ just lint            # run every pre-commit hook (matches the linter CI job)
 just lint-changed    # pre-commit on files changed vs origin/main (fast pre-push)
 just test <args>     # pytest in the uv env, e.g. `just test tests/py/dynamo/conversion/`
 
-# Reproduce a whole CI tier before pushing (selectors mirror _linux-x86_64-core.yml):
+# Reproduce a whole CI tier before pushing:
 just l0              # full L0 smoke tier (converter + core + py-core + torchscript)
 just l1              # full L1 tier
-just l0-converter    # or a single sub-suite
+just l0-converter    # or a single sub-suite (forwards extra args: just l0-core -k test_foo)
 ```
 
-`just test` and the tier recipes accept the same args/flags as pytest. On a
-single local GPU, the default `-n auto` parallelism may exceed GPU memory when
-many TRT engines build at once — lower it with `just jobs=2 l0`.
+The tier recipes and the CI jobs call the **same** `trt_tier_*` functions in
+`tests/py/ci_helpers.sh`, so local and CI run identical selectors and cannot
+drift — only environment policy differs (CI sets `RUNNER_TEST_RESULTS_DIR` and
+runs the container python; the recipes set `PYTHON="uv run --no-sync python"`,
+`TRT_JOBS`, and disable the flaky-test reruns). On a single local GPU the
+default `-n auto` parallelism may exceed GPU memory when many TRT engines build
+at once — lower it with `just jobs=2 l0`.
 
 > Legacy: `noxfile.py` still defines multi-Python-version sessions
 > (`nox --session -l`) used by some release flows, but `just` is the
