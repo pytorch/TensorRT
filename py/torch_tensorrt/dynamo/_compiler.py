@@ -10,6 +10,7 @@ from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 import sympy
 import torch
 from torch.export import ExportedProgram
+from torch.export.graph_signature import InputKind
 from torch.fx.node import Target
 from torch.utils._sympy.numbers import int_oo
 from torch_tensorrt._Device import Device
@@ -905,8 +906,12 @@ def _build_user_symbol_bounds(
     log only); the ``user_min=1, exp_min=2`` case warns -- it's PyTorch's
     0/1 specialization artifact, not a user error.
     """
-    name_to_node = {n.name: n for n in gm.graph.nodes if n.op == "placeholder"}
-    placeholders = [name_to_node[name] for name in graph_signature.user_inputs]
+    all_placeholders = [n for n in gm.graph.nodes if n.op == "placeholder"]
+    placeholders = [
+        p
+        for p, s in zip(all_placeholders, graph_signature.input_specs)
+        if s.kind == InputKind.USER_INPUT
+    ]
 
     in_spec = getattr(gm, "_in_spec", None)
     assert in_spec is not None, "Exported graph module missing _in_spec"
@@ -1057,8 +1062,8 @@ def compile_module(
     sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
-    graph_signature: Optional[torch.export.graph_signature.ExportGraphSignature] = None,
     *,
+    graph_signature: torch.export.graph_signature.ExportGraphSignature,
     _debugger_config: Optional[DebuggerConfig] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -1092,12 +1097,9 @@ def compile_module(
 
     # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
     # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
-    if graph_signature is not None:
-        user_symbol_bounds = _build_user_symbol_bounds(
-            gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
-        )
-    else:
-        user_symbol_bounds = {}
+    user_symbol_bounds = _build_user_symbol_bounds(
+        gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
+    )
 
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
