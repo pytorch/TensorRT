@@ -20,7 +20,9 @@ trt_pytest() {
     local rerun='--reruns 1 --reruns-delay 5'
     local only_rerun='--only-rerun cudaErrorStreamCaptureInvalidated --only-rerun "Stream capture invalidated"'
     if ! python -m pytest $rerun $only_rerun "$@"; then
-        echo "::warning::pytest failed. Reproduce locally with: cd $(pwd) && uv run pytest $*"
+        # Use --no-sync so the repro runs against an already-built local
+        # checkout instead of uv trying to rebuild torch-tensorrt from source.
+        echo "::warning::pytest failed. Reproduce locally with: cd $(pwd) && uv run --no-sync pytest $* (or 'just test ...' from the repo root)"
         return 1
     fi
 }

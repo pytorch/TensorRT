@@ -88,40 +88,33 @@ pip install pre-commit
 go install github.com/bazelbuild/buildtools/buildifier@latest
 ```
 
-## Testing using Python backend
+## Local testing
 
-Torch-TensorRT supports testing in Python using [nox](https://nox.thea.codes/en/stable)
+Once you have a built/installed Torch-TensorRT (see the build docs), use the
+[`just`](https://github.com/casey/just) recipes in the repo root to run the
+same checks CI runs, against your local checkout. They drive `uv` with
+`--no-sync` (so they use your already-built environment instead of rebuilding
+from source) and isolate the engine/timing cache under a per-user `$TMPDIR`.
 
-To install the nox using python-pip
+```sh
+just                 # list all recipes
+just lint            # run every pre-commit hook (matches the linter CI job)
+just lint-changed    # pre-commit on files changed vs origin/main (fast pre-push)
+just test <args>     # pytest in the uv env, e.g. `just test tests/py/dynamo/conversion/`
 
-```
-python3 -m pip install --upgrade nox
-```
-
-To list supported nox sessions:
-
-```
-nox --session -l
-```
-
-Environment variables supported by nox
-
-```
-PYT_PATH          - To use different PYTHONPATH than system installed Python packages
-TOP_DIR           - To set the root directory of the noxfile
-USE_HOST_DEPS     - To use host dependencies for tests (Defaults to 0)
+# Reproduce a whole CI tier before pushing (selectors mirror _linux-x86_64-core.yml):
+just l0              # full L0 smoke tier (converter + core + py-core + torchscript)
+just l1              # full L1 tier
+just l0-converter    # or a single sub-suite
 ```
 
-Usage example
+`just test` and the tier recipes accept the same args/flags as pytest. On a
+single local GPU, the default `-n auto` parallelism may exceed GPU memory when
+many TRT engines build at once — lower it with `just jobs=2 l0`.
 
-```
-nox --session l0_api_tests
-```
-
-Supported Python versions:
-```
-["3.7", "3.8", "3.9", "3.10"]
-```
+> Legacy: `noxfile.py` still defines multi-Python-version sessions
+> (`nox --session -l`) used by some release flows, but `just` is the
+> recommended path for everyday local verification.
 
 ## How do I add support for a new op...
 

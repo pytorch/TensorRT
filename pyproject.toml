@@ -140,6 +140,10 @@ include-package-data = false
 [tool.pytest.ini_options]
 testpaths = ["tests/py"]
 addopts = "-n auto --dist=loadfile"
+markers = [
+    "unit: a focused unit test (the bulk of the suite)",
+    "critical: a smoke/critical-path case run in the L1 tier (pytest -m critical); the L2 tier runs the complement (-m 'not critical')",
+]
 norecursedirs = [
     "bazel-*",
     ".venv",
