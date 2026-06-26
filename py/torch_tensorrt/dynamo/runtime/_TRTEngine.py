@@ -422,7 +422,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         metadata = self.decode_metadata(self.serialized_metadata)
         self.settings = metadata.get("settings", CompilationSettings())
-        self.weight_name_map = metadata.get("weight_name_map")
         self.symbolic_shape_expressions = metadata.get("inout_symexprs")
         self.output_tensors_are_unowned = metadata.get(
             "output_tensors_are_unowned", False
