@@ -217,13 +217,9 @@ class RuntimeCache:
         # Engine-implicit handles must save before ``sys.meta_path`` is torn
         # down at interpreter exit -- ``__del__`` then hits ``ImportError``
         # from the torchbind property and the lazy ``filelock`` import.
-        # ``atexit`` fires before that teardown. ``partial`` over a
-        # ``weakref`` keeps the registration non-owning, so mid-program GC
-        # still runs ``__del__`` normally.
+        # ``atexit`` fires before that teardown.
         if autosave_on_del:
-            self._atexit_token = atexit.register(
-                partial(_autosave_at_exit, weakref.ref(self))
-            )
+            self._register_atexit_autosave()
 
     @property
     def path(self) -> str:
@@ -361,7 +357,19 @@ class RuntimeCache:
         # active in the saving one. The fresh ``weakref.ref(self)`` is
         # bound to the *new* instance, so the loading-process GC behavior
         # mirrors what ``__init__`` would have set up directly.
-        if self.autosave_on_del and self._atexit_token is None:
+        if self.autosave_on_del:
+            self._register_atexit_autosave()
+
+    def _register_atexit_autosave(self) -> None:
+        """Idempotently arm the atexit autosave hook for this handle.
+
+        Shared by ``__init__`` (initial wiring when ``autosave_on_del=True``)
+        and ``__setstate__`` (rewiring after pickle round-trip drops the
+        token). ``partial`` over a ``weakref`` keeps the registration
+        non-owning, so mid-program GC still runs ``__del__`` normally; the
+        ``_atexit_token`` slot check makes a second call a no-op.
+        """
+        if self._atexit_token is None:
             self._atexit_token = atexit.register(
                 partial(_autosave_at_exit, weakref.ref(self))
             )
