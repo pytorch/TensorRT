@@ -97,6 +97,17 @@ cc_library(
 )
 
 cc_library(
+    name = "tensorrt_executorch_weight_streaming_budget",
+    srcs = [
+        "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
+    ],
+    hdrs = [
+        "include/torch_tensorrt/executorch/WeightStreamingBudget.h",
+    ],
+    strip_include_prefix = "include",
+)
+
+cc_library(
     name = "tensorrt_executorch_binding_names",
     hdrs = [
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
@@ -127,6 +138,7 @@ cc_library(
     deps = [
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
+        ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
@@ -150,6 +162,7 @@ filegroup(
         "src/torch_tensorrt/executorch/README.md",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
+        "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
     ],
 )
 
@@ -169,5 +182,6 @@ filegroup(
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
+        "include/torch_tensorrt/executorch/WeightStreamingBudget.h",
     ],
 )

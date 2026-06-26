@@ -66,6 +66,7 @@ test_suite(
     tests = [
         "//tests/cpp/executorch:test_executorch_binding_names",
         "//tests/cpp/executorch:test_executorch_blob_header",
+        "//tests/cpp/executorch:test_executorch_weight_streaming_budget",
     ],
 )
 
