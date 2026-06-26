@@ -1,0 +1,102 @@
+name: Retrigger CI
+
+# Re-run CI on a PR without pushing a new commit.
+#
+# Usage — post a comment on any PR:
+#   /rerun          re-run only failed / cancelled jobs
+#   /rerun all      re-run all jobs from scratch
+#
+# The comment author must have write access to the repo.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  pull-requests: read
+
+jobs:
+  retrigger:
+    if: |
+      github.event.issue.pull_request != null &&
+      (
+        startsWith(github.event.comment.body, '/rerun')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check commenter has write access
+        id: auth
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: perm } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.actor,
+            });
+            const level = perm.permission;
+            if (!["admin", "write"].includes(level)) {
+              core.setFailed(`${context.actor} has permission '${level}' — write access required to retrigger CI`);
+            }
+            return level;
+
+      - name: Parse command
+        id: cmd
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.comment.body.trim();
+            const rerunAll = body === '/rerun all';
+            core.setOutput('rerun_all', rerunAll ? 'true' : 'false');
+            return rerunAll;
+
+      - name: Re-run CI
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const rerunAll = '${{ steps.cmd.outputs.rerun_all }}' === 'true';
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const sha = pr.head.sha;
+
+            const { data: { workflow_runs: runs } } =
+              await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: sha,
+                per_page: 50,
+              });
+
+            if (runs.length === 0) {
+              core.warning(`No workflow runs found for SHA ${sha}`);
+              return;
+            }
+
+            let retriggered = 0;
+            for (const run of runs) {
+              try {
+                if (rerunAll) {
+                  await github.rest.actions.reRunWorkflow({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    run_id: run.id,
+                  });
+                } else {
+                  await github.rest.actions.reRunWorkflowFailedJobs({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    run_id: run.id,
+                  });
+                }
+                retriggered++;
+              } catch (e) {
+                // A run that is still in progress can't be re-run; skip it.
+                core.info(`Skipped run ${run.id} (${run.name}): ${e.message}`);
+              }
+            }
+            core.info(`Retriggered ${retriggered}/${runs.length} workflow runs`);
