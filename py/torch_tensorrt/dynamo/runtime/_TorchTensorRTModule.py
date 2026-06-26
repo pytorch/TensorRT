@@ -530,6 +530,37 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.output_binding_names = state[3]
         self.target_device = self._resolve_target_device()
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Exclude per-engine, in-memory state from the pickle stream.
+
+        Mirrors the ``set_extra_state`` reset (line 515) so that
+        ``torch.save(module)`` / ``torch.load`` behaves the same way as
+        ``state_dict`` / ``load_state_dict`` w.r.t. ``RuntimeSettings``:
+        the caller must reapply any ``runtime_cache`` / strategy / cuda-graph
+        configuration after load. See ``_pack_engine_info`` for the matching
+        cpp-side exclusion (engine bytes never carry these fields).
+
+        ``_implicit_cache_handle`` is dropped alongside ``_runtime_settings``
+        because it aliases the same ``RuntimeCache`` instance and would
+        otherwise drag a ``weakref`` (via the handle's ``atexit`` closure)
+        and a Python-only ``threading.Lock`` (when the python-runtime path
+        is active) into pickle -- neither is picklable.
+        """
+        get_state = getattr(super(), "__getstate__", None)
+        state = (get_state() if get_state else self.__dict__).copy()
+        state.pop("_runtime_settings", None)
+        state.pop("_implicit_cache_handle", None)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        state.setdefault("_runtime_settings", RuntimeSettings())
+        state.setdefault("_implicit_cache_handle", None)
+        set_state = getattr(super(), "__setstate__", None)
+        if set_state is not None:
+            set_state(state)
+        else:
+            self.__dict__.update(state)
+
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.get_engine().use_pre_allocated_outputs = enable
 

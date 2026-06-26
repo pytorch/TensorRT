@@ -31,16 +31,28 @@ static auto TORCHTRT_UNUSED RuntimeCacheHandleRegistration =
         // ``def_pickle`` registers ``__getstate__`` / ``__setstate__`` so the
         // handle can survive ``deepcopy`` / ``torch.export.save`` paths that
         // walk Python attributes (e.g. ``TorchTensorRTModule._implicit_cache_handle``).
-        // We persist only the ``path`` string: the underlying ``IRuntimeCache``
-        // is CPU-side state that can't cross a process boundary anyway, and
-        // ``_resolve_runtime_cache`` re-warms from disk on the deserialized
-        // path through the standard load -> pending_warm_bytes flow.
+        //
+        // We persist ``(path, bytes)``: the bytes blob round-trips the cache
+        // contents end-to-end (live ``IRuntimeCache`` when materialized,
+        // ``pending_warm_bytes_`` when not -- ``serialize()`` unifies both
+        // states). On unpickle, ``deserialize`` stashes the bytes into
+        // ``pending_warm_bytes_`` so the first engine that calls
+        // ``ensure_materialized`` drains them into the live cache. The
+        // matching python facade (``_RuntimeCacheHandle.__getstate__``)
+        // uses the same shape.
         .def_pickle(
             // __getstate__
-            [](c10::intrusive_ptr<RuntimeCacheHandle> const& self) -> std::string { return self->path; },
+            [](c10::intrusive_ptr<RuntimeCacheHandle> const& self) -> std::tuple<std::string, at::Tensor> {
+              return std::make_tuple(self->path, self->serialize());
+            },
             // __setstate__
-            [](std::string path) -> c10::intrusive_ptr<RuntimeCacheHandle> {
-              return c10::make_intrusive<RuntimeCacheHandle>(std::move(path));
+            [](std::tuple<std::string, at::Tensor> state) -> c10::intrusive_ptr<RuntimeCacheHandle> {
+              auto handle = c10::make_intrusive<RuntimeCacheHandle>(std::move(std::get<0>(state)));
+              auto const& blob = std::get<1>(state);
+              if (blob.numel() > 0) {
+                handle->deserialize(blob);
+              }
+              return handle;
             });
 
 // TODO: Implement a call method

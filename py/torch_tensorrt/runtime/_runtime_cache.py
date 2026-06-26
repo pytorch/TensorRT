@@ -99,16 +99,21 @@ class _RuntimeCacheHandle:
         self._pending_warm_bytes: Optional[bytes] = None
         self._lock = threading.Lock()
 
+    def _serialize_unlocked(self) -> torch.Tensor:
+        """Lock-free helper used by ``serialize`` and ``__getstate__``;
+        caller must hold ``self._lock``."""
+        if self._cache is None:
+            return torch.empty(0, dtype=torch.uint8)
+        host_mem = self._cache.serialize()
+        if host_mem is None or host_mem.nbytes == 0:
+            return torch.empty(0, dtype=torch.uint8)
+        return torch.frombuffer(
+            bytearray(bytes(memoryview(host_mem))), dtype=torch.uint8
+        )
+
     def serialize(self) -> torch.Tensor:
         with self._lock:
-            if self._cache is None:
-                return torch.empty(0, dtype=torch.uint8)
-            host_mem = self._cache.serialize()
-            if host_mem is None or host_mem.nbytes == 0:
-                return torch.empty(0, dtype=torch.uint8)
-            return torch.frombuffer(
-                bytearray(bytes(memoryview(host_mem))), dtype=torch.uint8
-            )
+            return self._serialize_unlocked()
 
     def deserialize(self, data: torch.Tensor) -> None:
         with self._lock:
@@ -138,6 +143,39 @@ class _RuntimeCacheHandle:
                     self._cache.deserialize(self._pending_warm_bytes)
                     self._pending_warm_bytes = None
             return self._cache
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Pickle as ``(path, bytes)`` mirroring the cpp ``def_pickle``
+        contract. The bytes blob carries either the live ``IRuntimeCache``
+        contents (when materialized) or the pending warm bytes
+        (pre-materialize window), so the loading side gets a hot handle on
+        the first engine without an extra ``handle.load()`` from disk.
+
+        The lock and the live ``_cache`` are per-process and never cross
+        the pickle boundary; ``__setstate__`` rebuilds them fresh.
+        """
+        with self._lock:
+            if self._cache is not None:
+                blob = self._serialize_unlocked()
+            elif self._pending_warm_bytes is not None:
+                blob = torch.frombuffer(
+                    bytearray(self._pending_warm_bytes), dtype=torch.uint8
+                )
+            else:
+                blob = torch.empty(0, dtype=torch.uint8)
+            path = self.path
+        return {"path": path, "bytes": blob}
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.path = state["path"]
+        self._cache = None
+        self._pending_warm_bytes = None
+        self._lock = threading.Lock()
+        blob = state.get("bytes")
+        if blob is not None and blob.numel() > 0:
+            # Stashes into ``_pending_warm_bytes``; first engine that calls
+            # ``ensure_materialized`` drains it into the live cache.
+            self.deserialize(blob)
 
 
 class RuntimeCache:
