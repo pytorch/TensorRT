@@ -466,15 +466,15 @@ class TestRuntimeCacheAutosave(TestCase):
             "loaded handle must own its own atexit token (fresh weakref)",
         )
 
-    @unittest.skipIf(
-        ENABLED_FEATURES.torch_tensorrt_runtime,
-        "exercises the python ``_RuntimeCacheHandle`` directly; cpp-rt "
-        "path is covered by ``register_jit_hooks.cpp`` ``def_pickle``",
-    )
     def test_python_handle_pickle_preserves_pending_warm_bytes(self):
         """A python ``_RuntimeCacheHandle`` that has bytes loaded but
         hasn't materialized them yet must round-trip those bytes through
         pickle. Matches the cpp ``def_pickle`` contract (path + bytes).
+
+        The test instantiates ``_RuntimeCacheHandle`` directly rather than
+        going through ``RuntimeCache`` (which would pick the torchbind
+        backing on cpp rt), so the python class is exercisable regardless
+        of which runtime is active.
         """
         import pickle
 
