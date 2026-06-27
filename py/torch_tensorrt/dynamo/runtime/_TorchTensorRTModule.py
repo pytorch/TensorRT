@@ -541,10 +541,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         cpp-side exclusion (engine bytes never carry these fields).
 
         ``_implicit_cache_handle`` is dropped alongside ``_runtime_settings``
-        because it aliases the same ``RuntimeCache`` instance and would
-        otherwise drag a ``weakref`` (via the handle's ``atexit`` closure)
-        and a Python-only ``threading.Lock`` (when the python-runtime path
-        is active) into pickle -- neither is picklable.
+        because it aliases the same ``RuntimeCache`` instance.
         """
         get_state = getattr(super(), "__getstate__", None)
         state = (get_state() if get_state else self.__dict__).copy()

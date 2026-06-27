@@ -1,5 +1,6 @@
 #include "core/runtime/RuntimeSettings.h"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <iterator>
@@ -124,16 +125,12 @@ at::Tensor RuntimeCacheHandle::serialize() const {
 #ifdef TRT_MAJOR_RTX
   std::lock_guard<std::mutex> lock(state_mu_);
   if (!trt_handle_) {
-    // Pre-materialize: forward any ``pending_warm_bytes_`` so that the
-    // handle's persistable state survives ``save_to_stream`` and pickle
-    // even before any engine has triggered ``ensure_materialized``.
-    // ``save_to_stream`` / ``def_pickle`` round-trip then matches the
-    // python facade's behavior (it reads ``_pending_warm_bytes`` directly).
-    if (pending_warm_bytes_.empty()) {
+    if (std::empty(pending_warm_bytes_)) {
       return empty();
     }
     auto tensor = at::empty({static_cast<int64_t>(pending_warm_bytes_.size())}, opts);
-    std::memcpy(tensor.data_ptr(), pending_warm_bytes_.data(), pending_warm_bytes_.size());
+    std::copy(
+        std::cbegin(pending_warm_bytes_), std::cend(pending_warm_bytes_), static_cast<uint8_t*>(tensor.data_ptr()));
     return tensor;
   }
   auto host_mem = make_trt(trt_handle_->serialize());
