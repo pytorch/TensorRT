@@ -131,8 +131,8 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     // the constant-weights path below for why TRT requires this.
     if (in->getType() != kernel->getType()) {
       LOG_DEBUG(
-          "Conv/deconv input type (" << in->getType() << ") differs from kernel tensor type ("
-                                     << kernel->getType() << "); casting input to match.");
+          "Conv/deconv input type (" << in->getType() << ") differs from kernel tensor type (" << kernel->getType()
+                                     << "); casting input to match.");
       in = castITensor(ctx, in, kernel->getType());
     }
     auto kernel_dims = kernel->getDimensions();

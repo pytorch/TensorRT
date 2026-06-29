@@ -382,9 +382,7 @@ class TestTorchTensorRTModule(unittest.TestCase):
             self.assertTrue(
                 len(trt_json["Layers"]) == num_layers
             ), "Not enough layers found"
-            self.assertTrue(
-                len(trt_json[io_key]) == 2, "Not enough I/O tensors found"
-            )
+            self.assertTrue(len(trt_json[io_key]) == 2, "Not enough I/O tensors found")
 
 
 if __name__ == "__main__":

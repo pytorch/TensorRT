@@ -57,11 +57,18 @@ _trt_xml() {
 # Used by the L0/L1 tiers. The L2 tiers call pytest directly (no reruns) to
 # match their historical behavior.
 trt_pytest() {
-    local rerun=""
+    # MUST be an array: one --only-rerun value is the multi-word regex
+    # "Stream capture invalidated". A plain string expanded unquoted ($rerun)
+    # word-splits it into phantom positional args ("capture", 'invalidated"'),
+    # which pytest treats as missing test paths -> "file or directory not found"
+    # -> 0 tests collected -> the whole tier fails. An array keeps it one arg.
+    local rerun=()
     if [ "${TRT_PYTEST_RERUNS:-1}" != "0" ]; then
-        rerun='--reruns 1 --reruns-delay 5 --only-rerun cudaErrorStreamCaptureInvalidated --only-rerun "Stream capture invalidated"'
+        rerun=(--reruns 1 --reruns-delay 5 --only-rerun cudaErrorStreamCaptureInvalidated --only-rerun "Stream capture invalidated")
     fi
-    if ! _trt_py -m pytest $rerun "$@"; then
+    # ${rerun[@]+"${rerun[@]}"} expands to the quoted elements when set, and to
+    # nothing when empty -- avoiding an "unbound variable" error under `set -u`.
+    if ! _trt_py -m pytest ${rerun[@]+"${rerun[@]}"} "$@"; then
         # --no-sync so the repro runs against an already-built local checkout
         # instead of uv trying to rebuild torch-tensorrt from source.
         echo "::warning::pytest failed. Reproduce locally with: cd $(pwd) && uv run --no-sync pytest $* (or 'just test ...' from the repo root)"

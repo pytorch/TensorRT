@@ -298,9 +298,7 @@ class TRTRuntimeConfig:
             try:
                 wrapped.load()
             except Exception as e:
-                logger.warning(
-                    f"Failed to warm-load runtime cache from {rc!r}: {e}"
-                )
+                logger.warning(f"Failed to warm-load runtime cache from {rc!r}: {e}")
             cache = wrapped.ensure_cache(self._live)
             self._live.set_runtime_cache(cache)
         else:
