@@ -365,14 +365,17 @@ class TestTorchTensorRTModule(unittest.TestCase):
             TestTorchTensorRTModule._get_trt_mod(via_ts=True),
         ):
             trt_json = json.loads(trt_mod.get_layer_info())
-            [
+            # TRT 11.x renamed the engine-inspector "Bindings" key to "I/O Tensors"
+            # (verified on TRT 11.0.0.114); the I/O info is still present, just under
+            # the new key with a richer per-tensor schema.
+            for k in ["Layers", "I/O Tensors"]:
                 self.assertTrue(k in trt_json.keys(), f"Key {k} is missing")
-                for k in ["Layers", "Bindings"]
-            ]
             self.assertTrue(
-                len(trt_json["Layers"]) == num_layers
-            ), "Not enough layers found"
-            self.assertTrue(len(trt_json["Bindings"]) == 2, "Not enough bindings found")
+                len(trt_json["Layers"]) == num_layers, "Not enough layers found"
+            )
+            self.assertTrue(
+                len(trt_json["I/O Tensors"]) == 2, "Not enough I/O tensors found"
+            )
 
 
 if __name__ == "__main__":
