@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=71cb5aee"></script>
+    <script src="../../../../_static/documentation_options.js?v=59f2f5f2"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -542,7 +542,6 @@ document.write(`
         <span class="o">*</span><span class="p">,</span>
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
         <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
-        <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">requires_native_multidevice</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -563,7 +562,6 @@ document.write(`
 <span class="sd">        Keyword Arguments:</span>
 <span class="sd">            name (str): Name for module</span>
 <span class="sd">            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed</span>
-<span class="sd">            weight_name_map (dict): Mapping of engine weight name to state_dict weight name</span>
 <span class="sd">            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)</span>
 <span class="sd">            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)</span>
 <span class="sd">            symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding</span>
@@ -590,7 +588,6 @@ document.write(`
 <span class="sd">            output_binding_names: Output tensor names in return order.</span>
 <span class="sd">            name: Logical name for logging and serialization.</span>
 <span class="sd">            settings: Compilation/runtime settings (device, lazy init, cross-compile, etc.).</span>
-<span class="sd">            weight_name_map: Engine weight name to ``state_dict`` key mapping (refit).</span>
 <span class="sd">            requires_output_allocator: Engine needs TRT dynamic output allocation.</span>
 <span class="sd">            symbolic_shape_expressions: Optional symbolic shape metadata from compile.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -605,7 +602,6 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">hardware_compatible</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">weight_name_map</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">serialized_engine</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
@@ -664,7 +660,6 @@ document.write(`
         <span class="p">)</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span>
-            <span class="s2">&quot;weight_name_map&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span><span class="p">,</span>
             <span class="s2">&quot;inout_symexprs&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span><span class="p">,</span>
             <span class="s2">&quot;output_tensors_are_unowned&quot;</span><span class="p">:</span> <span class="p">(</span>
                 <span class="kc">False</span>
@@ -999,7 +994,6 @@ document.write(`
             <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
             <span class="n">metadata</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;weight_name_map&quot;</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;inout_symexprs&quot;</span><span class="p">]</span>
 
             <span class="c1"># RuntimeSettings are NOT serialized; restore defaults. Caller can</span>

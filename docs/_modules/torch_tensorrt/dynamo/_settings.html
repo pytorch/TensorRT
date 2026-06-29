@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=71cb5aee"></script>
+    <script src="../../../_static/documentation_options.js?v=59f2f5f2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -506,6 +506,7 @@ document.write(`
     <span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
+    <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">,</span>
     <span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">IMMUTABLE_WEIGHTS</span><span class="p">,</span>
     <span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
@@ -591,6 +592,7 @@ document.write(`
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines</span>
 <span class="sd">        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
+<span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">WORKSPACE_SIZE</span>
@@ -649,6 +651,7 @@ document.write(`
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DECOMPOSE_ATTENTION</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ATTN_BIAS_IS_CAUSAL</span>
+    <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -664,6 +667,7 @@ document.write(`
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;use_python_runtime&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;fallback_data_dependent_ops&quot;</span><span class="p">,</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
 
