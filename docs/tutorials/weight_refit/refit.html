@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=71cb5aee"></script>
+    <script src="../../_static/documentation_options.js?v=59f2f5f2"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -666,7 +666,6 @@ by default).</p>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_inputs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">verify_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">use_weight_map_cache</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">in_place</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
@@ -687,11 +686,6 @@ architecture (graph topology and tensor shapes) as the original.</p>
 <dt><code class="docutils literal notranslate"><span class="pre">verify_output</span></code> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>, default <code class="docutils literal notranslate"><span class="pre">False</span></code>)</dt><dd><p>Run a numerical check comparing the output of the refitted TRT engine against
 PyTorch on the provided sample inputs. Useful for catching silent refit failures
 during development.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">use_weight_map_cache</span></code> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>, default <code class="docutils literal notranslate"><span class="pre">True</span></code>)</dt><dd><p>When torch-tensorrt programs are compiled, the TRTIntpereter builds a map of which
-exported program nodes correspond to which TensorRT layers. This mapping is stored as metadata in serialized
-torch-tensorrt programs. This cache is not gaurenteed to be an exact match but to a new
-unseen exported program but when it does, it reduces refit time by ~50%.</p>
 </dd>
 <dt><code class="docutils literal notranslate"><span class="pre">in_place</span></code> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>, default <code class="docutils literal notranslate"><span class="pre">False</span></code>)</dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code>, modify the compiled module in-place rather than returning a copy.
 Not supported for <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> inputs (use the returned module instead).</p>
