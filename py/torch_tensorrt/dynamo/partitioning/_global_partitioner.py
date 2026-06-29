@@ -168,11 +168,9 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
 
     @staticmethod
     def _requires_output_allocator(node: torch.fx.Node) -> bool:
-        # A converter that needs a TRT output allocator has a data-dependent output
-        # shape; route the node to PyTorch when fallback_data_dependent_ops is set.
-        settings = CONVERTERS.compilation_settings
-        if settings is None or not settings.fallback_data_dependent_ops:
-            return False
+        # True if the converter selected for this node needs a TRT output allocator,
+        # i.e. the node has a data-dependent output shape (e.g. nonzero or boolean
+        # index). The fallback_data_dependent_ops setting is honored by the caller.
         converter_packet = CONVERTERS.get(node)
         return converter_packet is not None and converter_packet[2].get(
             "requires_output_allocator", False
@@ -192,7 +190,12 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 )
             return False
 
-        if self._requires_output_allocator(node):
+        settings = CONVERTERS.compilation_settings
+        if (
+            settings is not None
+            and settings.fallback_data_dependent_ops
+            and self._requires_output_allocator(node)
+        ):
             # data-dependent output shape needs a TRT output allocator, which some
             # runtimes cannot consume; honor the fallback and run the node in PyTorch
             if not node.is_impure():

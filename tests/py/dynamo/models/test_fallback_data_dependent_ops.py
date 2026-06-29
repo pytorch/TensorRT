@@ -43,21 +43,29 @@ def _nonzero_node() -> torch.fx.Node:
     )
 
 
-def test_output_allocator_node_falls_back_only_when_enabled():
-    # nonzero's selected converter requires an output allocator, so the partitioner
-    # marks the node unsupported only when the flag is on. This is decided per node
-    # (via the selected converter), not by op target.
+def test_requires_output_allocator_is_setting_independent():
+    # _requires_output_allocator is a pure predicate: it reports whether the
+    # converter selected for the node needs a TRT output allocator (decided per node
+    # via the selected converter, not by op target), independent of any setting.
     node = _nonzero_node()
+    assert TorchTensorRTOperatorSupport._requires_output_allocator(node) is True
+
+
+def test_output_allocator_node_falls_back_only_when_enabled():
+    # The node is routed to PyTorch (unsupported) only when fallback_data_dependent_ops
+    # is on; with it off the node stays on TensorRT.
+    node = _nonzero_node()
+    support = TorchTensorRTOperatorSupport()
     original = CONVERTERS.compilation_settings
     try:
         CONVERTERS.set_compilation_settings(
             CompilationSettings(fallback_data_dependent_ops=False)
         )
-        assert TorchTensorRTOperatorSupport._requires_output_allocator(node) is False
+        assert support.is_node_supported({}, node) is True
         CONVERTERS.set_compilation_settings(
             CompilationSettings(fallback_data_dependent_ops=True)
         )
-        assert TorchTensorRTOperatorSupport._requires_output_allocator(node) is True
+        assert support.is_node_supported({}, node) is False
     finally:
         CONVERTERS.compilation_settings = original
 
