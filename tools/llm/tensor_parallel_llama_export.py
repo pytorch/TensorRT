@@ -1,5 +1,5 @@
 """
-Tensor Parallel Llama: torch.export → save → load TRT engines across nodes.
+Tensor Parallel LLM (Llama / Qwen): torch.export → save → load TRT engines.
 
 Two modes:
   export  — torch.export → TRT AOT compile → save per-rank engines to disk
@@ -11,19 +11,32 @@ therefore exports the model *before* DTensor sharding and manually slices
 the weights per-rank, injecting NCCL all-reduce ops via Torch-TensorRT's
 distributed compilation path.
 
+The manual slicing assumes the standard decoder layout
+(``model.model.layers[i].self_attn.{q,k,v,o}_proj`` +
+``mlp.{gate,up,down}_proj``), which both Llama and Qwen2/Qwen3 follow, so the
+same script works for either.
 
+Tested ungated models (no HF token needed):
+  Qwen/Qwen2.5-0.5B-Instruct  - smallest/fastest smoke test; kv_heads=2 => TP=2 ONLY
+  Qwen/Qwen3-1.7B             - default; kv_heads=8 => TP 2/4/8
+  meta-llama/Llama-3.2-1B-Instruct - original example (GATED, needs HF token)
 
 Usage
 -----
-# Export mode — export + compile + save engines (run on each node):
-  torchtrtrun --nproc_per_node=1 --nnodes=2 --node_rank=0 \\
-      --rdzv_endpoint=<node0-ip>:29500 \\
-      tools/llm/tensor_parallel_llama_export.py --mode export --save_dir /tmp/llama_tp_engines
+# Export mode — single node, 2 GPUs (ungated Qwen, no token needed):
+  torchtrtrun --nproc_per_node=2 \\
+      tools/llm/tensor_parallel_llama_export.py \\
+      --mode export --save_dir /tmp/llm_tp_engines --model Qwen/Qwen3-1.7B
 
 # Load mode — load saved engines + inference (no model download needed):
+  torchtrtrun --nproc_per_node=2 \\
+      tools/llm/tensor_parallel_llama_export.py \\
+      --mode load --save_dir /tmp/llm_tp_engines --model Qwen/Qwen3-1.7B
+
+# Multi-node export (one GPU per node):
   torchtrtrun --nproc_per_node=1 --nnodes=2 --node_rank=0 \\
       --rdzv_endpoint=<node0-ip>:29500 \\
-      tools/llm/tensor_parallel_llama_export.py --mode load --save_dir /tmp/llama_tp_engines
+      tools/llm/tensor_parallel_llama_export.py --mode export --save_dir /tmp/llm_tp_engines
 """
 
 import argparse
@@ -180,6 +193,20 @@ def get_exportable_model(args, rank, world_size):
         # static KV cache lowering pass) can pattern-match it.
         register_sdpa.enable_sdpa_converter(args.model, model.config)
 
+    # Column/row slicing divides the head dims by world_size, so both head
+    # counts must be divisible. Small-KV models (e.g. Qwen2.5-0.5B has
+    # num_key_value_heads=2) therefore only support up to TP=2. Fail early with
+    # a clear message instead of a downstream reshape/shape mismatch.
+    assert model.config.num_attention_heads % world_size == 0, (
+        f"num_attention_heads ({model.config.num_attention_heads}) must be "
+        f"divisible by world_size ({world_size})."
+    )
+    assert model.config.num_key_value_heads % world_size == 0, (
+        f"num_key_value_heads ({model.config.num_key_value_heads}) must be "
+        f"divisible by world_size ({world_size}). "
+        f"{args.model} caps out at TP={model.config.num_key_value_heads}."
+    )
+
     # Get the default process group name for NCCL all-reduce.
     default_pg = dist.distributed_c10d._get_default_group()
     group_name = default_pg.group_name
@@ -215,12 +242,26 @@ def get_exportable_model(args, rank, world_size):
                 _RowParallelLinear(proj, group_name),
             )
 
-    # Patch head counts for the sharded attention
+    # Patch head counts for the sharded attention. Each rank now holds only
+    # num_heads // world_size of the projection outputs, so the per-head reshape
+    # must use the per-rank counts.
+    #
+    # Llama-style attention reads self.num_heads / self.num_key_value_heads for
+    # this reshape, so we set them. Qwen3-style attention instead infers the
+    # head count via a `-1` reshape against self.head_dim (so num_heads may be
+    # absent), and derives the GQA repeat from num_key_value_groups -- a ratio
+    # that's invariant under even sharding. Guard every attribute with hasattr
+    # so the same code is correct for both families.
+    heads_per_rank = model.config.num_attention_heads // world_size
+    kv_heads_per_rank = model.config.num_key_value_heads // world_size
     for layer in model.model.layers:
-        layer.self_attn.num_heads = model.config.num_attention_heads // world_size
-        layer.self_attn.num_key_value_heads = (
-            model.config.num_key_value_heads // world_size
-        )
+        attn = layer.self_attn
+        if hasattr(attn, "num_heads"):
+            attn.num_heads = heads_per_rank
+        if hasattr(attn, "num_key_value_heads"):
+            attn.num_key_value_heads = kv_heads_per_rank
+        if hasattr(attn, "num_key_value_groups"):
+            attn.num_key_value_groups = heads_per_rank // kv_heads_per_rank
 
     logger.info(f"Weights sliced + all-reduce inserted for rank {rank}/{world_size}.")
     return model
@@ -400,9 +441,16 @@ def load_and_run(input_ids, tokenizer, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Llama TP: torch.export → save → load with TRT engines"
+        description="LLM (Llama/Qwen) TP: torch.export → save → load with TRT engines"
     )
-    parser.add_argument("--model", default="meta-llama/Llama-3.2-1B-Instruct")
+    parser.add_argument(
+        "--model",
+        default="Qwen/Qwen3-1.7B",
+        help="HF model id. All ungated unless noted. Tested options:\n"
+        "  Qwen/Qwen2.5-0.5B-Instruct  - smallest/fastest smoke test; kv_heads=2 => TP=2 ONLY\n"
+        "  Qwen/Qwen3-1.7B             - default; kv_heads=8 => TP 2/4/8\n"
+        "  meta-llama/Llama-3.2-1B-Instruct - original example (GATED, needs HF token)",
+    )
     parser.add_argument("--prompt", default="What is tensor parallelism?")
     parser.add_argument("--num_tokens", type=int, default=128)
     parser.add_argument(
@@ -411,7 +459,7 @@ if __name__ == "__main__":
         choices=["export", "load"],
         help="export: AOT compile + save engines | load: load engines + infer",
     )
-    parser.add_argument("--save_dir", default="/tmp/llama_tp_engines")
+    parser.add_argument("--save_dir", default="/tmp/llm_tp_engines")
     parser.add_argument(
         "--cache",
         choices=["", "static_v1", "static_v2"],
