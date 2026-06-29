@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 import torch_tensorrt
 
 skip_no_cuda = pytest.mark.skipif(
@@ -14,6 +13,42 @@ skip_no_qdp = pytest.mark.skipif(
     not torch_tensorrt.ENABLED_FEATURES.qdp_plugin,
     reason="TensorRT QDP plugin not available",
 )
+
+
+def _has_cuda_core() -> bool:
+    """True if the cuda-core ``cuda.core`` API (NVRTC/QDP backend) is importable."""
+    import importlib.util
+
+    for mod in ("cuda.core", "cuda.core.experimental"):
+        try:
+            if importlib.util.find_spec(mod) is not None:
+                return True
+        except (ImportError, ModuleNotFoundError, ValueError):
+            continue
+    return False
+
+
+_HAS_CUDA_CORE = _has_cuda_core()
+
+skip_no_cuda_core = pytest.mark.skipif(
+    not _HAS_CUDA_CORE,
+    reason="cuda-core (cuda.core) not installed; QDP kernel compilation unavailable. "
+    "Install via the kernels group (e.g. `just install-test-ext`).",
+)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip the whole kernels suite when cuda-core is missing.
+
+    The QDP kernel tests compile CUDA via the ``cuda.core`` NVRTC API; without
+    cuda-core they all error on import. Skip (not fail) so a plain test run is
+    green — `just install-test-ext` pulls cuda-core so they actually run.
+    """
+    if _HAS_CUDA_CORE:
+        return
+    skip = pytest.mark.skip(reason="cuda-core (cuda.core) not installed")
+    for item in items:
+        item.add_marker(skip)
 
 
 SIGMOID_SRC = """

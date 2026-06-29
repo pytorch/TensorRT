@@ -136,10 +136,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l0_converter
   L0-dynamo-core-tests:
     name: ${{ matrix.display-name }}
@@ -167,10 +167,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l0_core
   L0-py-core-tests:
     name: ${{ matrix.display-name }}
@@ -198,10 +198,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l0_py_core
   # Standard-TRT only: TorchScript frontend is not exercised on RTX.
   L0-torchscript-tests:
@@ -230,10 +230,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l0_torchscript
   L1-dynamo-core-tests:
     name: ${{ matrix.display-name }}
@@ -269,10 +269,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l1_dynamo_core
   L1-dynamo-compile-tests:
     name: ${{ matrix.display-name }}
@@ -308,10 +308,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l1_dynamo_compile
   L1-torch-compile-tests:
     name: ${{ matrix.display-name }}
@@ -347,10 +347,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l1_torch_compile
   # Standard-TRT only: TorchScript frontend is not exercised on RTX.
   L1-torchscript-tests:
@@ -387,10 +387,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l1_torchscript
   L2-torch-compile-tests:
     name: ${{ matrix.display-name }}
@@ -426,10 +426,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l2_torch_compile
   L2-dynamo-compile-tests:
     name: ${{ matrix.display-name }}
@@ -465,10 +465,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l2_dynamo_compile
   L2-dynamo-core-tests:
     name: ${{ matrix.display-name }}
@@ -504,10 +504,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l2_dynamo_core
   L2-dynamo-plugin-tests:
     name: ${{ matrix.display-name }}
@@ -543,10 +543,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l2_plugin
   # Standard-TRT only: TorchScript frontend is not exercised on RTX.
   L2-torchscript-tests:
@@ -583,10 +583,10 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l2_torchscript
   # Standard-TRT only: distributed tests need a multi-GPU runner not in the RTX matrix.
   L2-dynamo-distributed-tests:
@@ -624,10 +624,10 @@ jobs:
       runner: linux.g4dn.12xlarge.nvidia.gpu
       script: |
           set -euo pipefail
-          # Tier definition lives in tests/py/ci_helpers.sh (single source of
+          # Tier definition lives in tests/py/utils/ci_helpers.sh (single source of
           # truth, shared with the local `just` recipes). USE_TRT_RTX is exported
           # by this workflow's caller.
-          source tests/py/ci_helpers.sh
+          source tests/py/utils/ci_helpers.sh
           trt_tier_l2_distributed
   # Gather every build/test job's result into a single JSON map and expose it
   # as the ``results`` workflow output. The thin caller workflows render this

@@ -109,7 +109,7 @@ just l0-converter    # or a single sub-suite (forwards extra args: just l0-core 
 ```
 
 The tier recipes and the CI jobs call the **same** `trt_tier_*` functions in
-`tests/py/ci_helpers.sh`, so local and CI run identical selectors and cannot
+`tests/py/utils/ci_helpers.sh`, so local and CI run identical selectors and cannot
 drift — only environment policy differs (CI sets `RUNNER_TEST_RESULTS_DIR` and
 runs the container python; the recipes set `PYTHON="uv run --no-sync python"`,
 `TRT_JOBS`, and disable the flaky-test reruns). On a single local GPU the

@@ -21,18 +21,22 @@
 # Each trt_tier_* function forwards any extra args ("$@") to pytest, so you can
 # do e.g. `just test`-style narrowing: trt_tier_l0_core -x -k test_foo.
 
-# Absolute repo root, independent of the caller's CWD.
+# Absolute repo root, independent of the caller's CWD. This file lives at
+# tests/py/utils/ci_helpers.sh, so the repo root is three levels up.
 _CI_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TRT_REPO_ROOT="${TRT_REPO_ROOT:-$(cd "${_CI_HELPERS_DIR}/../.." && pwd)}"
+TRT_REPO_ROOT="${TRT_REPO_ROOT:-$(cd "${_CI_HELPERS_DIR}/../../.." && pwd)}"
 
 # python/pytest launcher (override via $PYTHON for local uv runs)
 _trt_py() {
     ${PYTHON:-python} "$@"
 }
 
-# xdist parallelism token for the parallel suites
+# xdist parallelism token for the parallel suites. TRT_JOBS overrides; otherwise
+# falls back to the per-tier default passed as $1 (default 8). L0/L1 use 8 (their
+# CI default); L2 uses "auto" (CI relied on the pyproject addopts -n auto). Either
+# way TRT_JOBS lets a memory-constrained local GPU throttle every tier.
 _trt_nproc() {
-    echo "-n ${TRT_JOBS:-8}"
+    echo "-n ${TRT_JOBS:-${1:-8}}"
 }
 
 # --junitxml path for a given suite name (creates the results dir on demand)
@@ -132,23 +136,23 @@ trt_tier_l1_torchscript() {
 
 trt_tier_l2_torch_compile() {
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-      _trt_py -m pytest -m "not critical" -ra --junitxml="$(_trt_xml l2_torch_compile_models_tests_results)" --ir torch_compile models/test_models.py "$@"
-      _trt_py -m pytest -m "not critical" -ra --junitxml="$(_trt_xml l2_torch_compile_dyn_models_tests_results)" --ir torch_compile models/test_dyn_models.py "$@" )
+      _trt_py -m pytest -m "not critical" -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_torch_compile_models_tests_results)" --ir torch_compile models/test_models.py "$@"
+      _trt_py -m pytest -m "not critical" -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_torch_compile_dyn_models_tests_results)" --ir torch_compile models/test_dyn_models.py "$@" )
 }
 
 trt_tier_l2_dynamo_compile() {
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-      _trt_py -m pytest -m "not critical" -ra --junitxml="$(_trt_xml l2_dynamo_compile_tests_results)" models/ "$@"
-      _trt_py -m pytest -ra --junitxml="$(_trt_xml l2_dynamo_compile_llm_tests_results)" llm/ "$@" )
+      _trt_py -m pytest -m "not critical" -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_compile_tests_results)" models/ "$@"
+      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_compile_llm_tests_results)" llm/ "$@" )
 }
 
 trt_tier_l2_dynamo_core() {
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-      _trt_py -m pytest -ra --junitxml="$(_trt_xml l2_dynamo_core_tests_results)" -k "not test_000_ and not test_001_" runtime/* "$@"
+      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_core_tests_results)" -k "not test_000_ and not test_001_" runtime/* "$@"
       if [ "${USE_TRT_RTX:-false}" != "true" ]; then
         # ExecuTorch integration is standard-TRT only.
         _trt_py -m pip install pyyaml "executorch>=1.3.1"
-        _trt_py -m pytest -ra --junitxml="$(_trt_xml l2_dynamo_executorch_tests_results)" executorch/ "$@"
+        _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_executorch_tests_results)" executorch/ "$@"
       fi )
 }
 
@@ -156,20 +160,20 @@ trt_tier_l2_plugin() {
     if [ "${USE_TRT_RTX:-false}" = "true" ]; then
         # RTX only runs the automatic-plugin suite (no QDP kernels layer).
         ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-          _trt_py -m pytest -ra --junitxml="$(_trt_xml l2_dynamo_plugins_tests_results)" automatic_plugin/ "$@" )
+          _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_plugins_tests_results)" automatic_plugin/ "$@" )
     else
         ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-          _trt_py -m pytest -ra --junitxml="$(_trt_xml dynamo_converters_test_results)" -n 4 conversion/ "$@"
-          _trt_py -m pytest -ra --junitxml="$(_trt_xml dynamo_converters_test_results)" automatic_plugin/test_automatic_plugin.py "$@"
-          _trt_py -m pytest -ra --junitxml="$(_trt_xml dynamo_converters_test_results)" automatic_plugin/test_automatic_plugin_with_attrs.py "$@"
-          _trt_py -m pytest -ra --junitxml="$(_trt_xml dynamo_converters_test_results)" automatic_plugin/test_flashinfer_rmsnorm.py "$@" )
+          _trt_py -m pytest -ra $(_trt_nproc 4) --junitxml="$(_trt_xml dynamo_converters_test_results)" conversion/ "$@"
+          _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml dynamo_converters_test_results)" automatic_plugin/test_automatic_plugin.py "$@"
+          _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml dynamo_converters_test_results)" automatic_plugin/test_automatic_plugin_with_attrs.py "$@"
+          _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml dynamo_converters_test_results)" automatic_plugin/test_flashinfer_rmsnorm.py "$@" )
         # The torch_tensorrt.kernels QDP layer needs cuda-core's high-level
         # ``cuda.core`` API (Device / Program / launch). NVIDIA split this out
         # of the old cuda-python umbrella into the cuda-core distribution for
         # CUDA 13+, so installing cuda-python alone is no longer enough.
         ( _trt_py -m pip install cuda-python cuda-core
           cd "${TRT_REPO_ROOT}/tests/py/kernels"
-          _trt_py -m pytest -ra --junitxml="$(_trt_xml dynamo_kernels_test_results)" . "$@" )
+          _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml dynamo_kernels_test_results)" . "$@" )
     fi
 }
 
@@ -177,7 +181,7 @@ trt_tier_l2_plugin() {
 trt_tier_l2_torchscript() {
     ( cd "${TRT_REPO_ROOT}/tests/modules" && _trt_py hub.py )
     ( cd "${TRT_REPO_ROOT}/tests/py/ts"
-      _trt_py -m pytest -ra --junitxml="$(_trt_xml l2_ts_integrations_tests_results)" integrations/ "$@" )
+      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_ts_integrations_tests_results)" integrations/ "$@" )
 }
 
 # Standard-TRT only; needs a multi-GPU runner + system MPI (CI-only).
@@ -187,7 +191,7 @@ trt_tier_l2_distributed() {
     export USE_TRTLLM_PLUGINS=1
     dnf install -y mpich mpich-devel openmpi openmpi-devel
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-      _trt_py -m pytest -ra -v --junitxml="$(_trt_xml l2_dynamo_distributed_test_results)" \
+      _trt_py -m pytest -ra -v $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_distributed_test_results)" \
         distributed/test_nccl_ops.py \
         distributed/test_native_nccl.py \
         distributed/test_export_save_load.py "$@"
