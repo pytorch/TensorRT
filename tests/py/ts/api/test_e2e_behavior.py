@@ -116,7 +116,6 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
             half_mod,
             inputs=[self.input],
             require_full_compilation=True,
-            enabled_precisions={torch.float, torch.half},
         )
         trt_mod(self.input)
 
@@ -139,7 +138,6 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
             half_mod,
             inputs=[input_spec],
             require_full_compilation=True,
-            enabled_precisions={torch.float, torch.half},
         )
         trt_mod(self.input)
 
