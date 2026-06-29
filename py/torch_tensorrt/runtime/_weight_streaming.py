@@ -83,6 +83,13 @@ class _WeightStreamingContextManager(object):
             ws_budget_bytes += rt_mod.set_device_memory_budget(normalized_size[i])
             logger.debug(f"Set weight streaming size {normalized_size[i]} for {name}")
 
+        if self.cuda_graphs_module:
+            # Changing the weight-streaming budget invalidates TRT execution
+            # contexts. Whole-graph CUDA capture cannot create a new TRT
+            # context inside capture, so warm the wrapped graph once after the
+            # budget update and before the next capture attempt.
+            self.cuda_graphs_module.warm_up()
+
         return ws_budget_bytes
 
     def __setattr__(self, name: str, value: Any) -> None:
