@@ -90,7 +90,7 @@ test = [
 test-ext = [
     "timm>=1.0.3",
     "transformers>=5.0.0",
-    "torchvision>=0.28.0.dev,<0.29.0",
+    "torchvision>=0.29.0.dev,<0.30.0",
     "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
 ]
 
