@@ -21,6 +21,14 @@ assertions = unittest.TestCase()
 
 HELPER_SCRIPT = os.path.join(os.path.dirname(__file__), "_cross_runtime_load_helper.py")
 
+# Cross-runtime and Python-only serialization both rely on serializing a Python
+# ``TRTEngine`` constant into the ``.pt2`` archive, which requires opaque object
+# serialization support in the installed PyTorch version.
+opaque_obj_serialization_required = pytest.mark.skipif(
+    not torchtrt.ENABLED_FEATURES.opaque_obj_serialization,
+    reason="Opaque object serialization is not supported in this version of PyTorch",
+)
+
 
 class SmallConvModel(torch.nn.Module):
     def __init__(self) -> None:
@@ -94,6 +102,7 @@ def _assert_outputs_match(
 
 
 @pytest.mark.unit
+@opaque_obj_serialization_required
 def test_save_cpp_load_python(tmpdir):
     """Save with C++ runtime active, load in Python-only subprocess."""
     if not torchtrt.ENABLED_FEATURES.torch_tensorrt_runtime:
@@ -124,6 +133,7 @@ def test_save_cpp_load_python(tmpdir):
 
 
 @pytest.mark.unit
+@opaque_obj_serialization_required
 def test_save_python_load_python(tmpdir):
     """Save and load entirely in Python-only subprocesses."""
     paths = _tmp_paths(tmpdir)
@@ -165,6 +175,7 @@ def test_save_python_load_python(tmpdir):
 
 
 @pytest.mark.unit
+@opaque_obj_serialization_required
 def test_save_python_load_cpp(tmpdir):
     """Save in Python-only subprocess, load in C++ runtime."""
     if not torchtrt.ENABLED_FEATURES.torch_tensorrt_runtime:

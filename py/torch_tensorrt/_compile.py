@@ -351,7 +351,7 @@ def compile(
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
-@needs_cross_compile  # type: ignore[misc]
+@needs_cross_compile
 def cross_compile_for_windows(
     module: torch.nn.Module,
     file_path: str,
@@ -1394,19 +1394,14 @@ def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> Non
     """
     import base64
 
-    import torch.export.pt2_archive.constants as pt2_archive_constants
+    from torch_tensorrt._features import ENABLED_FEATURES
     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import ENGINE_IDX
     from torch_tensorrt.dynamo.runtime._TRTEngine import (
         EngineSerializer,
         TRTEngine,
     )
 
-    # OPAQUE_OBJ_FILENAME_PREFIX was introduced in the Opaque Object Serialization PR:
-    # https://github.com/pytorch/pytorch/pull/181676. Its presence on the (pre-existing)
-    # constants module gates whether opaque object serialization is supported.
-    opaque_obj_serialization_supported = hasattr(
-        pt2_archive_constants, "OPAQUE_OBJ_FILENAME_PREFIX"
-    )
+    opaque_obj_serialization_supported = ENABLED_FEATURES.opaque_obj_serialization
 
     for fqn, constant in list(exp_program.constants.items()):
         if isinstance(constant, (torch._C.ScriptObject, TRTEngine)):

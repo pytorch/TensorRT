@@ -27,6 +27,7 @@ FeatureSet = namedtuple(
         "tensorrt_rtx",
         "trtllm_for_nccl",
         "native_trt_collectives",
+        "opaque_obj_serialization",
     ],
 )
 
@@ -63,6 +64,20 @@ _TRTLLM_AVAIL = False
 if not _NATIVE_TRT_COLLECTIVES_AVAIL:
     _TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
 
+# Opaque object serialization gates whether a Python ``TRTEngine`` constant can be
+# pickled into a ``.pt2`` archive. ``OPAQUE_OBJ_FILENAME_PREFIX`` was introduced on the
+# (pre-existing) ``torch.export.pt2_archive.constants`` module in the Opaque Object
+# Serialization PR: https://github.com/pytorch/pytorch/pull/181676. Its presence gates
+# whether opaque object serialization is supported by the installed PyTorch version.
+try:
+    import torch.export.pt2_archive.constants as _pt2_archive_constants
+
+    _OPAQUE_OBJ_SERIALIZATION_AVAIL = hasattr(
+        _pt2_archive_constants, "OPAQUE_OBJ_FILENAME_PREFIX"
+    )
+except ImportError:
+    _OPAQUE_OBJ_SERIALIZATION_AVAIL = False
+
 if _TENSORRT_RTX:
     _QDP_PLUGIN_AVAIL = False
 elif importlib.util.find_spec("tensorrt.plugin") and importlib.util.find_spec(
@@ -87,6 +102,7 @@ ENABLED_FEATURES = FeatureSet(
     _TENSORRT_RTX,
     _TRTLLM_AVAIL,
     _NATIVE_TRT_COLLECTIVES_AVAIL,
+    _OPAQUE_OBJ_SERIALIZATION_AVAIL,
 )
 
 T = TypeVar("T")
@@ -94,7 +110,7 @@ T = TypeVar("T")
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
-    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n - Native TRT Collectives: {enabled(_NATIVE_TRT_COLLECTIVES_AVAIL)}\n"  # type: ignore[no-untyped-call]
+    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n - Native TRT Collectives: {enabled(_NATIVE_TRT_COLLECTIVES_AVAIL)}\n - Opaque Object Serialization: {enabled(_OPAQUE_OBJ_SERIALIZATION_AVAIL)}\n"  # type: ignore[no-untyped-call]
     return out_str
 
 
