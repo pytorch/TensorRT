@@ -97,6 +97,7 @@ void setup_input_tensors(
     c10::intrusive_ptr<TRTEngine> compiled_engine,
     bool cudagraphs_enabled,
     bool need_cudagraphs_record) {
+  auto* ctx = compiled_engine->exec_ctx();
   compiled_engine->reset_active_input_tensors();
 
   for (size_t i = 0; i < inputs.size(); i++) {
@@ -105,8 +106,7 @@ void setup_input_tensors(
     TORCHTRT_CHECK(
         inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
 
-    auto expected_type =
-        util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+    auto expected_type = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
     TORCHTRT_CHECK(
         inputs[i].dtype() == expected_type,
         "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
@@ -125,8 +125,7 @@ void setup_input_tensors(
           input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
       compiled_engine->active_shape_tensor_values.emplace_back(std::move(inputs_cpu_vec));
       TORCHTRT_CHECK(
-          compiled_engine->exec_ctx->setTensorAddress(
-              name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
+          ctx->setTensorAddress(name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
           "Error while setting the tensor address for shape inputs");
 
       if (cudagraphs_enabled) {
@@ -134,8 +133,7 @@ void setup_input_tensors(
         compiled_engine->cudagraph_input_staging_buffers[i] = input_cpu;
       }
       TORCHTRT_CHECK(
-          compiled_engine->exec_ctx->setTensorAddress(
-              name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
+          ctx->setTensorAddress(name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
           "Error while setting the tensor address for shape inputs");
 
     } else {
@@ -146,8 +144,7 @@ void setup_input_tensors(
         compiled_engine->cudagraph_input_staging_buffers[i] = compiled_engine->active_input_tensors[i].clone();
       }
 
-      TORCHTRT_CHECK(
-          compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
+      TORCHTRT_CHECK(ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
 
       at::Tensor final_input;
       if (cudagraphs_enabled) {
@@ -164,25 +161,24 @@ void setup_input_tensors(
       // empty_tensor_placeholder is pre-allocated in TRTEngine constructor
       void* input_addr = final_input.numel() == 0 ? compiled_engine->empty_tensor_placeholder : final_input.data_ptr();
 
-      TORCHTRT_CHECK(
-          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), input_addr),
-          "Failed to bind tensor address for " << name);
+      TORCHTRT_CHECK(ctx->setTensorAddress(name.c_str(), input_addr), "Failed to bind tensor address for " << name);
     }
   }
 }
 
 std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  auto* ctx = compiled_engine->exec_ctx();
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
   for (auto output_indices : compiled_engine->out_binding_map) {
     // out_binding_map stores TRT_IDX: PYT_IDX
     auto pyt_idx = output_indices.second;
 
     std::string name = compiled_engine->out_binding_names[pyt_idx];
-    auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
+    auto out_shape = ctx->getTensorShape(name.c_str());
     LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
 
     auto dims = core::util::toVec(out_shape);
-    auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+    auto type = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
     auto options = torch::TensorOptions()
                        .dtype(type)
                        .layout(at::kStrided)
@@ -195,17 +191,17 @@ std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> comp
 }
 
 void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  auto* ctx = compiled_engine->exec_ctx();
   if (compiled_engine->output_allocator == nullptr) {
     std::unordered_map<std::string, at::ScalarType> output_dtypes_dict;
     for (size_t o = 0; o < compiled_engine->out_binding_names.size(); ++o) {
       auto name = compiled_engine->out_binding_names[o];
-      output_dtypes_dict[name] =
-          util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+      output_dtypes_dict[name] = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
     }
     compiled_engine->output_allocator = std::make_shared<DynamicOutputAllocator>(output_dtypes_dict);
   }
   for (const auto& output_name : compiled_engine->out_binding_names) {
-    if (!compiled_engine->exec_ctx->setOutputAllocator(output_name.c_str(), compiled_engine->output_allocator.get())) {
+    if (!ctx->setOutputAllocator(output_name.c_str(), compiled_engine->output_allocator.get())) {
       TORCHTRT_THROW_ERROR("Failed to set output allocator for " + output_name);
     }
   }
@@ -233,14 +229,37 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   }
 #endif
 
+  // Materialize the IExecutionContext once for this call. Holding the raw
+  // pointer locally avoids paying the null-check + virtual dispatch through
+  // ``compiled_engine->exec_ctx()`` at every TRT API call below; the lock on
+  // ``compiled_engine->mu`` (acquired further down) keeps the pointer stable
+  // for the remainder of the call.
+  auto* ctx = compiled_engine->exec_ctx();
+
   torch::Tensor dynamic_workspace;
   if (compiled_engine->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
     dynamic_workspace = torch::empty(compiled_engine->cuda_engine->getDeviceMemorySizeV2(), {torch::kCUDA});
-    compiled_engine->exec_ctx->setDeviceMemory(dynamic_workspace.data_ptr());
+    ctx->setDeviceMemory(dynamic_workspace.data_ptr());
   }
 
   auto run_standard_execution = [&]() {
     bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
+    // effective_cudagraphs controls the manual at::cuda::CUDAGraph path below. For TRT-RTX
+    // the runtime owns capture/replay inside enqueueV3 whenever it has a cuda_graph_strategy
+    // set or subgraph cudagraphs are enabled.  The `uses_internal_capture` API below lets the caller
+    // know to skip the manual capture path. If an outer stream capture is already in progress
+    // (e.g. the caller wraps this module in  CudaGraphsTorchTensorRTModule for whole-graph capture),
+    // engine-internal capture would collide, so we disable it one-shot here.
+    bool effective_cudagraphs = cudagraphs_enabled;
+    if (compiled_engine->runtime_cfg.uses_internal_capture(cudagraphs_enabled)) {
+      effective_cudagraphs = false;
+      cudaStreamCaptureStatus capture_status;
+      cudaStreamIsCapturing(compiled_engine->engine_stream.stream(), &capture_status);
+      if (capture_status != cudaStreamCaptureStatusNone) {
+        compiled_engine->disable_rtx_native_cudagraphs();
+      }
+    }
+
     bool shape_changed = _validate_shapes(inputs, compiled_engine);
 
     auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
@@ -262,7 +281,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     // Whether cudagraphs needs to record the graph on this pass
     auto result = compiled_engine->runtime_states.set_runtime_states(
-        cudagraphs_enabled, compiled_engine->use_pre_allocated_outputs, shape_changed);
+        effective_cudagraphs, compiled_engine->use_pre_allocated_outputs, shape_changed);
 
     bool need_cudagraphs_record = std::get<0>(result);
     bool can_use_pre_allocated_outputs = std::get<1>(result);
@@ -282,11 +301,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record);
+      setup_input_tensors(inputs, compiled_engine, effective_cudagraphs, need_cudagraphs_record);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
-      int32_t const nbNames = compiled_engine->exec_ctx->inferShapes(names.size(), names.data());
+      int32_t const nbNames = ctx->inferShapes(names.size(), names.data());
       TORCHTRT_CHECK(
           nbNames == 0,
           "The shapes of the inputs: "
@@ -314,14 +333,14 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           compiled_engine->cudagraph_output_staging_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
         }
 
-        if (cudagraphs_enabled) {
+        if (effective_cudagraphs) {
           TORCHTRT_CHECK(
-              compiled_engine->exec_ctx->setTensorAddress(
+              ctx->setTensorAddress(
                   name.c_str(), compiled_engine->cudagraph_output_staging_buffers[pyt_idx].data_ptr()),
               "Error while setting the output tensor address");
         } else {
           TORCHTRT_CHECK(
-              compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
+              ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
               "Error while setting the output tensor address");
         }
       }
@@ -346,19 +365,29 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         caller_exec_complete.block(compiled_engine->engine_stream);
       }
 
-      if (!cudagraphs_enabled) {
-        // Direct execution uses the caller buffers directly
-        compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
+      if (!effective_cudagraphs) {
+        // Direct execution uses the caller buffers directly. On TRT-RTX with a
+        // cuda_graph_strategy set, the engine captures/replays internally during
+        // this enqueueV3 call.
+        ctx->enqueueV3(compiled_engine->engine_stream);
       } else {
         if (need_cudagraphs_record) {
           // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
           c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
           compiled_engine->cudagraph.capture_begin();
-          compiled_engine->exec_ctx->enqueueV3(recording_stream);
+          ctx->enqueueV3(recording_stream);
           compiled_engine->cudagraph.capture_end();
 
           if (compiled_engine->profile_execution) {
-            compiled_engine->cudagraph.debug_dump(compiled_engine->cuda_graph_debug_path);
+            cudaError_t debug_dump_err = cudaGraphDebugDotPrint(
+                compiled_engine->cudagraph.raw_cuda_graph(),
+                compiled_engine->cuda_graph_debug_path.c_str(),
+                cudaGraphDebugDotFlagsVerbose);
+            if (debug_dump_err != cudaSuccess) {
+              LOG_WARNING(
+                  "Failed to dump CUDA graph debug DOT to " << compiled_engine->cuda_graph_debug_path << ": "
+                                                            << cudaGetErrorString(debug_dump_err));
+            }
           }
         }
 
@@ -384,7 +413,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       trt_exec_complete.block(compiled_engine->caller_stream);
     }
 
-    if (cudagraphs_enabled) {
+    if (effective_cudagraphs) {
       // If in CUDAGraph mode, copy persistent staging outputs to returned tensors on the caller stream.
       for (size_t o = 0; o < compiled_engine->cudagraph_output_staging_buffers.size(); o++) {
         outputs[o].copy_(compiled_engine->cudagraph_output_staging_buffers[o], false);
@@ -412,7 +441,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
-      int32_t const nbNames = compiled_engine->exec_ctx->inferShapes(names.size(), names.data());
+      int32_t const nbNames = ctx->inferShapes(names.size(), names.data());
       TORCHTRT_CHECK(
           nbNames == 0,
           "The shapes of the inputs: "
@@ -460,7 +489,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
 
       // Direct execution uses the caller buffers directly
-      compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
+      ctx->enqueueV3(compiled_engine->engine_stream);
 
     } // End engine exeuction (resets to caller stream)
 
@@ -482,8 +511,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     for (size_t i = 0; i < compiled_engine->out_binding_names.size(); i++) {
       auto name = compiled_engine->out_binding_names[i];
       auto dims = compiled_engine->output_allocator->getShapes().at(name);
-      auto dtype =
-          util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+      auto dtype = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
       at::Tensor output = compiled_engine->output_allocator->getBuffers().at(name).clone().detach();
       int64_t prod = 1;
       for (int i = 0; i < dims.nbDims; ++i) {

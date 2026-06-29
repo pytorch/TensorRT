@@ -78,28 +78,36 @@ Example: RTX-Only Features
 --------------------------
 
 The following minimal example compiles a toy convolutional model with dynamic
-input shapes and demonstrates two TensorRT-RTX-only ``torch_tensorrt.compile``
-keyword arguments:
+input shapes and applies three TensorRT-RTX-only runtime knobs **after**
+compile, via ``mod.runtime_settings``:
 
-* ``runtime_cache_path`` — path to an on-disk cache of JIT-compiled engines.
-  The cache is populated on first use and reloaded on subsequent runs, so
-  repeated invocations of the same compiled module skips JIT compilation. The
-  default is a file under the system temp directory; set this to a persistent
-  path (e.g. somewhere under your project) to share the cache across runs.
-* ``dynamic_shapes_kernel_specialization_strategy`` — controls how TensorRT-RTX
-  specializes kernels for the current runtime shape. Accepts ``"lazy"``
-  (default; use a generic fallback kernel while a shape-specialized kernel
-  compiles asynchronously), ``"eager"`` (block on the current shape until the
-  specialized kernel is ready), or ``"none"`` (always use the generic kernel).
+* ``runtime_cache`` — path to an on-disk cache of JIT-compiled kernels. The
+  cache is populated on first use and reloaded on subsequent runs, so
+  repeated invocations of the same compiled module skip JIT compilation. The
+  default is a per-user file under the system temp directory; set this to a
+  persistent path (e.g. somewhere under your project) to share the cache
+  across runs.
+* ``dynamic_shapes_kernel_specialization_strategy`` — controls how
+  TensorRT-RTX specializes kernels for the current runtime shape. Accepts
+  ``"lazy"`` (default; use a generic fallback kernel while a
+  shape-specialized kernel compiles asynchronously), ``"eager"`` (block on
+  the current shape until the specialized kernel is ready), or ``"none"``
+  (always use the generic kernel).
+* ``cuda_graph_strategy`` — whether TensorRT-RTX captures and replays the
+  engine internally as a CUDA graph. Accepts ``"disabled"`` (default) or
+  ``"whole_graph_capture"`` (capture the engine's forward and replay on
+  subsequent calls — lower per-call CPU overhead, fixed input shapes
+  required).
 
-Both keyword arguments are silently ignored on standard-TensorRT builds; they
-only take effect when the ``torch_tensorrt_rtx`` wheel is installed.
+All three fields are no-ops on standard-TensorRT builds; they only take
+effect when the ``torch_tensorrt_rtx`` wheel is installed.
 
 .. code-block:: python
 
     import torch
     import torch.nn as nn
     import torch_tensorrt
+    from torch_tensorrt.runtime import RuntimeSettings
 
 
     class ToyConv(nn.Module):
@@ -129,14 +137,32 @@ only take effect when the ``torch_tensorrt_rtx`` wheel is installed.
         inputs=inputs,
         enabled_precisions={torch.float32},
         use_python_runtime=True,
-        # RTX-only: persist JIT-compiled engines across runs.
-        runtime_cache_path="/tmp/my_rtx_cache.bin",
-        # RTX-only: "lazy" | "eager" | "none".
+    )
+
+    # RTX-only: persist JIT-compiled kernels across runs, eagerly specialize
+    # for the current input shape, and let TensorRT-RTX capture+replay the
+    # engine internally as a CUDA graph. Apply before first execute so the
+    # engine's IExecutionContext picks the settings up on its single, lazy
+    # create.
+    compiled.runtime_settings = RuntimeSettings(
+        runtime_cache="/tmp/my_rtx_cache.bin",
         dynamic_shapes_kernel_specialization_strategy="eager",
+        cuda_graph_strategy="whole_graph_capture",
     )
 
     out = compiled(torch.randn(4, 3, 224, 224).cuda())
     print(out.shape)
+
+.. note::
+
+   To both flip ``cuda_graph_strategy`` *and* wrap the module for outer
+   ``torch.cuda.CUDAGraph`` capture in a single context manager, prefer
+   ``with torch_tensorrt.runtime.enable_cudagraphs(compiled, cuda_graph_strategy="whole_graph_capture") as wrapped:``
+   — see :ref:`runtime_settings` for the full pattern.
+
+For temporary (scoped) overrides, shared caches across multiple modules,
+combining a cuda-graph capture strategy with ``enable_cudagraphs``, and other
+advanced patterns, see :ref:`runtime_settings`.
 
 
 Compiling From Source

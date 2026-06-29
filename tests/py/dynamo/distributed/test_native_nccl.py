@@ -949,6 +949,44 @@ class TestFuseDistributedOps(unittest.TestCase):
                 "3-arg all_reduce node."
             )
 
+    # -- all_to_all ---------------------------------------------------------
+
+    def test_fuse_all_to_all_replaces_pair(self) -> None:
+        """all_to_all_single + wait_tensor → tensorrt_fused_nccl_all_to_all_op."""
+        from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+            tensorrt_fused_nccl_all_to_all_op,
+        )
+
+        gm = _build_graph(
+            torch.ops._c10d_functional.all_to_all_single.default,
+            args_without_input=([], [], "test_group"),
+        )
+        gm = self._run_pass(gm)
+        targets = _node_targets(gm)
+        self.assertNotIn(torch.ops._c10d_functional.all_to_all_single.default, targets)
+        self.assertNotIn(torch.ops._c10d_functional.wait_tensor.default, targets)
+        self.assertIn(tensorrt_fused_nccl_all_to_all_op, targets)
+
+    def test_fuse_all_to_all_args(self) -> None:
+        """Fused all_to_all node carries (inp, input splits, output splits, group_name)."""
+        from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+            tensorrt_fused_nccl_all_to_all_op,
+        )
+
+        gm = _build_graph(
+            torch.ops._c10d_functional.all_to_all_single.default,
+            # input splits, output splits, group name
+            args_without_input=([1], [2], "grp"),
+        )
+        gm = self._run_pass(gm)
+        fused = next(
+            n for n in gm.graph.nodes if n.target == tensorrt_fused_nccl_all_to_all_op
+        )
+        # args: (inp_placeholder, [], [], "grp")
+        self.assertEqual(fused.args[1], [1])
+        self.assertEqual(fused.args[2], [2])
+        self.assertEqual(fused.args[3], "grp")
+
     # -- no-fuse when wait_tensor has multiple users -----------------------
 
     def test_fuse_when_wait_tensor_result_has_multiple_uses(self) -> None:
@@ -1079,6 +1117,46 @@ class _ReduceScatterModel(nn.Module):
         return torch.ops._c10d_functional.wait_tensor.default(out)
 
 
+class _AllToAllModel(nn.Module):
+    def __init__(self, dim: int, world_size: int, group_name: str) -> None:
+        super().__init__()
+        self.fc = nn.Linear(dim, dim)
+        self.world_size = world_size
+        self.group_name = group_name
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc(x)
+        split_sizes = [x.shape[0] // self.world_size] * self.world_size
+        out = torch.ops._c10d_functional.all_to_all_single.default(
+            x, split_sizes, split_sizes, self.group_name
+        )
+        return torch.ops._c10d_functional.wait_tensor.default(out)
+
+
+class _ScatterModel(nn.Module):
+    def __init__(self, dim: int, root: int, group_name: str) -> None:
+        super().__init__()
+        self.fc = nn.Linear(dim, dim)
+        self.group_name = group_name
+        self.root = root
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc(x)
+        return torch.ops.tensorrt.fused_nccl_scatter(x, self.root, self.group_name)
+
+
+class _GatherModel(nn.Module):
+    def __init__(self, dim: int, root: int, group_name: str) -> None:
+        super().__init__()
+        self.fc = nn.Linear(dim, dim)
+        self.group_name = group_name
+        self.root = root
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc(x)
+        return torch.ops.tensorrt.fused_nccl_gather(x, self.root, self.group_name)
+
+
 @unittest.skipIf(
     not is_nccl_available(),
     "Skipped: NCCL backend not available.",
@@ -1104,6 +1182,7 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         cls.group = dist.new_group(ranks=[0])
         cls.group_name = cls.group.group_name
         cls.world_size = 1
+        cls.root = 0
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -1155,6 +1234,30 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         dim = 8
         self._run(
             _ReduceScatterModel(dim, self.world_size, self.group_name),
+            [torch.randn(1, dim)],
+        )
+
+    def test_all_to_all_single_rank(self) -> None:
+        """all_to_all compiles and produces correct output on a single rank."""
+        dim = 8
+        self._run(
+            _AllToAllModel(dim, self.world_size, self.group_name),
+            [torch.randn(1, dim)],
+        )
+
+    def test_scatter_single_rank(self) -> None:
+        """scatter compiles and produces correct output on a single rank."""
+        dim = 8
+        self._run(
+            _ScatterModel(dim, self.root, self.group_name),
+            [torch.randn(1, dim)],
+        )
+
+    def test_gather_single_rank(self) -> None:
+        """gather compiles and produces correct output on a single rank."""
+        dim = 8
+        self._run(
+            _GatherModel(dim, self.root, self.group_name),
             [torch.randn(1, dim)],
         )
 
@@ -1401,8 +1504,71 @@ def _multirank_all_gather_correctness(
     # After gather: shape is (world_size, 4), row i == float(i)
     assert out.shape == torch.Size([world_size, 4]), f"Shape mismatch: {out.shape}"
     for r in range(world_size):
-        expected_row = torch.full((4,), float(r), device=device)
+        expected_row = torch.full((4,), float(r), device=device, dtype=out.dtype)
         _check_close(out[r], expected_row, f"all_gather row {r} rank={rank}")
+
+
+def _multirank_scatter_correctness(
+    root: int, rank: int, world_size: int, device: torch.device
+) -> None:
+    """all_gather concatenates tensors from all ranks in order."""
+    group = dist.group.WORLD
+    group_name = group.group_name if hasattr(group, "group_name") else ""
+
+    class Scatter(nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return torch.ops.tensorrt.fused_nccl_scatter(x, root, group_name)
+
+    model = Scatter().to(device).eval()
+    # input is of shape (world_size, 4) laid out like
+    # [0, 0, 0, 0]
+    # ...
+    # [world_size - 1, world_size - 1, world_size - 1, world_size - 1]
+
+    # Supply root only with valid input
+    inp = (
+        torch.arange(world_size, device=device).unsqueeze(1).repeat(1, 4)
+        if rank == root
+        else torch.full((world_size, 4), -1, device=device)
+    )
+
+    with torch.no_grad():
+        out = model(inp)
+
+    # After scatter: shape is (1, 4), row[0] == [rank, rank, rank, rank]
+    assert out.shape == torch.Size([1, 4]), f"Shape mismatch: {out.shape}"
+    expected_row = torch.full((1, 4), int(rank), device=device)
+    _check_close(out, expected_row, f"scatter row {out} rank={rank}")
+
+
+def _multirank_gather_correctness(
+    root: int, rank: int, world_size: int, device: torch.device
+) -> None:
+    """gather has the root rank receive a chunk of data from all other ranks."""
+    group = dist.group.WORLD
+    group_name = group.group_name if hasattr(group, "group_name") else ""
+
+    class Gather(nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return torch.ops.tensorrt.fused_nccl_gather(x, root, group_name)
+
+    model = Gather().to(device).eval()
+    # input is of shape (1, 4) where all data is rank
+    inp = torch.full((1, 4), int(rank), device=device)
+
+    with torch.no_grad():
+        out = model(inp)
+
+    # After gather: shape is (world_size, 4), row[i] == [i, i, i, i], only validate data on root
+    assert out.shape == torch.Size([world_size, 4]), f"Shape mismatch: {out.shape}"
+
+    if rank == root:
+        # output is of shape (world_size, 4) laid out like
+        # [0, 0, 0, 0]
+        # ...
+        # [world_size - 1, world_size - 1, world_size - 1, world_size - 1]
+        expected = torch.arange(world_size, device=device).unsqueeze(1).repeat(1, 4)
+        _check_close(out, expected, f"gather received {out} expected {expected} ")
 
 
 def _multirank_reduce_scatter_all_reduce_ops(
@@ -1481,6 +1647,37 @@ def _multirank_reduce_scatter_all_reduce_ops(
             ref,
             f"reduce_scatter reduce_op={reduce_op!r} (TRT vs eager) rank={rank}",
         )
+
+
+def _multirank_all_to_all_correctness(
+    rank: int, world_size: int, device: torch.device
+) -> None:
+    """all_to_all sends a chunk from each rank to every other ank."""
+    import torch_tensorrt
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+    group = dist.group.WORLD
+    group_name = group.group_name if hasattr(group, "group_name") else ""
+
+    class AllToAll(nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            split_sizes = [x.shape[0] // world_size] * world_size
+            out = torch.ops._c10d_functional.all_to_all_single.default(
+                x, split_sizes, split_sizes, group_name
+            )
+            return torch.ops._c10d_functional.wait_tensor.default(out)
+
+    model = AllToAll().to(device).eval()
+    # Input: [0...world_size)
+    inp = torch.arange(world_size, device=device)
+
+    with torch.no_grad():
+        out = model(inp)
+
+    # Result for rank r: [r] * world_size
+    expected = torch.tensor([rank] * world_size, device=device)
+    _check_close(out, expected, f"all_to_all rank={rank}")
 
 
 def _multirank_distributed_mode_tp_model(
@@ -1864,6 +2061,29 @@ class TestMultirankNccl(MultiProcessTestCase):
         device = self._init_dist()
         _multirank_reduce_scatter_all_reduce_ops(self.rank, self.world_size, device)
 
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_all_to_all_correctness(self) -> None:
+        """all_to_all sends a chunk from each rank to every other ank."""
+        device = self._init_dist()
+        _multirank_all_to_all_correctness(self.rank, self.world_size, device)
+
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_scatter_correctness(self) -> None:
+        """scatter sends a chunk of data from the root rank to every other rank."""
+        device = self._init_dist()
+        for i in range(self.world_size):
+            _multirank_scatter_correctness(i, self.rank, self.world_size, device)
+
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_gather_correctness(self) -> None:
+        """gather receives a chunk of data from every other rank on the root rank."""
+        device = self._init_dist()
+        for i in range(self.world_size):
+            _multirank_gather_correctness(i, self.rank, self.world_size, device)
+
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
@@ -1919,6 +2139,9 @@ def run_multirank_tests() -> None:
         _multirank_all_reduce_correctness,
         _multirank_all_gather_correctness,
         _multirank_reduce_scatter_all_reduce_ops,
+        _multirank_all_to_all_correctness,
+        _multirank_scatter_correctness,
+        _multirank_gather_correctness,
         _multirank_distributed_mode_tp_model,
         _multirank_distributed_mode_subgroup,
         _multirank_cpp_runtime_bind_nccl,

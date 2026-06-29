@@ -1,0 +1,1071 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Runtime Settings (TensorRT-RTX) &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=59f2f5f2"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user_guide/runtime_performance/runtime_settings';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="DLA" href="using_dla.html" />
+    <link rel="prev" title="Runtime API" href="runtime_api.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../compilation/index.html">Compilation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/compilation_settings.html">CompilationSettings Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/shared_dynamic_dims_example.html">Example: Sharing Dynamic Dimensions Across Inputs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/unsupported_ops.html">Handling Unsupported Operators</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../shapes_precision/index.html">Precision &amp; Quantization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/quantization.html">Quantization (INT8 / FP8 / FP4)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Runtime &amp; Serialization</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_api.html">Runtime API</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Runtime Settings (TensorRT-RTX)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="using_dla.html">DLA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mutable_module.html">MutableTorchTensorRTModule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">User Guide</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Runtime &amp; Serialization</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Runtime...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="runtime-settings-tensorrt-rtx">
+<span id="runtime-settings"></span><h1>Runtime Settings (TensorRT-RTX)<a class="headerlink" href="#runtime-settings-tensorrt-rtx" title="Link to this heading">#</a></h1>
+<p>Three knobs that affect TensorRT-RTX runtime behavior <strong>without</strong> recompiling:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Effect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;disabled&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;whole_graph_capture&quot;</span></code></p></td>
+<td><p>Whether TensorRT-RTX captures+replays the engine internally.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dynamic_shapes_kernel_specialization_strategy</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;lazy&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;eager&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;none&quot;</span></code></p></td>
+<td><p>When dynamic-shape kernels are JIT-compiled.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> | <code class="docutils literal notranslate"><span class="pre">str</span></code> path | <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code></p></td>
+<td><p>On-disk cache of JIT-compiled kernels.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>All three live on <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.runtime.RuntimeSettings</span></code> (a frozen
+dataclass). All three are <strong>TensorRT-RTX only</strong> — they are no-ops on standard
+TensorRT, and constructing a non-default <code class="docutils literal notranslate"><span class="pre">RuntimeSettings</span></code> on a non-RTX build
+emits a <code class="docutils literal notranslate"><span class="pre">UserWarning</span></code>.</p>
+<hr class="docutils" />
+<section id="the-three-ways-to-apply-settings">
+<h2>The three ways to apply settings<a class="headerlink" href="#the-three-ways-to-apply-settings" title="Link to this heading">#</a></h2>
+<section id="direct-assignment-permanent">
+<h3>Direct assignment — permanent<a class="headerlink" href="#direct-assignment-permanent" title="Link to this heading">#</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeSettings</span>
+
+<span class="n">mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Use when you want the setting to apply for the module’s lifetime.</p>
+</section>
+<section id="runtime-config-context-manager-scoped-override">
+<h3><code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> context manager — scoped override<a class="headerlink" href="#runtime-config-context-manager-scoped-override" title="Link to this heading">#</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">runtime_config</span>
+
+<span class="k">with</span> <span class="n">runtime_config</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">):</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="c1"># settings restored on exit</span>
+</pre></div>
+</div>
+<p>Use when you want to flip a setting just for one call site. The CM snapshots
+prior settings on enter and restores them on exit.</p>
+<p><code class="docutils literal notranslate"><span class="pre">runtime_config</span></code> accepts a single module or a list:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">runtime_config</span><span class="p">([</span><span class="n">mod_a</span><span class="p">,</span> <span class="n">mod_b</span><span class="p">],</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="n">out_a</span> <span class="o">=</span> <span class="n">a</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">out_b</span> <span class="o">=</span> <span class="n">b</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>A sugar wrapper exists for the dynamic-shapes strategy field:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">set_dynamic_shapes_kernel_strategy</span>
+
+<span class="k">with</span> <span class="n">set_dynamic_shapes_kernel_strategy</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s2">&quot;eager&quot;</span><span class="p">):</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For the <code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code> field, prefer
+<code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(mod,</span> <span class="pre">cuda_graph_strategy=...)</span></code> (see
+<a class="reference internal" href="#runtime-settings-combining-cudagraphs"><span class="std std-ref">Combining with enable_cudagraphs(...)</span></a> below). There is no
+<code class="docutils literal notranslate"><span class="pre">set_cuda_graph_strategy(...)</span></code> wrapper — flipping <code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code> is
+almost always paired with <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code>, so the two CMs are collapsed
+into one.</p>
+</section>
+<section id="runtime-cache-context-manager-shared-cache-io">
+<h3><code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> context manager — shared cache + IO<a class="headerlink" href="#runtime-cache-context-manager-shared-cache-io" title="Link to this heading">#</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">runtime_cache</span>
+
+<span class="c1"># Cache implicitly attached to mod for the duration of the with-block.</span>
+<span class="c1"># Loaded from disk on enter, saved on exit.</span>
+<span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">):</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Bind the handle (<code class="docutils literal notranslate"><span class="pre">as</span> <span class="pre">rc</span></code>) when you need to do something with it — pass it
+to nested calls, inspect it, or save it mid-block:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">rc</span><span class="p">:</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="c1"># mid-block checkpoint</span>
+    <span class="n">rc</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/var/cache/jit-mid.bin&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Different from <code class="docutils literal notranslate"><span class="pre">runtime_config(runtime_cache=&quot;...&quot;)</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">runtime_config</span></code> gives each module its <strong>own</strong> implicit cache; modules do
+not share kernels.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> constructs <strong>one shared</strong> <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code> and
+attaches it to <em>all</em> listed modules.</p></li>
+</ul>
+<p>Use <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> when you want multiple modules to pool kernels, or you
+want explicit I/O control (load before, save after).</p>
+<section id="stream-backed-runtime-cache">
+<h4>Stream-backed <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code><a class="headerlink" href="#stream-backed-runtime-cache" title="Link to this heading">#</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">path</span></code> can be a file-like object (<code class="docutils literal notranslate"><span class="pre">io.BytesIO</span></code>, opened binary file). This
+is useful for in-memory round-trips, gzipped storage, or network sinks:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+
+<span class="n">buf</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+<span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">buf</span><span class="p">):</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="c1"># buf.getvalue() holds the saved bytes; the caller owns open/close.</span>
+</pre></div>
+</div>
+<p>Stream-mode behavior:</p>
+<ul class="simple">
+<li><p>On enter: <code class="docutils literal notranslate"><span class="pre">stream.read()</span></code> once, bytes deserialized into the cache.</p></li>
+<li><p>On exit: cache serialized, <code class="docutils literal notranslate"><span class="pre">stream.write(bytes)</span></code> once.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rc.path</span></code> reports <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code> in stream-mode.</p></li>
+</ul>
+</section>
+</section>
+</section>
+<hr class="docutils" />
+<section id="composing-the-context-managers">
+<h2>Composing the context managers<a class="headerlink" href="#composing-the-context-managers" title="Link to this heading">#</a></h2>
+<section id="idiomatic-cache-outside-strategy-inside">
+<h3>Idiomatic: cache outside, strategy inside<a class="headerlink" href="#idiomatic-cache-outside-strategy-inside" title="Link to this heading">#</a></h3>
+<p>When you bind the handle as <code class="docutils literal notranslate"><span class="pre">rc</span></code>, plug it into the nested <code class="docutils literal notranslate"><span class="pre">runtime_config</span></code>
+call so it is clear which cache the inner override applies to:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">rc</span><span class="p">:</span>
+    <span class="k">with</span> <span class="n">runtime_config</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">runtime_cache</span><span class="o">=</span><span class="n">rc</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">):</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If you are not passing <code class="docutils literal notranslate"><span class="pre">rc</span></code> anywhere, drop the binding — the cache is
+attached implicitly by the outer CM regardless:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">runtime_config</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">):</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Both forms produce identical engine state. The explicit form is preferable
+when readability matters (multi-module composition, deep nesting); the
+implicit form is fine for one-off scripts. The cache lives “longer” than
+transient strategy toggles in either case — the strategy CM’s snapshot
+captures the cache-attached state, applies the override, restores the
+snapshot on exit.</p>
+</section>
+<section id="combining-with-enable-cudagraphs">
+<span id="runtime-settings-combining-cudagraphs"></span><h3>Combining with <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(...)</span></code><a class="headerlink" href="#combining-with-enable-cudagraphs" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(mod,</span> <span class="pre">cuda_graph_strategy=&quot;whole_graph_capture&quot;)</span></code> applies
+the RTX cuda-graph strategy and wraps the module in one CM — exactly one
+<code class="docutils literal notranslate"><span class="pre">createExecutionContext</span></code> call:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">enable_cudagraphs</span>
+
+<span class="k">with</span> <span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">wrapped</span><span class="p">:</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">wrapped</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Under the hood, <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code> opens a
+<code class="docutils literal notranslate"><span class="pre">runtime_config(mod,</span> <span class="pre">cuda_graph_strategy=...)</span></code> CM <em>before</em> the wrapper’s
+<code class="docutils literal notranslate"><span class="pre">warm_up()</span></code> materializes the engine’s <code class="docutils literal notranslate"><span class="pre">IExecutionContext</span></code>, then closes it
+after teardown on exit. The strategy is in effect for the captured context
+but restored on the engines once the wrapper is gone.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code> kwarg is <strong>TensorRT-RTX only</strong>; passing it on a
+non-RTX build raises <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code> at the call site.</p>
+<p>If you want <em>non</em>-strategy knobs alongside cudagraphs (e.g. a different
+<code class="docutils literal notranslate"><span class="pre">dynamic_shapes_kernel_specialization_strategy</span></code>), nest <code class="docutils literal notranslate"><span class="pre">runtime_config</span></code>
+<em>outside</em> <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">runtime_config</span><span class="p">,</span> <span class="n">enable_cudagraphs</span>
+
+<span class="k">with</span> <span class="n">runtime_config</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="o">=</span><span class="s2">&quot;eager&quot;</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">wrapped</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">wrapped</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Any setting flipped <em>inside</em> <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(...)</span></code> invalidates the
+warmed <code class="docutils literal notranslate"><span class="pre">IExecutionContext</span></code> and forces a re-JIT on RTX. Apply your
+settings outside (via <code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> or the
+<code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy=</span></code> kwarg on <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code> itself), not
+inside.</p>
+</div>
+</section>
+<section id="share-one-cache-across-runtime-config-calls-on-different-modules">
+<h3>Share one cache across <code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> calls on different modules<a class="headerlink" href="#share-one-cache-across-runtime-config-calls-on-different-modules" title="Link to this heading">#</a></h3>
+<p>The handle yielded by <code class="docutils literal notranslate"><span class="pre">runtime_cache([...])</span></code> is a <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code> you
+can plug into any <code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> call. Useful when you want a shared
+cache plus per-module strategy overrides:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">runtime_cache</span><span class="p">([</span><span class="n">mod_a</span><span class="p">,</span> <span class="n">mod_b</span><span class="p">],</span> <span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">rc</span><span class="p">:</span>
+    <span class="c1"># mod_a gets whole-graph capture; mod_b stays default.</span>
+    <span class="c1"># Both modules continue sharing rc.</span>
+    <span class="k">with</span> <span class="n">runtime_config</span><span class="p">(</span><span class="n">mod_a</span><span class="p">,</span> <span class="n">runtime_cache</span><span class="o">=</span><span class="n">rc</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">):</span>
+        <span class="n">out_a</span> <span class="o">=</span> <span class="n">mod_a</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">out_b</span> <span class="o">=</span> <span class="n">mod_b</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="putting-it-all-together">
+<h3>Putting it all together<a class="headerlink" href="#putting-it-all-together" title="Link to this heading">#</a></h3>
+<p>A two-stage pipeline where <code class="docutils literal notranslate"><span class="pre">mod1</span></code> and <code class="docutils literal notranslate"><span class="pre">mod2</span></code> share a JIT-kernel cache,
+<code class="docutils literal notranslate"><span class="pre">mod1</span></code> runs with a temporary dynamic-shapes override + cudagraph capture,
+and <code class="docutils literal notranslate"><span class="pre">mod2</span></code> consumes <code class="docutils literal notranslate"><span class="pre">mod1</span></code>’s output under the same cache:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">runtime_cache</span><span class="p">,</span>
+    <span class="n">runtime_config</span><span class="p">,</span>
+    <span class="n">enable_cudagraphs</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">with</span> <span class="n">runtime_cache</span><span class="p">([</span><span class="n">mod1</span><span class="p">,</span> <span class="n">mod2</span><span class="p">],</span> <span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">rc</span><span class="p">:</span>
+    <span class="k">with</span> <span class="p">(</span>
+        <span class="n">runtime_config</span><span class="p">(</span>
+            <span class="n">mod1</span><span class="p">,</span>
+            <span class="n">runtime_cache</span><span class="o">=</span><span class="n">rc</span><span class="p">,</span>
+            <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="o">=</span><span class="s2">&quot;eager&quot;</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">as</span> <span class="n">modr</span><span class="p">,</span>
+        <span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">modr</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">cg</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="n">cg</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+    <span class="n">mod2</span><span class="p">(</span><span class="o">*</span><span class="n">outputs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>What happens, step by step:</p>
+<ul class="simple">
+<li><p>The outer <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> builds <strong>one</strong> shared <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code>
+<code class="docutils literal notranslate"><span class="pre">rc</span></code> and attaches it to both <code class="docutils literal notranslate"><span class="pre">mod1</span></code> and <code class="docutils literal notranslate"><span class="pre">mod2</span></code> — any kernel JIT’d
+while running <code class="docutils literal notranslate"><span class="pre">mod1</span></code> is available to <code class="docutils literal notranslate"><span class="pre">mod2</span></code> with no re-compile.</p></li>
+<li><p>The inner <code class="docutils literal notranslate"><span class="pre">runtime_config</span></code> applies <code class="docutils literal notranslate"><span class="pre">&quot;eager&quot;</span></code> dynamic-shapes
+specialization to <code class="docutils literal notranslate"><span class="pre">mod1</span></code> for this scope and explicitly threads <code class="docutils literal notranslate"><span class="pre">rc</span></code>
+through (the <code class="docutils literal notranslate"><span class="pre">modr</span></code> binding is just <code class="docutils literal notranslate"><span class="pre">mod1</span></code> with the override active).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(modr,</span> <span class="pre">cuda_graph_strategy=&quot;whole_graph_capture&quot;)</span></code>
+applies the RTX cuda-graph strategy and wraps <code class="docutils literal notranslate"><span class="pre">modr</span></code> for capture in one
+CM — one <code class="docutils literal notranslate"><span class="pre">createExecutionContext</span></code> call total.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mod2(*outputs)</span></code> runs <em>outside</em> the strategy + cudagraph scope but
+<em>inside</em> the cache scope, so it sees default settings plus the shared
+cache.</p></li>
+<li><p>On exit: cudagraph wrapper torn down → <code class="docutils literal notranslate"><span class="pre">mod1</span></code>’s strategy restored →
+cache saved to <code class="docutils literal notranslate"><span class="pre">/var/cache/jit.bin</span></code>.</p></li>
+</ul>
+</section>
+</section>
+<hr class="docutils" />
+<section id="advanced-caller-owned-runtimecache">
+<h2>Advanced: caller-owned <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code><a class="headerlink" href="#advanced-caller-owned-runtimecache" title="Link to this heading">#</a></h2>
+<p>Construct your own handle if you want full lifetime control:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeCache</span><span class="p">,</span> <span class="n">RuntimeSettings</span>
+
+<span class="n">handle</span> <span class="o">=</span> <span class="n">RuntimeCache</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">,</span> <span class="n">autosave_on_del</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">handle</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="c1"># handle.save() will fire when handle goes out of scope (autosave_on_del=True)</span>
+</pre></div>
+</div>
+<p>Or with explicit save/load:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">handle</span> <span class="o">=</span> <span class="n">RuntimeCache</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;/var/cache/jit.bin&quot;</span><span class="p">)</span>  <span class="c1"># autosave_on_del=False default</span>
+<span class="n">handle</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">handle</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="n">handle</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="best-practices">
+<h2>Best practices<a class="headerlink" href="#best-practices" title="Link to this heading">#</a></h2>
+<section id="apply-settings-before-first-execute">
+<h3>Apply settings <em>before</em> first execute<a class="headerlink" href="#apply-settings-before-first-execute" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">IExecutionContext</span></code> is created lazily on first execute. Apply settings
+before that and you get <strong>one</strong> context create:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="c1"># single createExecutionContext call here</span>
+</pre></div>
+</div>
+<p>Apply settings <em>after</em> first execute and you get <strong>two</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="c1"># context created with defaults</span>
+<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="c1"># context invalidated + recreated</span>
+</pre></div>
+</div>
+<p>On RTX, each <code class="docutils literal notranslate"><span class="pre">createExecutionContext</span></code> JIT-compiles the specialized kernel
+set, so this matters for setup latency.</p>
+</section>
+<section id="nccl-engines-pay-the-extra-create">
+<h3>NCCL engines pay the extra create<a class="headerlink" href="#nccl-engines-pay-the-extra-create" title="Link to this heading">#</a></h3>
+<p>NCCL-collective engines eagerly materialize the context at setup (cross-rank
+barrier ordering). Any subsequent <code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">...</span></code> triggers a
+second create. This is a documented trade-off — apply settings before any
+inference if you can, but the eager bind is non-negotiable for NCCL safety.</p>
+</section>
+<section id="default-runtime-cache-is-shared-per-user-concurrent-processes-can-lose-kernels">
+<h3>Default <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> is shared per-user — concurrent processes can lose kernels<a class="headerlink" href="#default-runtime-cache-is-shared-per-user-concurrent-processes-can-lose-kernels" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">RuntimeSettings()</span></code> defaults <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> to
+<code class="docutils literal notranslate"><span class="pre">{tmpdir}/torch_tensorrt_{user}/runtime_cache.bin</span></code>. The file is protected
+by a filelock against corruption, but <strong>not</strong> against lost-update races:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">proc</span><span class="w"> </span><span class="n">A</span><span class="o">:</span><span class="w"> </span><span class="n">load</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="n">a1</span><span class="p">,</span><span class="n">a2</span><span class="p">};</span><span class="w"> </span><span class="n">generate</span><span class="w"> </span><span class="p">{</span><span class="n">a3</span><span class="p">};</span><span class="w"> </span><span class="n">save</span><span class="w">  </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">a1</span><span class="p">,</span><span class="n">a2</span><span class="p">,</span><span class="n">a3</span><span class="p">}</span>
+<span class="n">proc</span><span class="w"> </span><span class="n">B</span><span class="o">:</span><span class="w"> </span><span class="n">load</span><span class="w"> </span><span class="p">(</span><span class="n">before</span><span class="w"> </span><span class="n">A</span><span class="err">&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">save</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="n">a1</span><span class="p">,</span><span class="n">a2</span><span class="p">};</span><span class="w"> </span><span class="n">generate</span><span class="w"> </span><span class="p">{</span><span class="n">b1</span><span class="p">};</span><span class="w"> </span><span class="n">save</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">a1</span><span class="p">,</span><span class="n">a2</span><span class="p">,</span><span class="n">b1</span><span class="p">}</span>
+<span class="w">                                                                  </span><span class="cp"># a3 lost</span>
+</pre></div>
+</div>
+<p>For hyperparameter sweeps, or any multi-process workload where lost kernels
+matter:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Option 1: per-worker path</span>
+<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;/var/cache/jit-worker-</span><span class="si">{</span><span class="n">worker_id</span><span class="si">}</span><span class="s2">.bin&quot;</span><span class="p">)</span>
+
+<span class="c1"># Option 2: opt out</span>
+<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="don-t-nest-runtime-cache-cms-with-the-same-path">
+<h3>Don’t nest <code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> CMs with the same path<a class="headerlink" href="#don-t-nest-runtime-cache-cms-with-the-same-path" title="Link to this heading">#</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># DON&#39;T:</span>
+<span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s2">&quot;/p&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">rc1</span><span class="p">:</span>
+    <span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s2">&quot;/p&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">rc2</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Each <code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> builds a <em>different</em> <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code>
+object. The inner one displaces the outer’s handle from the engine. On inner
+exit, <code class="docutils literal notranslate"><span class="pre">rc2.save()</span></code> writes <code class="docutils literal notranslate"><span class="pre">/p</span></code>. On outer exit, the engine has <code class="docutils literal notranslate"><span class="pre">rc1</span></code>
+re-attached (different <code class="docutils literal notranslate"><span class="pre">IRuntimeCache</span></code> from <code class="docutils literal notranslate"><span class="pre">rc2</span></code>), and <code class="docutils literal notranslate"><span class="pre">rc1.save()</span></code>
+overwrites <code class="docutils literal notranslate"><span class="pre">/p</span></code> with the now-stale <code class="docutils literal notranslate"><span class="pre">rc1</span></code> state. <strong>Last writer wins;
+mid-block kernels are silently lost.</strong></p>
+</section>
+<section id="setter-is-per-torchtensorrtmodule">
+<h3>Setter is per-<code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code><a class="headerlink" href="#setter-is-per-torchtensorrtmodule" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">rs</span></code> only affects <code class="docutils literal notranslate"><span class="pre">self</span></code>. If you compile a model
+with multiple TRT subgraphs, walk the submodules:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
+
+<span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">compiled</span><span class="o">.</span><span class="n">named_modules</span><span class="p">():</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
+        <span class="n">sub</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> and <code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> do this walk automatically
+— that is the easier API for compound models.</p>
+</section>
+<section id="non-tensorrt-rtx-builds-emit-a-warning-do-nothing">
+<h3>Non-TensorRT-RTX builds emit a warning, do nothing<a class="headerlink" href="#non-tensorrt-rtx-builds-emit-a-warning-do-nothing" title="Link to this heading">#</a></h3>
+<p>Constructing a non-default <code class="docutils literal notranslate"><span class="pre">RuntimeSettings()</span></code> on a non-RTX build emits a
+<code class="docutils literal notranslate"><span class="pre">UserWarning</span></code> and the settings have no effect. The dispatch path still
+runs; it is just a no-op on the engine side. If you are shipping
+cross-RTX/non-RTX code, you can suppress the warning with
+<code class="docutils literal notranslate"><span class="pre">warnings.simplefilter(&quot;once&quot;,</span> <span class="pre">UserWarning)</span></code>.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="quick-reference">
+<h2>Quick reference<a class="headerlink" href="#quick-reference" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Goal</p></th>
+<th class="head"><p>API</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Set a runtime knob permanently on one module</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">RuntimeSettings(...)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Temporary override for one call site</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">runtime_config(mod,</span> <span class="pre">**overrides):</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Just the dynamic-shapes kernel strategy</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">set_dynamic_shapes_kernel_strategy(mod,</span> <span class="pre">&quot;...&quot;):</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>RTX cuda-graph strategy + cudagraphs capture in one CM</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">enable_cudagraphs(mod,</span> <span class="pre">cuda_graph_strategy=&quot;...&quot;):</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Share one cache across multiple modules</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">runtime_cache([a,</span> <span class="pre">b],</span> <span class="pre">path)</span> <span class="pre">as</span> <span class="pre">rc:</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Cache to/from a stream</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">runtime_cache(mod,</span> <span class="pre">io.BytesIO()):</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Caller-controlled cache lifetime</p></td>
+<td><p>construct <code class="docutils literal notranslate"><span class="pre">RuntimeCache(...)</span></code> directly</p></td>
+</tr>
+<tr class="row-odd"><td><p>In-memory cache (no disk)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">RuntimeSettings(runtime_cache=None)</span></code> or <code class="docutils literal notranslate"><span class="pre">runtime_cache(mod,</span> <span class="pre">&quot;&quot;)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Non-cuda-graph settings alongside cudagraphs capture</p></td>
+<td><p>nest <code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> <em>outside</em> <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(...)</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="runtime_api.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Runtime API</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="using_dla.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">DLA</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-three-ways-to-apply-settings">The three ways to apply settings</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#direct-assignment-permanent">Direct assignment — permanent</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-config-context-manager-scoped-override"><code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> context manager — scoped override</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-cache-context-manager-shared-cache-io"><code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> context manager — shared cache + IO</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#stream-backed-runtime-cache">Stream-backed <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#composing-the-context-managers">Composing the context managers</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#idiomatic-cache-outside-strategy-inside">Idiomatic: cache outside, strategy inside</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#combining-with-enable-cudagraphs">Combining with <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(...)</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#share-one-cache-across-runtime-config-calls-on-different-modules">Share one cache across <code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> calls on different modules</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#putting-it-all-together">Putting it all together</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#advanced-caller-owned-runtimecache">Advanced: caller-owned <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#best-practices">Best practices</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#apply-settings-before-first-execute">Apply settings <em>before</em> first execute</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nccl-engines-pay-the-extra-create">NCCL engines pay the extra create</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#default-runtime-cache-is-shared-per-user-concurrent-processes-can-lose-kernels">Default <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> is shared per-user — concurrent processes can lose kernels</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#don-t-nest-runtime-cache-cms-with-the-same-path">Don’t nest <code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> CMs with the same path</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#setter-is-per-torchtensorrtmodule">Setter is per-<code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#non-tensorrt-rtx-builds-emit-a-warning-do-nothing">Non-TensorRT-RTX builds emit a warning, do nothing</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quick-reference">Quick reference</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/user_guide/runtime_performance/runtime_settings.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/user_guide/runtime_performance/runtime_settings.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=8ef620a9"></script>
+    <script src="../../_static/documentation_options.js?v=59f2f5f2"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1231,11 +1231,14 @@ document.write(`
 
 <span class="sd">                - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes</span>
 <span class="sd">                  parameter takes precedence.</span>
-<span class="sd">        kwargs: Additional format-specific kwargs. ``partitioners=`` and</span>
-<span class="sd">                ``compile_specs=`` are only used with ``output_format=&quot;executorch&quot;``;</span>
-<span class="sd">                otherwise they are ignored with a warning. Pass</span>
-<span class="sd">                ``compile_specs=[CompileSpec(&quot;target_device&quot;, b&quot;cuda:&lt;i&gt;&quot;)]`` to</span>
-<span class="sd">                override the default target device (``cuda:0``).</span>
+<span class="sd">        kwargs: Additional format-specific kwargs. ``partitioners=``,</span>
+<span class="sd">                ``compile_specs=``, and ``backend_config=`` are only used with</span>
+<span class="sd">                ``output_format=&quot;executorch&quot;``; otherwise they are ignored with a</span>
+<span class="sd">                warning. Pass ``compile_specs=[CompileSpec(&quot;target_device&quot;,</span>
+<span class="sd">                b&quot;cuda:&lt;i&gt;&quot;)]`` to override the default target device (``cuda:0``).</span>
+<span class="sd">                ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``</span>
+<span class="sd">                and is forwarded to ``to_executorch(config=...)`` to customize</span>
+<span class="sd">                ExecuTorch lowering (e.g. memory planning or device placement).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
@@ -1262,6 +1265,7 @@ document.write(`
 
     <span class="n">executorch_partitioners</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;partitioners&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">executorch_compile_specs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;compile_specs&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">executorch_backend_config</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;backend_config&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">accepted_formats</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1388,6 +1392,11 @@ document.write(`
             <span class="s2">&quot;compile_specs= is only used with output_format=&#39;executorch&#39; and will &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;be ignored for output_format=&#39;</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
         <span class="p">)</span>
+    <span class="k">if</span> <span class="n">executorch_backend_config</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">&quot;executorch&quot;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;backend_config= is only used with output_format=&#39;executorch&#39; and will &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;be ignored for output_format=&#39;</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+        <span class="p">)</span>
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;aot_inductor&quot;</span> <span class="ow">and</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;The AOT Inductor format is only supported on Linux, </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="si">}</span><span class="s2"> is not a supported platform for this format&quot;</span>
@@ -1456,6 +1465,7 @@ document.write(`
                     <span class="n">file_path</span><span class="p">,</span>
                     <span class="n">partitioners</span><span class="o">=</span><span class="n">executorch_partitioners</span><span class="p">,</span>
                     <span class="n">compile_specs</span><span class="o">=</span><span class="n">executorch_compile_specs</span><span class="p">,</span>
+                    <span class="n">backend_config</span><span class="o">=</span><span class="n">executorch_backend_config</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1521,6 +1531,7 @@ document.write(`
                         <span class="n">file_path</span><span class="p">,</span>
                         <span class="n">partitioners</span><span class="o">=</span><span class="n">executorch_partitioners</span><span class="p">,</span>
                         <span class="n">compile_specs</span><span class="o">=</span><span class="n">executorch_compile_specs</span><span class="p">,</span>
+                        <span class="n">backend_config</span><span class="o">=</span><span class="n">executorch_backend_config</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1607,6 +1618,7 @@ document.write(`
                         <span class="n">file_path</span><span class="p">,</span>
                         <span class="n">partitioners</span><span class="o">=</span><span class="n">executorch_partitioners</span><span class="p">,</span>
                         <span class="n">compile_specs</span><span class="o">=</span><span class="n">executorch_compile_specs</span><span class="p">,</span>
+                        <span class="n">backend_config</span><span class="o">=</span><span class="n">executorch_backend_config</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1870,7 +1882,7 @@ document.write(`
         <span class="n">partitioner</span><span class="o">=</span><span class="n">partitioners</span><span class="p">,</span>
         <span class="n">compile_config</span><span class="o">=</span><span class="n">get_edge_compile_config</span><span class="p">(),</span>
     <span class="p">)</span>
-    <span class="n">executorch_program</span> <span class="o">=</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">()</span>
+    <span class="n">executorch_program</span> <span class="o">=</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;backend_config&quot;</span><span class="p">))</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
         <span class="n">executorch_program</span><span class="o">.</span><span class="n">write_to_file</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
 
