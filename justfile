@@ -25,6 +25,11 @@ jobs := "4"
 # no rebuild) and TRT_JOBS feeds the parallel suites.
 _tier := 'mkdir -p "$TMPDIR" && source tests/py/utils/ci_helpers.sh && export PYTHON="uv run --no-sync python" TRT_JOBS="' + jobs + '" TRT_PYTEST_RERUNS=0 &&'
 
+# Invocation for the new suite manifest/runner (tests/ci). Same env policy as
+# _tier: the built venv via `uv --no-sync`, GPU-memory-aware jobs, reruns off
+# locally (the rerunfailures plugin may be absent and you want to SEE flakes).
+_ci := 'mkdir -p "$TMPDIR" && PYTHON="uv run --no-sync python" TRT_JOBS="' + jobs + '" TRT_PYTEST_RERUNS=0 uv run --no-sync python -m tests.ci'
+
 # ── Testing ───────────────────────────────────────────────────────────────────
 
 # Run pytest in the uv-managed env (honors pyproject addopts). Pass any args:
@@ -33,6 +38,41 @@ _tier := 'mkdir -p "$TMPDIR" && source tests/py/utils/ci_helpers.sh && export PY
 test *args:
     @mkdir -p "$TMPDIR"
     uv run --no-sync pytest {{args}}
+
+# ── Suite manifest (tests/ci) ──────────────────────────────────────────────────
+#
+# The suite manifest is the single source of truth for what each job runs; CI
+# and these recipes both call `python -m tests.ci`. See TESTING_AND_CI_DESIGN.md.
+
+# Validate the suite manifest (unique names/junit paths, valid setup steps)
+doctor:
+    uv run --no-sync python -m tests.ci doctor
+
+# List every suite with its tier, lanes, and variants
+suites:
+    uv run --no-sync python -m tests.ci list
+
+# Run ONE suite exactly as CI runs it. Extra pytest args after `--`:
+#   just suite dynamo-runtime -- -k test_foo -x
+suite name *args:
+    {{_ci}} run {{name}} {{args}}
+
+# Run every suite in a LANE (fast|full|nightly), continuing past failures:
+#   just lane fast
+lane name *args:
+    {{_ci}} run-lane --lane {{name}} --variant standard {{args}}
+
+# Run a lane past failures, then print one consolidated report (--agent for Claude):
+#   just report fast --agent
+report lane *summary_args:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    mkdir -p "$TMPDIR"
+    results="${RUNNER_TEST_RESULTS_DIR:-$TMPDIR/trt_test_results}"
+    rm -f "$results"/*.xml 2>/dev/null || true
+    export PYTHON="uv run --no-sync python" TRT_JOBS="{{jobs}}" TRT_PYTEST_RERUNS=0
+    uv run --no-sync python -m tests.ci run-lane --lane {{lane}} --variant standard || true
+    uv run --no-sync python tests/py/utils/junit_summary.py "$results" {{summary_args}}
 
 # ── CI tier reproduction ──────────────────────────────────────────────────────
 #
