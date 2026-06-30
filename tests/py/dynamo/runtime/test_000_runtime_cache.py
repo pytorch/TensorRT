@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import torch
 import torch_tensorrt as torchtrt
@@ -333,6 +334,137 @@ class TestRuntimeCacheAutosave(TestCase):
                 os.path.exists(path),
                 "User-built handle with autosave_on_del=False should not save on GC",
             )
+
+    def test_del_swallows_shutdown_import_error_on_path(self):
+        """During interpreter shutdown ``self.path`` (a property that forwards
+        to ``self._handle.path``) can raise ``ImportError`` from a lazy import
+        triggered on a torn-down ``sys.meta_path``. ``__del__`` must wrap the
+        entire body in try/except so this does not surface as a noisy
+        ``Exception ignored in __del__``.
+        """
+        import sys
+
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
+
+        handle = RuntimeCache(path="/nonexistent/path", autosave_on_del=True)
+
+        class _Boom:
+            @property
+            def path(self) -> str:
+                raise ImportError(
+                    "sys.meta_path is None, Python is likely shutting down"
+                )
+
+        handle._handle = _Boom()
+
+        # An exception escaping ``__del__`` reaches the interpreter via
+        # ``sys.unraisablehook`` rather than ordinary stderr. Swap the hook
+        # for a Mock so the call (if any) is recorded and the contract --
+        # "nothing leaks" -- maps to ``assert_not_called``.
+        with patch.object(sys, "unraisablehook") as mock_hook:
+            del handle
+            gc.collect()
+            mock_hook.assert_not_called()
+
+    def test_atexit_hook_saves_via_weakref(self):
+        """``_autosave_at_exit`` resolves the weakref and invokes ``save()``,
+        and flips ``autosave_on_del`` off so a subsequent ``__del__`` no-ops.
+        """
+        import weakref
+
+        from torch_tensorrt.runtime._runtime_cache import (
+            RuntimeCache,
+            _autosave_at_exit,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = RuntimeCache(path=path, autosave_on_del=True)
+
+            with patch.object(handle, "save") as mock_save:
+                _autosave_at_exit(weakref.ref(handle))
+                mock_save.assert_called_once()
+            self.assertFalse(
+                handle.autosave_on_del,
+                "atexit hook must flip autosave_on_del off so __del__ skips",
+            )
+
+    def test_atexit_hook_no_op_on_dead_weakref(self):
+        """If the handle was already collected mid-program, the atexit hook
+        sees a dead weakref and does nothing -- no exceptions, no save."""
+        import weakref
+
+        from torch_tensorrt.runtime._runtime_cache import _autosave_at_exit
+
+        class _WeakrefableDummy:
+            pass
+
+        ref: weakref.ref = weakref.ref(_WeakrefableDummy())
+        gc.collect()
+        self.assertIsNone(ref(), "sentinel must be collected by gc")
+
+        # Must not raise even though ref() is dead.
+        _autosave_at_exit(ref)
+
+    def test_atexit_token_unregistered_after_del(self):
+        """``__del__`` removes the handle's atexit hook so the registry does
+        not accumulate dead entries across many engine-implicit handles in
+        long-running processes."""
+        import atexit
+
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
+
+        handle = RuntimeCache(path="/nonexistent/path", autosave_on_del=True)
+        token = handle._atexit_token
+        self.assertIsNotNone(token)
+
+        # Spy on ``atexit.unregister`` to verify ``__del__`` cleaned up. Using
+        # a mock avoids depending on private CPython implementation details
+        # of the atexit registry (no ``atexit._exithandlers`` in modern
+        # Python).
+        with patch.object(atexit, "unregister") as mock_unregister:
+            del handle
+            gc.collect()
+            mock_unregister.assert_called_once_with(token)
+
+    def test_pickle_round_trip_strips_atexit_token(self):
+        """Standalone ``RuntimeCache`` pickle: the unpicklable ``partial``
+        over ``weakref`` is stripped on ``__getstate__`` and a fresh atexit
+        hook is wired up by ``__setstate__`` when ``autosave_on_del`` was on.
+
+        ``_handle`` is stubbed with a picklable placeholder so that the test
+        isolates ``RuntimeCache.__getstate__/__setstate__`` from an
+        orthogonal pre-existing limitation: the python-runtime
+        ``_RuntimeCacheHandle`` carries a ``threading.Lock`` that pickle
+        can't serialize. The cpp-rt torchbind handle pickles to path-only
+        (see ``register_jit_hooks.cpp``).
+        """
+        import pickle
+        from types import SimpleNamespace
+
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
+
+        original = RuntimeCache(path="/nonexistent/path", autosave_on_del=True)
+        self.assertIsNotNone(original._atexit_token)
+
+        # Sidestep the python-rt ``threading.Lock`` so we only exercise the
+        # RuntimeCache state-transition logic.
+        original._handle = SimpleNamespace(path="/nonexistent/path")
+
+        blob = pickle.dumps(original)
+        loaded = pickle.loads(blob)
+
+        self.assertTrue(loaded.autosave_on_del)
+        self.assertEqual(loaded.path, "/nonexistent/path")
+        self.assertIsNotNone(
+            loaded._atexit_token,
+            "autosave_on_del=True must re-wire atexit on unpickle",
+        )
+        self.assertIsNot(
+            loaded._atexit_token,
+            original._atexit_token,
+            "loaded handle must own its own atexit token (fresh weakref)",
+        )
 
 
 @unittest.skipIf(
