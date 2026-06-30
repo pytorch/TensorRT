@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=01ee72d3"></script>
+    <script src="../../_static/documentation_options.js?v=917efdc1"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1275,7 +1275,7 @@ document.write(`
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
             <span class="s2">&quot;Saving in ExecuTorch format requires the executorch package &quot;</span>
             <span class="s2">&quot;with executorch.exir. Install with: pip install &quot;</span>
-            <span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">executorch</span><span class="se">\&quot;</span><span class="s2"> to use output_format=&#39;executorch&#39;.&quot;</span>
+            <span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">torch_tensorrt[executorch]</span><span class="se">\&quot;</span><span class="s2"> to use output_format=&#39;executorch&#39;.&quot;</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_all_are_input_objects</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
@@ -1836,7 +1836,7 @@ document.write(`
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
             <span class="s2">&quot;ExecuTorch is not installed. Install with: pip install &quot;</span>
-            <span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">executorch</span><span class="se">\&quot;</span><span class="s2"> to use output_format=&#39;executorch&#39;.&quot;</span>
+            <span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">torch_tensorrt[executorch]</span><span class="se">\&quot;</span><span class="s2"> to use output_format=&#39;executorch&#39;.&quot;</span>
         <span class="p">)</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops</span>  <span class="c1"># noqa: F401</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
