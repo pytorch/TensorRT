@@ -31,10 +31,17 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 Tier = Literal["l0", "l1", "l2"]
-Lane = Literal["fast", "full", "nightly"]
+# python-only validates the PYTHON_ONLY=1 wheel (no C++ runtime) against the
+# dynamo runtime suite. It's its own lane because it pairs a distinct BUILD mode
+# with a focused test set, orthogonal to fast/full/nightly depth.
+Lane = Literal["fast", "full", "nightly", "python-only"]
 Variant = Literal["standard", "rtx"]
+# Test channels. SBSA (linux-aarch64) is build-only — no GPU test runners — so it
+# is a build channel handled at the workflow level, not a suite platform here.
+Platform = Literal["linux-x86_64", "windows"]
 
 ALL_VARIANTS: tuple[Variant, ...] = ("standard", "rtx")
+ALL_PLATFORMS: tuple[Platform, ...] = ("linux-x86_64", "windows")
 
 
 @dataclass(frozen=True)
@@ -60,6 +67,7 @@ class Suite:
     reruns: bool = True  # wrap in the flake-rerun helper
     verbose: bool = False  # -v
     variants: tuple[Variant, ...] = ALL_VARIANTS
+    platforms: tuple[Platform, ...] = ALL_PLATFORMS  # channels this suite runs on
     setup: tuple[str, ...] = ()  # named pre-steps: hub|executorch|cuda-core|mpi
     follow: tuple[tuple[str, ...], ...] = ()  # extra argv to run AFTER pytest
     env: dict[str, str] = field(default_factory=dict)
@@ -243,6 +251,7 @@ _L2: list[Suite] = [
         setup=("executorch",),
         jobs="auto",
         variants=("standard",),
+        platforms=("linux-x86_64",),
     ),
     Suite(
         # Standard: the automatic-plugin trio. RTX: the whole automatic_plugin dir.
@@ -267,6 +276,7 @@ _L2: list[Suite] = [
         setup=("cuda-core",),
         jobs="auto",
         variants=("standard",),
+        platforms=("linux-x86_64",),
     ),
     Suite(
         "ts-integrations",
@@ -291,6 +301,7 @@ _L2: list[Suite] = [
         verbose=True,
         reruns=False,
         variants=("standard",),
+        platforms=("linux-x86_64",),
         setup=("mpi",),
         env={"USE_HOST_DEPS": "1", "CI_BUILD": "1", "USE_TRTLLM_PLUGINS": "1"},
         follow=(
@@ -312,7 +323,20 @@ _L2: list[Suite] = [
     ),
 ]
 
-SUITES: tuple[Suite, ...] = tuple(_L0 + _L1 + _L2)
+# ── python-only — validates the PYTHON_ONLY=1 wheel against the runtime suite ──
+_PYTHON_ONLY: list[Suite] = [
+    Suite(
+        "python-only-runtime",
+        tier="l1",
+        lanes=("python-only",),
+        paths=("runtime/",),
+        jobs="8",
+        # Runs for BOTH backends: the PYTHON_ONLY=1 wheel is validated against
+        # standard TensorRT and TensorRT-RTX (variants default to both).
+    ),
+]
+
+SUITES: tuple[Suite, ...] = tuple(_L0 + _L1 + _L2 + _PYTHON_ONLY)
 
 
 def by_name(name: str) -> Suite:

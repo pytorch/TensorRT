@@ -1,0 +1,135 @@
+name: CI Linux x86_64
+
+# Per-platform entry (one small, independent run — not the old 8-channel mega-run).
+# Runs the linux-x86_64 channels: standard, RTX, and python-only. Lane + backend
+# come from the shared _decide reusable.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "Which lane to run"
+        type: choice
+        options: [fast, full, nightly]
+        default: full
+      backend:
+        description: "Which backend(s) to test"
+        type: choice
+        options: [standard, rtx, both]
+        default: both
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  decide:
+    uses: ./.github/workflows/_decide.yml
+
+  # Generate the build matrix ONCE. generate_binary_build_matrix's concurrency
+  # group is keyed on (workflow, PR, os) with cancel-in-progress, so calling it
+  # per-channel makes the channels cancel each other's matrix job. All channels
+  # share this one output and filter it per-variant.
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: linux
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  # Standard — the only channel on the fast lane (every PR push).
+  standard:
+    needs: [decide, generate-matrix]
+    if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      use-rtx: false
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  rtx:
+    needs: [decide, generate-matrix]
+    if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'standard'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      use-rtx: true
+      name-prefix: "RTX - "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  python-only:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: python-only
+      python-only: true
+      name-prefix: "Python-only "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  # python-only against TensorRT-RTX (so backend=both runs BOTH python-only variants).
+  python-only-rtx:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: python-only
+      python-only: true
+      use-rtx: true
+      name-prefix: "Python-only RTX "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  # Required check. Fails ONLY on a genuine failure; skipped/cancelled don't block.
+  gate:
+    needs: [decide, standard, rtx, python-only, python-only-rtx]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate
+        run: |
+          set -euo pipefail
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
+            echo "::error::a Linux x86_64 channel failed — see the channel jobs above"
+            exit 1
+          fi
+          echo "Linux x86_64 gate OK (cancelled/skipped channels ignored)."
+
+  # Consolidated, agent-friendly report over this run's suites (informational).
+  report:
+    needs: [standard, rtx, python-only, python-only-rtx]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: junit-*
+          path: all-results
+          merge-multiple: true
+      - name: Consolidated report
+        run: |
+          set -uo pipefail
+          mkdir -p all-results
+          if [ -z "$(find all-results -name '*.xml' 2>/dev/null)" ]; then
+            echo "No JUnit results uploaded." >> "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          python tests/py/utils/junit_summary.py all-results --agent >> "$GITHUB_STEP_SUMMARY" || true
+          python tests/py/utils/junit_summary.py all-results || true
