@@ -87,8 +87,9 @@ in **filenames** (`runtime/test_000_*` = L0, `runtime/test_001_*` = L1, the rest
 `-k "not test_000_…"`). That's retired. The axes are now:
 
 - **Subsystem** *(what — a directory)*: `converters`, `runtime`, `lowering`, `partitioning`, `dynamo-models`, `torch-compile`, `torchscript`, `plugins`, `kernels`, `quantization`, `llm`, `distributed`, `executorch`.
-- **Lane** *(how deep — a marker)*: `fast` (= `-m smoke`, every push), `full` (default, the ready-signal lane), `nightly` (everything + perf).
-- **Variant** *(where — a dimension)*: `standard` / `rtx` / platform — applied centrally by the runner, **not** as `if [ "$USE_TRT_RTX" ]` branches scattered through shell.
+- **Lane** *(how deep — a marker)*: `fast` (= `-m smoke`, every push), `full` (default, the ready-signal lane), `nightly` (everything + perf), plus `python-only` (a build-mode lane: the `PYTHON_ONLY=1` wheel validated against the runtime suite).
+- **Variant** *(where — a dimension)*: `standard` / `rtx` — applied centrally by the runner, **not** as `if [ "$USE_TRT_RTX" ]` branches scattered through shell.
+- **Platform / channel** *(another dimension)*: `linux-x86_64` / `windows` for tests (SBSA/aarch64 is build-only — no GPU test runners). One reusable per OS family (`uses:` must be literal); the suite *selection* is platform-agnostic.
 
 |              | fast (every push) | full (ready signal) | nightly |
 |---|---|---|---|

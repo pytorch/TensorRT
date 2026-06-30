@@ -217,6 +217,7 @@ def select(
     lane: str | None = None,
     tier: str | None = None,
     variant: str | None = None,
+    platform: str | None = None,
     names: list[str] | None = None,
 ) -> list[tuple[Suite, Variant]]:
     """All (suite, variant) jobs matching the filters. No filter on an axis = all."""
@@ -226,6 +227,8 @@ def select(
         if lane is not None and lane not in s.lanes:
             continue
         if tier is not None and s.tier != tier:
+            continue
+        if platform is not None and platform not in s.platforms:
             continue
         for var in s.variants:
             if variant is not None and var != variant:
