@@ -10,6 +10,7 @@ from executorch.exir.backend.backend_details import (
     PreprocessResult,
 )
 from torch.export.exported_program import ExportedProgram
+from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     DEVICE_IDX,
     ENGINE_IDX,
@@ -36,18 +37,25 @@ def _schema_name(target: Any) -> str:
     return ""
 
 
+_ENGINE_OP_SCHEMA_NAMES = (
+    "tensorrt::execute_engine",
+    "tensorrt::no_op_placeholder_for_execute_engine",
+)
+
+
+def _get_engine_nodes_in(nodes: Any) -> List[Any]:
+    """Return the TRT engine nodes in an iterable of FX nodes (graph or partition)."""
+    return [
+        node
+        for node in nodes
+        if node.op == "call_function"
+        and _schema_name(node.target) in _ENGINE_OP_SCHEMA_NAMES
+    ]
+
+
 def _get_engine_nodes_from_edge_program(edge_program: ExportedProgram) -> List[Any]:
     """Return all TRT engine nodes found in a lowered ExecuTorch partition."""
-    engine_nodes = []
-    for node in edge_program.graph_module.graph.nodes:
-        if node.op != "call_function":
-            continue
-        if _schema_name(node.target) in (
-            "tensorrt::execute_engine",
-            "tensorrt::no_op_placeholder_for_execute_engine",
-        ):
-            engine_nodes.append(node)
-    return engine_nodes
+    return _get_engine_nodes_in(edge_program.graph_module.graph.nodes)
 
 
 def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[Any]:
@@ -63,15 +71,22 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
     Uses schema name comparison (not object identity) so it works for both
     OpOverload and EdgeOpOverload targets.
     """
-    gm = edge_program.graph_module
     engine_nodes = _get_engine_nodes_from_edge_program(edge_program)
     if len(engine_nodes) != 1:
         raise RuntimeError(
             "TensorRT ExecuTorch backend expects exactly 1 engine node per "
             f"partition, found {len(engine_nodes)}."
         )
+    return _get_engine_info_for_node(edge_program, engine_nodes[0])
 
-    node = engine_nodes[0]
+
+def _get_engine_info_for_node(
+    edge_program: ExportedProgram, node: torch.fx.Node
+) -> List[Any]:
+    # Engine-info extraction for a single TRT node; callable per-partition so a
+    # coalesced multi-engine graph can resolve each engine without the
+    # whole-program "exactly 1 engine" assumption.
+    gm = edge_program.graph_module
     name = _schema_name(node.target)
 
     if name == "tensorrt::no_op_placeholder_for_execute_engine":
@@ -135,14 +150,13 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
                 f"'{engine_node.target}' not found on graph module"
             )
     elif engine_node.op == "placeholder":
-        constants = getattr(edge_program, "constants", {})
-        engine_obj = constants.get(engine_node.name) or constants.get(
-            engine_node.target
-        )
+        engine_obj = _resolve_lifted_custom_obj(edge_program, engine_node)
         if engine_obj is None:
             raise RuntimeError(
                 f"execute_engine node '{node.name}': placeholder engine "
-                f"'{engine_node.name}' not found in edge_program.constants"
+                f"'{engine_node.name}' did not resolve to a lifted custom-object "
+                f"constant (available: "
+                f"{sorted(getattr(edge_program, 'constants', {}) or {})})"
             )
     else:
         raise RuntimeError(
