@@ -1,0 +1,151 @@
+name: _test-linux
+
+# Manifest-driven build (+ optional test) for ONE Linux channel. Covers both:
+#   * x86_64  — os=linux,         architecture=x86_64, run-tests=true   (build + suites)
+#   * SBSA    — os=linux-aarch64, architecture=aarch64, run-tests=false (build-only;
+#               there are no aarch64 GPU test runners)
+#
+# One reusable serves both because the build (build_linux.yml) and test
+# (linux-test.yml) reusables are the same — only inputs differ. (GitHub requires
+# `uses:` to be a literal, so Windows, which needs build_windows/windows-test,
+# has its own _test-windows.yml.)
+
+on:
+  workflow_call:
+    inputs:
+      lane:
+        description: "fast | full | nightly"
+        required: true
+        type: string
+      use-rtx:
+        description: "Test against TensorRT-RTX (x86_64 only)"
+        type: boolean
+        default: false
+      name-prefix:
+        description: "Display-name prefix (e.g. 'RTX - ', 'SBSA ')"
+        type: string
+        default: ""
+      os:
+        description: "generate_binary_build_matrix os: linux | linux-aarch64"
+        type: string
+        default: linux
+      architecture:
+        description: "x86_64 | aarch64"
+        type: string
+        default: x86_64
+      run-tests:
+        description: "Run the suite matrix after building (false = build-only, e.g. SBSA)"
+        type: boolean
+        default: true
+      python-only:
+        description: "Build the PYTHON_ONLY=1 wheel (no C++ runtime) via env_vars_python_only.txt"
+        type: boolean
+        default: false
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: ${{ inputs.os }}
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  filter-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/checkout@v6
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          LIMIT_PR=${{ inputs.lane == 'fast' && 'true' || 'false' }}
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx ${{ inputs.use-rtx }} --limit-pr-builds "${LIMIT_PR}" --matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: filter-matrix
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            package-name: torch_tensorrt
+            display-name: ${{ inputs.name-prefix }}Build Linux ${{ inputs.architecture }} torch-tensorrt whl package
+    name: ${{ matrix.display-name }}
+    uses: ./.github/workflows/build_linux.yml
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      # python-only swaps in the env_vars_python_only.txt (sets PYTHON_ONLY=1).
+      env-var-script: ${{ inputs.python-only && 'packaging/env_vars_python_only.txt' || matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+      architecture: ${{ inputs.architecture }}
+      use-rtx: ${{ inputs.use-rtx }}
+      pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
+
+  # Suite list from the manifest. Skipped for build-only channels (SBSA).
+  suite-matrix:
+    if: ${{ inputs.run-tests }}
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - id: gen
+        run: |
+          set -euo pipefail
+          variant=${{ inputs.use-rtx && 'rtx' || 'standard' }}
+          json="$(python -m tests.ci matrix --platform linux-x86_64 --lane '${{ inputs.lane }}' --variant "${variant}")"
+          echo "matrix=${json}" >> "$GITHUB_OUTPUT"
+          echo "Lane '${{ inputs.lane }}' (${variant}) suites:"; echo "${json}" | python -m json.tool
+
+  # One test job per suite (auto-skips when suite-matrix is skipped, i.e. SBSA).
+  test:
+    needs: [filter-matrix, build, suite-matrix]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.suite-matrix.outputs.matrix) }}
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: ${{ matrix.suite }}-${{ matrix.variant }}
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: packaging/pre_build_script.sh
+      use-rtx: ${{ inputs.use-rtx }}
+      fail-on-empty: true
+      script: |
+        set -euo pipefail
+        python -m tests.ci run "${{ matrix.suite }}" --variant "${{ matrix.variant }}"

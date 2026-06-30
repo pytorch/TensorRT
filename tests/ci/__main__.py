@@ -19,10 +19,10 @@ from .suites import SUITES, by_name
 
 def _cmd_list(_: argparse.Namespace) -> int:
     width = max(len(s.name) for s in SUITES)
-    print(f"{'SUITE'.ljust(width)}  TIER  LANES                  VARIANTS")
+    print(f"{'SUITE'.ljust(width)}  TIER  LANES                  VARIANTS         PLATFORMS")
     for s in SUITES:
         print(f"{s.name.ljust(width)}  {s.tier:<4}  "
-              f"{','.join(s.lanes):<21}  {','.join(s.variants)}")
+              f"{','.join(s.lanes):<21}  {','.join(s.variants):<15}  {','.join(s.platforms)}")
     print(f"\n{len(SUITES)} suites.  "
           f"Run one:  python -m tests.ci run <suite>  (or `just suite <suite>`)")
     return 0
@@ -53,7 +53,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
 def _cmd_run_lane(args: argparse.Namespace) -> int:
     """Run every suite in a lane/tier, continuing past failures (so one consolidated
     report sees them all). Returns non-zero if any suite failed."""
-    jobs = select(lane=args.lane, tier=args.tier, variant=args.variant)
+    jobs = select(lane=args.lane, tier=args.tier, variant=args.variant,
+                  platform=args.platform)
     if not jobs:
         print("::warning::no suites match the given filters", file=sys.stderr)
         return 0
@@ -64,7 +65,8 @@ def _cmd_run_lane(args: argparse.Namespace) -> int:
 
 
 def _cmd_matrix(args: argparse.Namespace) -> int:
-    include = matrix(lane=args.lane, tier=args.tier, variant=args.variant)
+    include = matrix(lane=args.lane, tier=args.tier, variant=args.variant,
+                     platform=args.platform)
     if not include:
         print("::warning::matrix is empty for the given filters", file=sys.stderr)
     print(json.dumps({"include": include}))
@@ -94,6 +96,8 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
             problems.append(f"{s.name}: belongs to no lane")
         if not s.variants:
             problems.append(f"{s.name}: runs on no variant")
+        if not s.platforms:
+            problems.append(f"{s.name}: runs on no platform")
         cwd = REPO_ROOT / s.cwd
         if not cwd.is_dir():
             problems.append(f"{s.name}: cwd {s.cwd} does not exist")
@@ -132,17 +136,19 @@ def main(argv: list[str] | None = None) -> int:
 
     sp = sub.add_parser("run-lane", help="run every suite in a lane/tier, past failures")
     g = sp.add_mutually_exclusive_group()
-    g.add_argument("--lane", choices=("fast", "full", "nightly"))
+    g.add_argument("--lane", choices=("fast", "full", "nightly", "python-only"))
     g.add_argument("--tier", choices=("l0", "l1", "l2"))
     sp.add_argument("--variant", choices=("standard", "rtx"))
+    sp.add_argument("--platform", choices=("linux-x86_64", "windows"))
     sp.add_argument("--dry-run", action="store_true")
     sp.set_defaults(fn=_cmd_run_lane)
 
     sp = sub.add_parser("matrix", help="emit a GitHub Actions matrix as JSON")
     g = sp.add_mutually_exclusive_group()
-    g.add_argument("--lane", choices=("fast", "full", "nightly"))
+    g.add_argument("--lane", choices=("fast", "full", "nightly", "python-only"))
     g.add_argument("--tier", choices=("l0", "l1", "l2"))
     sp.add_argument("--variant", choices=("standard", "rtx"))
+    sp.add_argument("--platform", choices=("linux-x86_64", "windows"))
     sp.set_defaults(fn=_cmd_matrix)
 
     sub.add_parser("doctor", help="validate the manifest").set_defaults(fn=_cmd_doctor)

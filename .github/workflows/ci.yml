@@ -1,0 +1,207 @@
+name: CI
+
+# Single build+test entry. Picks a LANE from the event, then fans out to the
+# per-channel reusables (_test-linux.yml, _test-windows.yml). Substitutes for a
+# merge queue (which this repo can't use):
+#
+#   fast    every PR push           linux-x86_64 only: representative build + L0 smoke
+#   full    approval / `ci: full`    all channels (x86_64 ±rtx, SBSA build, windows ±rtx)
+#           label / push to main     ← the required gate
+#   nightly schedule                 full + -ext + perf
+#
+# Each channel reusable builds the wheel (build_linux/build_windows.yml) and runs
+# the manifest suites via linux-test/windows-test.yml (which install the wheel).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "Which lane to run"
+        type: choice
+        options: [fast, full, nightly]
+        default: full
+
+# Never burn runners on a superseded commit.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# id-token: write is required so the reusable build jobs (build_linux/build_windows)
+# can request their OIDC token; a reusable can't exceed the caller's permission
+# ceiling. Matches the original per-platform entry workflows.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # Resolve the lane from the triggering event (the merge-queue substitute).
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      lane: ${{ steps.pick.outputs.lane }}
+    steps:
+      - id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          # Whether the PR CURRENTLY carries the label (not just the label-add
+          # event), so `full` sticks across subsequent pushes while it's applied.
+          HAS_FULL_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'ci: full') }}"
+          DISPATCH_LANE: ${{ github.event.inputs.lane }}
+        run: |
+          set -euo pipefail
+          case "$EVENT" in
+            schedule)          lane=nightly ;;
+            workflow_dispatch)  lane="${DISPATCH_LANE:-full}" ;;
+            push)              lane=full ;;                 # main canary
+            pull_request_review)
+              [ "$REVIEW_STATE" = "approved" ] && lane=full || lane=skip ;;
+            pull_request)
+              [ "$HAS_FULL_LABEL" = "true" ] && lane=full || lane=fast ;;
+            *)                 lane=fast ;;
+          esac
+          echo "lane=$lane" >> "$GITHUB_OUTPUT"
+          echo "Resolved lane '$lane' for event '$EVENT'."
+
+  # ── Channels ──────────────────────────────────────────────────────────────
+  # Linux x86_64 standard — the only channel on the fast lane (every PR push).
+  linux-x86_64:
+    needs: decide
+    if: needs.decide.outputs.lane != 'skip'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      use-rtx: false
+
+  # The heavier channels run only on the full/nightly (ready-signal) lanes.
+  linux-x86_64-rtx:
+    needs: decide
+    if: needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      use-rtx: true
+      name-prefix: "RTX - "
+
+  # SBSA (linux-aarch64): build-only — there are no aarch64 GPU test runners.
+  sbsa:
+    needs: decide
+    if: needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      os: linux-aarch64
+      architecture: aarch64
+      run-tests: false
+      name-prefix: "SBSA "
+
+  windows:
+    needs: decide
+    if: needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly'
+    uses: ./.github/workflows/_test-windows.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      use-rtx: false
+
+  windows-rtx:
+    needs: decide
+    if: needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly'
+    uses: ./.github/workflows/_test-windows.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      use-rtx: true
+      name-prefix: "RTX - "
+
+  # ── python-only (PYTHON_ONLY=1 wheel, validated against the runtime suite) ──
+  # These pass lane=python-only directly (the python-only validation), gated to
+  # run as part of the full/nightly lanes.
+  python-only-x86_64:
+    needs: decide
+    if: needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: python-only
+      python-only: true
+      name-prefix: "Python-only "
+
+  python-only-sbsa:
+    needs: decide
+    if: needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: python-only
+      python-only: true
+      os: linux-aarch64
+      architecture: aarch64
+      run-tests: false
+      name-prefix: "Python-only SBSA "
+
+  python-only-windows:
+    needs: decide
+    if: needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly'
+    uses: ./.github/workflows/_test-windows.yml
+    with:
+      lane: python-only
+      name-prefix: "Python-only "
+
+  # The single required check for branch protection: green iff every lane that
+  # ran is green. Reports failure if a needed lane failed or was cancelled.
+  ci-gate:
+    needs: [decide, linux-x86_64, linux-x86_64-rtx, sbsa, windows, windows-rtx,
+            python-only-x86_64, python-only-sbsa, python-only-windows]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate
+        env:
+          LANE: ${{ needs.decide.outputs.lane }}
+          RESULTS: "${{ needs.linux-x86_64.result }} ${{ needs.linux-x86_64-rtx.result }} ${{ needs.sbsa.result }} ${{ needs.windows.result }} ${{ needs.windows-rtx.result }} ${{ needs.python-only-x86_64.result }} ${{ needs.python-only-sbsa.result }} ${{ needs.python-only-windows.result }}"
+        run: |
+          set -euo pipefail
+          echo "lane=$LANE  channel results: $RESULTS"
+          # A skipped channel is fine (e.g. windows on the fast lane, or a non-approval review).
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::a required channel concluded '$r'"; exit 1 ;;
+            esac
+          done
+          echo "All required channels passed (lane=$LANE)."
+
+  # Consolidated, agent-friendly report across every suite of the run (the
+  # paste-to-Claude summary). Informational — ci-gate above is the hard gate —
+  # so a skipped lane never red-flags this.
+  report:
+    needs: [linux-x86_64, linux-x86_64-rtx, sbsa, windows, windows-rtx,
+            python-only-x86_64, python-only-sbsa, python-only-windows]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: junit-*
+          path: all-results
+          merge-multiple: true
+      - name: Consolidated report
+        run: |
+          set -uo pipefail
+          mkdir -p all-results
+          if [ -z "$(find all-results -name '*.xml' 2>/dev/null)" ]; then
+            echo "No JUnit results uploaded (no test lane ran)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Agent-friendly Markdown to the run summary; human report to the log.
+          python tests/py/utils/junit_summary.py all-results --agent >> "$GITHUB_STEP_SUMMARY" || true
+          python tests/py/utils/junit_summary.py all-results || true
