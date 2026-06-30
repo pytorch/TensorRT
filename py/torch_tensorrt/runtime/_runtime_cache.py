@@ -162,7 +162,11 @@ class RuntimeCache:
        ``RuntimeSettings(runtime_cache="/path")``, the engine's
        ``TRTRuntimeConfig`` materializes a :class:`RuntimeCache` internally
        with ``autosave_on_del=True``. No other Python object holds it, so
-       ``__del__`` writes the cache to disk on the engine's last release.
+       two non-owning hooks back the save: ``__del__`` for mid-program GC,
+       and a ``weakref``-based ``atexit`` hook for interpreter shutdown
+       (where ``__del__`` is unsafe because lazy imports like ``filelock``
+       may already be torn down). Whichever fires first flips
+       ``autosave_on_del`` off so the other no-ops.
 
     2. **Runtime CM** (shared, multi-engine): the :func:`runtime_cache` CM
        constructs a :class:`RuntimeCache` with ``autosave_on_del=False``
@@ -175,17 +179,15 @@ class RuntimeCache:
        ``RuntimeCache(path=..., autosave_on_del=True)`` for with-block-style
        autosave on hand-built handles.
 
-    The internal ``_handle`` is auto-picked at construction based on
-    ``ENABLED_FEATURES.torch_tensorrt_runtime``: the cpp-rt torchbind
-    ``torch.classes.tensorrt.RuntimeCacheHandle`` when the C++ runtime is
-    loaded, the python :class:`_RuntimeCacheHandle` otherwise. Both
-    satisfy :class:`_RuntimeCacheHandleProtocol`; the facade forwards
-    without branching.
+    The internal ``_handle`` is the cpp-rt torchbind
+    ``torch.classes.tensorrt.RuntimeCacheHandle`` when
+    ``ENABLED_FEATURES.torch_tensorrt_runtime`` is set, else the
+    pure-Python :class:`_RuntimeCacheHandle`; both satisfy
+    :class:`_RuntimeCacheHandleProtocol` interface which this class uses.
 
     **Identity-based equality.** Two handles wrap distinct underlying
     ``IRuntimeCache`` instances even when they share a path, and the
-    runtime treats them as such (separate ``IRuntimeConfig`` slots, no
-    kernel-specialization sharing).
+    runtime treats them as such.
     """
 
     def __init__(
