@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=71cb5aee"></script>
+    <script src="../_static/documentation_options.js?v=01ee72d3"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -746,11 +746,14 @@ equality constraints. Use explicit dynamic_shapes for these cases.</p></li>
 parameter takes precedence.</p></li>
 </ul>
 </p></li>
-<li><p><strong>kwargs</strong> – Additional format-specific kwargs. <code class="docutils literal notranslate"><span class="pre">partitioners=</span></code> and
-<code class="docutils literal notranslate"><span class="pre">compile_specs=</span></code> are only used with <code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code>;
-otherwise they are ignored with a warning. Pass
-<code class="docutils literal notranslate"><span class="pre">compile_specs=[CompileSpec(&quot;target_device&quot;,</span> <span class="pre">b&quot;cuda:&lt;i&gt;&quot;)]</span></code> to
-override the default target device (<code class="docutils literal notranslate"><span class="pre">cuda:0</span></code>).</p></li>
+<li><p><strong>kwargs</strong> – Additional format-specific kwargs. <code class="docutils literal notranslate"><span class="pre">partitioners=</span></code>,
+<code class="docutils literal notranslate"><span class="pre">compile_specs=</span></code>, and <code class="docutils literal notranslate"><span class="pre">backend_config=</span></code> are only used with
+<code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code>; otherwise they are ignored with a
+warning. Pass <code class="docutils literal notranslate"><span class="pre">compile_specs=[CompileSpec(&quot;target_device&quot;,</span>
+<span class="pre">b&quot;cuda:&lt;i&gt;&quot;)]</span></code> to override the default target device (<code class="docutils literal notranslate"><span class="pre">cuda:0</span></code>).
+<code class="docutils literal notranslate"><span class="pre">backend_config=</span></code> takes an <code class="docutils literal notranslate"><span class="pre">Optional[ExecutorchBackendConfig]</span></code>
+and is forwarded to <code class="docutils literal notranslate"><span class="pre">to_executorch(config=...)</span></code> to customize
+ExecuTorch lowering (e.g. memory planning or device placement).</p></li>
 </ul>
 </dd>
 </dl>

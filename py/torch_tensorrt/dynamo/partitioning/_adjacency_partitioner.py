@@ -53,7 +53,12 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 )
             return False
 
-        if TorchTensorRTOperatorSupport._requires_output_allocator(node):
+        settings = CONVERTERS.compilation_settings
+        if (
+            settings is not None
+            and settings.fallback_data_dependent_ops
+            and TorchTensorRTOperatorSupport._requires_output_allocator(node)
+        ):
             # data-dependent output shape needs a TRT output allocator, which some
             # runtimes cannot consume; honor the fallback and run the node in PyTorch
             if not node.is_impure():

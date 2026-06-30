@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=71cb5aee"></script>
+    <script src="../../../_static/documentation_options.js?v=01ee72d3"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -558,6 +558,13 @@ document.write(`
             <span class="n">rt_mod</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
             <span class="n">ws_budget_bytes</span> <span class="o">+=</span> <span class="n">rt_mod</span><span class="o">.</span><span class="n">set_device_memory_budget</span><span class="p">(</span><span class="n">normalized_size</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set weight streaming size </span><span class="si">{</span><span class="n">normalized_size</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span><span class="p">:</span>
+            <span class="c1"># Changing the weight-streaming budget invalidates TRT execution</span>
+            <span class="c1"># contexts. Whole-graph CUDA capture cannot create a new TRT</span>
+            <span class="c1"># context inside capture, so warm the wrapped graph once after the</span>
+            <span class="c1"># budget update and before the next capture attempt.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span><span class="o">.</span><span class="n">warm_up</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">ws_budget_bytes</span>
 

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=71cb5aee"></script>
+    <script src="../../../_static/documentation_options.js?v=01ee72d3"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -692,11 +692,10 @@ print(&quot;Refit successfully!&quot;)
 <section id="Advanced-Usage">
 <h2>Advanced Usage<a class="headerlink" href="#Advanced-Usage" title="Link to this heading">#</a></h2>
 <p>There are a number of settings you can use to control the refit process</p>
-<section id="Weight-Map-Cache">
-<h3>Weight Map Cache<a class="headerlink" href="#Weight-Map-Cache" title="Link to this heading">#</a></h3>
-<p>Weight refitting works by matching the weights of the compiled module with the new weights from the user supplied ExportedProgram. Since 1:1 name matching from PyTorch to TensorRT is hard to accomplish, the only gaurenteed way to match weights at <em>refit-time</em> is to pass the new ExportedProgram through the early phases of the compilation process to generate near identical weight names. This can be expensive and is not always necessary.</p>
-<p>To avoid this, <strong>At initial compile</strong>, Torch-TensorRt will attempt to cache a direct mapping from PyTorch weights to TensorRT weights. This cache is stored in the compiled module as metadata and can be used to speed up refit. If the cache is not present, the refit system will fallback to rebuilding the mapping at refit-time. Use of this cache is controlled by the <code class="docutils literal notranslate"><span class="pre">use_weight_map_cache</span></code> parameter.</p>
-<p>Since the cache uses a heuristic based system for matching PyTorch and TensorRT weights, you may want to verify the refitting. This can be done by setting <code class="docutils literal notranslate"><span class="pre">verify_output</span></code> to True and providing sample <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code>. When this is done, the refit system will run the refitted module and the user supplied module on the same inputs and compare the outputs.</p>
+<section id="Output-Verification">
+<h3>Output Verification<a class="headerlink" href="#Output-Verification" title="Link to this heading">#</a></h3>
+<p>Weight refitting works by matching the weights of the compiled module with the new weights from the user supplied ExportedProgram. To do this, the new ExportedProgram is passed through the early phases of the compilation process to generate near identical weight names, which are then used to refit the existing TensorRT engine in place without rebuilding it.</p>
+<p>You may want to verify the refitting. This can be done by setting <code class="docutils literal notranslate"><span class="pre">verify_output</span></code> to True and providing sample <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code>. When this is done, the refit system will run the refitted module and the user supplied module on the same inputs and compare the outputs.</p>
 </section>
 <section id="In-Place-Refit">
 <h3>In-Place Refit<a class="headerlink" href="#In-Place-Refit" title="Link to this heading">#</a></h3>
@@ -758,7 +757,7 @@ print(&quot;Refit successfully!&quot;)
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Make-a-refittable-Compilation-Program">Make a refittable Compilation Program</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Refit-the-Program-with-Pretrained-Weights">Refit the Program with Pretrained Weights</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Advanced-Usage">Advanced Usage</a><ul class="visible nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#Weight-Map-Cache">Weight Map Cache</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#Output-Verification">Output Verification</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#In-Place-Refit">In-Place Refit</a></li>
 </ul>
 </li>
