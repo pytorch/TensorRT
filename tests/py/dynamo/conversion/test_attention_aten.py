@@ -318,7 +318,10 @@ class TestScaledDotProductAttention(DispatchTestCase):
                 [(2, 4, 128, 64), (4, 4, 128, 64), (8, 4, 128, 64)],
                 [(2, 4, 128, 64), (4, 4, 128, 64), (8, 4, 128, 64)],
                 [(2, 4, 128, 128), (4, 4, 128, 128), (8, 4, 128, 128)],
-                True,
+                # is_causal must be False when an explicit attn_mask is provided:
+                # newer torch rejects passing both to scaled_dot_product_attention
+                # ("Explicit attn_mask should not be set when is_causal=True").
+                False,
                 2.0,
                 torch.float32,
                 0.0,

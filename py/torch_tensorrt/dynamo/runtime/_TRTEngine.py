@@ -699,20 +699,27 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def device_memory_budget(self, budget_bytes: int) -> None:
         if budget_bytes < 0:
             budget_bytes = self.streamable_device_memory_budget
-        # TensorRT requires no live IExecutionContext while changing the
-        # weight-streaming budget. Match the C++ runtime: drop any captured
-        # graph/context first, then leave context recreation lazy unless
-        # profiling needs an eager re-attach.
+        # TRT 11+ rejects setWeightStreamingBudgetV2 while a live
+        # IExecutionContext exists (its use_count must be 1). A captured
+        # cudagraph also keeps the context alive, so drop the graph first and
+        # then the context -- matching the C++ TRTEngine::set_device_memory_budget.
         self.reset_captured_graph()
         self.invalidate_context()
         self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
         if self.cuda_engine.weight_streaming_budget_v2 != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
-        # Eagerly rebuild if the user had profiling on, so the profiler is
-        # re-attached to the fresh context (it lives on the context object and
-        # is dropped by invalidate_context()); otherwise leave creation lazy.
+        # Eagerly materialise the replacement context now rather than letting
+        # the next forward build it lazily: a lazy create_execution_context()
+        # during torch.cuda.graph(...) capture performs GPU allocations that
+        # break the capture when the budget changes while cudagraphs are
+        # enabled (see test_weight_streaming_cudagraphs / test_runtime_state_change).
+        # When profiling is on, route through enable_profiling() so the profiler
+        # -- which lives on the context and was dropped by invalidate_context()
+        # -- is re-attached to the fresh context.
         if self._profile_execution:
             self.enable_profiling()
+        else:
+            _ = self.context
         self.runtime_states.context_changed = True
 
     def reset_captured_graph(self) -> None:
