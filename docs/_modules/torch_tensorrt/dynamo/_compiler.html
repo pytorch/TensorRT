@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=917efdc1"></script>
+    <script src="../../../_static/documentation_options.js?v=66600436"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -528,6 +528,7 @@ document.write(`
     <span class="n">prepare_inputs</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
+    <span class="n">validate_optimization_profiles</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
@@ -1219,6 +1220,7 @@ document.write(`
     <span class="p">}</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage before lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
+
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
@@ -1524,6 +1526,24 @@ document.write(`
         <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span>
 
     <span class="n">preserve_module_specs</span><span class="p">(</span><span class="n">original_in_spec</span><span class="p">,</span> <span class="n">original_out_spec</span><span class="p">,</span> <span class="n">partitioned_module</span><span class="p">)</span>
+
+    <span class="c1"># Multi-profile propagation: build the map from export source</span>
+    <span class="c1"># symbols to per-profile bounds once, from the top-level inputs, then reuse</span>
+    <span class="c1"># it to attach the same profiles (by index) to every TRT submodule&#39;s inputs.</span>
+    <span class="n">top_level_inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Input</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sample_arg_inputs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sample_kwarg_inputs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">top_level_inputs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">sample_kwarg_inputs</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="n">num_profiles</span> <span class="o">=</span> <span class="n">validate_optimization_profiles</span><span class="p">(</span><span class="n">top_level_inputs</span><span class="p">)</span>
+    <span class="n">profile_source_bounds</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">num_profiles</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Building engine(s) with </span><span class="si">{</span><span class="n">num_profiles</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="s2">&quot;optimization profiles (selected by index)&quot;</span>
+        <span class="p">)</span>
+        <span class="n">profile_source_bounds</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">build_profile_source_bounds</span><span class="p">(</span>
+            <span class="n">partitioned_module</span><span class="p">,</span> <span class="n">top_level_inputs</span><span class="p">,</span> <span class="n">num_profiles</span>
+        <span class="p">)</span>
+
     <span class="c1"># Store TRT replicas of Torch subgraphs</span>
     <span class="n">trt_modules</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="c1"># Iterate over all components that can be accelerated</span>
@@ -1581,8 +1601,14 @@ document.write(`
             <span class="p">]</span>
         <span class="p">)</span>
 
-        <span class="c1"># Get the submodule inputs for min, opt, max shapes of the graph inputs</span>
-        <span class="n">submodule_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span><span class="n">submodule</span><span class="p">)</span>
+        <span class="c1"># Get the submodule inputs for min, opt, max shapes of the graph inputs.</span>
+        <span class="c1"># With multi-profile compile, propagate the profiles (by index) to each</span>
+        <span class="c1"># submodule input by symbolic substitution.</span>
+        <span class="n">submodule_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span>
+            <span class="n">submodule</span><span class="p">,</span>
+            <span class="n">profile_source_bounds</span><span class="o">=</span><span class="n">profile_source_bounds</span><span class="p">,</span>
+            <span class="n">num_profiles</span><span class="o">=</span><span class="n">num_profiles</span><span class="p">,</span>
+        <span class="p">)</span>
 
         <span class="k">assert</span> <span class="n">submodule_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 

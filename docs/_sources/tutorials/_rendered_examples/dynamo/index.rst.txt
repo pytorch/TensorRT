@@ -446,6 +446,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="Autoregressive LLMs run in two very different shape regimes that share one set of weights (and ...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_multi_optimization_profiles_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_multi_optimization_profiles.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Multiple Optimization Profiles: Prefill vs Decode for Gemma-3</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="Basic example on how to use the hierarchical adjacency partitioner function and manually compil...">
 
 .. only:: html
@@ -663,6 +680,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example
    /tutorials/_rendered_examples/dynamo/aot_plugin
    /tutorials/_rendered_examples/dynamo/ptx_op
+   /tutorials/_rendered_examples/dynamo/multi_optimization_profiles
    /tutorials/_rendered_examples/dynamo/hierarchical_partitioner_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/weight_streaming_example

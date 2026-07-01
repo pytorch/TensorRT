@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=917efdc1"></script>
+    <script src="../_static/documentation_options.js?v=66600436"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -736,7 +736,7 @@ that a properly-bound module avoids the per-call attribute check.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.get_engine">
-<span class="sig-name descname"><span class="pre">get_engine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">&lt;torch.ScriptClass</span> <span class="pre">object</span> <span class="pre">at</span> <span class="pre">0x7fcecf8cfeb0&gt;</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.get_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_engine" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">get_engine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">&lt;torch.ScriptClass</span> <span class="pre">object</span> <span class="pre">at</span> <span class="pre">0x7ff52c7e16b0&gt;</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.get_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_engine" title="Link to this definition">#</a></dt>
 <dd><p>Return the underlying engine, raising if it has not been set up.</p>
 <p>Used by every engine-accessing method except the hot <code class="docutils literal notranslate"><span class="pre">forward</span></code> path,
 which intentionally skips the check to avoid per-call overhead.</p>
@@ -778,6 +778,20 @@ their serialized pickled form changes.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.get_optimization_profile_state">
+<span class="sig-name descname"><span class="pre">get_optimization_profile_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.get_optimization_profile_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_optimization_profile_state" title="Link to this definition">#</a></dt>
+<dd><p>Return the engine’s current <code class="docutils literal notranslate"><span class="pre">(auto,</span> <span class="pre">active)</span></code> profile state.</p>
+<p>Used by the <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">optimization_profile()</span></code> context manager to save/restore
+state across a <code class="docutils literal notranslate"><span class="pre">with</span></code> block. Returns <code class="docutils literal notranslate"><span class="pre">None</span></code> if unsupported.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.restore_optimization_profile_state">
+<span class="sig-name descname"><span class="pre">restore_optimization_profile_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.restore_optimization_profile_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.restore_optimization_profile_state" title="Link to this definition">#</a></dt>
+<dd><p>Restore profile state captured by <a href="#id1"><span class="problematic" id="id2">:meth:`get_optimization_profile_state`</span></a>.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.set_extra_state">
 <span class="sig-name descname"><span class="pre">set_extra_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.set_extra_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.set_extra_state" title="Link to this definition">#</a></dt>
 <dd><p>Set extra state contained in the loaded <cite>state_dict</cite>.</p>
@@ -790,6 +804,16 @@ found within the <cite>state_dict</cite>. Implement this function and a correspo
 <dd class="field-odd"><p><strong>state</strong> (<em>dict</em>) – Extra state from the <cite>state_dict</cite></p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.set_optimization_profile">
+<span class="sig-name descname"><span class="pre">set_optimization_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">profile</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.set_optimization_profile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.set_optimization_profile" title="Link to this definition">#</a></dt>
+<dd><p>Select the active TRT optimization profile for this engine.</p>
+<p><code class="docutils literal notranslate"><span class="pre">profile</span></code> may be a profile index (<code class="docutils literal notranslate"><span class="pre">int</span></code>), the string <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> to
+enable shape-based auto-selection, or <code class="docutils literal notranslate"><span class="pre">None</span></code> to clear any pin / auto
+setting and reset to the default profile (index 0).
+See <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.runtime.optimization_profile()</span></code>.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -887,7 +911,10 @@ to the module.</p>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_engine"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.get_engine()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_extra_state"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.get_extra_state()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_layer_info"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.get_layer_info()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_optimization_profile_state"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.get_optimization_profile_state()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.restore_optimization_profile_state"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.restore_optimization_profile_state()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.set_extra_state"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.set_extra_state()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.set_optimization_profile"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.set_optimization_profile()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.setup_engine"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.setup_engine()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.pre_allocated_outputs"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.pre_allocated_outputs</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.runtime.TorchTensorRTModule.runtime_settings"><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule.runtime_settings</span></code></a></li>

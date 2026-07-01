@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=917efdc1"></script>
+    <script src="../../_static/documentation_options.js?v=66600436"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -532,6 +532,15 @@ document.write(`
     <span class="n">shared_dims</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
         <span class="p">{}</span>
     <span class="p">)</span>  <span class="c1">#: Optional {axis_index: name} for dynamic axes. The same name across inputs is exported as one shared ``torch.export.Dim`` (e.g. a batch axis shared by ``input_ids`` and ``attention_mask``).</span>
+    <span class="c1">#: Optional ordered optimization profiles for multi-profile engines. A list</span>
+    <span class="c1">#: of dicts, one per profile; the list index is the TRT optimization-profile</span>
+    <span class="c1">#: index used to select the profile at runtime. Each entry has</span>
+    <span class="c1">#: ``min_shape`` / ``opt_shape`` / ``max_shape`` tuples. ``None`` for the</span>
+    <span class="c1">#: default zero/one-profile behavior. ``profiles`` may be combined with ``shared_dims``: the profiles</span>
+    <span class="c1">#: define the per-profile TRT ranges while ``shared_dims`` names dynamic axes</span>
+    <span class="c1">#: on the union envelope so they export as one shared ``torch.export.Dim``</span>
+    <span class="c1">#: across inputs.</span>
+    <span class="n">profiles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="Input.__init__">
 <a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.__init__">[docs]</a>
@@ -562,8 +571,17 @@ document.write(`
 <span class="sd">            - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)</span>
 <span class="sd">            - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Compatibility code for switching over from InputTensorSpec</span>
-        <span class="k">if</span> <span class="s2">&quot;shape&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="s2">&quot;shape_ranges&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="c1"># Multi optimization profile support. ``profiles`` is validated and</span>
+        <span class="c1"># translated into the union ``min_shape`` / ``opt_shape`` / ``max_shape``</span>
+        <span class="c1"># kwargs so the regular dynamic-shape path below constructs the Input</span>
+        <span class="c1"># unchanged.</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;profiles&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_profiles</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># Compatibility code for switching over from InputTensorSpec.</span>
+        <span class="c1"># Mutually exclusive with `profiles` above (which translates into</span>
+        <span class="c1"># min/opt/max kwargs and forbids `shape`/`shape_ranges`).</span>
+        <span class="k">elif</span> <span class="s2">&quot;shape&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="s2">&quot;shape_ranges&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
             <span class="k">assert</span> <span class="p">(</span>
                 <span class="nb">len</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">3</span>
             <span class="p">)</span>
@@ -698,6 +716,115 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span></div>
 
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_from_profiles</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate ``profiles`` and translate them into union shape kwargs.</span>
+
+<span class="sd">        ``profiles`` (``kwargs[&quot;profiles&quot;]``) is an ordered list of dicts (one per</span>
+<span class="sd">        profile); the list index is the TRT optimization-profile index selected at</span>
+<span class="sd">        runtime. Each entry has ``min_shape`` / ``opt_shape`` / ``max_shape``</span>
+<span class="sd">        tuples. This stores the normalized list on ``self.profiles`` and fills</span>
+<span class="sd">        ``kwargs`` with the elementwise union envelope (the range ``torch.export``</span>
+<span class="sd">        must cover), so the regular dynamic-shape path in ``__init__`` builds the</span>
+<span class="sd">        Input.</span>
+
+<span class="sd">        ``shared_dims`` is intentionally *not* mutually exclusive with</span>
+<span class="sd">        ``profiles``: profiles describe the per-profile TRT shape ranges, whereas</span>
+<span class="sd">        ``shared_dims`` names dynamic axes so they export as a single shared</span>
+<span class="sd">        ``torch.export.Dim`` across inputs. The two compose -- ``shared_dims`` is</span>
+<span class="sd">        left in ``kwargs`` and validated against the union envelope by the regular</span>
+<span class="sd">        dynamic-shape path (a named axis must be dynamic in the union).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">profiles</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;profiles&quot;</span><span class="p">]</span>
+        <span class="c1"># ``profiles`` is the only *shape* specifier when used (``shared_dims`` is</span>
+        <span class="c1"># an axis-naming modifier, not a shape, so it is allowed alongside).</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Found both a positional shape argument and `profiles`. &quot;</span>
+                <span class="s2">&quot;class Input expects `profiles` to be the only shape specifier when used.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;shape&quot;</span><span class="p">,</span> <span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;shape_ranges&quot;</span><span class="p">]</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;`profiles` is mutually exclusive with `shape` / `min_shape` / &quot;</span>
+                <span class="s2">&quot;`opt_shape` / `max_shape`. Specify only one shape declaration on an Input.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">profiles</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">profiles</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;`profiles` must be a non-empty list of dicts, each with keys &quot;</span>
+                <span class="s2">&quot;&#39;min_shape&#39;, &#39;opt_shape&#39;, &#39;max_shape&#39;. The list index is the optimization-profile &quot;</span>
+                <span class="s2">&quot;index used to select the profile at runtime.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">normalized</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">rank</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">prof</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">profiles</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prof</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
+                <span class="n">k</span> <span class="ow">in</span> <span class="n">prof</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> must be a dict with keys &#39;min_shape&#39;, &#39;opt_shape&#39;, &#39;max_shape&#39;&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="n">field_name</span><span class="p">]):</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> field &#39;</span><span class="si">{</span><span class="n">field_name</span><span class="si">}</span><span class="s2">&#39; must be a List, &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;tuple or torch.Size, found </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="n">field_name</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+
+            <span class="n">min_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">])</span>
+            <span class="n">opt_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">])</span>
+            <span class="n">max_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">opt_shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">max_shape</span><span class="p">)):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> min/opt/max shapes must have the same number &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;of dimensions, found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">opt_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">max_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">rank</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">rank</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;All profiles on an Input must have the same number of dimensions. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)):</span>
+                <span class="c1"># No min=0 (and TRT requires &gt;= 1).</span>
+                <span class="k">if</span> <span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> min_shape[</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">]=</span><span class="si">{</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2"> is invalid; &quot;</span>
+                        <span class="s2">&quot;every dimension must have min &gt;= 1 (min=0 is not supported).&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">opt_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> requires min &lt;= opt &lt;= max element-wise. &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Got min=</span><span class="si">{</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2">, opt=</span><span class="si">{</span><span class="n">opt_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2">, max=</span><span class="si">{</span><span class="n">max_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2"> at dim </span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">.&quot;</span>
+                    <span class="p">)</span>
+
+            <span class="n">normalized</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;min_shape&quot;</span><span class="p">:</span> <span class="n">min_shape</span><span class="p">,</span>
+                    <span class="s2">&quot;opt_shape&quot;</span><span class="p">:</span> <span class="n">opt_shape</span><span class="p">,</span>
+                    <span class="s2">&quot;max_shape&quot;</span><span class="p">:</span> <span class="n">max_shape</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiles</span> <span class="o">=</span> <span class="n">normalized</span>
+
+        <span class="c1"># Derive the export envelope: elementwise union over every profile. opt</span>
+        <span class="c1"># is taken from the first declared profile (the shape export will trace /</span>
+        <span class="c1"># specialize at). The regular dynamic-shape path in ``__init__`` consumes</span>
+        <span class="c1"># these to set ``self.shape`` and ``shape_mode``.</span>
+        <span class="k">assert</span> <span class="n">rank</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">union_min</span> <span class="o">=</span> <span class="p">[</span><span class="nb">min</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">][</span><span class="n">d</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">normalized</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">)]</span>
+        <span class="n">union_max</span> <span class="o">=</span> <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">][</span><span class="n">d</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">normalized</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">)]</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">union_min</span><span class="p">)</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">normalized</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">])</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">union_max</span><span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span><span class="p">:</span>
             <span class="k">return</span> <span class="s2">&quot;Input(shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
@@ -709,10 +836,21 @@ document.write(`
             <span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
-                <span class="k">return</span> <span class="s2">&quot;Input(min_shape=</span><span class="si">{}</span><span class="s2">, opt_shape=</span><span class="si">{}</span><span class="s2">, max_shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">profiles_str</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">&quot;, profiles=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="p">[</span>
+                            <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">prof</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+                            <span class="k">for</span> <span class="n">prof</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiles</span>
+                        <span class="p">]</span>
+                    <span class="p">)</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiles</span>
+                    <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="s2">&quot;Input(min_shape=</span><span class="si">{}</span><span class="s2">, opt_shape=</span><span class="si">{}</span><span class="s2">, max_shape=</span><span class="si">{}{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
+                    <span class="n">profiles_str</span><span class="p">,</span>
                     <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
                     <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">),</span>
                     <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
@@ -740,6 +878,7 @@ document.write(`
                 <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
                 <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
                 <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
+                <span class="n">a</span><span class="o">.</span><span class="n">profiles</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">profiles</span><span class="p">,</span>
                 <span class="n">a</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
                 <span class="n">a</span><span class="o">.</span><span class="n">format</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">format</span><span class="p">,</span>
                 <span class="n">a</span><span class="o">.</span><span class="n">low_tensor_domain_incl</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">low_tensor_domain_incl</span><span class="p">,</span>
