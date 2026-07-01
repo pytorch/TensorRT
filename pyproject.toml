@@ -82,6 +82,15 @@ test = [
     "parameterized>=0.2.0",
     "pytest>=8.2.1",
     "pytest-forked>=1.6.0",
+    # Emits ``::error file=...,line=...::`` annotations on test failure so
+    # GitHub renders them inline on the PR's Files Changed tab. Inert when
+    # ``GITHUB_ACTIONS`` is unset (local runs are unaffected).
+    "pytest-github-actions-annotate-failures>=0.2.0",
+    # pytest-rerunfailures lets CI retry tests that hit known transient
+    # CUDA / cudagraphs / engine-deserialization failures (see L0/L1
+    # ``--only-rerun`` regex in the workflows) without papering over real
+    # bugs in numerical / model-accuracy suites where it is omitted.
+    "pytest-rerunfailures>=14.0",
     "pytest-xdist>=3.6.1",
     "pyyaml",
     "setuptools",
@@ -110,8 +119,10 @@ quantization = [
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
-# which compiles user-supplied CUDA C++ kernels via NVRTC.
-kernels = ["cuda-python"]
+# which compiles user-supplied CUDA C++ kernels via NVRTC. The high-level
+# launch/compile API (``cuda.core``) lives in cuda-core; cuda-python's
+# bindings are still pulled in for the lower-level driver/runtime shims.
+kernels = ["cuda-python", "cuda-core"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
@@ -129,6 +140,10 @@ include-package-data = false
 [tool.pytest.ini_options]
 testpaths = ["tests/py"]
 addopts = "-n auto --dist=loadfile"
+markers = [
+    "unit: a focused unit test (the bulk of the suite)",
+    "critical: a smoke/critical-path case run in the L1 tier (pytest -m critical); the L2 tier runs the complement (-m 'not critical')",
+]
 norecursedirs = [
     "bazel-*",
     ".venv",
@@ -140,6 +155,7 @@ norecursedirs = [
     "experiments",
     "tools",
     "modules",
+    "utils",
 ]
 
 [tool.uv]

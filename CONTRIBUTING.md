@@ -51,6 +51,28 @@ We use the PyTorch Slack for communication about core development, integration w
 
 - Document hacks, we can discuss it only if we can find it
 
+### Controlling CI scope via PR labels
+
+**PR default:** build + L0 + L1 on a single representative config (Python 3.12 × CUDA 13.0). L2 (slow model-level suites) is opt-in on PRs. The full matrix ({Python 3.10–3.13} × {CUDA 13.0, 13.2}) runs on main / nightly / release branches.
+
+Apply labels in the PR's right sidebar and re-push (or close/reopen) to re-trigger:
+
+| Label | Effect |
+|---|---|
+| `ci: only-l0` | Skip L1 and L2. Useful for docs / build-system-only changes. |
+| `ci: run-l2` | Opt-in to L2 model-compilation tests on this PR. |
+| `ci: skip-l2` | (Legacy — no-op on PRs since L2 is now off by default; still skips L2 on main-branch push runs.) |
+| `Force All Tests[L0+L1+L2]` | Force every tier to run even if an earlier tier failed. Also enables L2 on PRs. |
+
+The Linux x86_64 standard and RTX pipelines share a single reusable workflow,
+`.github/workflows/_linux-x86_64-core.yml`. The two entry workflows
+(`build-test-linux-x86_64.yml` and `build-test-linux-x86_64_rtx.yml`) just call
+it with `use-rtx: false` / `true` and render a single rollup check
+(`CI / Linux x86_64` and `CI / Linux x86_64 (RTX)`). Edit test scope, tiers, or
+gating in the core — not the entry workflows. RTX-only differences are gated
+with `if: ${{ !inputs.use-rtx ... }}` (for standard-only jobs) or branch inside
+the script on the `$USE_TRT_RTX` env var (for divergent test scope).
+
 ### Commits and PRs
 
 - Try to keep pull requests focused (multiple pull requests are okay). Typically PRs should focus on a single issue or a small collection of closely related issue.
@@ -66,40 +88,37 @@ pip install pre-commit
 go install github.com/bazelbuild/buildtools/buildifier@latest
 ```
 
-## Testing using Python backend
+## Local testing
 
-Torch-TensorRT supports testing in Python using [nox](https://nox.thea.codes/en/stable)
+Once you have a built/installed Torch-TensorRT (see the build docs), use the
+[`just`](https://github.com/casey/just) recipes in the repo root to run the
+same checks CI runs, against your local checkout. They drive `uv` with
+`--no-sync` (so they use your already-built environment instead of rebuilding
+from source) and isolate the engine/timing cache under a per-user `$TMPDIR`.
 
-To install the nox using python-pip
+```sh
+just                 # list all recipes
+just lint            # run every pre-commit hook (matches the linter CI job)
+just lint-changed    # pre-commit on files changed vs origin/main (fast pre-push)
+just test <args>     # pytest in the uv env, e.g. `just test tests/py/dynamo/conversion/`
 
-```
-python3 -m pip install --upgrade nox
-```
-
-To list supported nox sessions:
-
-```
-nox --session -l
-```
-
-Environment variables supported by nox
-
-```
-PYT_PATH          - To use different PYTHONPATH than system installed Python packages
-TOP_DIR           - To set the root directory of the noxfile
-USE_HOST_DEPS     - To use host dependencies for tests (Defaults to 0)
+# Reproduce a whole CI tier before pushing:
+just l0              # full L0 smoke tier (converter + core + py-core + torchscript)
+just l1              # full L1 tier
+just l0-converter    # or a single sub-suite (forwards extra args: just l0-core -k test_foo)
 ```
 
-Usage example
+The tier recipes and the CI jobs call the **same** `trt_tier_*` functions in
+`tests/py/utils/ci_helpers.sh`, so local and CI run identical selectors and cannot
+drift — only environment policy differs (CI sets `RUNNER_TEST_RESULTS_DIR` and
+runs the container python; the recipes set `PYTHON="uv run --no-sync python"`,
+`TRT_JOBS`, and disable the flaky-test reruns). On a single local GPU the
+default `-n auto` parallelism may exceed GPU memory when many TRT engines build
+at once — lower it with `just jobs=2 l0`.
 
-```
-nox --session l0_api_tests
-```
-
-Supported Python versions:
-```
-["3.7", "3.8", "3.9", "3.10"]
-```
+> Legacy: `noxfile.py` still defines multi-Python-version sessions
+> (`nox --session -l`) used by some release flows, but `just` is the
+> recommended path for everyday local verification.
 
 ## How do I add support for a new op...
 

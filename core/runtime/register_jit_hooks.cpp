@@ -77,6 +77,13 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def(
             "num_execution_contexts_created",
             [](const c10::intrusive_ptr<TRTEngine>& self) -> int64_t { return self->num_execution_contexts_created(); })
+        // Multiple optimization profiles. Names match the Python runtime
+        // (_TRTEngine.py) so both runtimes are interchangeable behind
+        // TorchTensorRTModule / the optimization_profile context manager.
+        .def("set_active_profile", &TRTEngine::set_active_profile)
+        .def_readonly("num_optimization_profiles", &TRTEngine::num_optimization_profiles)
+        .def_readonly("_active_profile_index", &TRTEngine::active_profile_index)
+        .def_readwrite("_auto_select_profiles", &TRTEngine::auto_select_profiles)
         .def(
             "use_dynamically_allocated_resources",
             [](const c10::intrusive_ptr<TRTEngine>& self, bool dynamic) -> void {

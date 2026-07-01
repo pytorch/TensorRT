@@ -279,11 +279,32 @@ class TRTRuntimeConfig:
         elif isinstance(rc, RuntimeCache):
             cache = rc.ensure_cache(self._live)
             self._live.set_runtime_cache(cache)
+        elif isinstance(rc, str):
+            # ``TorchTensorRTModule._resolve_runtime_cache`` pre-wraps path
+            # strings on the compile / configure path, but engines created
+            # directly (e.g. the Python ``TRTEngine`` constructed from a
+            # cross-runtime ``.pt2`` load — see
+            # ``test_cross_runtime_serde::test_save_python_load_python``)
+            # get a default ``RuntimeSettings(runtime_cache=RUNTIME_CACHE_PATH)``
+            # that's never seen by the module's resolver. Wrap defensively
+            # here so the load path doesn't crash; this also keeps the
+            # documented contract that callers MAY pass a path string.
+            #
+            # ``RuntimeSettings`` is a frozen dataclass, so we can't store the
+            # wrapper back onto ``self._settings``; just use it locally. The
+            # wrapper is GC'd after this call, which is fine: ensure_cache has
+            # already materialized the underlying IRuntimeCache on ``_live``.
+            wrapped = RuntimeCache(path=rc, autosave_on_del=True)
+            try:
+                wrapped.load()
+            except Exception as e:
+                logger.warning(f"Failed to warm-load runtime cache from {rc!r}: {e}")
+            cache = wrapped.ensure_cache(self._live)
+            self._live.set_runtime_cache(cache)
         else:
             raise TypeError(
-                f"runtime_cache must be None or RuntimeCache by the time "
-                f"it reaches TRTRuntimeConfig; got {type(rc).__name__}. "
-                f"Path strings should be pre-wrapped by the module."
+                f"runtime_cache must be None, str, or RuntimeCache by the "
+                f"time it reaches TRTRuntimeConfig; got {type(rc).__name__}."
             )
         logger.info("TensorRT-RTX runtime config configured")
 

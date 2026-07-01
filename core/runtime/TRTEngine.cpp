@@ -280,6 +280,11 @@ TRTEngine::TRTEngine(
   }
 
   has_dynamic_inputs = engine_has_dynamic_inputs(cuda_engine.get(), in_binding_names);
+  // Cache input binding metadata used by the runtime hot path, then reconstruct
+  // optimization-profile info from the TRT API so multi-profile selection works
+  // for any loaded engine.
+  this->setup_input_binding_infos();
+  this->setup_optimization_profiles();
 
 #ifndef NDEBUG
   this->enable_profiling();
@@ -557,6 +562,168 @@ std::vector<std::string> TRTEngine::serialize() {
 
 void TRTEngine::reset_captured_graph() {
   cudagraph.reset();
+}
+
+void TRTEngine::setup_input_binding_infos() {
+  input_binding_infos.clear();
+  input_binding_infos.reserve(in_binding_names.size());
+  for (const auto& name : in_binding_names) {
+    input_binding_infos.push_back(
+        {name,
+         util::TRTDataTypeToScalarType(cuda_engine->getTensorDataType(name.c_str())),
+         cuda_engine->isShapeInferenceIO(name.c_str())});
+  }
+}
+
+void TRTEngine::setup_optimization_profiles() {
+  num_optimization_profiles = cuda_engine->getNbOptimizationProfiles();
+  profile_dynamic_dims.clear();
+  // Single-profile engines never auto-select a profile, so the per-profile dim
+  // cache below isn't needed.
+  if (num_optimization_profiles <= 1) {
+    return;
+  }
+  // One entry per input binding position; shape-inference IO and all-static
+  // inputs keep their default empty list so auto-selection can skip them without
+  // any name lookup.
+  profile_dynamic_dims.resize(in_binding_names.size());
+  for (size_t i = 0; i < input_binding_infos.size(); ++i) {
+    const auto& binding = input_binding_infos[i];
+    const auto& name = binding.name;
+    // Shape tensors carry value ranges, not dim ranges, so they can't be matched
+    // by getProfileShape; skip them (leaving an empty entry).
+    if (binding.is_shape_tensor) {
+      continue;
+    }
+    // Gather [min, max] for every dim across every profile: dim -> [profile] -> (min, max).
+    std::vector<std::vector<std::pair<int64_t, int64_t>>> per_dim;
+    for (int64_t p = 0; p < num_optimization_profiles; ++p) {
+      auto dmin =
+          cuda_engine->getProfileShape(name.c_str(), static_cast<int32_t>(p), nvinfer1::OptProfileSelector::kMIN);
+      auto dmax =
+          cuda_engine->getProfileShape(name.c_str(), static_cast<int32_t>(p), nvinfer1::OptProfileSelector::kMAX);
+      if (per_dim.empty()) {
+        per_dim.resize(dmin.nbDims);
+      }
+      for (int d = 0; d < dmin.nbDims; ++d) {
+        per_dim[d].push_back(std::make_pair(dmin.d[d], dmax.d[d]));
+      }
+    }
+    // Keep only dims that vary within a profile (min != max) or differ across
+    // profiles; a dim that is the same fixed extent in every profile cannot
+    // distinguish profiles, so we skip it (TRT validates it at setInputShape).
+    auto& dynamic_dims = profile_dynamic_dims[i];
+    for (int32_t d = 0; d < static_cast<int32_t>(per_dim.size()); ++d) {
+      const auto& ranges = per_dim[d];
+      bool is_dynamic = false;
+      for (const auto& r : ranges) {
+        if (r.first != r.second || r != ranges[0]) {
+          is_dynamic = true;
+          break;
+        }
+      }
+      if (is_dynamic) {
+        dynamic_dims.push_back({d, ranges});
+      }
+    }
+  }
+}
+
+void TRTEngine::set_active_profile(int64_t profile_index) {
+  // Manual-pin / torchbind path: this runs outside execute_engine's stream
+  // choreography, so the switch's async memcpys aren't otherwise ordered against
+  // the (later, separate) enqueue. Resolve the current stream and fully
+  // synchronize to make the switch safe. This path is rare and not perf-critical.
+  auto stream = c10::cuda::getCurrentCUDAStream(device_info.id);
+  set_active_profile_with_stream(profile_index, stream);
+  stream.synchronize();
+}
+
+void TRTEngine::set_active_profile_with_stream(int64_t profile_index, const c10::cuda::CUDAStream& stream) {
+  if (num_optimization_profiles <= 1) {
+    return;
+  }
+  if (profile_index == active_profile_index) {
+    return;
+  }
+
+  // setOptimizationProfileAsync returns false for an out-of-range index; the
+  // index is validated upstream in TorchTensorRTModule.resolve_profile_index.
+  TORCHTRT_CHECK(
+      exec_ctx()->setOptimizationProfileAsync(static_cast<int32_t>(profile_index), stream.stream()),
+      "Failed to switch to optimization profile index " << profile_index);
+
+  active_profile_index = profile_index;
+  // A profile switch invalidates any captured CUDA graph and changes the
+  // context state, so force re-record / shape re-inference on the next call.
+  runtime_states.context_changed = true;
+  reset_captured_graph();
+  shape_key = "None";
+  LOG_DEBUG("Switched to optimization profile index " << profile_index);
+}
+
+bool TRTEngine::profile_fits(int64_t profile_index, const std::vector<at::Tensor>& inputs) const {
+  // Indexed positionally by input (inputs[i] <-> in_binding_names[i], the same
+  // convention setup_input_tensors uses); empty entries (shape-inference IO /
+  // all-static inputs) are skipped with no name lookup. Static dims are not
+  // cached (they cannot distinguish profiles) and are validated later by TRT at
+  // setInputShape.
+  //
+  // Example profile_dynamic_dims for an image input (1, 3, H, W) with H/W
+  // dynamic across 3 profiles plus a fully-static second input:
+  //   profile_dynamic_dims = [
+  //     # input 0: dims 2 (H), 3 (W) vary; dims 0 (N=1) and 1 (channels=3) fixed -> omitted
+  //     [
+  //       (2, [(224, 224), (256, 512), (256, 512)]),  # H   ranges for profiles 0,1,2
+  //       (3, [(224, 224), (256, 512), (256, 512)]),  # W
+  //     ],
+  //     # input 1: fully static (and/or shape-inference IO) -> empty, skipped
+  //     [],
+  //   ]
+  const size_t num_to_check = std::min(inputs.size(), profile_dynamic_dims.size());
+  for (size_t i = 0; i < num_to_check; ++i) {
+    const auto& dynamic_dims = profile_dynamic_dims[i];
+    if (dynamic_dims.empty()) {
+      continue;
+    }
+    auto sizes = inputs[i].sizes();
+    for (const auto& dyn : dynamic_dims) {
+      if (dyn.dim_index < static_cast<int32_t>(sizes.size())) {
+        int64_t lo = dyn.profile_ranges[profile_index].first;
+        int64_t hi = dyn.profile_ranges[profile_index].second;
+        int64_t sz = sizes[dyn.dim_index];
+        if (!(lo <= sz && sz <= hi)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+int64_t TRTEngine::auto_select_profile(const std::vector<at::Tensor>& inputs) {
+  // Prefer the profile already loaded: if it still fits the inputs, keep it.
+  // This avoids thrashing between equally-valid profiles when shapes alternate
+  // (e.g. decode/prefill), since a switch invalidates the captured CUDA graph
+  // and forces shape re-inference. Only fall back to a scan when it no longer
+  // fits.
+  if (profile_fits(active_profile_index, inputs)) {
+    return active_profile_index;
+  }
+  // Lazy / first-working: switch to the first profile whose [min, max] ranges
+  // fit every input. Overlapping profiles therefore resolve to the lowest
+  // matching index (pin manually to force a specific one). This method owns the
+  // switch so callers don't have to follow up.
+  for (int64_t p = 0; p < num_optimization_profiles; ++p) {
+    if (profile_fits(p, inputs)) {
+      set_active_profile_with_stream(p, this->engine_stream);
+      return p;
+    }
+  }
+  TORCHTRT_THROW_ERROR(
+      "No optimization profile matches the input shapes. Fix the input shapes or pin a profile "
+      "explicitly via optimization_profile(module, index).");
+  return 0; // unreachable
 }
 
 void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationStrategy new_strategy) {

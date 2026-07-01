@@ -443,7 +443,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return encoded_metadata
 
     @staticmethod
-    def decode_metadata(encoded_metadata: bytes) -> Any:
+    def decode_metadata(encoded_metadata: Any) -> Any:
         dumped_metadata = base64.b64decode(encoded_metadata.encode("utf-8"))
         metadata = pickle.loads(dumped_metadata)
         return metadata
@@ -529,6 +529,76 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
         self.target_device = self._resolve_target_device()
+
+    def set_optimization_profile(self, profile: Optional[Any]) -> None:
+        """Select the active TRT optimization profile for this engine.
+
+        ``profile`` may be a profile index (``int``), the string ``"auto"`` to
+        enable shape-based auto-selection, or ``None`` to clear any pin / auto
+        setting and reset to the default profile (index 0).
+        See :func:`torch_tensorrt.runtime.optimization_profile`.
+        """
+        if self.engine is None:
+            self.setup_engine()
+        assert self.engine is not None
+        engine = self.engine
+        # Drive the primitive engine API (set_active_profile / _auto_select_profiles)
+        # that both the Python and C++ runtimes expose under the same names, so
+        # this works regardless of the active runtime.
+        if not hasattr(engine, "set_active_profile"):
+            raise RuntimeError(
+                "This engine does not support optimization profile selection."
+            )
+        if profile is None:
+            engine._auto_select_profiles = False
+            engine.set_active_profile(0)
+            return
+        if isinstance(profile, str) and profile == "auto":
+            engine._auto_select_profiles = True
+            return
+        # Validate the profile index. ``num_optimization_profiles`` is exposed by
+        # both the Python and C++ runtimes under the same name.
+        if isinstance(profile, bool) or not isinstance(profile, int):
+            raise TypeError(
+                f"Optimization profile must be an integer index, got {type(profile)}"
+            )
+        num_profiles = engine.num_optimization_profiles
+        if not (0 <= profile < num_profiles):
+            raise ValueError(
+                f"Optimization profile index {profile} out of range "
+                f"[0, {num_profiles})"
+            )
+        engine._auto_select_profiles = False
+        engine.set_active_profile(profile)
+
+    def get_optimization_profile_state(self) -> Optional[Tuple[Any, ...]]:
+        """Return the engine's current ``(auto, active)`` profile state.
+
+        Used by the :func:`optimization_profile` context manager to save/restore
+        state across a ``with`` block. Returns ``None`` if unsupported.
+        """
+        if self.engine is None:
+            return None
+        engine = self.engine
+        if not hasattr(engine, "_active_profile_index"):
+            return None
+        return (
+            engine._auto_select_profiles,
+            engine._active_profile_index,
+        )
+
+    def restore_optimization_profile_state(
+        self, state: Optional[Tuple[Any, ...]]
+    ) -> None:
+        """Restore profile state captured by :meth:`get_optimization_profile_state`."""
+        if state is None or self.engine is None:
+            return
+        engine = self.engine
+        if not hasattr(engine, "set_active_profile"):
+            return
+        auto, active = state
+        engine._auto_select_profiles = auto
+        engine.set_active_profile(active)
 
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.get_engine().use_pre_allocated_outputs = enable

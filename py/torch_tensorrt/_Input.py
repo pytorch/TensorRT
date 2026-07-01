@@ -54,6 +54,15 @@ class Input(object):
     shared_dims: Dict[int, str] = (
         {}
     )  #: Optional {axis_index: name} for dynamic axes. The same name across inputs is exported as one shared ``torch.export.Dim`` (e.g. a batch axis shared by ``input_ids`` and ``attention_mask``).
+    #: Optional ordered optimization profiles for multi-profile engines. A list
+    #: of dicts, one per profile; the list index is the TRT optimization-profile
+    #: index used to select the profile at runtime. Each entry has
+    #: ``min_shape`` / ``opt_shape`` / ``max_shape`` tuples. ``None`` for the
+    #: default zero/one-profile behavior. ``profiles`` may be combined with ``shared_dims``: the profiles
+    #: define the per-profile TRT ranges while ``shared_dims`` names dynamic axes
+    #: on the union envelope so they export as one shared ``torch.export.Dim``
+    #: across inputs.
+    profiles: Optional[List[Dict[str, Tuple[int, ...]]]] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """__init__ Method for torch_tensorrt.Input
@@ -82,8 +91,17 @@ class Input(object):
             - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)
             - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW
         """
-        # Compatibility code for switching over from InputTensorSpec
-        if "shape" in kwargs and "shape_ranges" in kwargs:
+        # Multi optimization profile support. ``profiles`` is validated and
+        # translated into the union ``min_shape`` / ``opt_shape`` / ``max_shape``
+        # kwargs so the regular dynamic-shape path below constructs the Input
+        # unchanged.
+        if kwargs.get("profiles") is not None:
+            self._init_from_profiles(args, kwargs)
+
+        # Compatibility code for switching over from InputTensorSpec.
+        # Mutually exclusive with `profiles` above (which translates into
+        # min/opt/max kwargs and forbids `shape`/`shape_ranges`).
+        elif "shape" in kwargs and "shape_ranges" in kwargs:
             assert (
                 len(kwargs["shape_ranges"]) == 1 and len(kwargs["shape_ranges"][0]) == 3
             )
@@ -217,6 +235,115 @@ class Input(object):
         if "name" in kwargs:
             self.name = kwargs["name"]
 
+    def _init_from_profiles(self, args: Any, kwargs: Any) -> None:
+        """Validate ``profiles`` and translate them into union shape kwargs.
+
+        ``profiles`` (``kwargs["profiles"]``) is an ordered list of dicts (one per
+        profile); the list index is the TRT optimization-profile index selected at
+        runtime. Each entry has ``min_shape`` / ``opt_shape`` / ``max_shape``
+        tuples. This stores the normalized list on ``self.profiles`` and fills
+        ``kwargs`` with the elementwise union envelope (the range ``torch.export``
+        must cover), so the regular dynamic-shape path in ``__init__`` builds the
+        Input.
+
+        ``shared_dims`` is intentionally *not* mutually exclusive with
+        ``profiles``: profiles describe the per-profile TRT shape ranges, whereas
+        ``shared_dims`` names dynamic axes so they export as a single shared
+        ``torch.export.Dim`` across inputs. The two compose -- ``shared_dims`` is
+        left in ``kwargs`` and validated against the union envelope by the regular
+        dynamic-shape path (a named axis must be dynamic in the union).
+        """
+        profiles = kwargs["profiles"]
+        # ``profiles`` is the only *shape* specifier when used (``shared_dims`` is
+        # an axis-naming modifier, not a shape, so it is allowed alongside).
+        if len(args) != 0:
+            raise ValueError(
+                "Found both a positional shape argument and `profiles`. "
+                "class Input expects `profiles` to be the only shape specifier when used."
+            )
+        if any(
+            k in kwargs
+            for k in ["shape", "min_shape", "opt_shape", "max_shape", "shape_ranges"]
+        ):
+            raise ValueError(
+                "`profiles` is mutually exclusive with `shape` / `min_shape` / "
+                "`opt_shape` / `max_shape`. Specify only one shape declaration on an Input."
+            )
+        if not isinstance(profiles, (list, tuple)) or len(profiles) == 0:
+            raise ValueError(
+                "`profiles` must be a non-empty list of dicts, each with keys "
+                "'min_shape', 'opt_shape', 'max_shape'. The list index is the optimization-profile "
+                "index used to select the profile at runtime."
+            )
+
+        normalized: List[Dict[str, Tuple[int, ...]]] = []
+        rank: Optional[int] = None
+        for i, prof in enumerate(profiles):
+            if not isinstance(prof, dict) or not all(
+                k in prof for k in ("min_shape", "opt_shape", "max_shape")
+            ):
+                raise ValueError(
+                    f"Profile at index {i} must be a dict with keys 'min_shape', 'opt_shape', 'max_shape'"
+                )
+
+            for field_name in ("min_shape", "opt_shape", "max_shape"):
+                if not Input._supported_input_size_type(prof[field_name]):
+                    raise TypeError(
+                        f"Profile at index {i} field '{field_name}' must be a List, "
+                        f"tuple or torch.Size, found {type(prof[field_name])}"
+                    )
+
+            min_shape = tuple(prof["min_shape"])
+            opt_shape = tuple(prof["opt_shape"])
+            max_shape = tuple(prof["max_shape"])
+
+            if not (len(min_shape) == len(opt_shape) == len(max_shape)):
+                raise ValueError(
+                    f"Profile at index {i} min/opt/max shapes must have the same number "
+                    f"of dimensions, found {len(min_shape)}/{len(opt_shape)}/{len(max_shape)}"
+                )
+            if rank is None:
+                rank = len(min_shape)
+            elif rank != len(min_shape):
+                raise ValueError(
+                    "All profiles on an Input must have the same number of dimensions. "
+                    f"Profile at index {i} has {len(min_shape)}, expected {rank}."
+                )
+
+            for d in range(len(min_shape)):
+                # No min=0 (and TRT requires >= 1).
+                if min_shape[d] < 1:
+                    raise ValueError(
+                        f"Profile at index {i} min_shape[{d}]={min_shape[d]} is invalid; "
+                        "every dimension must have min >= 1 (min=0 is not supported)."
+                    )
+                if not (min_shape[d] <= opt_shape[d] <= max_shape[d]):
+                    raise ValueError(
+                        f"Profile at index {i} requires min <= opt <= max element-wise. "
+                        f"Got min={min_shape[d]}, opt={opt_shape[d]}, max={max_shape[d]} at dim {d}."
+                    )
+
+            normalized.append(
+                {
+                    "min_shape": min_shape,
+                    "opt_shape": opt_shape,
+                    "max_shape": max_shape,
+                }
+            )
+
+        self.profiles = normalized
+
+        # Derive the export envelope: elementwise union over every profile. opt
+        # is taken from the first declared profile (the shape export will trace /
+        # specialize at). The regular dynamic-shape path in ``__init__`` consumes
+        # these to set ``self.shape`` and ``shape_mode``.
+        assert rank is not None
+        union_min = [min(p["min_shape"][d] for p in normalized) for d in range(rank)]
+        union_max = [max(p["max_shape"][d] for p in normalized) for d in range(rank)]
+        kwargs["min_shape"] = tuple(union_min)
+        kwargs["opt_shape"] = tuple(normalized[0]["opt_shape"])
+        kwargs["max_shape"] = tuple(union_max)
+
     def __str__(self) -> str:
         if self.shape_mode == Input._ShapeMode.STATIC:
             return "Input(shape={}, dtype={}, format={}, domain=[{}, {}))".format(
@@ -228,10 +355,21 @@ class Input(object):
             )
         elif self.shape_mode == Input._ShapeMode.DYNAMIC:
             if isinstance(self.shape, dict):
-                return "Input(min_shape={}, opt_shape={}, max_shape={}, dtype={}, format={}, domain=[{}, {}))".format(
+                profiles_str = (
+                    ", profiles={}".format(
+                        [
+                            {k: tuple(v) for k, v in prof.items()}
+                            for prof in self.profiles
+                        ]
+                    )
+                    if self.profiles
+                    else ""
+                )
+                return "Input(min_shape={}, opt_shape={}, max_shape={}{}, dtype={}, format={}, domain=[{}, {}))".format(
                     self.shape["min_shape"],
                     self.shape["opt_shape"],
                     self.shape["max_shape"],
+                    profiles_str,
                     str(self.dtype),
                     str(self.format),
                     str(self.tensor_domain[0]),
@@ -259,6 +397,7 @@ class Input(object):
                 a.shape["min_shape"] == b.shape["min_shape"],
                 a.shape["opt_shape"] == b.shape["opt_shape"],
                 a.shape["max_shape"] == b.shape["max_shape"],
+                a.profiles == b.profiles,
                 a.dtype == b.dtype,
                 a.format == b.format,
                 a.low_tensor_domain_incl == b.low_tensor_domain_incl,

@@ -444,6 +444,7 @@ def scaled_dot_product_efficient_attention(
 
     mask_tensor = None
     if attn_bias is not None:
+        attn_bias = get_trt_tensor(ctx, attn_bias, name + "_attn_bias")
         if attn_bias.dtype == trt.DataType.BOOL:
             mask_tensor = attn_bias
         elif attn_bias.dtype != query.dtype:

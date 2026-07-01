@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=01ee72d3"></script>
+    <script src="../_static/documentation_options.js?v=66600436"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1025,6 +1025,19 @@ the information of all the given PyTorch tensors.</p>
 </dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.profiles">
+<span class="sig-name descname"><span class="pre">profiles</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#torch_tensorrt.Input.profiles" title="Link to this definition">#</a></dt>
+<dd><p>Optional ordered optimization profiles for multi-profile engines. A list
+of dicts, one per profile; the list index is the TRT optimization-profile
+index used to select the profile at runtime. Each entry has
+<code class="docutils literal notranslate"><span class="pre">min_shape</span></code> / <code class="docutils literal notranslate"><span class="pre">opt_shape</span></code> / <code class="docutils literal notranslate"><span class="pre">max_shape</span></code> tuples. <code class="docutils literal notranslate"><span class="pre">None</span></code> for the
+default zero/one-profile behavior. <code class="docutils literal notranslate"><span class="pre">profiles</span></code> may be combined with <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code>: the profiles
+define the per-profile TRT ranges while <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> names dynamic axes
+on the union envelope so they export as one shared <code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code>
+across inputs.</p>
+</dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="torch_tensorrt.Input.shared_dims">
 <span class="sig-name descname"><span class="pre">shared_dims</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#torch_tensorrt.Input.shared_dims" title="Link to this definition">#</a></dt>
 <dd><p>name} for dynamic axes. The same name across inputs is exported as one shared <code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code> (e.g. a batch axis shared by <code class="docutils literal notranslate"><span class="pre">input_ids</span></code> and <code class="docutils literal notranslate"><span class="pre">attention_mask</span></code>).</p>
@@ -1807,6 +1820,7 @@ If  <code class="docutils literal notranslate"><span class="pre">self</span></co
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.Input.from_tensors"><code class="docutils literal notranslate"><span class="pre">Input.from_tensors()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.Input.dtype"><code class="docutils literal notranslate"><span class="pre">Input.dtype</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.Input.format"><code class="docutils literal notranslate"><span class="pre">Input.format</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.Input.profiles"><code class="docutils literal notranslate"><span class="pre">Input.profiles</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.Input.shared_dims"><code class="docutils literal notranslate"><span class="pre">Input.shared_dims</span></code></a></li>
 </ul>
 </li>

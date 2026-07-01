@@ -21,6 +21,17 @@ assertions = unittest.TestCase()
 
 HELPER_SCRIPT = os.path.join(os.path.dirname(__file__), "_cross_runtime_load_helper.py")
 
+# Cross-runtime save/load of a serialized engine is not supported on TRT-RTX:
+# deserialized RTX engines require a Myelin execution-graph cache to be set up
+# before ``createExecutionContext`` (``myelinGraphSetExecutionGraphCache: Must
+# be called with an execution graph cache``), which the portable .pt2 load path
+# does not currently provide. Tracked separately; the standard TensorRT runtime
+# is the supported target for this interop.
+skip_on_rtx = pytest.mark.skipif(
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    reason="cross-runtime engine serde is not supported on TensorRT-RTX (Myelin execution-graph cache requirement)",
+)
+
 
 class SmallConvModel(torch.nn.Module):
     def __init__(self) -> None:
@@ -93,6 +104,7 @@ def _assert_outputs_match(
     )
 
 
+@skip_on_rtx
 @pytest.mark.unit
 def test_save_cpp_load_python(tmpdir):
     """Save with C++ runtime active, load in Python-only subprocess."""
@@ -123,6 +135,7 @@ def test_save_cpp_load_python(tmpdir):
     _assert_outputs_match(reference_output, python_output, "save_cpp_load_python")
 
 
+@skip_on_rtx
 @pytest.mark.unit
 def test_save_python_load_python(tmpdir):
     """Save and load entirely in Python-only subprocesses."""
@@ -164,6 +177,7 @@ def test_save_python_load_python(tmpdir):
     _assert_outputs_match(pytorch_output, python_output, "save_python_load_python")
 
 
+@skip_on_rtx
 @pytest.mark.unit
 def test_save_python_load_cpp(tmpdir):
     """Save in Python-only subprocess, load in C++ runtime."""
