@@ -5,7 +5,7 @@ import logging
 import os
 import platform
 import warnings
-from typing import Any, Collection, List, Optional, Sequence, Union
+from typing import Any, Collection, List, Optional, Sequence, Tuple, Union
 
 import torch
 from torch.export import ExportedProgram
@@ -39,6 +39,10 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
     pre_export_lowering,
+)
+from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+    inline_lifted_buffers_into_gm,
+    lift_mutated_buffers,
 )
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
@@ -757,6 +761,25 @@ def compile(
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 
+    # Lift mutated buffers from get_attr to placeholders BEFORE post_lowering's
+    # constant_fold runs, so the engine sees them as input bindings (a
+    # prerequisite for IKVCacheUpdateLayer / aliased I/O to fire on a
+    # module-held cache). Returns a fresh GraphModule whose forward signature
+    # reflects the new placeholders.
+    gm, lifted_buffers = lift_mutated_buffers(gm)
+    if lifted_buffers:
+        # Append each lifted buffer as an engine input AFTER the user inputs.
+        # Buffer tensors live on the gm's state; prepare an Input spec for
+        # each so engine building knows their shape/dtype/device.
+        buffer_tensors = [t for _, _, t in lifted_buffers]
+        buffer_inputs = prepare_inputs(buffer_tensors)
+        trt_arg_inputs = list(trt_arg_inputs) + list(buffer_inputs)
+        logger.info(
+            "Lifted %d mutable buffer(s) into engine inputs: %s",
+            len(lifted_buffers),
+            [b for _, b, _ in lifted_buffers],
+        )
+
     # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
     # module parameters to still be on GPU, so we must not deallocate before this call.
     gm = post_lowering(gm, settings)
@@ -783,6 +806,14 @@ def compile(
         settings,
         engine_cache,
     )
+    if lifted_buffers:
+        # Inline buffers into the compiled gm as get_attr nodes + registered
+        # buffers. The resulting gm's forward takes only user inputs; buffers
+        # are read from module state on each call and threaded into the
+        # engine via get_attr nodes in the fx graph. This shape is naturally
+        # serializable by torch_tensorrt.save / torch.export (no external
+        # Python wrapper that would be lost on a round-trip).
+        trt_gm = inline_lifted_buffers_into_gm(trt_gm, lifted_buffers)
     return trt_gm
 
 
@@ -1284,11 +1315,26 @@ def convert_exported_program_to_serialized_trt_engine(
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    lift_mutable_buffers: bool = False,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
 
     Converts an ExportedProgram to a serialized TensorRT engine given a dictionary of conversion settings
+
+    When ``lift_mutable_buffers=True``, any module buffer that the model mutates
+    (a ``BUFFER_MUTATION`` in the EP's graph signature) is lifted from a baked-in
+    constant to an engine *input binding*. The resulting engine has additional
+    input bindings appended after the user-supplied inputs, in the order the
+    buffers appear in the EP. The caller is responsible for threading those
+    bindings at runtime — pass the current buffer values in on each call; the
+    engine writes through the binding via aliased I/O so the buffer's storage
+    is mutated in place. Use ``trt.ICudaEngine.get_aliased_input_tensor`` (or
+    the metadata exposed by ``TRTEngine`` via ``aliased_io``) to discover
+    which output binding aliases which input. The higher-level
+    :func:`torch_tensorrt.dynamo.compile` does this lifting and threading
+    automatically; this lower-level entry point exposes the same machinery
+    for callers that want to manage the bindings themselves.
 
     Arguments:
         exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
@@ -1536,6 +1582,25 @@ def convert_exported_program_to_serialized_trt_engine(
     gm = exported_program.module()
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
+
+    # Optional: lift mutated module buffers from get_attr to placeholder so the
+    # engine treats them as input bindings (enabling KV-cache aliasing for
+    # module-held caches). The caller is responsible for threading the
+    # resulting bindings at runtime — they are appended after the user inputs
+    # in the order returned here.
+    lifted_buffers: List[Tuple[str, str, torch.Tensor]] = []
+    if lift_mutable_buffers:
+        gm, lifted_buffers = lift_mutated_buffers(gm)
+        if lifted_buffers:
+            buffer_tensors = [t for _, _, t in lifted_buffers]
+            buffer_inputs = prepare_inputs(buffer_tensors)
+            trt_arg_inputs = list(trt_arg_inputs) + list(buffer_inputs)
+            logger.info(
+                "lift_mutable_buffers=True: lifted %d buffer(s) into engine "
+                "inputs (appended after user inputs): %s",
+                len(lifted_buffers),
+                [b for _, b, _ in lifted_buffers],
+            )
 
     # Apply lowering on the graph module
     gm = post_lowering(gm, settings)
