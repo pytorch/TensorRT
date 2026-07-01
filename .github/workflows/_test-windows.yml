@@ -1,0 +1,136 @@
+name: _test-windows
+
+# Manifest-driven build + test for the Windows channel. Mirrors _test-linux.yml
+# but uses build_windows.yml + windows-test.yml, and wraps the suite run in
+# vc_env_helper.bat (the MSVC env). Suite SELECTION is identical to Linux — the
+# manifest is platform-agnostic (`ci matrix --platform windows`); only the build
+# reusable and the execution wrapper differ.
+
+on:
+  workflow_call:
+    inputs:
+      lane:
+        description: "fast | full | nightly"
+        required: true
+        type: string
+      use-rtx:
+        description: "Test against TensorRT-RTX"
+        type: boolean
+        default: false
+      name-prefix:
+        description: "Display-name prefix (e.g. 'RTX - ')"
+        type: string
+        default: ""
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: windows
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  filter-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/checkout@v6
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          LIMIT_PR=${{ inputs.lane == 'fast' && 'true' || 'false' }}
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx ${{ inputs.use-rtx }} --limit-pr-builds "${LIMIT_PR}" --matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  # Swap the build runner label for a GPU test runner (same as the legacy windows flow).
+  substitute-runner:
+    needs: filter-matrix
+    outputs:
+      matrix: ${{ steps.substitute.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Substitute runner
+        id: substitute
+        run: |
+          echo matrix="$(echo '${{ needs.filter-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: substitute-runner
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: packaging/pre_build_script_windows.sh
+            env-script: packaging/vc_env_helper.bat
+            smoke-test-script: packaging/smoke_test_windows.py
+            package-name: torch_tensorrt
+            display-name: ${{ inputs.name-prefix }}Build Windows torch-tensorrt whl package
+    name: ${{ matrix.display-name }}
+    uses: ./.github/workflows/build_windows.yml
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-script: ${{ matrix.env-script }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      package-name: ${{ matrix.package-name }}
+      trigger-event: ${{ github.event_name }}
+      timeout: 120
+
+  suite-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - id: gen
+        run: |
+          set -euo pipefail
+          variant=${{ inputs.use-rtx && 'rtx' || 'standard' }}
+          json="$(python -m tests.ci matrix --platform windows --lane '${{ inputs.lane }}' --variant "${variant}")"
+          echo "matrix=${json}" >> "$GITHUB_OUTPUT"
+          echo "Lane '${{ inputs.lane }}' (${variant}) windows suites:"; echo "${json}" | python -m json.tool
+
+  test:
+    needs: [substitute-runner, build, suite-matrix]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.suite-matrix.outputs.matrix) }}
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: ${{ matrix.suite }}-${{ matrix.variant }}
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      use-rtx: ${{ inputs.use-rtx }}
+      # vc_env_helper.bat sets the MSVC env, then runs the manifest runner; the
+      # inner `python -m pytest` it spawns inherits that env.
+      script: |
+        set -euo pipefail
+        packaging/vc_env_helper.bat python -m tests.ci run "${{ matrix.suite }}" --variant "${{ matrix.variant }}"

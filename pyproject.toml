@@ -143,6 +143,8 @@ addopts = "-n auto --dist=loadfile"
 markers = [
     "unit: a focused unit test (the bulk of the suite)",
     "critical: a smoke/critical-path case run in the L1 tier (pytest -m critical); the L2 tier runs the complement (-m 'not critical')",
+    "smoke: the fast-lane subset of a subsystem (pytest -m smoke); run on every push by the `fast` lane",
+    "flaky: a known-flaky test, quarantined out of the gating lanes and tracked by an issue; still run in nightly",
 ]
 norecursedirs = [
     "bazel-*",
@@ -156,6 +158,7 @@ norecursedirs = [
     "tools",
     "modules",
     "utils",
+    "ci",
 ]
 
 [tool.uv]
