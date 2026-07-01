@@ -27,6 +27,18 @@ nvinfer1::ITensor* anyDimImplementation(
   // Reduce does not work on bool inputs
   if (in_tensor->getType() == nvinfer1::DataType::kBOOL) {
     in_tensor = castITensor(ctx, in_tensor, nvinfer1::DataType::kINT32, (util::node_info(n) + "_in").c_str());
+  } else {
+    // Numeric truthiness is based on nonzero elements, not the reduced sum of raw values.
+    auto zero_tensor = tensor_to_const(
+        ctx, torch::tensor({0}, util::TRTDataTypeToScalarType(in_tensor->getType())), util::node_info(n) + "_zero");
+    auto equal_zero_layer = add_elementwise(
+        ctx, nvinfer1::ElementWiseOperation::kEQUAL, in_tensor, zero_tensor, util::node_info(n) + "_is_zero");
+    TORCHTRT_CHECK(equal_zero_layer, "Unable to create equal layer from node: " << *n);
+    auto nonzero_layer = ctx->net->addUnary(*equal_zero_layer->getOutput(0), nvinfer1::UnaryOperation::kNOT);
+    TORCHTRT_CHECK(nonzero_layer, "Unable to create logical_not layer from node: " << *n);
+    nonzero_layer->setName((util::node_info(n) + "_nonzero").c_str());
+    in_tensor = castITensor(
+        ctx, nonzero_layer->getOutput(0), nvinfer1::DataType::kINT32, (util::node_info(n) + "_mask").c_str());
   }
   auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, keepdim);
 
