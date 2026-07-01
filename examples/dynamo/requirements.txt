@@ -1,6 +1,6 @@
 cupy==13.1.0
 triton==2.3.0
-diffusers==0.30.3
+diffusers==0.38.0
 transformers==5.0.0rc3
 matplotlib
 pandas
