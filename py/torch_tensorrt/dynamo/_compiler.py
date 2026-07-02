@@ -1079,7 +1079,9 @@ def compile_module(
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
     *,
-    graph_signature: torch.export.graph_signature.ExportGraphSignature,
+    graph_signature: Optional[
+        torch.export.graph_signature.ExportGraphSignature
+    ] = None,
     _debugger_config: Optional[DebuggerConfig] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -1113,8 +1115,13 @@ def compile_module(
 
     # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
     # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
-    user_symbol_bounds = _build_user_symbol_bounds(
-        gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
+    # graph_signature is None on the torch.compile path, which has no ExportedProgram.
+    user_symbol_bounds = (
+        _build_user_symbol_bounds(
+            gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
+        )
+        if graph_signature is not None
+        else {}
     )
 
     # Configure user compilation settings to converters.
