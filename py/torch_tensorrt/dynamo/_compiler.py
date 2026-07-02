@@ -885,7 +885,6 @@ def _insert_complex_io_adapters(
         partitioned_module.graph.lint()
         partitioned_module.recompile()
 
-
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,

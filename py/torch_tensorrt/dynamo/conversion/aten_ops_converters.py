@@ -816,6 +816,7 @@ def aten_ops_rsqrt(
     )
 
 
+@dynamo_tensorrt_converter(operator.neg, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.neg.default, supports_dynamic_shapes=True)
 def aten_ops_neg(
     ctx: ConversionContext,
@@ -2223,6 +2224,7 @@ def aten_ops_maximum(
     )
 
 
+@dynamo_tensorrt_converter(torch.sym_min, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.minimum.default, supports_dynamic_shapes=True)
 def aten_ops_minimum(
     ctx: ConversionContext,
