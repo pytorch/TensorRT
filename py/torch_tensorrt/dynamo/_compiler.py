@@ -1105,14 +1105,6 @@ def compile_module(
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
 
-    # fallback_data_dependent_ops runs data-dependent ops in PyTorch during
-    # partitioning, which cannot coexist with require_full_compilation.
-    if settings.fallback_data_dependent_ops and settings.require_full_compilation:
-        raise ValueError(
-            "fallback_data_dependent_ops runs data-dependent ops in PyTorch, which "
-            "is incompatible with require_full_compilation=True; enable only one."
-        )
-
     # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
     # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
     # graph_signature is None on the torch.compile path, which has no ExportedProgram.
