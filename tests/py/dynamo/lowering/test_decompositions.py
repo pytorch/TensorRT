@@ -8,6 +8,7 @@ from torch.testing._internal.common_cuda import (
     PLATFORM_SUPPORTS_FLASH_ATTENTION,
 )
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.lowering import get_decompositions
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
@@ -1915,6 +1916,53 @@ class TestLowering(TestCase):
             atol=ATOL,
             msg="View TRT outputs don't match with the original model.",
         )
+
+    def test_lowering_scaled_dot_product_attention_fp32_acc(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query,
+                    key,
+                    value,
+                    None,
+                    0.0,
+                    True,
+                    enable_gqa=True,
+                )
+
+        inputs = (
+            torch.randn(1, 14, 8, 64, dtype=torch.half, device="cuda"),
+            torch.randn(1, 2, 8, 64, dtype=torch.half, device="cuda"),
+            torch.randn(1, 2, 8, 64, dtype=torch.half, device="cuda"),
+        )
+        exported_program = torch.export.export(TestModule(), inputs)
+
+        for use_fp32_acc, expected_matmul_dtype in (
+            (False, torch.float16),
+            (True, torch.float32),
+        ):
+            lowered = exported_program.run_decompositions(
+                get_decompositions(
+                    decompose_attention=True,
+                    use_fp32_acc=use_fp32_acc,
+                )
+            )
+            matmuls = [
+                node
+                for node in lowered.graph.nodes
+                if node.op == "call_function"
+                and node.target
+                in {
+                    torch.ops.aten.matmul.default,
+                    torch.ops.aten.bmm.default,
+                    torch.ops.aten.mm.default,
+                }
+            ]
+            self.assertEqual(len(matmuls), 2)
+            self.assertTrue(
+                all(node.meta["val"].dtype == expected_matmul_dtype for node in matmuls)
+            )
+            self.assertEqual(lowered.module()(*inputs).dtype, torch.float16)
 
     @parameterized.expand(
         [

@@ -175,7 +175,10 @@ def cross_compile_for_windows(
         engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
         engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -186,7 +189,10 @@ def cross_compile_for_windows(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
-        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -271,8 +277,11 @@ def cross_compile_for_windows(
 
     if use_fp32_acc:
         logger.debug(
-            "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
-                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
         )
 
     # Aliasing inputs to arg_inputs for better understanding
@@ -366,6 +375,7 @@ def cross_compile_for_windows(
             enable_experimental_decompositions,
             decompose_attention,
             use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
         )
     )
 
@@ -531,7 +541,10 @@ def compile(
         engine_cache_dir (str): Directory to store the cached TRT engines
         engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -550,7 +563,10 @@ def compile(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
-        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -651,8 +667,11 @@ def compile(
 
     if use_fp32_acc:
         logger.debug(
-            "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
-                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
         )
 
     # Aliasing inputs to arg_inputs for better understanding
@@ -750,6 +769,7 @@ def compile(
             enable_experimental_decompositions,
             decompose_attention,
             use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
         )
     )
 
@@ -1347,7 +1367,10 @@ def convert_exported_program_to_serialized_trt_engine(
         engine_cache_dir (str): Directory to store the cached TRT engines
         engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -1356,7 +1379,10 @@ def convert_exported_program_to_serialized_trt_engine(
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model.
-        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:
@@ -1443,8 +1469,11 @@ def convert_exported_program_to_serialized_trt_engine(
 
     if use_fp32_acc:
         logger.debug(
-            "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
-                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
         )
 
     # Aliasing inputs to arg_inputs for better understanding
@@ -1530,6 +1559,7 @@ def convert_exported_program_to_serialized_trt_engine(
             enable_experimental_decompositions,
             decompose_attention,
             use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
         )
     )
 

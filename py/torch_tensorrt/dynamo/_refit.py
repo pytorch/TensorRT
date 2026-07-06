@@ -262,6 +262,7 @@ def refit_module_weights(
             settings.enable_experimental_decompositions,
             settings.decompose_attention,
             settings.use_distributed_mode_trace,
+            use_fp32_acc=settings.use_fp32_acc,
         )
     )
     new_gm = new_weight_module.module()
