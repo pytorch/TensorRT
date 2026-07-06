@@ -768,7 +768,7 @@ def save(
         raise ImportError(
             "Saving in ExecuTorch format requires the executorch package "
             "with executorch.exir. Install with: pip install "
-            "\"executorch\" to use output_format='executorch'."
+            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
         )
 
     def _all_are_input_objects(obj: Any) -> bool:
@@ -1315,7 +1315,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     except ImportError:
         raise ImportError(
             "ExecuTorch is not installed. Install with: pip install "
-            "\"executorch\" to use output_format='executorch'."
+            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
     from torch_tensorrt.executorch import (
