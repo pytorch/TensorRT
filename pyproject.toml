@@ -80,7 +80,7 @@ test = [
     "networkx",
     "numpy",
     "parameterized>=0.2.0",
-    "pytest>=8.2.1",
+    "pytest>=9.0.3",
     "pytest-forked>=1.6.0",
     # Emits ``::error file=...,line=...::`` annotations on test failure so
     # GitHub renders them inline on the PR's Files Changed tab. Inert when
@@ -98,7 +98,7 @@ test = [
 
 test-ext = [
     "timm>=1.0.3",
-    "transformers>=5.0.0",
+    "transformers>=5.3.0",
     "torchvision>=0.29.0.dev,<0.30.0",
     "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
 ]
