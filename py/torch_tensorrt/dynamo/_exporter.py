@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Sequence, Tuple, cast
 import torch
 from torch._export.non_strict_utils import make_constraints
 from torch._guards import detect_fake_mode
+from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export import ExportedProgram, ExportGraphSignature
 from torch.export._trace import _combine_args
@@ -21,6 +22,37 @@ from torch.export.exported_program import (
 )
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
+
+
+def _resolve_lifted_custom_obj(
+    exp_program: ExportedProgram, node: torch.fx.Node
+) -> Any:
+    # torch.export lifts custom objects into exp_program.constants keyed by their
+    # graph-signature FQN and renames the placeholder node, so constants[node.name]
+    # misses. Resolve name -> FQN through the signature mapping; the direct
+    # name/target lookup is only for legacy programs that carry no such mapping.
+    constants = getattr(exp_program, "constants", {}) or {}
+    sig = getattr(exp_program, "graph_signature", None)
+    name_to_fqn = (
+        getattr(sig, "inputs_to_lifted_custom_objs", {}) or {}
+        if sig is not None
+        else {}
+    )
+
+    obj = None
+    fqn = name_to_fqn.get(node.name)
+    if fqn is not None:
+        obj = constants.get(fqn)
+    elif not name_to_fqn:
+        for key in (node.target, node.name):
+            if key in constants:
+                obj = constants[key]
+                break
+
+    # A FakeScriptObject has no __getstate__; callers need the real object.
+    if isinstance(obj, FakeScriptObject):
+        obj = obj.real_obj
+    return obj
 
 
 def export(

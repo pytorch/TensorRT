@@ -10,6 +10,7 @@ from executorch.exir.backend.backend_details import (
     PreprocessResult,
 )
 from torch.export.exported_program import ExportedProgram
+from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     DEVICE_IDX,
     ENGINE_IDX,
@@ -135,14 +136,13 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
                 f"'{engine_node.target}' not found on graph module"
             )
     elif engine_node.op == "placeholder":
-        constants = getattr(edge_program, "constants", {})
-        engine_obj = constants.get(engine_node.name) or constants.get(
-            engine_node.target
-        )
+        engine_obj = _resolve_lifted_custom_obj(edge_program, engine_node)
         if engine_obj is None:
             raise RuntimeError(
                 f"execute_engine node '{node.name}': placeholder engine "
-                f"'{engine_node.name}' not found in edge_program.constants"
+                f"'{engine_node.name}' did not resolve to a lifted custom-object "
+                f"constant (available: "
+                f"{sorted(getattr(edge_program, 'constants', {}) or {})})"
             )
     else:
         raise RuntimeError(
