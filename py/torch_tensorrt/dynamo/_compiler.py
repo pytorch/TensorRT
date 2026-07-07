@@ -915,7 +915,7 @@ def _build_user_symbol_bounds(
 
     in_spec = getattr(gm, "_in_spec", None)
     assert in_spec is not None, "Exported graph module missing _in_spec"
-    flat_inputs = in_spec.flatten_up_to((list(sample_arg_inputs), sample_kwarg_inputs))
+    flat_inputs = in_spec.flatten_up_to((tuple(sample_arg_inputs), sample_kwarg_inputs))
 
     user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
 
