@@ -17,6 +17,7 @@ shape we add a small no-op (``+ 0``) to the cache so it isn't a direct
 network input — the converter's "input is a placeholder" check fails and
 falls through to scatter.
 """
+
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests

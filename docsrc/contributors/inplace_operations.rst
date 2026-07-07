@@ -30,7 +30,12 @@ Implementation Status
   * The C++ runtime (``execute_engine``) honors the map: aliased outputs
     skip ``at::empty`` allocation, bind to the source input's ``data_ptr``,
     and are filtered from the user-facing return tuple. Pre-allocated
-    outputs are disabled when aliased I/O is present.
+    outputs are disabled entirely when the engine has aliased I/O: an
+    aliased output reuses the caller's input storage (there is no
+    allocation to amortize), and caching would pin a caller-owned tensor
+    across calls. Outputs are allocated fresh each call, and a warning is
+    logged if ``use_pre_allocated_outputs`` was requested on an aliased
+    engine.
   * ``TRTEngine`` constructor reconciles its build-time map against
     ``ICudaEngine::getAliasedInputTensor`` so the TRT API is the source of
     truth even for engines built outside Torch-TensorRT.
@@ -86,10 +91,13 @@ KVCacheUpdate Operator
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``IKVCacheUpdateLayer`` performs ``output[i, :, writeIndices[i] + s, :] =
-update[i, :, s, :]`` and aliases ``output`` to ``cache``. Inputs:
+update[i, :, s, :]`` and aliases ``output`` to ``cache``. The cache layout is
+``[batch, num_heads, s_max, head_dim]`` — the sequence axis (written to) is
+axis 2. Inputs:
 
-* ``cache`` — shape ``[b, d, s_max, h]``, network input, static ``s_max``.
-* ``update`` — shape ``[b, d, s, h]`` with ``s ≤ s_max``.
+* ``cache`` — shape ``[b, num_heads, s_max, head_dim]``, network input, static
+  ``s_max``.
+* ``update`` — shape ``[b, num_heads, s, head_dim]`` with ``s ≤ s_max``.
 * ``writeIndices`` — shape ``[b]``, ``int32`` or ``int64``, satisfying
   ``writeIndices[i] + s <= s_max``.
 
@@ -179,7 +187,8 @@ aliasing intent.
 A second lowering sub-pass detects KV-cache-shaped patterns among the
 aliased-output nodes:
 
-* Scatter or ``index_put`` into a tensor of shape ``[b, d, s_max, h]``.
+* Scatter or ``index_put`` into a tensor of shape
+  ``[b, num_heads, s_max, head_dim]``.
 * ``writeIndices`` is a ``[b]``-shaped integer tensor.
 * ``s_max`` is static.
 
@@ -217,24 +226,32 @@ This map is the bridge from build-time intent to the runtime engine object.
 C++ Runtime Changes
 ^^^^^^^^^^^^^^^^^^^^
 
-All runtime work lives under ``core/runtime/``. The Python runtime
-(``PythonTorchTensorRTModule``) is not modified by this design.
+All runtime work lives under ``core/runtime/``.
 
 ``TRTEngine`` (``core/runtime/TRTEngine.h``)
    Add one field::
 
        std::unordered_map<std::string, std::string> aliased_io;  // out → in
 
-   Populated from two sources:
+   Populated once at construction from two sources:
 
    1. The serialized engine metadata (see :ref:`serialization_format`).
-   2. **Source-of-truth reconciliation at deserialize time:** for every output
-      binding, query ``cuda_engine->getAliasedInputTensor(out_name)`` and merge
-      the result into ``aliased_io``. The TRT API is authoritative; the
-      serialized map is a cache that allows the runtime to avoid a per-call
-      query and lets engines built from external TensorRT plans (e.g. via
-      ``IKVCacheUpdateLayer`` from a non-Torch-TRT build flow) be loaded
-      transparently.
+   2. **Source-of-truth reconciliation:** for every output binding, query
+      ``cuda_engine->getAliasedInputTensor(out_name)`` and merge the result
+      into ``aliased_io``. This runs a single time in the ``TRTEngine``
+      constructor, not per execution, so the reconstructed map is reused across
+      all calls.
+
+   For the ``kv_cache_update`` kind the two sources are redundant: the engine
+   reports the same aliasing through ``getAliasedInputTensor``, so reconciliation
+   alone can rebuild it — this is what lets engines built from external TensorRT
+   plans (e.g. via ``IKVCacheUpdateLayer`` from a non-Torch-TRT build flow) load
+   transparently even with an empty serialized map. The serialized metadata is
+   therefore strictly required only for the ``user`` kind, which TRT has no API
+   to report, and to preserve the ``kind`` tag. We still serialize the KV
+   entries for completeness and self-description; dropping them for KV-only
+   engines and relying entirely on reconciliation would be a valid future
+   simplification.
 
 ``execute_engine`` (``core/runtime/execute_engine.cpp``)
    Three narrow changes:
@@ -284,6 +301,82 @@ CUDA Graph capture
    addresses. The user-supplied input tensor's ``data_ptr()`` must be stable
    across replays; if the caller passes a different tensor each call, capture
    is invalidated, the same as today for non-aliased inputs.
+
+Python Runtime Changes
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The pure-Python runtime mirrors the C++ engine so a compiled artifact behaves
+identically on either runtime. It honors aliased I/O natively — it does **not**
+merely warn and fall back to fresh allocation. All work lives under
+``py/torch_tensorrt/dynamo/runtime/_TRTEngine.py``.
+
+``TRTEngine`` (``_TRTEngine.py``)
+   Add one field::
+
+       self.aliased_io: Dict[str, Tuple[str, str]]  # out_name → (in_name, kind)
+
+   Populated once at setup from two sources, exactly like the C++ constructor:
+
+   1. The serialized engine metadata (``ALIASED_IO_IDX``), decoded in
+      ``_load_serialized_info`` (see :ref:`serialization_format`).
+   2. **Source-of-truth reconciliation:** ``_reconcile_aliased_io`` queries
+      ``cuda_engine.get_aliased_input_tensor(out_name)`` for every output and
+      merges the result. This runs a single time at setup, not per execution.
+
+   ``kind="user"`` entries are preserved (TRT has no API to report them); a
+   ``kv_cache_update`` alias the engine reports but the serialized map lacks is
+   discovered; a disagreement is resolved in favor of the engine. The pass also
+   recomputes ``aliased_input_binding_names`` so the per-call input loop tests
+   membership in O(1) (parallel to the C++ ``input_binding_infos`` ``is_aliased``
+   flag).
+
+``execute`` (``_execute_standard`` / ``setup_input_tensors`` / ``create_output_tensors``)
+   Three narrow changes:
+
+   1. **Input binding** — ``setup_input_tensors`` records each contiguous input's
+      tensor keyed by binding name into ``self._bound_inputs_by_name``. For an
+      aliased input it binds the user's tensor directly and skips the cudagraph
+      persistent staging-buffer clone (staging would break the aliasing).
+
+   2. **Output binding** — branch:
+
+      .. code-block:: python
+
+          alias = self.aliased_io.get(output_name)
+          if alias is not None:
+              # Aliased output: reuse the source input tensor by identity, do
+              # NOT allocate, and bind the engine output to the same data_ptr.
+              aliased_input = self._bound_inputs_by_name[alias[0]]
+              outputs.append(aliased_input)
+              self.context.set_tensor_address(output_name, aliased_input.data_ptr())
+          else:
+              out = torch.empty(self.output_shapes[idx], ...)
+              outputs.append(out)
+              self.context.set_tensor_address(output_name, out.data_ptr())
+
+      (allocation/identity reuse lives in ``create_output_tensors``; the address
+      binding and the cudagraph output-staging bypass live in
+      ``_execute_standard``.)
+
+   3. **Shape consistency check** — ``create_output_tensors`` asserts
+      ``aliased_input.shape == output_shape`` before reusing the input's storage;
+      a mismatch aborts rather than silently corrupting memory.
+
+   Pre-allocated outputs are disabled entirely when ``aliased_io`` is non-empty
+   (via the ``has_aliased_io`` argument to
+   ``TorchTRTRuntimeStates.set_runtime_states`` and the cache-refresh guard); a
+   warning is logged if ``use_pre_allocated_outputs`` was requested on an aliased
+   engine.
+
+Output allocator interaction
+   As in C++, the dynamic output-allocator path is incompatible with aliasing.
+   ``_reconcile_aliased_io`` raises ``RuntimeError`` if an aliased output is
+   present while ``requires_output_allocator`` is set.
+
+Stream and synchronization / CUDA Graph capture
+   Unchanged and identical to the C++ runtime: aliased I/O is a pointer-identity
+   trick, so the stream choreography and cudagraph record/replay paths behave the
+   same as above, minus the aliased output-staging copy-back.
 
 .. _serialization_format:
 
@@ -404,6 +497,29 @@ Both the user-passed-cache pattern (caller owns the cache) and the
 buffer-backed pattern (module owns the cache) work and produce identical
 results.
 
+Side effects on non-KV buffer mutations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``lift_mutated_buffers`` keys off the generic ``aten.copy_(get_attr, _)``
+marker, not off the KV-cache shape, so it lifts *every* mutated buffer — not
+only KV caches. This changes how any buffer-mutating module is compiled: the
+mutated buffer becomes an engine input binding and its trailing ``copy_`` is
+dropped, whereas previously it was constant-folded into the engine.
+
+For a mutation that also matches the KV-cache fast path this is the whole
+point — the engine aliases the output back into the buffer's storage and the
+mutation is observable across calls. For a mutation that does **not** match
+the fast path (wrong rank/shape/dim, dynamic ``s_max``, a plain elementwise
+``copy_``), the converter falls back to the scatter path and the output is
+**not** aliased. The buffer is still lifted to an input and threaded through
+``BufferThreadingModule``, so the mutated value is produced and carried
+forward correctly, but without the in-place aliasing benefit — behavior is
+equivalent to the pre-existing copy-back, just wired through a binding rather
+than a folded constant. Ordinary functional ``.copy_`` residue that is *not*
+a ``get_attr`` buffer mutation (e.g. the functionalization tail of an
+in-place op on an activation) does not match the ``get_attr`` first-arg
+pattern and is left untouched.
+
 Constraints and Known Limitations
 ----------------------------------
 
@@ -451,7 +567,7 @@ Tier B network-build API
 ZoomASR fit
    The KVCacheUpdate constraints (static ``s_max``, K/V split, ``[b, d, s_max,
    h]`` layout) need confirmation against the ZoomASR cache layout. If the
-   model uses a different memory layout (e.g. ``[b, s_max, d, h]``) a
+   model uses a different memory layout (e.g. ``[b, s_max, num_heads, head_dim]``) a
    ``permute`` may be required, and the cost of that permute may exceed the
    savings from aliasing. A small benchmark on the actual model is the
    gating criterion before investing in pattern-matching.

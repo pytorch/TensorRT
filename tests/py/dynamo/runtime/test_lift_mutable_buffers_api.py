@@ -16,14 +16,14 @@ caller. These tests exercise that caller-managed workflow end-to-end:
 4. Thread the buffer values in on each call and verify in-place
    mutation works (cache state persists across calls).
 """
+
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.export import export
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_engine
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
-
-import tensorrt as trt
 
 
 def _introspect_engine(engine_bytes):

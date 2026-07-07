@@ -44,6 +44,7 @@ SerializedTorchTensorRTModuleFmt = Tuple[
     List[str],
 ]
 
+
 def user_output_count(
     output_binding_names: List[str], aliased_io: Dict[str, Tuple[str, str]]
 ) -> int:
@@ -81,7 +82,7 @@ def serialize_aliased_io(aliased_io: Dict[str, Tuple[str, str]]) -> str:
             f"{out_name}{SERIALIZED_ALIASED_IO_FIELD_DELIM}{in_name}"
             f"{SERIALIZED_ALIASED_IO_FIELD_DELIM}{kind}"
         )
-    return SERIALIZED_ALIASED_IO_RECORD_DELIM.join(parts)
+    return str(SERIALIZED_ALIASED_IO_RECORD_DELIM.join(parts))
 
 
 def deserialize_aliased_io(s: str) -> Dict[str, Tuple[str, str]]:
@@ -433,7 +434,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         else:
             # Strategies cross the boundary as ints (TorchBind ``int64_t``,
             # mirroring the nvinfer1 enum integers on the cpp side).
-            self.engine.update_runtime_settings(
+            self.get_engine().update_runtime_settings(
                 _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP[
                     rs.dynamic_shapes_kernel_specialization_strategy
                 ],

@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
@@ -26,8 +27,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-
-from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -1101,6 +1100,10 @@ def _index_copy_kv_eligible(
     if input_shape[0] != 1:
         return False  # batch > 1 deferred; see index_copy.index_copy_kv
 
+    # IKVCacheUpdateLayer scatters along the sequence axis, which is axis 2 in
+    # the KV-cache layout it requires: ``[batch, num_heads, s_max, head_dim]``.
+    # A write on any other axis is not a cache-position update and cannot be
+    # expressed by the layer, so it must fall through to the scatter fallback.
     if dim != 2:
         return False
 
@@ -1184,7 +1187,7 @@ def aten_ops_slice_scatter(
         name,
         input=args[0],
         src=args[1],
-        dim=args[2],
+        dim=args_bounds_check(args, 2, 0),
         start=args_bounds_check(args, 3),
         end=args_bounds_check(args, 4),
         step=args_bounds_check(args, 5),

@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "ATen/core/function_schema.h"
@@ -110,7 +111,9 @@ struct TorchTRTRuntimeStates {
     if (new_cudagraphs && (!old_cudagraphs || shape_changed || context_changed)) {
       need_cudagraphs_record = true;
     }
-    // Pre-allocated output can be used when previous and current state are true without shape change
+    // Pre-allocated output can be used when previous and current state are true without shape change.
+    // Note: engines with aliased I/O disable pre-allocation entirely; that gating lives in
+    // execute_engine (which has access to the engine's aliased_io map) rather than here.
     if (old_pre_allocated_outputs && new_pre_allocated_output && !shape_changed) {
       can_use_pre_allocated_outputs = true;
     }
@@ -180,6 +183,12 @@ struct TRTEngine : torch::CustomClassHolder {
   // consults this map in the output-binding loop to skip allocation and bind
   // the same device pointer as the source input.
   std::unordered_map<std::string, AliasedIOSpec> aliased_io = {};
+
+  // The set of input binding names that are the alias source of some output.
+  // Derived once from aliased_io at construction so the per-call input-setup
+  // loop can test membership in O(1) instead of scanning aliased_io on every
+  // input, every execution.
+  std::unordered_set<std::string> aliased_input_binding_names = {};
 
   bool hardware_compatible = false; // Whether the engine was compiled in hardware compatible mode
   std::string serialized_metadata; // This is a base64 encoded pkl object used to store metadata such as settings used
@@ -265,6 +274,10 @@ struct TRTEngine : torch::CustomClassHolder {
     std::string name;
     at::ScalarType expected_type;
     bool is_shape_tensor;
+    // True when this input is the alias source of some output binding. Precomputed
+    // here so the per-call input-setup loop avoids an aliased_input_binding_names
+    // lookup on every input, every execution.
+    bool is_aliased_input;
   };
   std::vector<InputBindingInfo> input_binding_infos = {};
   std::vector<at::Tensor> active_input_tensors = {};

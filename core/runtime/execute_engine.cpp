@@ -145,14 +145,10 @@ void setup_input_tensors(
       // aliased input we deliberately bind to the user's tensor instead, so
       // the engine writes through to the user's storage. The user is already
       // required to pass stable input addresses under cudagraphs, so the
-      // aliasing contract is compatible.
-      bool is_aliased_input = false;
-      for (const auto& kv : compiled_engine->aliased_io) {
-        if (kv.second.input_binding_name == name) {
-          is_aliased_input = true;
-          break;
-        }
-      }
+      // aliasing contract is compatible. Membership is precomputed at engine
+      // construction (InputBindingInfo::is_aliased_input) to avoid rescanning
+      // aliased_io on every input, every execution.
+      const bool is_aliased_input = binding.is_aliased_input;
 
       if (need_cudagraphs_record && !is_aliased_input) {
         // Create a persistent CUDA graph input staging buffer with a stable replay address.
@@ -346,6 +342,23 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     bool can_use_pre_allocated_outputs = std::get<1>(result);
     bool need_cudagraphs_reset = std::get<2>(result);
 
+    // Pre-allocated outputs are disabled entirely for engines with aliased I/O.
+    // An aliased output reuses the caller's input storage, so there is no
+    // allocation to amortize by caching, and caching would pin a caller-owned
+    // tensor across calls. Only the non-aliased outputs could benefit, and that
+    // win is too small to justify the extra staleness/lifetime surface. See the
+    // cache-refresh guard below, which is the counterpart to this one.
+    if (!compiled_engine->aliased_io.empty()) {
+      if (compiled_engine->use_pre_allocated_outputs) {
+        LOG_WARNING(
+            "pre_allocated_outputs is enabled but this engine has aliased I/O; "
+            "pre-allocation is disabled for aliased engines (aliased outputs reuse "
+            "the caller's input storage, so there is nothing to pre-allocate). "
+            "Outputs are allocated fresh each call.");
+      }
+      can_use_pre_allocated_outputs = false;
+    }
+
     if (need_cudagraphs_reset) {
       compiled_engine->cudagraph.reset();
     }
@@ -367,8 +380,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(
-          inputs, compiled_engine, effective_cudagraphs, need_cudagraphs_record, bound_inputs_by_name);
+      setup_input_tensors(inputs, compiled_engine, effective_cudagraphs, need_cudagraphs_record, bound_inputs_by_name);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
@@ -387,6 +399,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
       }
       if (can_use_pre_allocated_outputs) {
+        // Never reached for engines with aliased I/O: can_use_pre_allocated_outputs
+        // is forced false above when aliased_io is non-empty, so cached outputs
+        // never hold an aliased (caller-owned) slot.
         outputs = compiled_engine->pre_allocated_outputs;
       } else {
         outputs = create_output_tensors(compiled_engine, bound_inputs_by_name);
@@ -483,16 +498,14 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     compiled_engine->clear_active_input_tensors();
 
     // When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first
-    // execution or when shape is changed. If the engine has aliased outputs we
-    // disable pre-allocation entirely: aliased outputs share storage with
-    // user-supplied inputs that may change between calls, so caching the
-    // tensor reference would lead to writes against stale storage.
-    if (compiled_engine->use_pre_allocated_outputs && !compiled_engine->aliased_io.empty()) {
-      LOG_DEBUG(
-          "Skipping pre_allocated_outputs cache because engine has aliased I/O; "
-          "aliased outputs reuse the user's input storage on every call.");
-    } else if (
-        compiled_engine->use_pre_allocated_outputs &&
+    // execution or when shape is changed.
+    //
+    // Disabled entirely for engines with aliased I/O: an aliased output reuses
+    // the caller's input storage (no allocation to amortize), and caching would
+    // pin a caller-owned tensor across calls. This mirrors the
+    // can_use_pre_allocated_outputs gate above so the cache is never populated
+    // for aliased engines in the first place.
+    if (compiled_engine->use_pre_allocated_outputs && compiled_engine->aliased_io.empty() &&
         (compiled_engine->pre_allocated_outputs.size() == 0 || compiled_engine->output_tensors_are_unowned ||
          shape_changed)) {
       compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine, bound_inputs_by_name);

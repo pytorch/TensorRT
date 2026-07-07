@@ -6,6 +6,7 @@ dynamic dim), the static converter path doesn't apply. The lowering pass
 rewrites the op into ``arange + view + expand + scatter`` so each piece
 hits its existing dynamic-shape converter.
 """
+
 import unittest
 
 import torch
@@ -110,10 +111,10 @@ class TestStaticPathPreserved(TestCase):
         ep = export(model, (cache, src))
         # The lowering pass should leave this node alone — confirm by
         # checking the post-lowering graph still contains slice_scatter.
+        from torch_tensorrt.dynamo._settings import CompilationSettings
         from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
             post_lowering,
         )
-        from torch_tensorrt.dynamo._settings import CompilationSettings
 
         gm = post_lowering(ep.module(), CompilationSettings())
         targets = [n.target for n in gm.graph.nodes if n.op == "call_function"]

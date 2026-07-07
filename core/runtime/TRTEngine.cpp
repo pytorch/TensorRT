@@ -284,11 +284,6 @@ TRTEngine::TRTEngine(
   }
 
   has_dynamic_inputs = engine_has_dynamic_inputs(cuda_engine.get(), in_binding_names);
-  // Cache input binding metadata used by the runtime hot path, then reconstruct
-  // optimization-profile info from the TRT API so multi-profile selection works
-  // for any loaded engine.
-  this->setup_input_binding_infos();
-  this->setup_optimization_profiles();
 
   // Store the build-time aliased_io map as the starting point. Then reconcile
   // against ICudaEngine::getAliasedInputTensor — that API is the source of
@@ -308,6 +303,10 @@ TRTEngine::TRTEngine(
     if (it == this->aliased_io.end()) {
       this->aliased_io[out_name] = AliasedIOSpec{std::string(aliased_in), AliasKind::kKVCacheUpdate};
       LOG_DEBUG("aliased_io reconciliation: discovered " << out_name << " -> " << aliased_in << " (kv_cache_update)");
+    } else if (it->second.kind == AliasKind::kUser) {
+      // A kUser alias is declared by Torch-TensorRT, not TRT. TRT does not track
+      // user-declared aliases, so its view is not authoritative here; keep the
+      // build-time value (and kUser kind) as-is.
     } else if (it->second.input_binding_name != std::string(aliased_in)) {
       LOG_WARNING(
           "aliased_io: build-time map disagrees with engine for output "
@@ -315,14 +314,29 @@ TRTEngine::TRTEngine(
           << "); using engine value.");
       it->second = AliasedIOSpec{std::string(aliased_in), AliasKind::kKVCacheUpdate};
     }
-    // Validation: aliased outputs must not also require an output allocator,
-    // since aliasing requires the output shape to match the input's static
-    // shape, which is incompatible with the dynamic-allocation path.
+  }
+
+  // Precompute the set of input binding names that are the alias source of some
+  // output (for the O(1) per-call membership test) and validate every aliased
+  // output against the output allocator. The reconciliation loop above is
+  // engine-driven and only visits kv_cache_update outputs; user-declared aliases
+  // are never reported by TRT, so iterating the merged map here is what covers
+  // them too. Aliasing binds an output to an input's static storage, which is
+  // incompatible with the dynamic-allocation output-allocator path.
+  this->aliased_input_binding_names.clear();
+  for (const auto& kv : this->aliased_io) {
     TORCHTRT_CHECK(
         !this->requires_output_allocator,
-        "Aliased output " << out_name
+        "Aliased output " << kv.first
                           << " is incompatible with dynamic output allocator. Aliasing requires fixed output shape.");
+    this->aliased_input_binding_names.insert(kv.second.input_binding_name);
   }
+
+  // Cache input binding metadata used by the runtime hot path (depends on
+  // aliased_input_binding_names above), then reconstruct optimization-profile
+  // info from the TRT API so multi-profile selection works for any loaded engine.
+  this->setup_input_binding_infos();
+  this->setup_optimization_profiles();
 
 #ifndef NDEBUG
   this->enable_profiling();
@@ -611,7 +625,8 @@ void TRTEngine::setup_input_binding_infos() {
     input_binding_infos.push_back(
         {name,
          util::TRTDataTypeToScalarType(cuda_engine->getTensorDataType(name.c_str())),
-         cuda_engine->isShapeInferenceIO(name.c_str())});
+         cuda_engine->isShapeInferenceIO(name.c_str()),
+         aliased_input_binding_names.find(name) != aliased_input_binding_names.end()});
   }
 }
 

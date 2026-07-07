@@ -8,7 +8,9 @@ from torch.testing._internal.common_cuda import (
     PLATFORM_SUPPORTS_FLASH_ATTENTION,
 )
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import post_lowering
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
@@ -862,25 +864,19 @@ class TestLowering(TestCase):
         )
         fx_graph = exported_program.module()
 
-        expected_ops = {torch.ops.aten.scatter.src}
-        unexpected_ops = {torch.ops.aten.slice_scatter.default}
-        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
-            fx_graph,
-            list(example_inputs),
-            expected_ops=expected_ops,
-            unexpected_ops=unexpected_ops,
-            min_block_size=1,
+        lowered_graph = post_lowering(fx_graph, CompilationSettings())
+        lowered_ops = {
+            node.target
+            for node in lowered_graph.graph.nodes
+            if node.op == "call_function"
+        }
+        self.assertNotIn(
+            torch.ops.aten.slice_scatter.default,
+            lowered_ops,
         )
-
-        self.assertEqual(
-            len(unexpected_ops_seen),
-            0,
-            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
-        )
-        self.assertEqual(
-            len(expected_ops_unseen),
-            0,
-            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        self.assertIn(
+            torch.ops.aten.scatter.src,
+            lowered_ops,
         )
 
         torch._dynamo.reset()
@@ -922,25 +918,19 @@ class TestLowering(TestCase):
         )
         fx_graph = exported_program.module()
 
-        expected_ops = {torch.ops.aten.scatter.src}
-        unexpected_ops = {torch.ops.aten.slice_scatter.default}
-        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
-            fx_graph,
-            list(example_inputs),
-            expected_ops=expected_ops,
-            unexpected_ops=unexpected_ops,
-            min_block_size=1,
+        lowered_graph = post_lowering(fx_graph, CompilationSettings())
+        lowered_ops = {
+            node.target
+            for node in lowered_graph.graph.nodes
+            if node.op == "call_function"
+        }
+        self.assertNotIn(
+            torch.ops.aten.slice_scatter.default,
+            lowered_ops,
         )
-
-        self.assertEqual(
-            len(unexpected_ops_seen),
-            0,
-            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
-        )
-        self.assertEqual(
-            len(expected_ops_unseen),
-            0,
-            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        self.assertIn(
+            torch.ops.aten.scatter.src,
+            lowered_ops,
         )
 
         torch._dynamo.reset()

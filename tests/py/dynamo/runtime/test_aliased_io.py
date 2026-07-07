@@ -20,11 +20,17 @@ These tests exercise the full pipeline:
   return tuple.
 * For buffer-style models, ``lift_mutated_buffers`` rewrites the EP and
   ``BufferThreadingModule`` threads buffers through each call.
+
+The Python runtime (:class:`~torch_tensorrt.dynamo.runtime._TRTEngine.TRTEngine`)
+also honors aliasing by binding the aliased output to the source input's
+storage; :class:`TestPythonRuntimeAliasedIO` exercises that path directly.
 """
+
 import torch
 import torch_tensorrt
 from torch.export import export
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
 
 def _compile_cpp(model, args):
@@ -266,6 +272,69 @@ class TestAliasedIORegressions(TestCase):
         got = compiled(x, y).item()
         expected = M().cuda()(x, y).item()
         self.assertAlmostEqual(got, expected, places=3)
+
+
+class TestPythonRuntimeAliasedIO(TestCase):
+    """The Python ``TRTEngine`` honors aliasing (in-place write-through).
+
+    In a build with the C++ runtime available, ``TorchTensorRTModule`` always
+    backs itself with the C++ engine, so we drive the Python ``TRTEngine``
+    directly from the compiled module's serialized info (the same tuple both
+    runtimes consume) to exercise its aliasing path.
+    """
+
+    def _python_engine_for(self, model, args):
+        compiled = _compile_cpp(model, args)
+        for _name, mod in compiled.named_modules():
+            if hasattr(mod, "aliased_io") and mod.aliased_io:
+                return TRTEngine(mod._pack_engine_info())
+        raise AssertionError("no aliased inner module found")
+
+    def _ordered_inputs(self, engine, aliased_tensor, other_tensor):
+        aliased_in = next(iter(engine.aliased_io.values()))[0]
+        return [
+            aliased_tensor if name == aliased_in else other_tensor
+            for name in engine.in_binding_names
+        ]
+
+    def test_in_place_write_through(self):
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                cache[:, :, 3:4, :] = update
+                return cache.sum()
+
+        cache = torch.zeros(2, 4, 16, 8, device="cuda")
+        update = torch.ones(2, 4, 1, 8, device="cuda") * 7.0
+        engine = self._python_engine_for(M().cuda(), (cache.clone(), update.clone()))
+
+        # The alias source input is flagged for the fast path.
+        self.assertEqual(engine.aliased_input_binding_names, {"cache"})
+
+        run_cache = cache.clone()
+        ptr_before = run_cache.data_ptr()
+        engine.execute(self._ordered_inputs(engine, run_cache, update))
+
+        eager = cache.clone()
+        eager[:, :, 3:4, :] = update
+        # Written in place, same storage, matches eager.
+        self.assertEqual(run_cache.data_ptr(), ptr_before)
+        self.assertTrue(torch.allclose(run_cache, eager))
+
+    def test_streaming_state_accumulates(self):
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                cache[:, :, 3:4, :] = update
+                return cache.sum()
+
+        proto = torch.zeros(2, 4, 16, 8, device="cuda")
+        upd = torch.ones(2, 4, 1, 8, device="cuda")
+        engine = self._python_engine_for(M().cuda(), (proto.clone(), upd.clone()))
+
+        cache = torch.zeros(2, 4, 16, 8, device="cuda")
+        engine.execute(self._ordered_inputs(engine, cache, torch.ones_like(upd) * 1.0))
+        self.assertAlmostEqual(cache.sum().item(), 64.0, places=3)
+        engine.execute(self._ordered_inputs(engine, cache, torch.ones_like(upd) * 5.0))
+        self.assertAlmostEqual(cache.sum().item(), 320.0, places=3)
 
 
 if __name__ == "__main__":

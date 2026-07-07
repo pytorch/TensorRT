@@ -40,9 +40,7 @@ def decompose_dynamic_slice_scatter(
         end: Optional[Any] = args[4] if len(args) > 4 else None
         step: Optional[Any] = args[5] if len(args) > 5 else None
 
-        is_dynamic = any(
-            isinstance(x, torch.fx.Node) for x in (start, end, step)
-        )
+        is_dynamic = any(isinstance(x, torch.fx.Node) for x in (start, end, step))
         if not is_dynamic:
             continue
 
@@ -61,34 +59,39 @@ def decompose_dynamic_slice_scatter(
             step = 1
 
         with gm.graph.inserting_before(node):
-            if end is None:
-                end_node = gm.graph.call_function(
-                    torch.ops.aten.sym_size.int, (input_node, dim)
-                )
-            else:
-                end_node = end
 
-            arange_node = gm.graph.call_function(
+            src_val = src_node.meta.get("val")
+
+            def src_size(i: int) -> Any:
+                size = src_val.shape[i] if src_val is not None else None
+                if isinstance(size, int):
+                    return size
+                return gm.graph.call_function(
+                    torch.ops.aten.sym_size.int, (src_node, i)
+                )
+
+            offsets_node = gm.graph.call_function(
                 torch.ops.aten.arange.start_step,
-                (start, end_node, step),
+                (0, src_size(dim), 1),
                 {
                     "dtype": torch.int64,
                     "device": input_val.device,
                 },
             )
+            scaled_offsets_node = gm.graph.call_function(
+                torch.ops.aten.mul.Tensor, (offsets_node, step)
+            )
+            indices_node = gm.graph.call_function(
+                torch.ops.aten.add.Tensor, (scaled_offsets_node, start)
+            )
 
             view_shape = [-1 if i == dim else 1 for i in range(rank)]
             view_node = gm.graph.call_function(
                 torch.ops.aten.view.default,
-                (arange_node, view_shape),
+                (indices_node, view_shape),
             )
 
-            expand_size = [
-                gm.graph.call_function(
-                    torch.ops.aten.sym_size.int, (src_node, i)
-                )
-                for i in range(rank)
-            ]
+            expand_size = [src_size(i) for i in range(rank)]
             expand_node = gm.graph.call_function(
                 torch.ops.aten.expand.default,
                 (view_node, expand_size),
@@ -110,8 +113,6 @@ def decompose_dynamic_slice_scatter(
 
     if changed:
         gm = clean_up_graph_after_modifications(gm)
-        logger.debug(
-            "After decompose_dynamic_slice_scatter:\n%s", gm.graph
-        )
+        logger.debug("After decompose_dynamic_slice_scatter:\n%s", gm.graph)
 
     return gm

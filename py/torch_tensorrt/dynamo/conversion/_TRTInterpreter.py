@@ -15,6 +15,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -51,8 +52,6 @@ from torch_tensorrt.dynamo.utils import (
     validate_optimization_profiles,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -806,8 +805,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
             # Capture identity before any cast — we use it to find aliasing.
             original_id = id(output)
+            # If this output was emitted by an aliased layer (e.g.
+            # IKVCacheUpdateLayer), it shares storage with its source input.
+            alias_info = aliased_info_by_id.get(original_id)
 
-            if output_dtype is not dtype.unknown:
+            # Skip the dtype cast for aliased outputs: a cast inserts a new
+            # layer whose output no longer shares storage with the source
+            # input, which would break engine-level aliasing. Aliased outputs
+            # already carry the correct dtype (they alias the input's buffer),
+            # so no cast is needed.
+            if alias_info is None and output_dtype is not dtype.unknown:
                 output = self._cast_output_dtype(
                     output,
                     output_dtype.to(trt.DataType, use_default=True),
@@ -820,28 +827,17 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
             self._output_names.append(name)
 
-            # If this output was emitted by an aliased layer (e.g. IKVCacheUpdateLayer),
-            # carry the alias to the final binding name. A cast layer inserted
-            # above would break engine-level aliasing — warn instead of recording.
-            alias_info = aliased_info_by_id.get(original_id)
+            # Carry the alias to the final binding name so the runtime can bind
+            # the output to its source input's storage.
             if alias_info is not None:
                 aliased_input, kind_str = alias_info
-                if output_dtype is not dtype.unknown and id(output) != original_id:
-                    _LOGGER.warning(
-                        "Output %s was aliased to input %s (kind=%s) but a dtype cast "
-                        "was inserted; engine-level aliasing is broken for this output.",
-                        name,
-                        aliased_input,
-                        kind_str,
-                    )
-                else:
-                    self._aliased_io[name] = (aliased_input, kind_str)
-                    _LOGGER.debug(
-                        "Output %s aliased to input %s (kind=%s)",
-                        name,
-                        aliased_input,
-                        kind_str,
-                    )
+                self._aliased_io[name] = (aliased_input, kind_str)
+                _LOGGER.debug(
+                    "Output %s aliased to input %s (kind=%s)",
+                    name,
+                    aliased_input,
+                    kind_str,
+                )
 
             _LOGGER.debug(
                 f"Marking output {name} [shape={output.shape}, dtype={output.dtype}]"

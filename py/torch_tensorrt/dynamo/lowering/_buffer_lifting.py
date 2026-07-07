@@ -216,10 +216,29 @@ def inline_lifted_buffers_into_gm(
     placeholder_to_buf: Dict[str, str] = {
         ph_name: buf_name for ph_name, buf_name, _ in lifted_buffers
     }
-    # Register buffers as module state. Clone so the gm owns its own storage.
+    # Register buffers as module state, mapping each original buffer name to the
+    # attribute name it is registered under. ``nn.Module.register_buffer``
+    # rejects names containing "." and ``get_attr`` on a dotted target would
+    # traverse submodules that no longer exist on this flattened GraphModule
+    # (e.g. HF's ``model.layers.0.k_cache``). Flat names keep their original
+    # name to preserve ``state_dict`` keys; nested names are sanitized to a
+    # unique flat attribute. Clone so the gm owns its own storage.
+    buf_to_attr: Dict[str, str] = {}
     for _ph_name, buf_name, tensor in lifted_buffers:
-        if not hasattr(gm, buf_name):
-            gm.register_buffer(buf_name, tensor.clone())
+        if buf_name in buf_to_attr:
+            continue
+        if "." in buf_name:
+            attr_name = "lifted_buf_" + buf_name.replace(".", "_")
+            base = attr_name
+            suffix = 0
+            while hasattr(gm, attr_name):
+                suffix += 1
+                attr_name = f"{base}_{suffix}"
+        else:
+            attr_name = buf_name
+        if not hasattr(gm, attr_name):
+            gm.register_buffer(attr_name, tensor.clone())
+        buf_to_attr[buf_name] = attr_name
 
     # Find placeholders we need to replace. Insert get_attr nodes BEFORE
     # removing the placeholders so the graph remains valid throughout.
@@ -231,7 +250,7 @@ def inline_lifted_buffers_into_gm(
             continue
         buf_name = placeholder_to_buf[node.name]
         with gm.graph.inserting_after(node):
-            get_attr_node = gm.graph.get_attr(buf_name)
+            get_attr_node = gm.graph.get_attr(buf_to_attr[buf_name])
         # Carry over fake-tensor metadata so downstream passes see the right
         # shape/dtype.
         if "val" in node.meta:
