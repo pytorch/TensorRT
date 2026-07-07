@@ -180,7 +180,9 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
         max_shape=(8, 8),
         dtype=torch.float32,
     )
-    bounds = _build_user_symbol_bounds(ep.module(), [dynamic_input], {})
+    bounds = _build_user_symbol_bounds(
+        ep.module(), [dynamic_input], {}, ep.graph_signature
+    )
     assert len(bounds) == 1
     ((sym, (lo, hi)),) = bounds.items()
     assert isinstance(sym, sympy.Symbol)
@@ -188,7 +190,10 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
 
     # Static input -> empty map.
     static_input = Input(shape=(2, 8), dtype=torch.float32)
-    assert _build_user_symbol_bounds(ep.module(), [static_input], {}) == {}
+    assert (
+        _build_user_symbol_bounds(ep.module(), [static_input], {}, ep.graph_signature)
+        == {}
+    )
 
 
 @pytest.mark.unit
@@ -214,7 +219,7 @@ def test_build_user_symbol_bounds_warns_on_01_specialization(caplog):
     import logging
 
     with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
-        _build_user_symbol_bounds(ep.module(), [input_min1], {})
+        _build_user_symbol_bounds(ep.module(), [input_min1], {}, ep.graph_signature)
 
     msgs = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
     if msgs:
@@ -240,7 +245,7 @@ def test_build_user_symbol_bounds_raises_when_input_min_genuinely_below_export()
         dtype=torch.float32,
     )
     with pytest.raises(ValueError) as exc_info:
-        _build_user_symbol_bounds(ep.module(), [input_too_low], {})
+        _build_user_symbol_bounds(ep.module(), [input_too_low], {}, ep.graph_signature)
     msg = str(exc_info.value)
     assert "Input.min_shape" in msg and "exported program" in msg
     assert "re-export" in msg.lower() or "Input.min_shape >=" in msg
@@ -265,7 +270,7 @@ def test_build_user_symbol_bounds_raises_when_input_max_above_export():
         dtype=torch.float32,
     )
     with pytest.raises(ValueError) as exc_info:
-        _build_user_symbol_bounds(ep.module(), [too_wide_input], {})
+        _build_user_symbol_bounds(ep.module(), [too_wide_input], {}, ep.graph_signature)
     msg = str(exc_info.value)
     assert "Input.max_shape" in msg and "exported program" in msg
     assert "re-export" in msg.lower() or "Input.max_shape <=" in msg
@@ -293,7 +298,7 @@ def test_build_user_symbol_bounds_no_warning_on_matching_bounds(caplog):
     import logging
 
     with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
-        _build_user_symbol_bounds(ep.module(), [matching_input], {})
+        _build_user_symbol_bounds(ep.module(), [matching_input], {}, ep.graph_signature)
 
     warning_messages = [
         rec.message for rec in caplog.records if rec.levelno >= logging.WARNING
@@ -324,7 +329,9 @@ def test_build_user_symbol_bounds_narrows_to_user_on_subset(caplog):
     import logging
 
     with caplog.at_level(logging.INFO, logger="torch_tensorrt.dynamo._compiler"):
-        bounds = _build_user_symbol_bounds(ep.module(), [subset_input], {})
+        bounds = _build_user_symbol_bounds(
+            ep.module(), [subset_input], {}, ep.graph_signature
+        )
 
     # No warning -- subset is a valid, intended narrowing.
     warning_messages = [
@@ -369,7 +376,7 @@ def test_build_user_symbol_bounds_no_warning_on_dim_dynamic(caplog):
     import logging
 
     with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
-        _build_user_symbol_bounds(ep.module(), [fill_input], {})
+        _build_user_symbol_bounds(ep.module(), [fill_input], {}, ep.graph_signature)
 
     mismatch_warnings = [
         rec.message
@@ -420,7 +427,9 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
         dtype=torch.int64,
     )
 
-    bounds = _build_user_symbol_bounds(ep.module(), [tensor_input, scalar_input], {})
+    bounds = _build_user_symbol_bounds(
+        ep.module(), [tensor_input, scalar_input], {}, ep.graph_signature
+    )
     assert len(bounds) == 1, bounds
     ((sym, (lo, hi)),) = bounds.items()
     assert isinstance(sym, sympy.Symbol)
@@ -473,6 +482,7 @@ def test_build_user_symbol_bounds_mixed_arg_and_kwarg():
         ep.module(),
         sample_arg_inputs=[x_input],
         sample_kwarg_inputs={"y": y_input},
+        graph_signature=ep.graph_signature,
     )
 
     bounds_values = set(bounds.values())
