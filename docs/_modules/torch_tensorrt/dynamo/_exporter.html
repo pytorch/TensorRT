@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=5c13c699"></script>
+    <script src="../../../_static/documentation_options.js?v=a7ee73b5"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -482,6 +482,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._export.non_strict_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_constraints</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._guards</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_fake_mode</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch._library.fake_class_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeScriptObject</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._subclasses.fake_tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeTensor</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">ExportGraphSignature</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export._trace</span><span class="w"> </span><span class="kn">import</span> <span class="n">_combine_args</span>
@@ -497,6 +498,37 @@ document.write(`
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENGINE_IDX</span><span class="p">,</span> <span class="n">NAME_IDX</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resolve_lifted_custom_obj</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="c1"># torch.export lifts custom objects into exp_program.constants keyed by their</span>
+    <span class="c1"># graph-signature FQN and renames the placeholder node, so constants[node.name]</span>
+    <span class="c1"># misses. Resolve name -&gt; FQN through the signature mapping; the direct</span>
+    <span class="c1"># name/target lookup is only for legacy programs that carry no such mapping.</span>
+    <span class="n">constants</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="s2">&quot;constants&quot;</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="n">sig</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="s2">&quot;graph_signature&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">name_to_fqn</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">sig</span><span class="p">,</span> <span class="s2">&quot;inputs_to_lifted_custom_objs&quot;</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">sig</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="p">{}</span>
+    <span class="p">)</span>
+
+    <span class="n">obj</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">fqn</span> <span class="o">=</span> <span class="n">name_to_fqn</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">fqn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">constants</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">fqn</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">name_to_fqn</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">constants</span><span class="p">:</span>
+                <span class="n">obj</span> <span class="o">=</span> <span class="n">constants</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+                <span class="k">break</span>
+
+    <span class="c1"># A FakeScriptObject has no __getstate__; callers need the real object.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">FakeScriptObject</span><span class="p">):</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">real_obj</span>
+    <span class="k">return</span> <span class="n">obj</span>
 
 
 <div class="viewcode-block" id="export">

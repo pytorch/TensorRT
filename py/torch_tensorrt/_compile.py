@@ -1227,14 +1227,15 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
                     f"'{engine_node.target}' not found on graph module"
                 )
         elif engine_node.op == "placeholder":
-            constants = getattr(exp_program, "constants", {})
-            engine_obj = constants.get(engine_node.name) or constants.get(
-                engine_node.target
-            )
+            from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
+
+            engine_obj = _resolve_lifted_custom_obj(exp_program, engine_node)
             if engine_obj is None:
                 raise RuntimeError(
                     f"execute_engine node '{node.name}': placeholder engine "
-                    f"'{engine_node.name}' not found in exp_program.constants"
+                    f"'{engine_node.name}' did not resolve to a lifted "
+                    f"custom-object constant (available: "
+                    f"{sorted(getattr(exp_program, 'constants', {}) or {})})"
                 )
         else:
             raise RuntimeError(
