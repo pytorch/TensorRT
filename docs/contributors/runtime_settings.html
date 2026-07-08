@@ -1,0 +1,927 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Runtime Settings &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=5e9644a2"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'contributors/runtime_settings';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Dynamic Shape Support" href="dynamic_shapes.html" />
+    <link rel="prev" title="CUDAGraphs" href="cuda_graphs.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">Architecture</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="system_overview.html">System Overview</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phases.html">Compiler Phases</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="lowering.html">Lowering Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partitioning.html">Partitioning Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="conversion.html">Conversion Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">Runtime Phase</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="lowering_passes.html">Built-in Dynamo Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="observer.html">Observer / Callback System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts_converters.html">Writing TorchScript Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Feature Design</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="engine_caching.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="weight_refit.html">Weight Refit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cuda_graphs.html">CUDAGraphs</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Runtime Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_shapes.html">Dynamic Shape Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="complex_number_support.html">Complex Number Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autocast.html">Autocast and Precision Management</a></li>
+<li class="toctree-l1"><a class="reference internal" href="export_serialization.html">Export and Serialization</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../contributing.html" class="nav-link">Contributing</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Runtime Settings</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="runtime-settings">
+<span id="runtime-settings-internals"></span><h1>Runtime Settings<a class="headerlink" href="#runtime-settings" title="Link to this heading">#</a></h1>
+<p>This page documents the design of the runtime-settings subsystem: the three
+runtime-only knobs it governs, why they live outside <code class="docutils literal notranslate"><span class="pre">CompilationSettings</span></code>,
+and how they are applied across Torch-TensorRT’s two runtimes. It is the
+maintainer-facing counterpart to the user guide at
+<a class="reference internal" href="../user_guide/runtime_performance/runtime_settings.html"><span class="doc">Runtime Settings (TensorRT-RTX)</span></a>, which covers the
+public API.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Runtime settings only take effect on TensorRT-RTX builds. On standard
+TensorRT the knobs validate and are stored, but have no runtime effect.</p>
+</div>
+<section id="goal">
+<h2>Goal<a class="headerlink" href="#goal" title="Link to this heading">#</a></h2>
+<p>Three knobs control <em>how the runtime drives an already-built engine</em>, without
+changing the engine itself:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code> — whether TensorRT-RTX captures the engine into a CUDA graph.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dynamic_shapes_kernel_specialization_strategy</span></code> — how kernels specialize when inputs have dynamic dimensions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> — the TensorRT-RTX runtime kernel cache, a JIT-kernel cache persisted across runs.</p></li>
+</ul>
+<p>These are <strong>runtime concerns</strong>, not compile-time ones: they do not affect an
+engine’s identity or its serialized form, only its execution. They are
+therefore kept out of <code class="docutils literal notranslate"><span class="pre">CompilationSettings</span></code> and are not baked into the
+serialized engine — instead they are held in memory, can be changed at any
+time, and are sampled when the engine’s <code class="docutils literal notranslate"><span class="pre">IExecutionContext</span></code> is (re)created.</p>
+</section>
+<section id="architecture">
+<h2>Architecture<a class="headerlink" href="#architecture" title="Link to this heading">#</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌──────────────────────────────────────────────────────────────┐
+│ Public API                                                   │
+│   runtime_config · runtime_cache · enable_cudagraphs(...)    │
+│   · mod.runtime_settings = RuntimeSettings(...)              │
+└───────────────────────────────┬──────────────────────────────┘
+                                ▼
+           RuntimeSettings  (frozen dataclass)
+             cuda_graph_strategy
+             dynamic_shapes_kernel_specialization_strategy
+             runtime_cache : None | str | RuntimeCache
+                                 │
+                                 ▼
+           TorchTensorRTModule ───── owns ─────▶ RuntimeCache (facade)
+           single dispatch point                 the only handle users touch;
+                                 │                forwards to one inner handle
+                       cpp runtime loaded?
+                 ┌───────────────┴───────────────┐
+              No │                               │ Yes
+                 ▼                               ▼
+        Python runtime path              C++ runtime path
+        TRTEngine                        torch.classes.tensorrt.Engine
+             │                                 │
+             ▼                                 ▼
+        TRTRuntimeConfig (py)            TRTRuntimeConfig (C++)
+        owns trt.IRuntimeConfig          owns nvinfer1::IRuntimeConfig
+             │                                 │
+             ▼                                 ▼
+        _RuntimeCacheHandle              RuntimeCacheHandle (torchbind)
+        pure-Python inner                C++ inner (used directly)
+             ▲                                               ▲
+             └───  RuntimeCache._handle → matching inner  ───┘
+</pre></div>
+</div>
+<p>Settings flow top-down. The two runtime columns are mirror images : engine -&gt;
+config shim -&gt; inner cache handle, and the <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code> facade (the only
+handle users touch) forwards uniformly to whichever inner handle matches the
+active runtime. The pieces are explained below.</p>
+</section>
+<section id="user-api">
+<h2>User API<a class="headerlink" href="#user-api" title="Link to this heading">#</a></h2>
+<p>The knobs are grouped in a frozen <code class="docutils literal notranslate"><span class="pre">RuntimeSettings</span></code> dataclass and applied
+through context managers (scoped) or direct assignment (persistent):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeSettings</span><span class="p">,</span> <span class="n">runtime_config</span><span class="p">,</span> <span class="n">runtime_cache</span>
+
+<span class="c1"># Scoped override for a with-block:</span>
+<span class="k">with</span> <span class="n">runtime_config</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">):</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+
+<span class="c1"># A shared, disk-backed kernel cache across every engine under the target:</span>
+<span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="s2">&quot;/path/to/cache.bin&quot;</span><span class="p">):</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+
+<span class="c1"># Persistent assignment:</span>
+<span class="n">trt_model</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="s2">&quot;/path/to/cache.bin&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>See the user guide for the full surface, including
+<code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(...,</span> <span class="pre">cuda_graph_strategy=...)</span></code>.</p>
+</section>
+<section id="design">
+<h2>Design<a class="headerlink" href="#design" title="Link to this heading">#</a></h2>
+<section id="runtime-not-compile-time">
+<h3>Runtime, not compile-time<a class="headerlink" href="#runtime-not-compile-time" title="Link to this heading">#</a></h3>
+<p>The defining decision is that these knobs are runtime state. An engine’s
+serialized bytes and its identity are independent of them, so the same engine
+can be driven with a different strategy or cache without recompiling. Because
+they are runtime-mode controls, the public surface is context managers and
+assignment rather than <code class="docutils literal notranslate"><span class="pre">compile()</span></code> keyword arguments — a settings change is
+just a state change on a live module.</p>
+</section>
+<section id="two-runtimes-one-dispatch-point">
+<h3>Two runtimes, one dispatch point<a class="headerlink" href="#two-runtimes-one-dispatch-point" title="Link to this heading">#</a></h3>
+<p>Torch-TensorRT has two engine runtimes: the Python runtime and the C++ runtime
+(the <code class="docutils literal notranslate"><span class="pre">torch.classes.tensorrt.Engine</span></code> TorchBind class). Each carries its own
+copy of the derived runtime state — there is no shared global.</p>
+<p><code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> is the single point of contact. Assigning
+<code class="docutils literal notranslate"><span class="pre">runtime_settings</span></code> resolves the cache, dispatches the settings to whichever
+runtime is attached, and stores the resolved value; which runtime is active is
+a per-process fact (whether the C++ runtime library is loaded), and the module
+adapts to it. Each engine holds its settings in a small shim, mirrored in
+Python and C++, whose only responsibility is to own the settings, lazily derive
+the live <code class="docutils literal notranslate"><span class="pre">IRuntimeConfig</span></code> from them, and keep all TensorRT-RTX feature gating
+in one place so the rest of the runtime stays uniform.</p>
+</section>
+<section id="lazy-execution-context">
+<h3>Lazy execution context<a class="headerlink" href="#lazy-execution-context" title="Link to this heading">#</a></h3>
+<p>Both runtimes create the <code class="docutils literal notranslate"><span class="pre">IExecutionContext</span></code> lazily, on first use, and a
+settings change <em>invalidates</em> it rather than rebuilding eagerly — the next use
+recreates it with the new settings sampled in. In the common case an engine
+therefore creates exactly one context across setup and first execution.</p>
+<p>The exception is multi-device (NCCL) engines, which must bind their
+communicator before any rank issues a collective, so they create the context
+eagerly at setup. They consequently pay one extra context rebuild if settings
+change afterwards. The trade-off is deliberate: cross-rank correctness outweighs
+the extra create.</p>
+</section>
+<section id="the-runtime-cache">
+<h3>The runtime cache<a class="headerlink" href="#the-runtime-cache" title="Link to this heading">#</a></h3>
+<p>The runtime kernel cache is the one piece of runtime state with non-trivial
+structure, because it can be <strong>shared across engines</strong> — one cache can back
+several engines under a single <code class="docutils literal notranslate"><span class="pre">runtime_cache([...],</span> <span class="pre">path)</span></code> block — and must
+be reachable from <strong>both runtimes</strong>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code> is a thin user-facing facade over a single inner handle. The
+inner handle is the C++ TorchBind handle when the C++ runtime is loaded and a
+pure-Python equivalent otherwise; both expose the same interface, so the facade
+forwards to either without branching. When the handle is C++-backed it <em>is</em> the
+same object the C++ engine holds — one refcounted instance visible from both
+languages, which is what lets a single cache be shared across the boundary.</p>
+<p>Materialization is deferred: the underlying TensorRT cache is created lazily, on
+the same first-use path as the execution context, and any bytes loaded from disk
+beforehand are held and drained in once it exists. This warm-start path is what
+lets a path-backed cache be primed from disk up front and still attach correctly
+to an engine whose cache only materializes on first execution.</p>
+</section>
+<section id="lifetime-and-autosave-contract">
+<h3>Lifetime and autosave contract<a class="headerlink" href="#lifetime-and-autosave-contract" title="Link to this heading">#</a></h3>
+<p>Who owns a cache determines when it is persisted. There are three origins:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 22.0%" />
+<col style="width: 48.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Origin</p></th>
+<th class="head"><p>Owner</p></th>
+<th class="head"><p>Saved when</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Engine-implicit</strong> — the module builds it from a path string in the settings</p></td>
+<td><p>the module</p></td>
+<td><p>automatically: when replaced by a new cache, on garbage collection, and at interpreter exit</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Shared</strong> — <code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> attaches it to every engine in scope</p></td>
+<td><p>the context manager</p></td>
+<td><p>on block exit</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>User-built</strong> — constructed directly by advanced callers</p></td>
+<td><p>the caller</p></td>
+<td><p>manually via <code class="docutils literal notranslate"><span class="pre">save()</span></code> (opt into automatic save with <code class="docutils literal notranslate"><span class="pre">autosave_on_del=True</span></code>)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Engine-implicit and shared caches never require an explicit save; user-built
+ones do unless autosave is opted in. Automatic saves are idempotent — the
+several hooks that can fire for an engine-implicit cache coordinate so it is
+written at most once.</p>
+</section>
+<section id="exception-safety">
+<h3>Exception safety<a class="headerlink" href="#exception-safety" title="Link to this heading">#</a></h3>
+<p>Cache persistence is best-effort and never surfaces as a user-visible failure. A
+save that fails (full disk, lock timeout, permission denied) is logged and
+swallowed, so assigning <code class="docutils literal notranslate"><span class="pre">runtime_settings</span></code> or exiting a <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code>
+block cannot raise because of a cache write.</p>
+<p>The engine-implicit cache is saved <strong>synchronously at the moment it is
+replaced</strong> — not deferred to garbage collection — so a failure in the
+subsequent settings dispatch can never strand freshly generated kernels, and the
+interpreter-exit save does not depend on finalizer ordering, which is unreliable
+during shutdown.</p>
+</section>
+<section id="concurrency">
+<h3>Concurrency<a class="headerlink" href="#concurrency" title="Link to this heading">#</a></h3>
+<p>Everything other than the cache is per-engine and runs under the engine’s
+existing execution lock, so the settings and the config shims need no new
+synchronization. The shared cache handle is the sole structure designed to be
+touched by multiple engines, and therefore the sole structure that carries its
+own lock — used to serialize the one-time cache materialization when several
+engines share a handle across threads. Coarse locking suffices because these are
+cold, infrequent operations, not per-inference ones.</p>
+<p>The scoped context managers are a separate matter: their snapshot/restore state
+is not synchronized, so overlapping <code class="docutils literal notranslate"><span class="pre">runtime_config</span></code> blocks on the <em>same</em>
+module from different threads are unsupported (see <a class="reference internal" href="#limitations">Limitations</a>).</p>
+</section>
+<section id="cuda-graphs-integration">
+<h3>CUDA graphs integration<a class="headerlink" href="#cuda-graphs-integration" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code> selects TensorRT-RTX-native CUDA-graph capture, which
+must be set <em>before</em> the graph is captured. Rather than leave that ordering to
+the caller, it is exposed as a keyword on
+<code class="docutils literal notranslate"><span class="pre">enable_cudagraphs(...,</span> <span class="pre">cuda_graph_strategy=...)</span></code>, which applies the strategy
+for the duration of the cudagraphs block and restores it afterwards — turning an
+ordering requirement into structure. (The dynamic-shapes strategy has no such
+coupling and keeps a plain scoped setter.)</p>
+</section>
+</section>
+<section id="limitations">
+<h2>Limitations<a class="headerlink" href="#limitations" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>The scoped context managers are not reentrant across threads — overlapping
+<code class="docutils literal notranslate"><span class="pre">runtime_config</span></code> blocks on the same module from different threads are
+unsupported.</p></li>
+<li><p>The default per-user cache path is safe against corruption (it is file-locked)
+but not against lost updates under concurrent processes; for CI or sweeps,
+give each worker its own path or opt out.</p></li>
+<li><p>Multi-device (NCCL) engines pay one extra execution-context rebuild for a
+post-setup settings change (see <a class="reference internal" href="#lazy-execution-context">Lazy execution context</a>).</p></li>
+<li><p>A shared cache stays attached to every listed engine for the whole
+<code class="docutils literal notranslate"><span class="pre">runtime_cache([...])</span></code> block; there is no mid-block detach.</p></li>
+</ul>
+</section>
+<section id="testing">
+<h2>Testing<a class="headerlink" href="#testing" title="Link to this heading">#</a></h2>
+<p>Unit tests live under <code class="docutils literal notranslate"><span class="pre">tests/py/dynamo/runtime/</span></code>: <code class="docutils literal notranslate"><span class="pre">test_000_runtime_cache.py</span></code>
+(cache lifetime, persistence, and stream I/O), <code class="docutils literal notranslate"><span class="pre">test_004_runtime_settings.py</span></code>
+(the settings dataclass, the context managers, the lazy-context invariant, and
+cudagraphs composition), and <code class="docutils literal notranslate"><span class="pre">test_001_cuda_graph_strategy.py</span></code> /
+<code class="docutils literal notranslate"><span class="pre">test_001_dynamic_shapes_kernel_strategy.py</span></code> (per-strategy behavior).
+Model-level coverage is under <code class="docutils literal notranslate"><span class="pre">tests/py/dynamo/models/</span></code>.</p>
+</section>
+<section id="migration-from-compile-time-knobs">
+<h2>Migration from compile-time knobs<a class="headerlink" href="#migration-from-compile-time-knobs" title="Link to this heading">#</a></h2>
+<p>These knobs were previously passed to <code class="docutils literal notranslate"><span class="pre">compile()</span></code>; they now live on
+<code class="docutils literal notranslate"><span class="pre">RuntimeSettings</span></code>:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Before (compile-time)</p></th>
+<th class="head"><p>After (runtime)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">compile(...,</span> <span class="pre">cuda_graph_strategy=&quot;whole_graph_capture&quot;)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">RuntimeSettings(cuda_graph_strategy=&quot;whole_graph_capture&quot;)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">compile(...,</span> <span class="pre">dynamic_shapes_kernel_specialization_strategy=&quot;eager&quot;)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">RuntimeSettings(dynamic_shapes_kernel_specialization_strategy=&quot;eager&quot;)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">compile(...,</span> <span class="pre">runtime_cache_path=&quot;/p&quot;)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">RuntimeSettings(runtime_cache=&quot;/p&quot;)</span></code> or <code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">runtime_cache(mod,</span> <span class="pre">&quot;/p&quot;):</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="related">
+<h2>Related<a class="headerlink" href="#related" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="runtime.html#execution"><span class="std std-ref">Runtime Phase</span></a> — the runtime module architecture.</p></li>
+<li><p><a class="reference internal" href="engine_caching.html#engine-caching-design"><span class="std std-ref">Engine Caching</span></a> — the build-time engine cache, distinct from the runtime kernel cache described here.</p></li>
+<li><p><a class="reference internal" href="../user_guide/runtime_performance/runtime_settings.html"><span class="doc">Runtime Settings (TensorRT-RTX)</span></a> — public API and usage.</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="cuda_graphs.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">CUDAGraphs</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="dynamic_shapes.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Dynamic Shape Support</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#goal">Goal</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#architecture">Architecture</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-api">User API</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#design">Design</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-not-compile-time">Runtime, not compile-time</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#two-runtimes-one-dispatch-point">Two runtimes, one dispatch point</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#lazy-execution-context">Lazy execution context</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#the-runtime-cache">The runtime cache</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#lifetime-and-autosave-contract">Lifetime and autosave contract</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#exception-safety">Exception safety</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#concurrency">Concurrency</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cuda-graphs-integration">CUDA graphs integration</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#limitations">Limitations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#testing">Testing</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#migration-from-compile-time-knobs">Migration from compile-time knobs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#related">Related</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/contributors/runtime_settings.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/contributors/runtime_settings.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
