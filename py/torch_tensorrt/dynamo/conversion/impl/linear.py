@@ -8,7 +8,7 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import broadcast, get_trt_tensor
 
 
 def linear(
@@ -49,6 +49,18 @@ def linear(
     )
 
     if bias is not None:
+        # Rank-align a 1-D linear bias with the matmul output while preserving
+        # singleton dimensions. TensorRT can broadcast those dimensions in the
+        # elementwise add without materializing the bias to the full output
+        # shape (for example, [O] -> [1, 1, O] for a [B, S, O] output).
+        out, bias = broadcast(
+            ctx,
+            out,
+            bias,
+            f"{name}_add_bias_lhs",
+            f"{name}_add_bias_rhs",
+        )
+
         # add bias
         out = impl.elementwise.add(
             ctx, target, source_ir, f"{name}_add_bias", out, bias
