@@ -18,7 +18,7 @@ if not _has_executorch_exir():
         raise ImportError(
             f"Cannot access torch_tensorrt.executorch.{name}: "
             "ExecuTorch with executorch.exir is required. "
-            'Install with: pip install "executorch"'
+            'Install with: pip install "torch_tensorrt[executorch]"'
         )
 
     __all__ = [
