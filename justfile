@@ -114,3 +114,18 @@ docs-serve port="3000":
 # Build docs then serve them
 docs-build-serve port="3000": docs
     python3 -m http.server {{port}} --directory docs
+
+# ── CI dashboard ──────────────────────────────────────────────────────────────
+
+# Local web UI for GitHub Actions CI. Per-platform pass/fail, a python×cuda×tier
+# grid, failing tests mapped back to source (file:line), a copy-paste local
+# repro, and a cross-platform failure rollup. Needs an authenticated `gh`
+# (check with `gh auth status`). Defaults to the current branch; override with
+# branch= and port=, e.g.  just ci branch=nightly  |  just ci branch=main port=9000
+#
+# Uses `uv run --no-sync` on purpose: the dashboard is stdlib-only and has no
+# torch-tensorrt dependency, so --no-sync skips the project build entirely and
+# just reuses the existing .venv interpreter. Binds 0.0.0.0 so it's reachable
+# over Tailscale.
+ci branch="" port="8712":
+    uv run --no-sync tools/ci-dashboard/ci_dashboard.py -b "{{branch}}" -p {{port}}
