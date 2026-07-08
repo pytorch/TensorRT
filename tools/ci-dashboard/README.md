@@ -1,0 +1,91 @@
+# CI dashboard
+
+A local web UI for Torch-TensorRT's GitHub Actions CI. It answers the questions
+the raw Actions tab makes painful: **which platforms are green, which are red,
+which test broke, and where that test lives in the tree.**
+
+![what it shows](#) <!-- run it; a screenshot beats this line -->
+
+## Run it
+
+```bash
+just ci                       # current branch
+just ci branch=nightly        # a specific branch
+just ci branch=main port=9000 # pick a port
+
+# or directly (no build — stdlib only):
+uv run --no-sync tools/ci-dashboard/ci_dashboard.py -b nightly
+python3 tools/ci-dashboard/ci_dashboard.py -b nightly   # also fine
+```
+
+It opens `http://127.0.0.1:8712/` locally. It also **binds `0.0.0.0`**, so it's
+reachable over your tailnet/LAN — the startup log prints the Tailscale + LAN URLs
+(e.g. `http://100.x.y.z:8712/`). To keep it local-only, pass `--host 127.0.0.1`.
+
+### Requirements
+
+- An **authenticated `gh`** — the only data source. Check with `gh auth status`;
+  log in with `gh auth login`.
+- Python 3.9+ (**stdlib only** — no `pip install`, and **no torch-tensorrt build**).
+  `just ci` uses `uv run --no-sync`, which reuses the existing `.venv` interpreter
+  and skips the project build; plain `python3` works too since nothing outside the
+  stdlib is imported. `htmx` is vendored under `static/`, so it works offline.
+
+## What you get
+
+- **Platform board** — one card per workflow (Linux x86_64, aarch64, Windows,
+  the RTX and python-only variants, jetpack…), sorted worst-first, with a live
+  status badge. A summary strip up top counts failing / running / queued /
+  passing at a glance.
+- **Drill in** — open a platform to see its jobs as a **python × cuda × tier**
+  grid. Green/red cells; L0/L1/L2 tiers are labelled with the pytest paths they
+  run (pulled from `tests/py/utils/ci_helpers.sh`).
+- **Click a red cell** — a drawer shows every failing test with its error, the
+  **source file:line it maps to** (local path + a GitHub link pinned to the run's
+  commit), and a **copy-paste command to reproduce it locally** via the same
+  tier function CI used.
+- **Relevant logs, captured** — the drawer then pulls that job's log and extracts
+  just the **pytest FAILURES block per failing test** (traceback + captured
+  stdout/stderr), so you read the actual failure without scrolling a 1 MB log.
+  A **raw log ↗** link opens the full plain-text log (grep/save it); a
+  build/env failure with no test annotations falls back to the end of the log.
+- **Failures across platforms** — a rollup that dedupes a failing test across
+  every platform it breaks on ("fails on 3 platforms → likely this code"), so a
+  systemic break stands out from a one-off.
+- **"Didn't run" ≠ "failed"** — skipped/gated-off tiers (common on PR branches),
+  jobs blocked by a failed dependency, and cancelled/never-started jobs are shown
+  as a distinct, dashed/muted **didn't run** state — never colored red and never
+  counted as failing. The summary strip tallies them separately, and the
+  cross-platform rollup only ever counts jobs that actually *ran and failed*.
+- **Live** — status badges refresh in the background (~every 25s) without
+  collapsing whatever you've expanded. `↻ Refresh` (or `r`) forces a full reload;
+  `/` focuses the branch box; the *failing only* toggle hides the green cards.
+
+## How it works
+
+The server (`ci_dashboard.py`) is a thin, caching proxy over `gh`; all rendering
+is server-side HTML fragments and `htmx` wires up the interactions (lazy-load a
+platform on open, out-of-band badge polling, the failure drawer).
+
+- **Runs / jobs**: `gh run list` + `gh api …/actions/runs/{id}/jobs`. Job names
+  encode the matrix — `core / L2 dynamo distributed tests /
+  L2-dynamo-distributed-tests--3.12-cu130` — which we parse into
+  `{tier, python, cuda, kind}`.
+- **Why a red cell → a test → a file**: the test jobs surface each pytest
+  failure as a GitHub **check-run annotation** (via `pytest-results-action`), so
+  the failing test name + traceback is one cheap API call
+  (`…/check-runs/{id}/annotations`) — no wheel or junit download. We then
+  `git grep` the test symbol in `tests/` to resolve it to `file:line`.
+- **Tier → paths** live in `TIER_MAP`, a mirror of the `trt_tier_*` selectors in
+  `tests/py/utils/ci_helpers.sh`. If a tier is added/renamed there, add it here.
+
+## Limitations
+
+- Results are only as granular as the CI annotations. A **build/env/setup**
+  failure (not a test assertion) has no pytest annotation — the drawer says so
+  and links you to the raw job log.
+- Expanded platform grids don't auto-refresh (only the top-level badges do). Open
+  a stale platform again, or hit `↻ Refresh`, to re-pull its jobs.
+- The cross-platform rollup fans out `gh` calls for every failing test job; on a
+  branch that's failing everywhere the first scan takes a few seconds (results
+  are cached; `↻ rescan` forces a refresh).

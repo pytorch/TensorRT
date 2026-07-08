@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Torch-TensorRT CI · {{BRANCH}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Torch-TensorRT <span class="dim">CI</span></h1>
+    <form class="controls" hx-get="/ui/board" hx-target="#content" hx-swap="innerHTML" hx-trigger="submit"
+          hx-indicator="#load">
+      <input type="text" id="branch" name="branch" value="{{BRANCH}}" spellcheck="false"
+             placeholder="branch…" title="branch (Enter to load, / to focus)">
+      <label class="toggle"><input type="checkbox" id="failonly"
+             onchange="document.getElementById('content').classList.toggle('filter-fail', this.checked)"> failing only</label>
+      <button type="button" class="btn" title="refresh (r)"
+              hx-get="/ui/board" hx-include="#branch" hx-vals='{"refresh":"1"}'
+              hx-target="#content" hx-swap="innerHTML">↻ Refresh</button>
+      <button type="submit" class="btn primary" id="load">Load</button>
+    </form>
+  </header>
+
+  <main>
+    <div class="legend" id="legend">
+      <span><span class="dot pass"></span> passed</span>
+      <span><span class="dot fail"></span> failed</span>
+      <span><span class="dot run"></span> running</span>
+      <span><span class="dot queue"></span> queued</span>
+      <span><span class="dot skip"></span> didn’t run</span>
+      <span class="muted">· open a platform for its python×cuda×tier grid · click a red cell for failing tests + code</span>
+    </div>
+    <div id="content" hx-get="/ui/board?branch={{BRANCH}}" hx-trigger="load" hx-swap="innerHTML">
+      <div class="empty-state"><span class="spinner"></span> loading {{BRANCH}}…</div>
+    </div>
+  </main>
+
+  <div class="drawer-bg" id="drawer-bg" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-head">
+      <div class="t"><div class="title" id="drawer-title">Failures</div><div class="sub" id="drawer-sub"></div></div>
+      <button class="x" id="drawer-x" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    function openDrawer() {
+      document.getElementById('drawer-body').innerHTML =
+        '<div class="muted" style="padding:24px 4px"><span class="spinner"></span> loading failures…</div>';
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawer-bg').classList.add('open');
+    }
+    function closeDrawer() {
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawer-bg').classList.remove('open');
+    }
+    function copyPre(btn) {
+      const code = btn.parentElement.querySelector('code');
+      navigator.clipboard.writeText(code.innerText).then(() => toast('copied'));
+    }
+    function toast(m) {
+      const t = document.getElementById('toast');
+      t.textContent = m; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1400);
+    }
+    document.addEventListener('keydown', e => {
+      const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+      if (e.key === 'Escape') closeDrawer();
+      if (e.key === '/' && !typing) { e.preventDefault(); document.getElementById('branch').focus(); }
+      if (e.key === 'r' && !typing) { e.preventDefault(); document.querySelector('[title="refresh (r)"]').click(); }
+    });
+  </script>
+</body>
+</html>
