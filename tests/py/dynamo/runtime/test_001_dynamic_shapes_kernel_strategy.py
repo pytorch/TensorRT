@@ -51,7 +51,7 @@ def _find_python_trt_engine(compiled):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
     "Dynamic shapes kernel specialization strategy requires TensorRT-RTX",
 )
 class TestDynamicShapesKernelStrategySetup(TestCase):

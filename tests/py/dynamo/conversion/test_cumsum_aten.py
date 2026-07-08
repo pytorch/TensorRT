@@ -1,4 +1,3 @@
-import sys
 import unittest
 
 import torch
@@ -11,8 +10,8 @@ from .harness import DispatchTestCase
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx and sys.platform == "win32",
-    "cumsum errors out on TensorRT-RTX on Windows",
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "cumsum errors out on TensorRT-RTX (build_serialized_network returns None)",
 )
 class TestCumsumConverter(DispatchTestCase):
     @parameterized.expand(

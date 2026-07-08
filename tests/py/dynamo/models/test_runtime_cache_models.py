@@ -14,8 +14,8 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
-    "Runtime cache is only available with TensorRT-RTX",
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Runtime cache uses the Python TRTEngine, only exercised in RTX python-only builds",
 )
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"),
@@ -136,8 +136,8 @@ class TestRuntimeCacheModels(TestCase):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
-    "Runtime cache is only available with TensorRT-RTX",
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Runtime cache uses the Python TRTEngine, only exercised in RTX python-only builds",
 )
 class TestRuntimeCacheDynamicShapes(TestCase):
     """Tests runtime cache with dynamic input shapes."""
@@ -254,8 +254,8 @@ class TestRuntimeCacheDynamicShapes(TestCase):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
-    "Runtime cache is only available with TensorRT-RTX",
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Runtime cache uses the Python TRTEngine, only exercised in RTX python-only builds",
 )
 class TestRuntimeCachePerformance(TestCase):
     """Informational timing tests for runtime cache warm-up behavior."""

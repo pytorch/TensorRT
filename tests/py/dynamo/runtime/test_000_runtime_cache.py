@@ -62,8 +62,8 @@ def _find_python_trt_engine(compiled):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
-    "Runtime cache is only available with TensorRT-RTX",
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Runtime cache uses the Python TRTEngine, only exercised in RTX python-only builds",
 )
 class TestRuntimeCacheSetup(TestCase):
     """Tests that runtime config and cache are correctly created for RTX."""
@@ -104,8 +104,8 @@ class TestRuntimeCacheSetup(TestCase):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
-    "Runtime cache is only available with TensorRT-RTX",
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Runtime cache uses the Python TRTEngine, only exercised in RTX python-only builds",
 )
 class TestRuntimeCachePersistence(TestCase):
     """Tests that runtime cache is correctly saved to and loaded from disk."""
@@ -177,8 +177,8 @@ class TestRuntimeCachePersistence(TestCase):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
-    "Runtime cache is only available with TensorRT-RTX",
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Runtime cache uses the Python TRTEngine, only exercised in RTX python-only builds",
 )
 class TestRuntimeCacheConcurrency(TestCase):
     """Tests that file locking works for concurrent access."""

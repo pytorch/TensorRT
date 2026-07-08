@@ -52,7 +52,7 @@ def _find_python_trt_engine(compiled):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
     "CUDA graph strategy requires TensorRT-RTX",
 )
 class TestCudaGraphStrategySetup(TestCase):
@@ -119,7 +119,7 @@ class TestCudaGraphStrategySetup(TestCase):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
     "CUDA graph strategy integration requires TensorRT-RTX",
 )
 class TestCudaGraphStrategyWithSubgraphCudagraphs(TestCase):
@@ -176,7 +176,7 @@ class TestCudaGraphStrategyWithSubgraphCudagraphs(TestCase):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
     "Monolithic capturability tests require TensorRT-RTX",
 )
 class TestMonolithicCapturability(TestCase):
@@ -221,7 +221,7 @@ class TestMonolithicCapturability(TestCase):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
     "Context recreation tests require TensorRT-RTX",
 )
 class TestContextRecreation(TestCase):
@@ -273,7 +273,7 @@ class TestContextRecreation(TestCase):
 
 
 @unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
+    not ENABLED_FEATURES.tensorrt_rtx or ENABLED_FEATURES.torch_tensorrt_runtime,
     "Cudagraph mode toggle tests require TensorRT-RTX",
 )
 class TestCudagraphModeToggle(TestCase):
