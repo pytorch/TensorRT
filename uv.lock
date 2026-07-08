@@ -30,7 +30,7 @@ conflicts = [[
 ]]
 
 [manifest]
-constraints = [{ name = "transformers", specifier = ">=5.3.0" }]
+constraints = [{ name = "transformers", specifier = ">=5.4.0" }]
 
 [[package]]
 name = "accelerate"
@@ -4472,7 +4472,7 @@ test-ext = [
     { name = "flashinfer-python", marker = "python_full_version >= '3.10' and python_full_version < '3.13'" },
     { name = "timm", specifier = ">=1.0.3" },
     { name = "torchvision", specifier = ">=0.29.0.dev0,<0.30.0", index = "https://download.pytorch.org/whl/nightly/cu130" },
-    { name = "transformers", specifier = ">=5.3.0" },
+    { name = "transformers", specifier = ">=5.4.0" },
 ]
 
 [[package]]
