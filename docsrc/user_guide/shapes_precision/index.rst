@@ -11,3 +11,4 @@ and reduce model size with INT8/FP8/FP4 quantization via ModelOpt.
    ../../tutorials/_rendered_examples/dynamo/autocast_example
    quantization
    ../../tutorials/_rendered_examples/dynamo/vgg16_ptq
+   Example: ViT FP8 Quantization <../../tutorials/_rendered_examples/dynamo/quantize_vit_fp8>
