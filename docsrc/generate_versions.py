@@ -16,6 +16,11 @@ VERSIONS = [
         "preferred": True,
     },
     {
+        "name": "v2.11.0",
+        "version": "v2.11.0",
+        "url": "https://pytorch.org/TensorRT/v2.11.0/",
+    },
+    {
         "name": "v2.10.0",
         "version": "v2.10.0",
         "url": "https://pytorch.org/TensorRT/v2.10.0/",

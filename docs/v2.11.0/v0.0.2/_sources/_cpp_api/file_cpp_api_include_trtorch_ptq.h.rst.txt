@@ -1,0 +1,69 @@
+
+.. _file_cpp_api_include_trtorch_ptq.h:
+
+File ptq.h
+==========
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp_api_include_trtorch>` (``cpp/api/include/trtorch``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+Definition (``cpp/api/include/trtorch/ptq.h``)
+----------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+
+   program_listing_file_cpp_api_include_trtorch_ptq.h.rst
+
+
+
+
+
+Includes
+--------
+
+
+- ``iostream``
+
+- ``memory``
+
+- ``sstream``
+
+- ``string``
+
+- ``vector``
+
+
+
+Included By
+-----------
+
+
+- :ref:`file_cpp_api_include_trtorch_trtorch.h`
+
+
+
+
+Namespaces
+----------
+
+
+- :ref:`namespace_trtorch`
+
+- :ref:`namespace_trtorch__ptq`
+
+
+Classes
+-------
+
+
+- :ref:`exhale_class_classtrtorch_1_1ptq_1_1Int8CacheCalibrator`
+
+- :ref:`exhale_class_classtrtorch_1_1ptq_1_1Int8Calibrator`
+
