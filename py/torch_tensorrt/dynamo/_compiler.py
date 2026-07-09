@@ -895,7 +895,7 @@ def _build_user_symbol_bounds(
     gm: torch.fx.GraphModule,
     sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: dict[Any, Any],
-    graph_signature: Optional[torch.export.graph_signature.ExportGraphSignature] = None,
+    graph_signature: torch.export.graph_signature.ExportGraphSignature,
 ) -> Dict[sympy.Symbol, Tuple[int, int]]:
     """Map ``sympy.Symbol -> (min, max)`` from dynamic ``Input``s, used to
     fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
@@ -910,30 +910,34 @@ def _build_user_symbol_bounds(
     # only contains USER_INPUT nodes, but graph_signature.input_specs still lists
     # all specs (PARAMETER, BUFFER, USER_INPUT). A positional zip misaligns.
     # Use name-based lookup keyed on graph_signature USER_INPUT names instead.
-    # When graph_signature is absent (e.g. direct unit-test calls), fall back to
-    # all placeholder nodes in graph order (which are already USER_INPUT only
-    # after ep.module()).
     placeholder_by_name = {n.name: n for n in gm.graph.nodes if n.op == "placeholder"}
-    if graph_signature is not None:
-        user_input_names = [
-            spec.arg.name
-            for spec in graph_signature.input_specs
-            if spec.kind == InputKind.USER_INPUT and hasattr(spec.arg, "name")
-        ]
-        placeholders = [
-            placeholder_by_name[name]
-            for name in user_input_names
-            if name in placeholder_by_name
-        ]
-    else:
-        placeholders = list(placeholder_by_name.values())
+    user_input_names = [
+        spec.arg.name
+        for spec in graph_signature.input_specs
+        if spec.kind == InputKind.USER_INPUT and hasattr(spec.arg, "name")
+    ]
+    placeholders = [
+        placeholder_by_name[name]
+        for name in user_input_names
+        if name in placeholder_by_name
+    ]
 
-    # Avoid flatten_up_to: the user may compile with a different arg/kwarg split
-    # than was used at export time, causing a pytree arity mismatch. Match the
-    # existing pattern in compile_module: positional args first, then kwargs.
-    flat_inputs: List[Any] = list(sample_arg_inputs)
-    if isinstance(sample_kwarg_inputs, dict):
-        flat_inputs.extend(sample_kwarg_inputs.values())
+    # Use _in_spec.flatten_up_to to preserve export-time kwarg ordering.
+    # Fall back to name-based kwarg lookup when the arg/kwarg split differs
+    # from export time (which would cause flatten_up_to to raise an arity error).
+    in_spec = getattr(gm, "_in_spec", None)
+    try:
+        if in_spec is None:
+            raise AttributeError("_in_spec not found on graph module")
+        flat_inputs = in_spec.flatten_up_to(
+            (tuple(sample_arg_inputs), sample_kwarg_inputs)
+        )
+    except (ValueError, AttributeError):
+        flat_inputs = list(sample_arg_inputs)
+        if isinstance(sample_kwarg_inputs, dict):
+            for name in user_input_names[len(sample_arg_inputs) :]:
+                if name in sample_kwarg_inputs:
+                    flat_inputs.append(sample_kwarg_inputs[name])
 
     user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
 
