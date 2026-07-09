@@ -1,3 +1,4 @@
+#include <limits>
 #include <string>
 #include "core/compiler.h"
 #include "core/lowering/passes/passes.h"
@@ -60,6 +61,17 @@ std::string gen_keepdim_graph(const std::string& op) {
         %5 : Tensor = aten::)IR" +
       op + R"IR((%0, %2, %3, %4)
         return (%5))IR";
+}
+
+std::string gen_any_dim_graph(int dim, bool keepdim) {
+  return R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=)IR" +
+      std::to_string(dim) + R"IR(]()
+      %3 : bool = prim::Constant[value=)IR" +
+      std::to_string(keepdim ? 1 : 0) + R"IR(]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
 }
 
 void test_body(const std::string& graph, at::Tensor& in, bool dynamic = false) {
@@ -324,6 +336,43 @@ TEST(Converters, ATenAnyDimAllFalseConvertsCorrectly) {
       %5 : Tensor = aten::any(%0, %1, %3)
       return (%5))IR";
   auto in = at::zeros({3, 7, 4}, at::kCUDA).to(torch::kBool);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimCancellingNumericValuesConvertsCorrectly) {
+  const auto graph = gen_any_dim_graph(0, false);
+  auto in = at::tensor({1, -1}, at::TensorOptions().dtype(at::kInt).device(at::kCUDA));
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimNegativeNumericValueConvertsCorrectly) {
+  const auto graph = gen_any_dim_graph(0, false);
+  auto in = at::tensor({0, -2}, at::TensorOptions().dtype(at::kInt).device(at::kCUDA));
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimNumericRowsWithCancellationConvertsCorrectly) {
+  const auto graph = gen_any_dim_graph(1, false);
+  auto in = at::tensor({{1, -1}, {0, 0}}, at::TensorOptions().dtype(at::kInt).device(at::kCUDA));
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimFloatNumericValuesConvertsCorrectly) {
+  const auto graph = gen_any_dim_graph(0, false);
+  auto in = at::tensor({1.0, -1.0}, at::TensorOptions().dtype(at::kFloat).device(at::kCUDA));
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimHalfNumericValuesConvertsCorrectly) {
+  const auto graph = gen_any_dim_graph(0, false);
+  auto in = at::tensor({1.0, -1.0}, at::TensorOptions().dtype(at::kHalf).device(at::kCUDA));
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimFloatNanValueConvertsCorrectly) {
+  const auto graph = gen_any_dim_graph(0, false);
+  auto in = at::tensor(
+      {0.0, std::numeric_limits<float>::quiet_NaN()}, at::TensorOptions().dtype(at::kFloat).device(at::kCUDA));
   test_body(graph, in);
 }
 
