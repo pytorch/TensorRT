@@ -197,6 +197,12 @@ class RuntimeCache:
             self._handle = _RuntimeCacheHandle(path=path)
         self.autosave_on_del = autosave_on_del
 
+    def __deepcopy__(self, memo: dict[int, Any]) -> "RuntimeCache":
+        # RuntimeCache is a live resource handle. Preserve identity so deepcopy
+        # does not traverse into torchbind objects or the Python handle's lock.
+        memo[id(self)] = self
+        return self
+
     @property
     def path(self) -> str:
         """The disk path the handle is anchored to. Single source of truth
