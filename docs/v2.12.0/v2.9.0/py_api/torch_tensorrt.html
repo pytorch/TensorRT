@@ -1,0 +1,1944 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>torch_tensorrt &mdash; Torch-TensorRT v2.9.0.dev0+c1987e4 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-binder.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-dataframe.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-rendered-html.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="torch_tensorrt.logging" href="logging.html" />
+    <link rel="prev" title="Legacy notebooks" href="../tutorials/notebooks.html" />
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+
+          <li class="main-menu-item">
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Learn
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/get-started">
+                  <span class=dropdown-title>Get Started</span>
+                  <p>Run PyTorch locally or get started quickly with one of the supported cloud platforms</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials">
+                  <span class="dropdown-title">Tutorials</span>
+                  <p>Whats new in PyTorch tutorials</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/basics/intro.html">
+                  <span class="dropdown-title">Learn the Basics</span>
+                  <p>Familiarize yourself with PyTorch concepts and modules</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/recipes/recipes_index.html">
+                  <span class="dropdown-title">PyTorch Recipes</span>
+                  <p>Bite-size, ready-to-deploy PyTorch code examples</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/introyt.html">
+                  <span class="dropdown-title">Intro to PyTorch - YouTube Series</span>
+                  <p>Master PyTorch basics with our engaging YouTube tutorial series</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Ecosystem
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem">
+                  <span class="dropdown-title">Tools</span>
+                  <p>Learn about the tools and frameworks in the PyTorch Ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class=dropdown-title>Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class=dropdown-title>Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class=dropdown-title>Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
+                  <p>Award winners announced at this year's PyTorch Conference</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Edge
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/edge">
+                  <span class="dropdown-title">About PyTorch Edge</span>
+                  <p>Build innovative and privacy-aware AI experiences for edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
+                  <span class="dropdown-title">ExecuTorch</span>
+                  <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
+                </a>
+              </div>
+            </div>  
+          </li>
+
+          <li class="main-menu-item">
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p>Explore the documentation for comprehensive guidance on how to use PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/pytorch-domains">
+                  <span class="dropdown-title">PyTorch Domains</span>
+                  <p>Read the PyTorch Domains documentation to learn more about domain-specific libraries</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Blogs & News 
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/blog/">
+                  <span class="dropdown-title">PyTorch Blog</span>
+                  <p>Catch up on the latest technical news and happenings</p>
+                </a>
+                 <a class="nav-dropdown-item" href="https://pytorch.org/community-blog">
+                  <span class="dropdown-title">Community Blog</span>
+                  <p>Stories from the PyTorch ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/videos">
+                  <span class="dropdown-title">Videos</span>
+                  <p>Learn about the latest PyTorch tutorials, new, and more </p>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                About
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn more about the PyTorch Foundation</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
+                  <span class="dropdown-title">Governing Board</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li class="main-menu-item">
+            <div class="no-dropdown">
+              <a href="https://pytorch.org/join" data-cta="join">
+                Become a Member
+              </a>
+            </div>
+          </li>
+          <li>
+           <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="github-icon">
+             </a>
+           </div>
+          </li>
+          <!--- TODO: This block adds the search icon to the nav bar. We will enable it later. 
+          <li>
+            <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="search-icon">
+             </a>
+            </div>
+          </li>
+          --->
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+   
+
+    
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+            
+
+            
+              
+              
+                <div class="version">
+                  v2.9.0.dev0+c1987e4
+                </div>
+              
+            
+
+            
+
+
+  
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+            
+          </div>
+
+          
+            
+            
+              
+            
+            
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/tensorrt_rtx.html">Torch-TensorRT-RTX</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/ptq.html">Post Training Quantization (PTQ)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Model Zoo</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Legacy notebooks</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo.html">torch_tensorrt.dynamo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ptq.html">torch_tensorrt.ts.ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/ts_converters.html">Writing TorchScript Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+    
+      <li>
+        <a href="../index.html">
+          
+            Docs
+          
+        </a> &gt;
+      </li>
+
+        
+      <li>torch_tensorrt</li>
+    
+    
+      <li class="pytorch-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/py_api/torch_tensorrt.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
+          <div class="rst-content">
+          
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+              
+  <section id="torch-tensorrt">
+<span id="torch-tensorrt-py"></span><h1>torch_tensorrt<a class="headerlink" href="#torch-tensorrt" title="Permalink to this heading">¶</a></h1>
+<span class="target" id="module-torch_tensorrt"></span><section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Permalink to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.compile">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">compile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt._Input.Input"><span class="pre">Input</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="fx.html#torch_tensorrt.fx.InputTensorSpec" title="torch_tensorrt.fx.input_tensor_spec.InputTensorSpec"><span class="pre">InputTensorSpec</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwarg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Set</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ScriptModule</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">GraphModule</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#compile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.compile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compile a PyTorch module for NVIDIA GPUs using TensorRT</p>
+<p>Takes a existing PyTorch module and a set of settings to configure the compiler
+and using the path specified in <code class="docutils literal notranslate"><span class="pre">ir</span></code> lower and compile the module to TensorRT
+returning a PyTorch Module back</p>
+<p>Converts specifically the forward method of a Module</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>module</strong> (<em>Union</em><em>(</em><em>torch.nn.Module</em><em>,</em><em>torch.jit.ScriptModule</em>) – Source module</p>
+</dd>
+<dt class="field-even">Keyword Arguments</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>inputs</strong> (<em>List</em><em>[</em><em>Union</em><em>(</em><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt.Input"><em>Input</em></a><em>, </em><em>torch.Tensor</em><em>)</em><em>]</em>) – <p><strong>Required</strong> List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+to select device type.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>inputs=[
+    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+    torch_tensorrt.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    ), # Dynamic input shape for input #2
+    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+]
+</pre></div>
+</div>
+</p></li>
+<li><p><strong>arg_inputs</strong> (<em>Tuple</em><em>[</em><em>Any</em><em>, </em><em>...</em><em>]</em>) – Same as inputs. Alias for better understanding with kwarg_inputs.</p></li>
+<li><p><strong>kwarg_inputs</strong> (<em>dict</em><em>[</em><em>Any</em><em>, </em><em>...</em><em>]</em>) – Optional, kwarg inputs to the module forward function.</p></li>
+<li><p><strong>enabled_precision</strong> (<em>Set</em><em>(</em><em>Union</em><em>(</em><em>torch.dpython:type</em><em>, </em><em>torch_tensorrt.dpython:type</em><em>)</em><em>)</em>) – The set of datatypes that TensorRT can use when selecting kernels</p></li>
+<li><p><strong>ir</strong> (<em>str</em>) – The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)</p></li>
+<li><p><strong>**kwargs</strong> – Additional settings for the specific requested strategy (See submodules for more info)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Compiled Module, when run it will execute via TensorRT</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>torch.nn.Module</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.convert_method_to_trt_engine">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">convert_method_to_trt_engine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'forward'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt._Input.Input"><span class="pre">Input</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwarg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Set</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#convert_method_to_trt_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.convert_method_to_trt_engine" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a TorchScript module method to a serialized TensorRT engine</p>
+<p>Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>module</strong> (<em>Union</em><em>(</em><em>torch.nn.Module</em><em>,</em><em>torch.jit.ScriptModule</em>) – Source module</p>
+</dd>
+<dt class="field-even">Keyword Arguments</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>inputs</strong> (<em>List</em><em>[</em><em>Union</em><em>(</em><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt.Input"><em>Input</em></a><em>, </em><em>torch.Tensor</em><em>)</em><em>]</em>) – <p><strong>Required</strong> List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+to select device type.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>input=[
+    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+    torch_tensorrt.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    ), # Dynamic input shape for input #2
+    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+]
+</pre></div>
+</div>
+</p></li>
+<li><p><strong>arg_inputs</strong> (<em>Tuple</em><em>[</em><em>Any</em><em>, </em><em>...</em><em>]</em>) – Same as inputs. Alias for better understanding with kwarg_inputs.</p></li>
+<li><p><strong>kwarg_inputs</strong> (<em>dict</em><em>[</em><em>Any</em><em>, </em><em>...</em><em>]</em>) – Optional, kwarg inputs to the module forward function.</p></li>
+<li><p><strong>enabled_precision</strong> (<em>Set</em><em>(</em><em>Union</em><em>(</em><em>torch.dpython:type</em><em>, </em><em>torch_tensorrt.dpython:type</em><em>)</em><em>)</em>) – The set of datatypes that TensorRT can use when selecting kernels</p></li>
+<li><p><strong>ir</strong> (<em>str</em>) – The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)</p></li>
+<li><p><strong>**kwargs</strong> – Additional settings for the specific requested strategy (See submodules for more info)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><em>bytes</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.cross_compile_for_windows">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">cross_compile_for_windows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="headerlink" href="#torch_tensorrt.cross_compile_for_windows" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.load_cross_compiled_exported_program">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">load_cross_compiled_exported_program</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#load_cross_compiled_exported_program"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.load_cross_compiled_exported_program" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load an ExportedProgram file in Windows which was previously cross compiled in Linux</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>file_path</strong> (<em>str</em>) – Path to file on the disk</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the api is not called in windows or there is no file or the file is not a valid ExportedProgram file</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.save">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'exported_program'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwarg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">retrace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pickle_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.save" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the model to disk in the specified output format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>module</strong> (<em>Optional</em><em>(</em><em>torch.jit.ScriptModule</em><em> | </em><em>torch.export.ExportedProgram</em><em> | </em><em>torch.fx.GraphModule</em><em> | </em><em>CudaGraphsTorchTensorRTModule</em><em>)</em>) – Compiled Torch-TensorRT module</p></li>
+<li><p><strong>inputs</strong> (<em>torch.Tensor</em>) – Torch input tensors</p></li>
+<li><p><strong>arg_inputs</strong> (<em>Tuple</em><em>[</em><em>Any</em><em>, </em><em>...</em><em>]</em>) – Same as inputs. Alias for better understanding with kwarg_inputs.</p></li>
+<li><p><strong>kwarg_inputs</strong> (<em>dict</em><em>[</em><em>Any</em><em>, </em><em>...</em><em>]</em>) – Optional, kwarg inputs to the module forward function.</p></li>
+<li><p><strong>output_format</strong> (<em>str</em>) – Format to save the model. Options include exported_program | torchscript | aot_inductor.</p></li>
+<li><p><strong>retrace</strong> (<em>bool</em>) – When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+This flag is experimental for now.</p></li>
+<li><p><strong>pickle_protocol</strong> (<em>python:int</em>) – The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.load">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.load" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load either a Torchscript model or ExportedProgram.</p>
+<p>Loads a TorchScript or ExportedProgram file from disk. File type will be detect the type using try, except.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>file_path</strong> (<em>str</em>) – Path to file on the disk</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If there is no file or the file is not either a TorchScript file or ExportedProgram file</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Permalink to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.MutableTorchTensorRTModule">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">MutableTorchTensorRTModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pytorch_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Device" title="torch_tensorrt._Device.Device"><span class="pre">Device</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_python_runtime</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">immutable_weights</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">strict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefer_deferred_runtime_asserts_over_guards</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_streaming_budget</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Set</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_MutableTorchTensorRTModule.html#MutableTorchTensorRTModule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.MutableTorchTensorRTModule" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize a MutableTorchTensorRTModule to seamlessly manipulate it like a regular PyTorch module.
+All TensorRT compilation and refitting processes are handled automatically as you work with the module.
+Any changes to its attributes or loading a different state_dict will trigger refitting or recompilation,
+which will be managed during the next forward pass.</p>
+<p>The MutableTorchTensorRTModule takes a PyTorch module and a set of configuration settings for the compiler.
+Once compilation is complete, the module maintains the connection between the TensorRT graph module and the original PyTorch module.
+Any modifications made to the MutableTorchTensorRTModule will be reflected in both the TensorRT graph module and the original PyTorch module.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.MutableTorchTensorRTModule.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pytorch_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Device" title="torch_tensorrt._Device.Device"><span class="pre">Device</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_python_runtime</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">immutable_weights</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">strict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefer_deferred_runtime_asserts_over_guards</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_streaming_budget</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Set</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_MutableTorchTensorRTModule.html#MutableTorchTensorRTModule.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.MutableTorchTensorRTModule.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>pytorch_model</strong> (<em>torch.nn.module</em>) – Source module that needs to be accelerated</p>
+</dd>
+<dt class="field-even">Keyword Arguments</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>device</strong> (<em>Union</em><em>(</em><a class="reference internal" href="#torch_tensorrt.Device" title="torch_tensorrt.Device"><em>Device</em></a><em>, </em><em>torch.device</em><em>, </em><em>dict</em><em>)</em>) – <p>Target device for TensorRT engines to run on</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">device</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Device</span><span class="p">(</span><span class="s">&quot;dla:1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="n">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</p></li>
+<li><p><strong>disable_tf32</strong> (<em>bool</em>) – Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</p></li>
+<li><p><strong>assume_dynamic_shape_support</strong> (<em>bool</em>) – Setting this to true enables the converters work for both dynamic and static shapes. Default: False</p></li>
+<li><p><strong>sparse_weights</strong> (<em>bool</em>) – Enable sparsity for convolution and fully connected layers.</p></li>
+<li><p><strong>enabled_precision</strong> (<em>Set</em><em>(</em><em>Union</em><em>(</em><em>torch.dpython:type</em><em>, </em><em>torch_tensorrt.dpython:type</em><em>)</em><em>)</em>) – The set of datatypes that TensorRT can use when selecting kernels</p></li>
+<li><p><strong>immutable_weights</strong> (<em>bool</em>) – Build non-refittable engines. This is useful for some layers that are not refittable.</p></li>
+<li><p><strong>capability</strong> (<a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability"><em>EngineCapability</em></a>) – Restrict kernel selection to safe gpu kernels or safe dla kernels</p></li>
+<li><p><strong>num_avg_timing_iters</strong> (<em>python:int</em>) – Number of averaging timing iterations used to select kernels</p></li>
+<li><p><strong>workspace_size</strong> (<em>python:int</em>) – Maximum size of workspace given to TensorRT</p></li>
+<li><p><strong>dla_sram_size</strong> (<em>python:int</em>) – Fast software managed RAM used by DLA to communicate within a layer.</p></li>
+<li><p><strong>dla_local_dram_size</strong> (<em>python:int</em>) – Host RAM used by DLA to share intermediate tensor data across operations</p></li>
+<li><p><strong>dla_global_dram_size</strong> (<em>python:int</em>) – Host RAM used by DLA to store weights and metadata for execution</p></li>
+<li><p><strong>truncate_double</strong> (<em>bool</em>) – Truncate weights provided in double (float64) to float32</p></li>
+<li><p><strong>require_full_compilation</strong> (<em>bool</em>) – Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch</p></li>
+<li><p><strong>min_block_size</strong> (<em>python:int</em>) – The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT</p></li>
+<li><p><strong>torch_executed_ops</strong> (<em>Collection</em><em>[</em><em>Target</em><em>]</em>) – Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but <code class="docutils literal notranslate"><span class="pre">require_full_compilation</span></code> is True</p></li>
+<li><p><strong>torch_executed_modules</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but <code class="docutils literal notranslate"><span class="pre">require_full_compilation</span></code> is True</p></li>
+<li><p><strong>pass_through_build_failures</strong> (<em>bool</em>) – Error out if there are issues during compilation (only applicable to torch.compile workflows)</p></li>
+<li><p><strong>max_aux_stream</strong> (<em>Optional</em><em>[</em><em>python:int</em><em>]</em>) – Maximum streams in the engine</p></li>
+<li><p><strong>version_compatible</strong> (<em>bool</em>) – Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)</p></li>
+<li><p><strong>optimization_level</strong> – (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.</p></li>
+<li><p><strong>use_python_runtime</strong> – (bool): Return a graph using a pure Python runtime, reduces options for serialization</p></li>
+<li><p><strong>use_fast_partitioner</strong> – (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (<code class="docutils literal notranslate"><span class="pre">False</span></code>) if looking for best performance</p></li>
+<li><p><strong>enable_experimental_decompositions</strong> (<em>bool</em>) – Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</p></li>
+<li><p><strong>dryrun</strong> (<em>bool</em>) – Toggle for “Dryrun” mode, running everything except conversion to TRT and logging outputs</p></li>
+<li><p><strong>hardware_compatible</strong> (<em>bool</em>) – Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</p></li>
+<li><p><strong>timing_cache_path</strong> (<em>str</em>) – Path to the timing cache if it exists (or) where it will be saved after compilation</p></li>
+<li><p><strong>lazy_engine_init</strong> (<em>bool</em>) – Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</p></li>
+<li><p><strong>enabled_precisions</strong> (<em>Set</em><em>(</em><em>Union</em><em>(</em><em>torch.dpython:type</em><em>, </em><em>torch_tensorrt.dpython:type</em><em>)</em><em>)</em>) – The set of datatypes that TensorRT can use when selecting kernels</p></li>
+<li><p><strong>**kwargs</strong> – Any,</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>MutableTorchTensorRTModule</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.MutableTorchTensorRTModule.compile">
+<span class="sig-name descname"><span class="pre">compile</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_MutableTorchTensorRTModule.html#MutableTorchTensorRTModule.compile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.MutableTorchTensorRTModule.compile" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Re)compile the TRT graph module using the PyTorch module.
+This function should be called whenever the weight structure get changed (shape, more layers…)
+MutableTorchTensorRTModule automatically catches weight value updates and call this function to recompile.
+If it fails to catch the changes, please call this function manually to recompile the TRT graph module.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.MutableTorchTensorRTModule.refit_gm">
+<span class="sig-name descname"><span class="pre">refit_gm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_MutableTorchTensorRTModule.html#MutableTorchTensorRTModule.refit_gm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.MutableTorchTensorRTModule.refit_gm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Refit the TRT graph module with any updates.
+This function should be called whenever the weight values get changed but the weight structure remains
+the same.
+MutableTorchTensorRTModule automatically catches weight value updates and call this function to refit the module.
+If it fails to catch the changes, please call this function manually to update the TRT graph module.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.MutableTorchTensorRTModule.set_expected_dynamic_shape_range">
+<span class="sig-name descname"><span class="pre">set_expected_dynamic_shape_range</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args_dynamic_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwargs_dynamic_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_MutableTorchTensorRTModule.html#MutableTorchTensorRTModule.set_expected_dynamic_shape_range"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.MutableTorchTensorRTModule.set_expected_dynamic_shape_range" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the dynamic shape range. The shape hint should EXACTLY follow arg_inputs and kwarg_inputs passed to the forward function
+and should not omit any entries (except None in the kwarg_inputs). If there is a nested dict/list in the input, the dynamic shape for that entry should also be an nested dict/list.
+If the dynamic shape is not required for an input, an empty dictionary should be given as the shape hint for that input.
+Note that you should exclude keyword arguments with value None as those will be filtered out.</p>
+<p>Example:
+def forward(a, b, c=0, d=0):</p>
+<blockquote>
+<div><p>pass</p>
+</div></blockquote>
+<p>seq_len = torch.export.Dim(“seq_len”, min=1, max=10)
+args_dynamic_shape = ({0: seq_len}, {}) # b does not have a dynamic shape
+kwargs_dynamic_shape = {‘c’: {0, seq_len}, ‘d’: {}} # d does not have a dynamic shape
+set_expected_dynamic_shape_range(args_dynamic_shape, kwargs_dynamic_shape)
+# Later when you call the function
+forward(<a href="#id1"><span class="problematic" id="id2">*</span></a>(a, b), <a href="#id3"><span class="problematic" id="id4">**</span></a>{c:…, d:…})</p>
+<p>Reference: <a class="reference external" href="https://pytorch.org/docs/stable/export.html#expressing-dynamism">https://pytorch.org/docs/stable/export.html#expressing-dynamism</a>
+:param args_dynamic_shape: Dynamic shape hint for the arg_inputs,
+:type args_dynamic_shape: tuple[dict[Any, Any]]
+:param kwargs_dynamic_shape: (dict[str, Any]): Dynamic shape hint for the kwarg_inputs</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.MutableTorchTensorRTModule.set_weight_streaming_ctx">
+<span class="sig-name descname"><span class="pre">set_weight_streaming_ctx</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">requested_budget</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_MutableTorchTensorRTModule.html#MutableTorchTensorRTModule.set_weight_streaming_ctx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.MutableTorchTensorRTModule.set_weight_streaming_ctx" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the weight streaming budget. If budget is not set, then automatic weight streaming budget
+is used.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.Input">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">Input</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_Input.html#Input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Input" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines an input to a module in terms of expected shape, data type and tensor format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>shape_mode</strong> (<em>torch_tensorrt.Input._ShapeMode</em>) – Is input statically or dynamically shaped</p></li>
+<li><p><strong>shape</strong> (<em>Tuple</em><em> or </em><em>Dict</em>) – <p>Either a single Tuple or a dict of tuples defining the input shape.
+Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;min_shape&quot;</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">}</span>
+</pre></div>
+</div>
+</p></li>
+<li><p><strong>dtype</strong> (<em>torch_tensorrt.dpython:type</em>) – The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)</p></li>
+<li><p><strong>format</strong> (<em>torch_tensorrt.TensorFormat</em>) – The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_Input.html#Input.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Input.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>__init__ Method for torch_tensorrt.Input</p>
+<p>Input accepts one of a few construction patterns</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Static shape of input tensor</p>
+</dd>
+<dt class="field-even">Keyword Arguments</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Static shape of input tensor</p></li>
+<li><p><strong>min_shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Min size of input tensor’s shape range
+Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC</p></li>
+<li><p><strong>opt_shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Opt size of input tensor’s shape range
+Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC</p></li>
+<li><p><strong>max_shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Max size of input tensor’s shape range
+Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC</p></li>
+<li><p><strong>dtype</strong> (<em>torch.dpython:type</em><em> or </em><em>torch_tensorrt.dpython:type</em>) – Expected data type for input tensor (default: torch_tensorrt.dtype.float32)</p></li>
+<li><p><strong>format</strong> (<em>torch.memory_format</em><em> or </em><em>torch_tensorrt.TensorFormat</em>) – The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</p></li>
+<li><p><strong>tensor_domain</strong> (<em>Tuple</em><em>(</em><em>python:float</em><em>, </em><em>python:float</em><em>)</em><em>, </em><em>optional</em>) – The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
+Note: Entering “None” (or not specifying) will set the bound to [0, 2)</p></li>
+<li><p><strong>torch_tensor</strong> (<em>torch.Tensor</em>) – Holds a corresponding torch tensor with this Input.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of this input in the input nn.Module’s forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<ul class="simple">
+<li><p>Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)</p></li>
+<li><p>Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)</p></li>
+<li><p>Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.example_tensor">
+<span class="sig-name descname"><span class="pre">example_tensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">optimization_profile_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_Input.html#Input.example_tensor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Input.example_tensor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get an example tensor of the shape specified by the Input object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>optimization_profile_field</strong> (<em>Optional</em><em>(</em><em>str</em><em>)</em>) – Name of the field to use for shape in the case the Input is dynamically shaped</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A PyTorch Tensor</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.from_tensor">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_tensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_memory_format_check</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt._Input.Input"><span class="pre">Input</span></a></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_Input.html#Input.from_tensor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Input.from_tensor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Produce a Input which contains the information of the given PyTorch tensor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tensor</strong> (<em>torch.Tensor</em>) – A PyTorch tensor.</p></li>
+<li><p><strong>disable_memory_format_check</strong> (<em>bool</em>) – Whether to validate the memory formats of input tensors</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A Input object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.from_tensors">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_tensors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_memory_format_check</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt._Input.Input"><span class="pre">Input</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_Input.html#Input.from_tensors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Input.from_tensors" title="Permalink to this definition">¶</a></dt>
+<dd><p>Produce a list of Inputs which contain
+the information of all the given PyTorch tensors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tensors</strong> (<em>Iterable</em><em>[</em><em>torch.Tensor</em><em>]</em>) – A list of PyTorch tensors.</p></li>
+<li><p><strong>disable_memory_format_check</strong> (<em>bool</em>) – Whether to validate the memory formats of input tensors</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A list of Inputs.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.dtype">
+<span class="sig-name descname"><span class="pre">dtype</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt.dtype"><span class="pre">dtype</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#torch_tensorrt.Input.dtype" title="Permalink to this definition">¶</a></dt>
+<dd><p>torch_tensorrt.dtype.float32)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>The expected data type of the input tensor (default</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.format">
+<span class="sig-name descname"><span class="pre">format</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt.memory_format"><span class="pre">memory_format</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#torch_tensorrt.Input.format" title="Permalink to this definition">¶</a></dt>
+<dd><p>torch_tensorrt.memory_format.linear)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>The expected format of the input tensor (default</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.Device">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">Device</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_Device.html#Device"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Device" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines a device that can be used to specify target devices for engines</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>device_type</strong> (<a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt.DeviceType"><em>DeviceType</em></a>) – Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.</p></li>
+<li><p><strong>gpu_id</strong> (<em>python:int</em>) – Device ID for target GPU</p></li>
+<li><p><strong>dla_core</strong> (<em>python:int</em>) – Core ID for target DLA core</p></li>
+<li><p><strong>allow_gpu_fallback</strong> (<em>bool</em>) – Whether falling back to GPU if DLA cannot support an op should be allowed</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.Device.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_Device.html#Device.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Device.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>__init__ Method for torch_tensorrt.Device</p>
+<p>Device accepts one of a few construction patterns</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>spec</strong> (<em>str</em>) – String with device spec e.g. “dla:0” for dla, core_id 0</p>
+</dd>
+<dt class="field-even">Keyword Arguments</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>gpu_id</strong> (<em>python:int</em>) – ID of target GPU (will get overridden if dla_core is specified to the GPU managing DLA). If specified, no positional arguments should be provided</p></li>
+<li><p><strong>dla_core</strong> (<em>python:int</em>) – ID of target DLA core. If specified, no positional arguments should be provided.</p></li>
+<li><p><strong>allow_gpu_fallback</strong> (<em>bool</em>) – Allow TensorRT to schedule operations on GPU if they are not supported on DLA (ignored if device type is not DLA)</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<ul class="simple">
+<li><p>Device(“gpu:1”)</p></li>
+<li><p>Device(“cuda:1”)</p></li>
+<li><p>Device(“dla:0”, allow_gpu_fallback=True)</p></li>
+<li><p>Device(gpu_id=0, dla_core=0, allow_gpu_fallback=True)</p></li>
+<li><p>Device(dla_core=0, allow_gpu_fallback=True)</p></li>
+<li><p>Device(gpu_id=1)</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.Device.device_type">
+<span class="sig-name descname"><span class="pre">device_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt._enums.DeviceType"><span class="pre">DeviceType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#torch_tensorrt.Device.device_type" title="Permalink to this definition">¶</a></dt>
+<dd><p>Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.Device.dla_core">
+<span class="sig-name descname"><span class="pre">dla_core</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-1</span></em><a class="headerlink" href="#torch_tensorrt.Device.dla_core" title="Permalink to this definition">¶</a></dt>
+<dd><p>Core ID for target DLA core</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.Device.gpu_id">
+<span class="sig-name descname"><span class="pre">gpu_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-1</span></em><a class="headerlink" href="#torch_tensorrt.Device.gpu_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Device ID for target GPU</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="enums">
+<h2>Enums<a class="headerlink" href="#enums" title="Permalink to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">dtype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#dtype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.dtype" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enum to describe data types to Torch-TensorRT, has compatibility with torch, tensorrt and numpy dtypes</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.to">
+<span class="sig-name descname"><span class="pre">to</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">DataType</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_default</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">DataType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#dtype.to"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.dtype.to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert dtype into the equivalent type in [torch, numpy, tensorrt]</p>
+<p>Converts <code class="docutils literal notranslate"><span class="pre">self</span></code> into one of numpy, torch, and tensorrt equivalent dtypes.
+If  <code class="docutils literal notranslate"><span class="pre">self</span></code> is not supported in the target library, then an exception will be raised.
+As such it is not recommended to use this method directly.</p>
+<p>Alternatively use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype.try_to()</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t</strong> (<em>Union</em><em>(</em><em>Type</em><em>(</em><em>torch.dpython:type</em><em>)</em><em>, </em><em>Type</em><em>(</em><em>tensorrt.DataType</em><em>)</em><em>, </em><em>Type</em><em>(</em><em>numpy.dpython:type</em><em>)</em><em>, </em><em>Type</em><em>(</em><em>dpython:type</em><em>)</em><em>)</em>) – Data type enum from another library to convert to</p></li>
+<li><p><strong>use_default</strong> (<em>bool</em>) – In some cases a catch all type (such as <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>) is sufficient, so instead of throwing an exception, return default value.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>dtype equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype</span></code> from library enum <code class="docutils literal notranslate"><span class="pre">t</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Union</em>(torch.dtype, tensorrt.DataType, numpy.dtype, <a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt.dtype"><em>dtype</em></a>)</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>TypeError</strong> – Unsupported data type or unknown target</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">float_dtype</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="c1"># Returns torch.float</span>
+
+<span class="c1"># Failure</span>
+<span class="n">float_dtype</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="c1"># Throws exception</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.try_from">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">try_from</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">DataType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_default</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#dtype.try_from"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.dtype.try_from" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a Torch-TensorRT dtype from another library’s dtype system.</p>
+<p>Takes a dtype enum from one of numpy, torch, and tensorrt and create a <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype</span></code>.
+If the source dtype system is not supported or the type is not supported in Torch-TensorRT,
+then returns <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t</strong> (<em>Union</em><em>(</em><em>torch.dpython:type</em><em>, </em><em>tensorrt.DataType</em><em>, </em><em>numpy.dpython:type</em><em>, </em><em>dpython:type</em><em>)</em>) – Data type enum from another library</p></li>
+<li><p><strong>use_default</strong> (<em>bool</em>) – In some cases a catch all type (such as <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype.f32</span></code>) is sufficient, so instead of throwing an exception, return default value.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype</span></code> to <code class="docutils literal notranslate"><span class="pre">t</span></code> or <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Optional</em>(<a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt.dtype"><em>dtype</em></a>)</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">float_dtype</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">)</span> <span class="c1"># Returns torch_tensorrt.dtype.f32</span>
+
+<span class="c1"># Unsupported type</span>
+<span class="n">float_dtype</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span> <span class="c1"># Returns None</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.try_to">
+<span class="sig-name descname"><span class="pre">try_to</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">DataType</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_default</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">DataType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt._enums.dtype"><span class="pre">dtype</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#dtype.try_to"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.dtype.try_to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert dtype into the equivalent type in [torch, numpy, tensorrt]</p>
+<p>Converts <code class="docutils literal notranslate"><span class="pre">self</span></code> into one of numpy, torch, and tensorrt equivalent dtypes.
+If  <code class="docutils literal notranslate"><span class="pre">self</span></code> is not supported in the target library, then returns <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t</strong> (<em>Union</em><em>(</em><em>Type</em><em>(</em><em>torch.dpython:type</em><em>)</em><em>, </em><em>Type</em><em>(</em><em>tensorrt.DataType</em><em>)</em><em>, </em><em>Type</em><em>(</em><em>numpy.dpython:type</em><em>)</em><em>, </em><em>Type</em><em>(</em><em>dpython:type</em><em>)</em><em>)</em>) – Data type enum from another library to convert to</p></li>
+<li><p><strong>use_default</strong> (<em>bool</em>) – In some cases a catch all type (such as <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>) is sufficient, so instead of throwing an exception, return default value.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>dtype equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype</span></code> from library enum <code class="docutils literal notranslate"><span class="pre">t</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Optional</em>(<em>Union</em>(torch.dtype, tensorrt.DataType, numpy.dtype, <a class="reference internal" href="#torch_tensorrt.dtype" title="torch_tensorrt.dtype"><em>dtype</em></a>))</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">float_dtype</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="c1"># Returns torch.float</span>
+
+<span class="c1"># Failure</span>
+<span class="n">float_dtype</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="c1"># Returns None</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.b">
+<span class="sig-name descname"><span class="pre">b</span></span><a class="headerlink" href="#torch_tensorrt.dtype.b" title="Permalink to this definition">¶</a></dt>
+<dd><p>Boolean value, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.bool</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.bf16">
+<span class="sig-name descname"><span class="pre">bf16</span></span><a class="headerlink" href="#torch_tensorrt.dtype.bf16" title="Permalink to this definition">¶</a></dt>
+<dd><p>16 bit “Brain” floating-point number, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.bfloat16</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.f16">
+<span class="sig-name descname"><span class="pre">f16</span></span><a class="headerlink" href="#torch_tensorrt.dtype.f16" title="Permalink to this definition">¶</a></dt>
+<dd><p>16 bit floating-point number, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.half</span></code>, <code class="docutils literal notranslate"><span class="pre">dtype.fp16</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype.float16</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.f32">
+<span class="sig-name descname"><span class="pre">f32</span></span><a class="headerlink" href="#torch_tensorrt.dtype.f32" title="Permalink to this definition">¶</a></dt>
+<dd><p>32 bit floating-point number, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.float</span></code>, <code class="docutils literal notranslate"><span class="pre">dtype.fp32</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype.float32</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.f4">
+<span class="sig-name descname"><span class="pre">f4</span></span><a class="headerlink" href="#torch_tensorrt.dtype.f4" title="Permalink to this definition">¶</a></dt>
+<dd><p>4 bit floating-point number, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.fp4</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype.float4</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.f64">
+<span class="sig-name descname"><span class="pre">f64</span></span><a class="headerlink" href="#torch_tensorrt.dtype.f64" title="Permalink to this definition">¶</a></dt>
+<dd><p>64 bit floating-point number, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.double</span></code>, <code class="docutils literal notranslate"><span class="pre">dtype.fp64</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype.float64</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.f8">
+<span class="sig-name descname"><span class="pre">f8</span></span><a class="headerlink" href="#torch_tensorrt.dtype.f8" title="Permalink to this definition">¶</a></dt>
+<dd><p>8 bit floating-point number, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.fp8</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype.float8</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.i32">
+<span class="sig-name descname"><span class="pre">i32</span></span><a class="headerlink" href="#torch_tensorrt.dtype.i32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed 32 bit integer, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.int32</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype.int</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.i64">
+<span class="sig-name descname"><span class="pre">i64</span></span><a class="headerlink" href="#torch_tensorrt.dtype.i64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed 64 bit integer, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.int64</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype.long</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.i8">
+<span class="sig-name descname"><span class="pre">i8</span></span><a class="headerlink" href="#torch_tensorrt.dtype.i8" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed 8 bit integer, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.int8</span></code>, when enabled as a kernel precision typically requires the model to support quantization</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.u8">
+<span class="sig-name descname"><span class="pre">u8</span></span><a class="headerlink" href="#torch_tensorrt.dtype.u8" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned 8 bit integer, equivalent to <code class="docutils literal notranslate"><span class="pre">dtype.uint8</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.dtype.unknown">
+<span class="sig-name descname"><span class="pre">unknown</span></span><a class="headerlink" href="#torch_tensorrt.dtype.unknown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sentinel value</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.DeviceType">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">DeviceType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#DeviceType"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.DeviceType" title="Permalink to this definition">¶</a></dt>
+<dd><p>Type of device TensorRT will target</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.DeviceType.to">
+<span class="sig-name descname"><span class="pre">to</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">DeviceType</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt._enums.DeviceType"><span class="pre">DeviceType</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_default</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">DeviceType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt._enums.DeviceType"><span class="pre">DeviceType</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#DeviceType.to"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.DeviceType.to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">DeviceType</span></code> into the equivalent type in tensorrt</p>
+<p>Converts <code class="docutils literal notranslate"><span class="pre">self</span></code> into one of torch or tensorrt equivalent device type.
+If  <code class="docutils literal notranslate"><span class="pre">self</span></code> is not supported in the target library, then an exception will be raised.
+As such it is not recommended to use this method directly.</p>
+<p>Alternatively use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.DeviceType.try_to()</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>t</strong> (<em>Union</em><em>(</em><em>Type</em><em>(</em><em>tensorrt.DeviceType</em><em>)</em><em>, </em><em>Type</em><em>(</em><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt.DeviceType"><em>DeviceType</em></a><em>)</em><em>)</em>) – Device type enum from another library to convert to</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Device type equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.DeviceType</span></code> in enum <code class="docutils literal notranslate"><span class="pre">t</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Union</em>(tensorrt.DeviceType, <a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt.DeviceType"><em>DeviceType</em></a>)</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>TypeError</strong> – Unknown target type or unsupported device type</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">trt_dla</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">)</span> <span class="c1"># Returns tensorrt.DeviceType.DLA</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.DeviceType.try_from">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">try_from</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">d</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">DeviceType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt._enums.DeviceType"><span class="pre">DeviceType</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt._enums.DeviceType"><span class="pre">DeviceType</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#DeviceType.try_from"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.DeviceType.try_from" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a Torch-TensorRT device type enum from a TensorRT device type enum.</p>
+<p>Takes a device type enum from tensorrt and create a <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.DeviceType</span></code>.
+If the source is not supported or the device type is not supported in Torch-TensorRT,
+then an exception will be raised. As such it is not recommended to use this method directly.</p>
+<p>Alternatively use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.DeviceType.try_from()</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>d</strong> (<em>Union</em><em>(</em><em>tensorrt.DeviceType</em><em>, </em><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt.DeviceType"><em>DeviceType</em></a><em>)</em>) – Device type enum from another library</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.DeviceType</span></code> to <code class="docutils literal notranslate"><span class="pre">d</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt.DeviceType"><em>DeviceType</em></a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">torchtrt_dla</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.DeviceType.try_to">
+<span class="sig-name descname"><span class="pre">try_to</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">DeviceType</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt._enums.DeviceType"><span class="pre">DeviceType</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_default</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">DeviceType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt._enums.DeviceType"><span class="pre">DeviceType</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#DeviceType.try_to"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.DeviceType.try_to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">DeviceType</span></code> into the equivalent type in tensorrt</p>
+<p>Converts <code class="docutils literal notranslate"><span class="pre">self</span></code> into one of torch or tensorrt equivalent memory format.
+If  <code class="docutils literal notranslate"><span class="pre">self</span></code> is not supported in the target library, then <code class="docutils literal notranslate"><span class="pre">None</span></code> will be returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>t</strong> (<em>Union</em><em>(</em><em>Type</em><em>(</em><em>tensorrt.DeviceType</em><em>)</em><em>, </em><em>Type</em><em>(</em><a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt.DeviceType"><em>DeviceType</em></a><em>)</em><em>)</em>) – Device type enum from another library to convert to</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Device type equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.DeviceType</span></code> in enum <code class="docutils literal notranslate"><span class="pre">t</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Optional</em>(<em>Union</em>(tensorrt.DeviceType, <a class="reference internal" href="#torch_tensorrt.DeviceType" title="torch_tensorrt.DeviceType"><em>DeviceType</em></a>))</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">trt_dla</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">)</span> <span class="c1"># Returns tensorrt.DeviceType.DLA</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.DeviceType.DLA">
+<span class="sig-name descname"><span class="pre">DLA</span></span><a class="headerlink" href="#torch_tensorrt.DeviceType.DLA" title="Permalink to this definition">¶</a></dt>
+<dd><p>Target is a DLA core</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.DeviceType.GPU">
+<span class="sig-name descname"><span class="pre">GPU</span></span><a class="headerlink" href="#torch_tensorrt.DeviceType.GPU" title="Permalink to this definition">¶</a></dt>
+<dd><p>Target is a GPU</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.DeviceType.UNKNOWN">
+<span class="sig-name descname"><span class="pre">UNKNOWN</span></span><a class="headerlink" href="#torch_tensorrt.DeviceType.UNKNOWN" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sentinel value</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.EngineCapability">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">EngineCapability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#EngineCapability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.EngineCapability" title="Permalink to this definition">¶</a></dt>
+<dd><p>EngineCapability determines the restrictions of a network during build time and what runtime it targets.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.EngineCapability.to">
+<span class="sig-name descname"><span class="pre">to</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">EngineCapability</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt._enums.EngineCapability"><span class="pre">EngineCapability</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">EngineCapability</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt._enums.EngineCapability"><span class="pre">EngineCapability</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#EngineCapability.to"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.EngineCapability.to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">EngineCapability</span></code> into the equivalent type in tensorrt</p>
+<p>Converts <code class="docutils literal notranslate"><span class="pre">self</span></code> into one of torch or tensorrt equivalent engine capability.
+If  <code class="docutils literal notranslate"><span class="pre">self</span></code> is not supported in the target library, then an exception will be raised.
+As such it is not recommended to use this method directly.</p>
+<p>Alternatively use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.EngineCapability.try_to()</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>t</strong> (<em>Union</em><em>(</em><em>Type</em><em>(</em><em>tensorrt.EngineCapability</em><em>)</em><em>, </em><em>Type</em><em>(</em><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability"><em>EngineCapability</em></a><em>)</em><em>)</em>) – Engine capability enum from another library to convert to</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Engine capability equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.EngineCapability</span></code> in enum <code class="docutils literal notranslate"><span class="pre">t</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Union</em>(tensorrt.EngineCapability, <a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability"><em>EngineCapability</em></a>)</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>TypeError</strong> – Unknown target type or unsupported engine capability</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">torchtrt_dla_ec</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">)</span> <span class="c1"># Returns tensorrt.EngineCapability.DLA</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.EngineCapability.try_from">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">try_from</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt._enums.EngineCapability"><span class="pre">EngineCapability</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#EngineCapability.try_from"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.EngineCapability.try_from" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a Torch-TensorRT engine capability enum from a TensorRT engine capability enum.</p>
+<p>Takes a device type enum from tensorrt and create a <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.EngineCapability</span></code>.
+If the source is not supported or the engine capability level is not supported in Torch-TensorRT,
+then an exception will be raised. As such it is not recommended to use this method directly.</p>
+<p>Alternatively use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.EngineCapability.try_from()</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>c</strong> (<em>Union</em><em>(</em><em>tensorrt.EngineCapability</em><em>, </em><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability"><em>EngineCapability</em></a><em>)</em>) – Engine capability enum from another library</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.EngineCapability</span></code> to <code class="docutils literal notranslate"><span class="pre">c</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability"><em>EngineCapability</em></a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">torchtrt_safety_ec</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAEFTY</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.EngineCapability.try_to">
+<span class="sig-name descname"><span class="pre">try_to</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">EngineCapability</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt._enums.EngineCapability"><span class="pre">EngineCapability</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">EngineCapability</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt._enums.EngineCapability"><span class="pre">EngineCapability</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#EngineCapability.try_to"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.EngineCapability.try_to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">EngineCapability</span></code> into the equivalent type in tensorrt</p>
+<p>Converts <code class="docutils literal notranslate"><span class="pre">self</span></code> into one of torch or tensorrt equivalent engine capability.
+If  <code class="docutils literal notranslate"><span class="pre">self</span></code> is not supported in the target library, then <code class="docutils literal notranslate"><span class="pre">None</span></code> will be returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>t</strong> (<em>Union</em><em>(</em><em>Type</em><em>(</em><em>tensorrt.EngineCapability</em><em>)</em><em>, </em><em>Type</em><em>(</em><a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability"><em>EngineCapability</em></a><em>)</em><em>)</em>) – Engine capability enum from another library to convert to</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Engine capability equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.EngineCapability</span></code> in enum <code class="docutils literal notranslate"><span class="pre">t</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Optional</em>(<em>Union</em>(tensorrt.EngineCapability, <a class="reference internal" href="#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability"><em>EngineCapability</em></a>))</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">trt_dla_ec</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">)</span> <span class="c1"># Returns tensorrt.EngineCapability.DLA_STANDALONE</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.EngineCapability.DLA_STANDALONE">
+<span class="sig-name descname"><span class="pre">DLA_STANDALONE</span></span><a class="headerlink" href="#torch_tensorrt.EngineCapability.DLA_STANDALONE" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">EngineCapability.DLA_STANDALONE</span></code> provides a restricted subset of network operations that are DLA compatible and the resulting serialized engine can be executed using standalone DLA runtime APIs.</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.EngineCapability.SAFETY">
+<span class="sig-name descname"><span class="pre">SAFETY</span></span><a class="headerlink" href="#torch_tensorrt.EngineCapability.SAFETY" title="Permalink to this definition">¶</a></dt>
+<dd><p>EngineCapability.SAFETY provides a restricted subset of network operations that are safety certified and the resulting serialized engine can be executed with TensorRT’s safe runtime APIs in the tensorrt.safe namespace.</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.EngineCapability.STANDARD">
+<span class="sig-name descname"><span class="pre">STANDARD</span></span><a class="headerlink" href="#torch_tensorrt.EngineCapability.STANDARD" title="Permalink to this definition">¶</a></dt>
+<dd><p>EngineCapability.STANDARD does not provide any restrictions on functionality and the resulting serialized engine can be executed with TensorRT’s standard runtime APIs.</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">memory_format</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#memory_format"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.memory_format" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.to">
+<span class="sig-name descname"><span class="pre">to</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">memory_format</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">TensorFormat</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt._enums.memory_format"><span class="pre">memory_format</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">memory_format</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">TensorFormat</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt._enums.memory_format"><span class="pre">memory_format</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#memory_format.to"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.memory_format.to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">memory_format</span></code> into the equivalent type in torch or tensorrt</p>
+<p>Converts <code class="docutils literal notranslate"><span class="pre">self</span></code> into one of torch or tensorrt equivalent memory format.
+If  <code class="docutils literal notranslate"><span class="pre">self</span></code> is not supported in the target library, then an exception will be raised.
+As such it is not recommended to use this method directly.</p>
+<p>Alternatively use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.memory_format.try_to()</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>t</strong> (<em>Union</em><em>(</em><em>Type</em><em>(</em><em>torch.memory_format</em><em>)</em><em>, </em><em>Type</em><em>(</em><em>tensorrt.TensorFormat</em><em>)</em><em>, </em><em>Type</em><em>(</em><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt.memory_format"><em>memory_format</em></a><em>)</em><em>)</em>) – Memory format type enum from another library to convert to</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Memory format equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.memory_format</span></code> in enum <code class="docutils literal notranslate"><span class="pre">t</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Union</em>(torch.memory_format, tensorrt.TensorFormat, <a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt.memory_format"><em>memory_format</em></a>)</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>TypeError</strong> – Unknown target type or unsupported memory format</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">tf</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">memory_format</span><span class="o">.</span><span class="n">linear</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="c1"># Returns torch.contiguous</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.try_from">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">try_from</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">memory_format</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">TensorFormat</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt._enums.memory_format"><span class="pre">memory_format</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt._enums.memory_format"><span class="pre">memory_format</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#memory_format.try_from"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.memory_format.try_from" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a Torch-TensorRT memory format enum from another library memory format enum.</p>
+<p>Takes a memory format enum from one of torch, and tensorrt and create a <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.memory_format</span></code>.
+If the source is not supported or the memory format is not supported in Torch-TensorRT,
+then <code class="docutils literal notranslate"><span class="pre">None</span></code> will be returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>f</strong> (<em>Union</em><em>(</em><em>torch.memory_format</em><em>, </em><em>tensorrt.TensorFormat</em><em>, </em><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt.memory_format"><em>memory_format</em></a><em>)</em>) – Memory format enum from another library</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.memory_format</span></code> to <code class="docutils literal notranslate"><span class="pre">f</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Optional</em>(<a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt.memory_format"><em>memory_format</em></a>)</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">torchtrt_linear</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">memory_format</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">contiguous</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.try_to">
+<span class="sig-name descname"><span class="pre">try_to</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">memory_format</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">TensorFormat</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt._enums.memory_format"><span class="pre">memory_format</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">memory_format</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">TensorFormat</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt._enums.memory_format"><span class="pre">memory_format</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_enums.html#memory_format.try_to"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.memory_format.try_to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">memory_format</span></code> into the equivalent type in torch or tensorrt</p>
+<p>Converts <code class="docutils literal notranslate"><span class="pre">self</span></code> into one of torch or tensorrt equivalent memory format.
+If  <code class="docutils literal notranslate"><span class="pre">self</span></code> is not supported in the target library, then <code class="docutils literal notranslate"><span class="pre">None</span></code> will be returned</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>t</strong> (<em>Union</em><em>(</em><em>Type</em><em>(</em><em>torch.memory_format</em><em>)</em><em>, </em><em>Type</em><em>(</em><em>tensorrt.TensorFormat</em><em>)</em><em>, </em><em>Type</em><em>(</em><a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt.memory_format"><em>memory_format</em></a><em>)</em><em>)</em>) – Memory format type enum from another library to convert to</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Memory format equivalent <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.memory_format</span></code> in enum <code class="docutils literal notranslate"><span class="pre">t</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><em>Optional</em>(<em>Union</em>(torch.memory_format, tensorrt.TensorFormat, <a class="reference internal" href="#torch_tensorrt.memory_format" title="torch_tensorrt.memory_format"><em>memory_format</em></a>))</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="c1"># Succeeds</span>
+<span class="n">tf</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">memory_format</span><span class="o">.</span><span class="n">linear</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="c1"># Returns torch.contiguous</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.cdhw32">
+<span class="sig-name descname"><span class="pre">cdhw32</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.cdhw32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thirty-two wide channel vectorized row major format with 3 spatial dimensions.</p>
+<p>This format is bound to FP16 and INT8. It is only available for dimensions &gt;= 4.</p>
+<p>For a tensor with dimensions {N, C, D, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+31)/32][D][H][W][32], with the tensor coordinates (n, d, c, h, w) mapping to array subscript [n][c/32][d][h][w][c%32].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.chw16">
+<span class="sig-name descname"><span class="pre">chw16</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.chw16" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sixteen wide channel vectorized row major format.</p>
+<p>This format is bound to FP16. It is only available for dimensions &gt;= 3.</p>
+<p>For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+15)/16][H][W][16], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/16][h][w][c%16].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.chw2">
+<span class="sig-name descname"><span class="pre">chw2</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.chw2" title="Permalink to this definition">¶</a></dt>
+<dd><p>Two wide channel vectorized row major format.</p>
+<p>This format is bound to FP16 in TensorRT. It is only available for dimensions &gt;= 3.</p>
+<p>For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+1)/2][H][W][2], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/2][h][w][c%2].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.chw32">
+<span class="sig-name descname"><span class="pre">chw32</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.chw32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thirty-two wide channel vectorized row major format.</p>
+<p>This format is only available for dimensions &gt;= 3.</p>
+<p>For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+31)/32][H][W][32], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/32][h][w][c%32].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.chw4">
+<span class="sig-name descname"><span class="pre">chw4</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.chw4" title="Permalink to this definition">¶</a></dt>
+<dd><p>Four wide channel vectorized row major format. This format is bound to INT8. It is only available for dimensions &gt;= 3.</p>
+<p>For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+3)/4][H][W][4], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/4][h][w][c%4].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.dhwc">
+<span class="sig-name descname"><span class="pre">dhwc</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.dhwc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Non-vectorized channel-last format. This format is bound to FP32. It is only available for dimensions &gt;= 4.</p>
+<p>Equivient to <code class="docutils literal notranslate"><span class="pre">memory_format.channels_last_3d</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.dhwc8">
+<span class="sig-name descname"><span class="pre">dhwc8</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.dhwc8" title="Permalink to this definition">¶</a></dt>
+<dd><p>Eight channel format where C is padded to a multiple of 8.</p>
+<p>This format is bound to FP16, and it is only available for dimensions &gt;= 4.</p>
+<p>For a tensor with dimensions {N, C, D, H, W}, the memory layout is equivalent to an array with dimensions [N][D][H][W][(C+7)/8*8], with the tensor coordinates (n, c, d, h, w) mapping to array subscript [n][d][h][w][c].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.dla_hwc4">
+<span class="sig-name descname"><span class="pre">dla_hwc4</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.dla_hwc4" title="Permalink to this definition">¶</a></dt>
+<dd><p>DLA image format. channel-last format. C can only be 1, 3, 4. If C == 3 it will be rounded to 4. The stride for stepping along the H axis is rounded up to 32 bytes.</p>
+<p>This format is bound to FP16/Int8 and is only available for dimensions &gt;= 3.</p>
+<p>For a tensor with dimensions {N, C, H, W}, with C’ is 1, 4, 4 when C is 1, 3, 4 respectively, the memory layout is equivalent to a C array with dimensions [N][H][roundUp(W, 32/C’/elementSize)][C’] where elementSize is 2 for FP16 and 1 for Int8, C’ is the rounded C. The tensor coordinates (n, c, h, w) maps to array subscript [n][h][w][c].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.dla_linear">
+<span class="sig-name descname"><span class="pre">dla_linear</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.dla_linear" title="Permalink to this definition">¶</a></dt>
+<dd><p>DLA planar format. Row major format. The stride for stepping along the H axis is rounded up to 64 bytes.</p>
+<p>This format is bound to FP16/Int8 and is only available for dimensions &gt;= 3.</p>
+<p>For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][C][H][roundUp(W, 64/elementSize)] where elementSize is 2 for FP16 and 1 for Int8, with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c][h][w].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.hwc">
+<span class="sig-name descname"><span class="pre">hwc</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.hwc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Non-vectorized channel-last format. This format is bound to FP32 and is only available for dimensions &gt;= 3.</p>
+<p>Equivient to <code class="docutils literal notranslate"><span class="pre">memory_format.channels_last</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.hwc16">
+<span class="sig-name descname"><span class="pre">hwc16</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.hwc16" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sixteen channel format where C is padded to a multiple of 16. This format is bound to FP16. It is only available for dimensions &gt;= 3.</p>
+<p>For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to the array with dimensions [N][H][W][(C+15)/16*16], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][h][w][c].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.hwc8">
+<span class="sig-name descname"><span class="pre">hwc8</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.hwc8" title="Permalink to this definition">¶</a></dt>
+<dd><p>Eight channel format where C is padded to a multiple of 8.</p>
+<p>This format is bound to FP16. It is only available for dimensions &gt;= 3.</p>
+<p>For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to the array with dimensions [N][H][W][(C+7)/8*8], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][h][w][c].</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.memory_format.linear">
+<span class="sig-name descname"><span class="pre">linear</span></span><a class="headerlink" href="#torch_tensorrt.memory_format.linear" title="Permalink to this definition">¶</a></dt>
+<dd><p>Row major linear format.</p>
+<p>For a tensor with dimensions {N, C, H, W}, the W axis always has unit stride, and the stride of every other axis is at least the product of the next dimension times the next stride. the strides are the same as for a C array with dimensions [N][C][H][W].</p>
+<p>Equivient to <code class="docutils literal notranslate"><span class="pre">memory_format.contiguous</span></code></p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ptq.html">torch_tensorrt.ts.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo.html">torch_tensorrt.dynamo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="runtime.html">torch_tensorrt.runtime</a></li>
+</ul>
+</div>
+</section>
+</section>
+
+
+             </article>
+             
+            </div>
+            <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="logging.html" class="btn btn-neutral float-right" title="torch_tensorrt.logging" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+      
+      
+        <a href="../tutorials/notebooks.html" class="btn btn-neutral" title="Legacy notebooks" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
+    </div>
+  
+
+  
+
+    <hr>
+
+  
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2024, NVIDIA Corporation.
+
+    </p>
+  </div>
+    
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+     
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">torch_tensorrt</a><ul>
+<li><a class="reference internal" href="#functions">Functions</a></li>
+<li><a class="reference internal" href="#classes">Classes</a></li>
+<li><a class="reference internal" href="#enums">Enums</a></li>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  
+
+
+  
+
+     
+       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+         <script src="../_static/jquery.js"></script>
+         <script src="../_static/underscore.js"></script>
+         <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+         <script src="../_static/doctools.js"></script>
+         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
+
+  
+
+  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">Stay up to date</li>
+            <li><a href="https://www.facebook.com/pytorch" target="_blank">Facebook</a></li>
+            <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
+            <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
+            <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
+          </ul>  
+          </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">PyTorch Podcasts</li>
+            <li><a href="https://open.spotify.com/show/6UzHKeiy368jKfQMKKvJY5" target="_blank">Spotify</a></li>
+            <li><a href="https://podcasts.apple.com/us/podcast/pytorch-developer-podcast/id1566080008" target="_blank">Apple</a></li>
+            <li><a href="https://www.google.com/podcasts?feed=aHR0cHM6Ly9mZWVkcy5zaW1wbGVjYXN0LmNvbS9PQjVGa0lsOA%3D%3D" target="_blank">Google</a></li>
+            <li><a href="https://music.amazon.com/podcasts/7a4e6f0e-26c2-49e9-a478-41bd244197d0/PyTorch-Developer-Podcast?" target="_blank">Amazon</a></li>
+          </ul>
+         </div>
+        </div>
+        
+        <div class="privacy-policy">
+          <ul>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
+            <li class="privacy-policy-links">|</li>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/privacy-policy/" target="_blank">Privacy</a></li>
+          </ul>
+        </div>
+        <div class="copyright">
+        <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
+          For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
+          <a href="https://www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
+          please see <a href="https://www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+      </div>
+     </div>
+
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+           <li class="resources-mobile-menu-title">
+             <a>Learn</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/get-started">Get Started</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials">Tutorials</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/basics/intro.html">Learn the Basics</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/recipes/recipes_index.html">PyTorch Recipes</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/introyt.html">Introduction to PyTorch - YouTube Series</a>
+             </li>
+           </ul>
+           <li class="resources-mobile-menu-title">
+             <a>Ecosystem</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/ecosystem">Tools</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/#community-module">Community</a>
+             </li>
+             <li>
+               <a href="https://discuss.pytorch.org/">Forums</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/resources">Developer Resources</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
+             </li>
+           </ul>
+
+           <li class="resources-mobile-menu-title">
+             <a>Edge</a>
+           </li>
+
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/edge">About PyTorch Edge</a>
+             </li>
+             
+             <li>
+               <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
+             </li>
+           </ul>
+
+           <li class="resources-mobile-menu-title">
+             <a>Docs</a>
+           </li>
+
+           <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/pytorch-domains">PyTorch Domains</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            <a>Blog & News</a>
+          </li>
+            
+           <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/blog/">PyTorch Blog</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/community-blog">Community Blog</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/videos">Videos</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
+          </ul>
+          
+          <li class="resources-mobile-menu-title">
+            <a>About</a>
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
+            </li>
+          </ul>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

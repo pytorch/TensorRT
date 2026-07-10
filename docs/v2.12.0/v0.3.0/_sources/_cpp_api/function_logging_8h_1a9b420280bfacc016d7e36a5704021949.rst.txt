@@ -1,0 +1,13 @@
+.. _exhale_function_logging_8h_1a9b420280bfacc016d7e36a5704021949:
+
+Function trtorch::logging::get_is_colored_output_on
+===================================================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_logging.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::logging::get_is_colored_output_on()

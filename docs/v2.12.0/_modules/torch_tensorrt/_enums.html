@@ -1,0 +1,1998 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>torch_tensorrt._enums &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/torch_tensorrt/_enums';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">torch_tensor...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for torch_tensorrt._enums</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span><span class="p">,</span> <span class="n">auto</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span><span class="p">,</span> <span class="n">needs_torch_tensorrt_runtime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_tensorrt_version_supported</span>
+
+
+<div class="viewcode-block" id="dtype">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">dtype</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to describe data types to Torch-TensorRT, has compatibility with torch, tensorrt and numpy dtypes&quot;&quot;&quot;</span>
+
+    <span class="c1"># Supported types in Torch-TensorRT</span>
+    <span class="n">unknown</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sentinel value</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">u8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Unsigned 8 bit integer, equivalent to ``dtype.uint8``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">i8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Signed 8 bit integer, equivalent to ``dtype.int8``, when enabled as a kernel precision typically requires the model to support quantization</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">i32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Signed 32 bit integer, equivalent to ``dtype.int32`` and ``dtype.int``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">i64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Signed 64 bit integer, equivalent to ``dtype.int64`` and ``dtype.long``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">f16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;16 bit floating-point number, equivalent to ``dtype.half``, ``dtype.fp16`` and ``dtype.float16``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">f32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;32 bit floating-point number, equivalent to ``dtype.float``, ``dtype.fp32`` and ``dtype.float32``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">f64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;64 bit floating-point number, equivalent to ``dtype.double``, ``dtype.fp64`` and ``dtype.float64``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">b</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Boolean value, equivalent to ``dtype.bool``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">bf16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;16 bit &quot;Brain&quot; floating-point number, equivalent to ``dtype.bfloat16``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">f8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;8 bit floating-point number, equivalent to ``dtype.fp8`` and ``dtype.float8``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">f4</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;4 bit floating-point number, equivalent to ``dtype.fp4`` and ``dtype.float4``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">uint8</span> <span class="o">=</span> <span class="n">u8</span>
+    <span class="n">int8</span> <span class="o">=</span> <span class="n">i8</span>
+
+    <span class="n">int32</span> <span class="o">=</span> <span class="n">i32</span>
+
+    <span class="n">long</span> <span class="o">=</span> <span class="n">i64</span>
+    <span class="n">int64</span> <span class="o">=</span> <span class="n">i64</span>
+
+    <span class="n">float8</span> <span class="o">=</span> <span class="n">f8</span>
+    <span class="n">fp8</span> <span class="o">=</span> <span class="n">f8</span>
+
+    <span class="n">float4</span> <span class="o">=</span> <span class="n">f4</span>
+    <span class="n">fp4</span> <span class="o">=</span> <span class="n">f4</span>
+
+    <span class="n">half</span> <span class="o">=</span> <span class="n">f16</span>
+    <span class="n">fp16</span> <span class="o">=</span> <span class="n">f16</span>
+    <span class="n">float16</span> <span class="o">=</span> <span class="n">f16</span>
+
+    <span class="nb">float</span> <span class="o">=</span> <span class="n">f32</span>
+    <span class="n">fp32</span> <span class="o">=</span> <span class="n">f32</span>
+    <span class="n">float32</span> <span class="o">=</span> <span class="n">f32</span>
+
+    <span class="n">double</span> <span class="o">=</span> <span class="n">f64</span>
+    <span class="n">fp64</span> <span class="o">=</span> <span class="n">f64</span>
+    <span class="n">float64</span> <span class="o">=</span> <span class="n">f64</span>
+
+    <span class="n">bfloat16</span> <span class="o">=</span> <span class="n">bf16</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_np_obj</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="nb">type</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">generic</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">,</span> <span class="nb">type</span><span class="p">],</span>
+        <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">dtype</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT dtype from another library&#39;s dtype system.</span>
+
+<span class="sd">        Takes a dtype enum from one of numpy, torch, and tensorrt and create a ``torch_tensorrt.dtype``.</span>
+<span class="sd">        If the source dtype system is not supported or the type is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.dtype.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): Data type enum from another library</span>
+<span class="sd">            use_default (bool): In some cases a catch all type (such as ``torch_tensorrt.dtype.f32``) is sufficient, so instead of throwing an exception, return default value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dtype: Equivalent ``torch_tensorrt.dtype`` to ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unsupported data type or unknown source</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype._from(torch.float) # Returns torch_tensorrt.dtype.f32</span>
+
+<span class="sd">                # Throws exception</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype._from(torch.complex128)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># TODO: Ideally implemented with match statement but need to wait for Py39 EoL</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">u8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float8_e4m3fn</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span>
+            <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Given dtype that does not have direct mapping to Torch-TensorRT supported types (</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">), defaulting to torch_tensorrt.dtype.float&quot;</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">float</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as a data type for translation (support: bool, int, long, half, float, bfloat16), got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">UINT8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">u8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">HALF</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FLOAT</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BOOL</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BF16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">is_tensorrt_version_supported</span><span class="p">(</span><span class="s2">&quot;10.8.0&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP4</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">fp4</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as a data type for translation (support: bool, int, half, float, bfloat16), got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_is_np_obj</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">u8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">float16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span>
+            <span class="c1"># TODO: Consider using ml_dtypes when issues like this are resolved:</span>
+            <span class="c1"># https://github.com/pytorch/pytorch/issues/109873</span>
+            <span class="c1"># elif t == ml_dtypes.bfloat16:</span>
+            <span class="c1">#    return dtype.bf16</span>
+            <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Given dtype that does not have direct mapping to Torch-TensorRT supported types (</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">), defaulting to torch_tensorrt.dtype.float&quot;</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">float</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="s2">&quot;Provided an unsupported data type as an input data type (support: bool, int, long, half, float, bfloat16), got: &quot;</span>
+                    <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">dtype</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">t</span>
+
+        <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">long</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span>
+                <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">int32</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span>
+                <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">int8</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span>
+                <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">half</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span>
+                <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">float</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span>
+                <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">double</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span>
+                <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span>
+                <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">unknown</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">unknown</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+        <span class="c1"># else: # commented out for mypy</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Provided unsupported source type for dtype conversion (got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="dtype.try_from">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_from">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_from</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">],</span>
+        <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">dtype</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT dtype from another library&#39;s dtype system.</span>
+
+<span class="sd">        Takes a dtype enum from one of numpy, torch, and tensorrt and create a ``torch_tensorrt.dtype``.</span>
+<span class="sd">        If the source dtype system is not supported or the type is not supported in Torch-TensorRT,</span>
+<span class="sd">        then returns ``None``.</span>
+
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): Data type enum from another library</span>
+<span class="sd">            use_default (bool): In some cases a catch all type (such as ``torch_tensorrt.dtype.f32``) is sufficient, so instead of throwing an exception, return default value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(dtype): Equivalent ``torch_tensorrt.dtype`` to ``t`` or ``None``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.try_from(torch.float) # Returns torch_tensorrt.dtype.f32</span>
+
+<span class="sd">                # Unsupported type</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.try_from(torch.complex128) # Returns None</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">casted_format</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">use_default</span><span class="o">=</span><span class="n">use_default</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">casted_format</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Conversion from </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> to torch_tensorrt.dtype failed&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="dtype.to">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">dtype</span><span class="p">]],</span>
+        <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert dtype into the equivalent type in [torch, numpy, tensorrt]</span>
+
+<span class="sd">        Converts ``self`` into one of numpy, torch, and tensorrt equivalent dtypes.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then an exception will be raised.</span>
+<span class="sd">        As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.dtype.try_to()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(torch.dtype), Type(tensorrt.DataType), Type(numpy.dtype), Type(dtype))): Data type enum from another library to convert to</span>
+<span class="sd">            use_default (bool): In some cases a catch all type (such as ``torch.float``) is sufficient, so instead of throwing an exception, return default value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype): dtype equivalent ``torch_tensorrt.dtype`` from library enum ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unsupported data type or unknown target</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.f32.to(torch.dtype) # Returns torch.float</span>
+
+<span class="sd">                # Failure</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.bf16.to(numpy.dtype) # Throws exception</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># TODO: Ideally implemented with match statement but need to wait for Py39 EoL</span>
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">u8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">int</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">long</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float8_e4m3fn</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">double</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span>
+            <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Given dtype that does not have direct mapping to torch (</span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2">), defaulting to torch.float&quot;</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported torch dtype (had: </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">u8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">UINT8</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT8</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT32</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP8</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT64</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">HALF</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FLOAT</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BOOL</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BF16</span>
+            <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FLOAT</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">is_tensorrt_version_supported</span><span class="p">(</span><span class="s2">&quot;10.8.0&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP4</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unsupported tensorrt dtype&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">u8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">uint8</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">int8</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">int64</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float16</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">bool_</span>
+            <span class="c1"># TODO: Consider using ml_dtypes when issues like this are resolved:</span>
+            <span class="c1"># https://github.com/pytorch/pytorch/issues/109873</span>
+            <span class="c1"># elif self == dtype.bf16:</span>
+            <span class="c1">#    return ml_dtypes.bfloat16</span>
+            <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unsupported numpy dtype&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">dtype</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+
+            <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">long</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">int8</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">int32</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">half</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">float</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">double</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">bool</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">unknown</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">unknown</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+        <span class="c1"># else: # commented out for mypy</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Provided unsupported destination type for dtype conversion </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="dtype.try_to">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">dtype</span><span class="p">]],</span>
+        <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert dtype into the equivalent type in [torch, numpy, tensorrt]</span>
+
+<span class="sd">        Converts ``self`` into one of numpy, torch, and tensorrt equivalent dtypes.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then returns ``None``.</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(torch.dtype), Type(tensorrt.DataType), Type(numpy.dtype), Type(dtype))): Data type enum from another library to convert to</span>
+<span class="sd">            use_default (bool): In some cases a catch all type (such as ``torch.float``) is sufficient, so instead of throwing an exception, return default value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): dtype equivalent ``torch_tensorrt.dtype`` from library enum ``t``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.f32.to(torch.dtype) # Returns torch.float</span>
+
+<span class="sd">                # Failure</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.bf16.to(numpy.dtype) # Returns None</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">casted_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">use_default</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">casted_format</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;torch_tensorrt.dtype conversion to target type </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> failed&quot;</span><span class="p">,</span>
+                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">other_</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">other_</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="c1"># Putting aliases here that mess with mypy</span>
+    <span class="nb">bool</span> <span class="o">=</span> <span class="n">b</span>
+    <span class="nb">int</span> <span class="o">=</span> <span class="n">i32</span></div>
+
+
+
+<div class="viewcode-block" id="memory_format">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">memory_format</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;&quot;&quot;&quot;</span>
+
+    <span class="c1"># TensorRT supported memory layouts</span>
+    <span class="n">linear</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Row major linear format.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the W axis always has unit stride, and the stride of every other axis is at least the product of the next dimension times the next stride. the strides are the same as for a C array with dimensions [N][C][H][W].</span>
+
+<span class="sd">    Equivient to ``memory_format.contiguous``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">chw2</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Two wide channel vectorized row major format.</span>
+
+<span class="sd">    This format is bound to FP16 in TensorRT. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+1)/2][H][W][2], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/2][h][w][c%2].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">hwc8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Eight channel format where C is padded to a multiple of 8.</span>
+
+<span class="sd">    This format is bound to FP16. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to the array with dimensions [N][H][W][(C+7)/8*8], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][h][w][c].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">chw4</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Four wide channel vectorized row major format. This format is bound to INT8. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+3)/4][H][W][4], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/4][h][w][c%4].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">chw16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sixteen wide channel vectorized row major format.</span>
+
+<span class="sd">    This format is bound to FP16. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+15)/16][H][W][16], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/16][h][w][c%16].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">chw32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Thirty-two wide channel vectorized row major format.</span>
+
+<span class="sd">    This format is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+31)/32][H][W][32], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/32][h][w][c%32].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dhwc8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Eight channel format where C is padded to a multiple of 8.</span>
+
+<span class="sd">    This format is bound to FP16, and it is only available for dimensions &gt;= 4.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, D, H, W}, the memory layout is equivalent to an array with dimensions [N][D][H][W][(C+7)/8*8], with the tensor coordinates (n, c, d, h, w) mapping to array subscript [n][d][h][w][c].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">cdhw32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Thirty-two wide channel vectorized row major format with 3 spatial dimensions.</span>
+
+<span class="sd">    This format is bound to FP16 and INT8. It is only available for dimensions &gt;= 4.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, D, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+31)/32][D][H][W][32], with the tensor coordinates (n, d, c, h, w) mapping to array subscript [n][c/32][d][h][w][c%32].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">hwc</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Non-vectorized channel-last format. This format is bound to FP32 and is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    Equivient to ``memory_format.channels_last``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dla_linear</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; DLA planar format. Row major format. The stride for stepping along the H axis is rounded up to 64 bytes.</span>
+
+<span class="sd">    This format is bound to FP16/Int8 and is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][C][H][roundUp(W, 64/elementSize)] where elementSize is 2 for FP16 and 1 for Int8, with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c][h][w].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dla_hwc4</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;DLA image format. channel-last format. C can only be 1, 3, 4. If C == 3 it will be rounded to 4. The stride for stepping along the H axis is rounded up to 32 bytes.</span>
+
+<span class="sd">    This format is bound to FP16/Int8 and is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, with C’ is 1, 4, 4 when C is 1, 3, 4 respectively, the memory layout is equivalent to a C array with dimensions [N][H][roundUp(W, 32/C’/elementSize)][C’] where elementSize is 2 for FP16 and 1 for Int8, C’ is the rounded C. The tensor coordinates (n, c, h, w) maps to array subscript [n][h][w][c].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">hwc16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sixteen channel format where C is padded to a multiple of 16. This format is bound to FP16. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to the array with dimensions [N][H][W][(C+15)/16*16], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][h][w][c].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dhwc</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Non-vectorized channel-last format. This format is bound to FP32. It is only available for dimensions &gt;= 4.</span>
+
+<span class="sd">    Equivient to ``memory_format.channels_last_3d``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># PyTorch aliases for TRT layouts</span>
+    <span class="n">contiguous</span> <span class="o">=</span> <span class="n">linear</span>
+    <span class="n">channels_last</span> <span class="o">=</span> <span class="n">hwc</span>
+    <span class="n">channels_last_3d</span> <span class="o">=</span> <span class="n">dhwc</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">memory_format</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT memory format enum from another library memory format enum.</span>
+
+<span class="sd">        Takes a memory format enum from one of torch, and tensorrt and create a ``torch_tensorrt.memory_format``.</span>
+<span class="sd">        If the source is not supported or the memory format is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.memory_format.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            f (Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            memory_format: Equivalent ``torch_tensorrt.memory_format`` to ``f``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unsupported memory format or unknown source</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_linear = torch_tensorrt.memory_format._from(torch.contiguous)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO: Ideally implemented with match statement but need to wait for Py39 EoL</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">f</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">contiguous</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">channels_last</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">channels_last_3d</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">channels_last_3d</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Provided an unsupported memory format for tensor, got: </span><span class="si">{</span><span class="n">dtype</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">LINEAR</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">linear</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CHW2</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">chw2</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">HWC8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">hwc8</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CHW4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">chw4</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CHW16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">chw16</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CHW32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">chw32</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">DHWC8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">dhwc8</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CDHW32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">cdhw32</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">HWC</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">hwc</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">DLA_LINEAR</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">dla_linear</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">DLA_HWC4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">dla_hwc4</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">HWC16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">hwc16</span>
+            <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">DHWC</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">dhwc</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Provided an unsupported tensor format for tensor, got: </span><span class="si">{</span><span class="n">dtype</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">f</span>
+
+        <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">f</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">contiguous</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">contiguous</span>
+                <span class="k">elif</span> <span class="n">f</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">channels_last</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">channels_last</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">&quot;Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)&quot;</span>
+                    <span class="p">)</span>
+        <span class="c1"># else: # commented out for mypy</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Provided unsupported source type for memory_format conversion&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="memory_format.try_from">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_from">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_from</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT memory format enum from another library memory format enum.</span>
+
+<span class="sd">        Takes a memory format enum from one of torch, and tensorrt and create a ``torch_tensorrt.memory_format``.</span>
+<span class="sd">        If the source is not supported or the memory format is not supported in Torch-TensorRT,</span>
+<span class="sd">        then ``None`` will be returned.</span>
+
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            f (Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(memory_format): Equivalent ``torch_tensorrt.memory_format`` to ``f``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_linear = torch_tensorrt.memory_format.try_from(torch.contiguous)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">casted_format</span> <span class="o">=</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">casted_format</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Conversion from </span><span class="si">{</span><span class="n">f</span><span class="si">}</span><span class="s2"> to torch_tensorrt.memory_format failed&quot;</span><span class="p">,</span>
+                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="memory_format.to">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]</span>
+        <span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``memory_format`` into the equivalent type in torch or tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent memory format.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then an exception will be raised.</span>
+<span class="sd">        As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.memory_format.try_to()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(torch.memory_format), Type(tensorrt.TensorFormat), Type(memory_format))): Memory format type enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union(torch.memory_format, tensorrt.TensorFormat, memory_format): Memory format equivalent ``torch_tensorrt.memory_format`` in enum ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown target type or unsupported memory format</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                tf = torch_tensorrt.memory_format.linear.to(torch.dtype) # Returns torch.contiguous</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">contiguous</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">channels_last</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">channels_last_3d</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">channels_last_3d</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unsupported torch dtype&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">linear</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">LINEAR</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">chw2</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CHW2</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">hwc8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">HWC8</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">chw4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CHW4</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">chw16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CHW16</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">chw32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CHW32</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">dhwc8</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">DHWC8</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">cdhw32</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">CDHW32</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">hwc</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">HWC</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">dla_linear</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">DLA_LINEAR</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">dla_hwc4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">DLA_HWC4</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">hwc16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">HWC16</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">dhwc</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">DHWC</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unsupported tensorrt memory format&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">memory_format</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+
+            <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">contiguous</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">contiguous</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">channels_last</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">channels_last</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">&quot;Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)&quot;</span>
+                    <span class="p">)</span>
+        <span class="c1"># else: # commented out for mypy</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;Provided unsupported destination type for memory format conversion&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="memory_format.try_to">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]</span>
+        <span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``memory_format`` into the equivalent type in torch or tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent memory format.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then ``None`` will be returned</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(torch.memory_format), Type(tensorrt.TensorFormat), Type(memory_format))): Memory format type enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format equivalent ``torch_tensorrt.memory_format`` in enum ``t``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                tf = torch_tensorrt.memory_format.linear.to(torch.dtype) # Returns torch.contiguous</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">casted_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">casted_format</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;torch_tensorrt.memory_format conversion to target type </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> failed&quot;</span><span class="p">,</span>
+                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">other_</span> <span class="o">=</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">other_</span><span class="o">.</span><span class="n">value</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="DeviceType">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DeviceType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Type of device TensorRT will target&quot;&quot;&quot;</span>
+
+    <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sentinel value</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">GPU</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Target is a GPU</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">DLA</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Target is a DLA core</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DeviceType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT device type enum from a TensorRT device type enum.</span>
+
+<span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.DeviceType``.</span>
+<span class="sd">        If the source is not supported or the device type is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.DeviceType.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            d (Union(tensorrt.DeviceType, DeviceType)): Device type enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            DeviceType: Equivalent ``torch_tensorrt.DeviceType`` to ``d``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown source type or unsupported device type</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_dla = torch_tensorrt.DeviceType._from(tensorrt.DeviceType.DLA)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
+            <span class="k">elif</span> <span class="n">d</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Provided an unsupported device type (support: GPU/DLA)&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">d</span>
+
+        <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
+                <span class="k">elif</span> <span class="n">d</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">&quot;Provided an unsupported device type (support: GPU/DLA)&quot;</span>
+                    <span class="p">)</span>
+        <span class="c1"># else: # commented out for mypy</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Provided unsupported source type for DeviceType conversion&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DeviceType.try_from">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_from">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT device type enum from a TensorRT device type enum.</span>
+
+<span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.DeviceType``.</span>
+<span class="sd">        If the source is not supported or the device type is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.DeviceType.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            d (Union(tensorrt.DeviceType, DeviceType)): Device type enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            DeviceType: Equivalent ``torch_tensorrt.DeviceType`` to ``d``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_dla = torch_tensorrt.DeviceType._from(tensorrt.DeviceType.DLA)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">casted_format</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">casted_format</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Conversion from </span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2"> to torch_tensorrt.DeviceType failed&quot;</span><span class="p">,</span>
+                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="DeviceType.to">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]],</span>
+        <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``DeviceType`` into the equivalent type in tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent device type.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then an exception will be raised.</span>
+<span class="sd">        As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.DeviceType.try_to()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(tensorrt.DeviceType), Type(DeviceType))): Device type enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union(tensorrt.DeviceType, DeviceType): Device type equivalent ``torch_tensorrt.DeviceType`` in enum ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown target type or unsupported device type</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                trt_dla = torch_tensorrt.DeviceType.DLA.to(tensorrt.DeviceType) # Returns tensorrt.DeviceType.DLA</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span>
+            <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Provided an unsupported device type (support: GPU/DLA)&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">DeviceType</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+
+            <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">&quot;Provided an unsupported device type (support: GPU/DLA)&quot;</span>
+                    <span class="p">)</span>
+        <span class="c1"># else: # commented out for mypy</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;Provided unsupported destination type for device type conversion&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DeviceType.try_to">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]],</span>
+        <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``DeviceType`` into the equivalent type in tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent memory format.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then ``None`` will be returned.</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(tensorrt.DeviceType), Type(DeviceType))): Device type enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(Union(tensorrt.DeviceType, DeviceType)): Device type equivalent ``torch_tensorrt.DeviceType`` in enum ``t``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                trt_dla = torch_tensorrt.DeviceType.DLA.to(tensorrt.DeviceType) # Returns tensorrt.DeviceType.DLA</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">casted_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">use_default</span><span class="o">=</span><span class="n">use_default</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">casted_format</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;torch_tensorrt.DeviceType conversion to target type </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> failed&quot;</span><span class="p">,</span>
+                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">other_</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">other_</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="EngineCapability">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EngineCapability</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    EngineCapability determines the restrictions of a network during build time and what runtime it targets.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">STANDARD</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    EngineCapability.STANDARD does not provide any restrictions on functionality and the resulting serialized engine can be executed with TensorRT’s standard runtime APIs.</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">SAFETY</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    EngineCapability.SAFETY provides a restricted subset of network operations that are safety certified and the resulting serialized engine can be executed with TensorRT’s safe runtime APIs in the tensorrt.safe namespace.</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">DLA_STANDALONE</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ``EngineCapability.DLA_STANDALONE`` provides a restricted subset of network operations that are DLA compatible and the resulting serialized engine can be executed using standalone DLA runtime APIs.</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">c</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EngineCapability</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT Engine capability enum from a TensorRT Engine capability enum.</span>
+
+<span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.EngineCapability``.</span>
+<span class="sd">        If the source is not supported or the engine capability is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.EngineCapability.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            c (Union(tensorrt.EngineCapability, EngineCapability)): Engine capability enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            EngineCapability: Equivalent ``torch_tensorrt.EngineCapability`` to ``c``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown source type or unsupported engine capability</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_ec = torch_tensorrt.EngineCapability._from(tensorrt.EngineCapability.SAFETY)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span>
+            <span class="k">elif</span> <span class="n">c</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAFETY</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAFETY</span>
+            <span class="k">elif</span> <span class="n">c</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Provided an unsupported engine capability&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">c</span>
+
+        <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span>
+                <span class="k">elif</span> <span class="n">c</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAFETY</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAFETY</span>
+                <span class="k">elif</span> <span class="n">c</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Provided an unsupported engine capability&quot;</span><span class="p">)</span>
+        <span class="c1"># else: # commented out for mypy</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;Provided unsupported source type for EngineCapability conversion&quot;</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="EngineCapability.try_from">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_from">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_from</span><span class="p">(</span>
+        <span class="n">c</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT engine capability enum from a TensorRT engine capability enum.</span>
+
+<span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.EngineCapability``.</span>
+<span class="sd">        If the source is not supported or the engine capability level is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.EngineCapability.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            c (Union(tensorrt.EngineCapability, EngineCapability)): Engine capability enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            EngineCapability: Equivalent ``torch_tensorrt.EngineCapability`` to ``c``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_safety_ec = torch_tensorrt.EngineCapability._from(tensorrt.EngineCapability.SAEFTY)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">casted_format</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">casted_format</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Conversion from </span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2"> to torch_tensorrt.EngineCapablity failed&quot;</span><span class="p">,</span>
+                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="EngineCapability.to">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``EngineCapability`` into the equivalent type in tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent engine capability.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then an exception will be raised.</span>
+<span class="sd">        As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.EngineCapability.try_to()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(tensorrt.EngineCapability), Type(EngineCapability))): Engine capability enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union(tensorrt.EngineCapability, EngineCapability): Engine capability equivalent ``torch_tensorrt.EngineCapability`` in enum ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown target type or unsupported engine capability</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                torchtrt_dla_ec = torch_tensorrt.EngineCapability.DLA_STANDALONE.to(tensorrt.EngineCapability) # Returns tensorrt.EngineCapability.DLA</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAFETY</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAFETY</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Provided an unsupported engine capability&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+
+            <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAFETY</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">SAFETY</span>
+                <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DLA_STANDALONE</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Provided an unsupported engine capability&quot;</span><span class="p">)</span>
+        <span class="c1"># else: # commented out for mypy</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;Provided unsupported destination type for engine capability type conversion&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="EngineCapability.try_to">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``EngineCapability`` into the equivalent type in tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent engine capability.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then ``None`` will be returned.</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(tensorrt.EngineCapability), Type(EngineCapability))): Engine capability enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(Union(tensorrt.EngineCapability, EngineCapability)): Engine capability equivalent ``torch_tensorrt.EngineCapability`` in enum ``t``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                trt_dla_ec = torch_tensorrt.EngineCapability.DLA.to(tensorrt.EngineCapability) # Returns tensorrt.EngineCapability.DLA_STANDALONE</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">casted_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">casted_format</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;torch_tensorrt.EngineCapablity conversion to target type </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> failed&quot;</span><span class="p">,</span>
+                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">other_</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">other_</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Platform</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Specifies a target OS and CPU architecture that a Torch-TensorRT program targets</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">LINUX_X86_64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OS: Linux, CPU Arch: x86_64</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">LINUX_AARCH64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OS: Linux, CPU Arch: aarch64</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">WIN_X86_64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OS: Windows, CPU Arch: x86_64</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">current_platform</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Platform</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns an enum for the current platform Torch-TensorRT is running on</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Platform: Current platform</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+
+        <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;linux&quot;</span><span class="p">):</span>
+            <span class="c1"># linux</span>
+            <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;aarch64&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_AARCH64</span>
+            <span class="k">elif</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;x86_64&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_X86_64</span>
+
+        <span class="k">elif</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;windows&quot;</span><span class="p">):</span>
+            <span class="c1"># Windows...</span>
+            <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;amd64&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_X86_64</span>
+
+        <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">UNKNOWN</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="nd">@needs_torch_tensorrt_runtime</span>  <span class="c1"># type: ignore</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_to_serialized_rt_platform</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">val</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_unknown</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_X86_64</span><span class="p">:</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_linux_x86_64</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_AARCH64</span><span class="p">:</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_linux_aarch64</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_X86_64</span><span class="p">:</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_win_x86_64</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">val</span>
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
