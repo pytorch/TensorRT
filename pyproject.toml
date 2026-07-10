@@ -98,7 +98,7 @@ test = [
 
 test-ext = [
     "timm>=1.0.3",
-    "transformers>=5.3.0",
+    "transformers>=5.4.0",
     "torchvision>=0.29.0.dev,<0.30.0",
     "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
 ]
@@ -115,7 +115,7 @@ docs = [
 ]
 
 quantization = [
-    "nvidia-modelopt[hf]>=0.43.0; python_version > '3.9' and python_version < '3.13'",
+    "nvidia-modelopt[hf]>=0.44.0; python_version > '3.9' and python_version < '3.13'",
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
@@ -173,6 +173,9 @@ conflicts = [
       { group = "test_ext" },
       { group = "quantization" },
     ],
+]
+constraint-dependencies = [
+    "transformers>=5.4.0",
 ]
 
 [tool.uv.sources]

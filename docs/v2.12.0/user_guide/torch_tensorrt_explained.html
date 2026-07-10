@@ -1,0 +1,778 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Torch-TensorRT Explained &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user_guide/torch_tensorrt_explained';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Compilation" href="compilation/index.html" />
+    <link rel="prev" title="User Guide" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="compilation/index.html">Compilation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="compilation/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compilation/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compilation/compilation_settings.html">CompilationSettings Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compilation/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compilation/unsupported_ops.html">Handling Unsupported Operators</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="shapes_precision/index.html">Precision &amp; Quantization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="shapes_precision/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shapes_precision/quantization.html">Quantization (INT8 / FP8 / FP4)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="runtime_performance/index.html">Runtime &amp; Serialization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="runtime_performance/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_performance/runtime_api.html">Runtime API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_performance/using_dla.html">DLA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_performance/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_performance/serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_performance/aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_performance/mutable_module.html">MutableTorchTensorRTModule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning.html">Performance Tuning Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">User Guide</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Torch-Tensor...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="torch-tensorrt-explained">
+<span id="id1"></span><h1>Torch-TensorRT Explained<a class="headerlink" href="#torch-tensorrt-explained" title="Link to this heading">#</a></h1>
+<p>Torch-TensorRT is a compiler for PyTorch models targeting NVIDIA GPUs
+via the TensorRT Model Optimization SDK. It aims to provide better
+inference performance for PyTorch models while still maintaining the
+great ergonomics of PyTorch.</p>
+<section id="dynamo-frontend">
+<h2>Dynamo Frontend<a class="headerlink" href="#dynamo-frontend" title="Link to this heading">#</a></h2>
+<p>The Dynamo frontend is the default frontend for Torch-TensorRT. It utilizes the <a class="reference external" href="https://pytorch.org/docs/stable/torch.compiler_deepdive.html">dynamo compiler stack</a> from PyTorch.</p>
+<section id="torch-compile-just-in-time">
+<h3><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> (Just-in-time)<a class="headerlink" href="#torch-compile-just-in-time" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> is a JIT compiler stack, as such, compilation is deferred until first use. This means that as conditions change in the graph, the graph will automatically recompile.
+This provides users the most runtime flexibility, however limits options regarding serialization.</p>
+<p>Under the hood, <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.compile.html#torch.compile">torch.compile</a> delegates subgraphs it believes can be lowered to Torch-TensorRT. Torch-TensorRT further lowers these graphs into ops consisting of solely <a class="reference external" href="https://pytorch.org/executorch/stable/ir-ops-set-definition.html">Core ATen Operators</a>
+or select “High-level Ops” amenable to TensorRT acceleration. Subgraphs are further partitioned into components that will run in PyTorch and ones to be further compiled to TensorRT based
+on support for operators. TensorRT engines then replace supported blocks and a hybrid subgraph is returned to <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to be run on call.</p>
+<section id="accepted-formats">
+<h4>Accepted Formats<a class="headerlink" href="#accepted-formats" title="Link to this heading">#</a></h4>
+<ul class="simple">
+<li><p>torch.fx GraphModule (<code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code>)</p></li>
+<li><p>PyTorch Module (<code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>)</p></li>
+</ul>
+</section>
+<section id="returns">
+<h4>Returns<a class="headerlink" href="#returns" title="Link to this heading">#</a></h4>
+<ul class="simple">
+<li><p>Boxed-function that triggers compilation on first call</p></li>
+</ul>
+</section>
+</section>
+<section id="torch-tensorrt-dynamo-compile-ahead-of-time">
+<h3><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code> (Ahead-of-time)<a class="headerlink" href="#torch-tensorrt-dynamo-compile-ahead-of-time" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code> is an AOT compiler, models are compiled in an explicit compilation phase. These compilation artifacts can then be serialized and reloaded at a later date.
+Graphs go through the <code class="docutils literal notranslate"><span class="pre">torch.export.trace</span></code> system to be lowered into a graph consisting of <a class="reference external" href="https://pytorch.org/executorch/stable/ir-ops-set-definition.html">Core ATen Operators</a> or select “High-level Ops” amenable to TensoRT acceleration.
+Subgraphs are further partitioned into components that will run in PyTorch and ones to be further compiled to TensorRT based on support for operators. TensorRT engines then replace supported blocks
+and a hybrid subgraph is packed into an <a class="reference external" href="https://pytorch.org/docs/stable/export.ir_spec.html#exportedprogram">ExportedProgram</a> which can be serialized and reloaded.</p>
+<section id="id3">
+<h4>Accepted Formats<a class="headerlink" href="#id3" title="Link to this heading">#</a></h4>
+<ul class="simple">
+<li><p>torch.export.ExportedProgram (<code class="docutils literal notranslate"><span class="pre">torch.export.ExportedProgram</span></code>)</p></li>
+<li><p>torch.fx GraphModule (<code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code>) (via <code class="docutils literal notranslate"><span class="pre">torch.export.export</span></code>)</p></li>
+<li><p>PyTorch Module (<code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>) (via <code class="docutils literal notranslate"><span class="pre">torch.export.export</span></code>)</p></li>
+</ul>
+</section>
+<section id="id4">
+<h4>Returns<a class="headerlink" href="#id4" title="Link to this heading">#</a></h4>
+<ul class="simple">
+<li><p>torch.fx.GraphModule (serializable with <code class="docutils literal notranslate"><span class="pre">torch.export.ExportedProgram</span></code>)</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="legacy-frontends">
+<h2>Legacy Frontends<a class="headerlink" href="#legacy-frontends" title="Link to this heading">#</a></h2>
+<p>As there has been a number of compiler technologies in the PyTorch ecosystem over the years
+Torch-TensorRT has some legacy features targeting them.</p>
+<section id="torchscript-torch-tensorrt-ts-compile">
+<h3>TorchScript (<cite>torch_tensorrt.ts.compile</cite>)<a class="headerlink" href="#torchscript-torch-tensorrt-ts-compile" title="Link to this heading">#</a></h3>
+<p>The TorchScript frontend was the original default frontend for Torch-TensorRT and targets models in the TorchScript format. The graph provided will be partitioned into supported and unsupported
+blocks. Supported blocks will be lowered to TensorRT and unsupported blocks will remain to run with LibTorch. The resultant graph is returned back to the user as a <code class="docutils literal notranslate"><span class="pre">ScriptModule</span></code> that can be loaded and saved
+with the Torch-TensorRT PyTorch runtime extension.</p>
+<section id="id5">
+<h4>Accepted Formats<a class="headerlink" href="#id5" title="Link to this heading">#</a></h4>
+<ul class="simple">
+<li><p>TorchScript Module (<code class="docutils literal notranslate"><span class="pre">torch.jit.ScriptModule</span></code>)</p></li>
+<li><p>PyTorch Module (<code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>) (via <code class="docutils literal notranslate"><span class="pre">torch.jit.script</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code>)</p></li>
+</ul>
+</section>
+<section id="id6">
+<h4>Returns<a class="headerlink" href="#id6" title="Link to this heading">#</a></h4>
+<ul class="simple">
+<li><p>TorchScript Module (<code class="docutils literal notranslate"><span class="pre">torch.jit.ScriptModule</span></code>)</p></li>
+</ul>
+</section>
+</section>
+<section id="fx-graph-modules-torch-tensorrt-fx-compile">
+<h3>FX Graph Modules (<cite>torch_tensorrt.fx.compile</cite>)<a class="headerlink" href="#fx-graph-modules-torch-tensorrt-fx-compile" title="Link to this heading">#</a></h3>
+<p>This frontend has almost entirely been replaced by the Dynamo frontend which is a superset of the
+features available though the FX frontend. The original FX frontend remains in the codebase for
+backwards compatibility reasons.</p>
+<section id="id7">
+<h4>Accepted Formats<a class="headerlink" href="#id7" title="Link to this heading">#</a></h4>
+<ul class="simple">
+<li><p>torch.fx GraphModule (<code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code>)</p></li>
+<li><p>PyTorch Module (<code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>) (via <code class="docutils literal notranslate"><span class="pre">torch.fx.trace</span></code>)</p></li>
+</ul>
+</section>
+<section id="id8">
+<h4>Returns<a class="headerlink" href="#id8" title="Link to this heading">#</a></h4>
+<ul class="simple">
+<li><p>torch.fx GraphModule (<code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code>)</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="torch-tensorrt-compile">
+<h2><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code><a class="headerlink" href="#torch-tensorrt-compile" title="Link to this heading">#</a></h2>
+<p>As there are many different frontends and supported formats, we provide a convenience layer called <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code> which lets users access
+all the different compiler options. You can specify to <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code> what compiler path to use by setting the <code class="docutils literal notranslate"><span class="pre">ir</span></code> option, telling
+Torch-TensorRT to try to lower the provided model through a specific intermediate representation.</p>
+<section id="ir-options">
+<h3><code class="docutils literal notranslate"><span class="pre">ir</span></code> Options<a class="headerlink" href="#ir-options" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">torch_compile</span></code>: Use the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> system. Immediately returns a boxed-function that will compile on first call</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dynamo</span></code>: Run the graph through the <code class="docutils literal notranslate"><span class="pre">torch.export</span></code>/ torchdynamo stack. If the input module is a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>, it must be “export-traceable” as the module will be traced with <code class="docutils literal notranslate"><span class="pre">torch.export.export</span></code>. Returns a <code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code> which can be run immediately or saved via <code class="docutils literal notranslate"><span class="pre">torch.export.export</span></code> or <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torchscript</span></code> or <code class="docutils literal notranslate"><span class="pre">ts</span></code>: Run graph through the TorchScript stack. If the input module is a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>, it must be “scriptable” as the module will be compiled with <code class="docutils literal notranslate"><span class="pre">torch.jit.script</span></code>. Returns a <code class="docutils literal notranslate"><span class="pre">torch.jit.ScriptModule</span></code> which can be run immediately or saved via <code class="docutils literal notranslate"><span class="pre">torch.save</span></code> or <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fx</span></code>: Run graph through the <code class="docutils literal notranslate"><span class="pre">torch.fx</span></code> stack. If the input module is a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>, it will be traced with <code class="docutils literal notranslate"><span class="pre">torch.fx.trace</span></code> and subject to its limitations.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">User Guide</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="compilation/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Compilation</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamo-frontend">Dynamo Frontend</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-compile-just-in-time"><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> (Just-in-time)</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#accepted-formats">Accepted Formats</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#returns">Returns</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-tensorrt-dynamo-compile-ahead-of-time"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code> (Ahead-of-time)</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id3">Accepted Formats</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id4">Returns</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#legacy-frontends">Legacy Frontends</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torchscript-torch-tensorrt-ts-compile">TorchScript (<cite>torch_tensorrt.ts.compile</cite>)</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id5">Accepted Formats</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id6">Returns</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fx-graph-modules-torch-tensorrt-fx-compile">FX Graph Modules (<cite>torch_tensorrt.fx.compile</cite>)</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id7">Accepted Formats</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id8">Returns</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-tensorrt-compile"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#ir-options"><code class="docutils literal notranslate"><span class="pre">ir</span></code> Options</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/user_guide/torch_tensorrt_explained.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/user_guide/torch_tensorrt_explained.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

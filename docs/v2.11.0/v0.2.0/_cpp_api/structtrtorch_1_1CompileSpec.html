@@ -1,0 +1,2716 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="width=device-width,initial-scale=1" name="viewport"/>
+  <meta content="ie=edge" http-equiv="x-ua-compatible"/>
+  <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
+  <meta content="Copied to clipboard" name="lang:clipboard.copied"/>
+  <meta content="en" name="lang:search.language"/>
+  <meta content="True" name="lang:search.pipeline.stopwords"/>
+  <meta content="True" name="lang:search.pipeline.trimmer"/>
+  <meta content="No matching documents" name="lang:search.result.none"/>
+  <meta content="1 matching document" name="lang:search.result.one"/>
+  <meta content="# matching documents" name="lang:search.result.other"/>
+  <meta content="[\s\-]+" name="lang:search.tokenizer"/>
+  <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500,700|Roboto:300,400,400i,700&amp;display=fallback" rel="stylesheet"/>
+  <style>
+   body,
+      input {
+        font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif
+      }
+
+      code,
+      kbd,
+      pre {
+        font-family: "Roboto Mono", "Courier New", Courier, monospace
+      }
+  </style>
+  <link href="../_static/stylesheets/application.css" rel="stylesheet"/>
+  <link href="../_static/stylesheets/application-palette.css" rel="stylesheet"/>
+  <link href="../_static/stylesheets/application-fixes.css" rel="stylesheet"/>
+  <link href="../_static/fonts/material-icons.css" rel="stylesheet"/>
+  <meta content="84bd00" name="theme-color"/>
+  <script src="../_static/javascripts/modernizr.js">
+  </script>
+  <title>
+   Struct CompileSpec — TRTorch master documentation
+  </title>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
+  </script>
+  <script src="../_static/jquery.js">
+  </script>
+  <script src="../_static/underscore.js">
+  </script>
+  <script src="../_static/doctools.js">
+  </script>
+  <script src="../_static/language_data.js">
+  </script>
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
+  </script>
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <link href="../genindex.html" rel="index" title="Index"/>
+  <link href="../search.html" rel="search" title="Search"/>
+  <link href="structtrtorch_1_1CompileSpec_1_1Device.html" rel="next" title="Struct CompileSpec::Device"/>
+  <link href="namespace_trtorch__ptq.html" rel="prev" title="Namespace trtorch::ptq"/>
+ </head>
+ <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
+  <svg class="md-svg">
+   <defs data-children-count="0">
+    <svg height="448" id="__github" viewbox="0 0 416 448" width="416" xmlns="http://www.w3.org/2000/svg">
+     <path d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z" fill="currentColor">
+     </path>
+    </svg>
+   </defs>
+  </svg>
+  <input class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+  <input class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+  <label class="md-overlay" data-md-component="overlay" for="__drawer">
+  </label>
+  <a class="md-skip" href="#_cpp_api/structtrtorch_1_1CompileSpec" tabindex="1">
+   Skip to content
+  </a>
+  <header class="md-header" data-md-component="header">
+   <nav class="md-header-nav md-grid">
+    <div class="md-flex navheader">
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+       <i class="md-icon">
+        
+       </i>
+      </a>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer">
+      </label>
+     </div>
+     <div class="md-flex__cell md-flex__cell--stretch">
+      <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+       <span class="md-header-nav__topic">
+        TRTorch
+       </span>
+       <span class="md-header-nav__topic">
+        Struct CompileSpec
+       </span>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <label class="md-icon md-icon--search md-header-nav__button" for="__search">
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+       <label class="md-search__overlay" for="__search">
+       </label>
+       <div class="md-search__inner" role="search">
+        <form action="../search.html" class="md-search__form" method="GET" name="search">
+         <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
+         <label class="md-icon md-search__icon" for="__search">
+         </label>
+         <button class="md-icon md-search__icon" data-md-component="reset" tabindex="-1" type="reset">
+          
+         </button>
+        </form>
+        <div class="md-search__output">
+         <div class="md-search__scrollwrap" data-md-scrollfix="">
+          <div class="md-search-result" data-md-component="result">
+           <div class="md-search-result__meta">
+            Type to start searching
+           </div>
+           <ol class="md-search-result__list">
+           </ol>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <div class="md-header-nav__source">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+        <div class="md-source__icon">
+         <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+          <use height="24" width="24" xlink:href="#__github">
+          </use>
+         </svg>
+        </div>
+        <div class="md-source__repository">
+         TRTorch
+        </div>
+       </a>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink dropdown">
+      <button class="dropdownbutton">
+       Versions
+      </button>
+      <div class="dropdown-content md-hero">
+       <a href="https://nvidia.github.io/TRTorch/" title="master">
+        master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+        v0.1.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+        v0.0.3
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+        v0.0.2
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+        v0.0.1
+       </a>
+      </div>
+     </div>
+    </div>
+   </nav>
+  </header>
+  <div class="md-container">
+   <nav class="md-tabs" data-md-component="tabs">
+    <div class="md-tabs__inner md-grid">
+     <ul class="md-tabs__list">
+      <li class="md-tabs__item">
+       <a class="md-tabs__link" href="../index.html">
+        TRTorch master documentation
+       </a>
+      </li>
+      <li class="md-tabs__item">
+       <a class="md-tabs__link" href="trtorch_cpp.html">
+        TRTorch C++ API
+       </a>
+      </li>
+     </ul>
+    </div>
+   </nav>
+   <main class="md-main">
+    <div class="md-main__inner md-grid" data-md-component="container">
+     <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--primary" data-md-level="0">
+         <label class="md-nav__title md-nav__title--site" for="__drawer">
+          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+           <i class="md-icon">
+            
+           </i>
+          </a>
+          <a href="../index.html" title="TRTorch master documentation">
+           TRTorch
+          </a>
+         </label>
+         <div class="md-nav__source">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+           <div class="md-source__icon">
+            <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+             <use height="24" width="24" xlink:href="#__github">
+             </use>
+            </svg>
+           </div>
+           <div class="md-source__repository">
+            TRTorch
+           </div>
+          </a>
+         </div>
+         <ul class="md-nav__list">
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Getting Started
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/installation.html">
+            Installation
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started.html">
+            Getting Started
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/ptq.html">
+            Post Training Quantization (PTQ)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/trtorchc.html">
+            trtorchc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
+            Using TRTorch Directly From PyTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/runtime.html">
+            Deploying TRTorch Programs
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/using_dla.html">
+            DLA
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
+            TRTorch Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
+            Object Detection with TRTorch (SSD)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Python API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/trtorch.html">
+            trtorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            trtorch.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="trtorch_cpp.html">
+            TRTorch C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Contributor Documentation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/system_overview.html">
+            System Overview
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/writing_converters.html">
+            Writing Converters
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/useful_links.html">
+            Useful Links for TRTorch Development
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--secondary">
+         <label class="md-nav__title" for="__toc">
+          Contents
+         </label>
+         <ul class="md-nav__list" data-md-scrollfix="">
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="#cpp-api-structtrtorch-1-1compilespec--page-root">
+            Struct CompileSpec
+           </a>
+           <nav class="md-nav">
+            <ul class="md-nav__list">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#nested-relationships">
+               Nested Relationships
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#nested-types">
+                  Nested Types
+                 </a>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#struct-documentation">
+               Struct Documentation
+              </a>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__extra_link" href="../_sources/_cpp_api/structtrtorch_1_1CompileSpec.rst.txt">
+            Show Source
+           </a>
+          </li>
+          <li class="md-nav__item" id="searchbox">
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-content">
+      <article class="md-content__inner md-typeset" role="main">
+       <span id="exhale-struct-structtrtorch-1-1compilespec">
+       </span>
+       <h1 id="cpp-api-structtrtorch-1-1compilespec--page-root">
+        Struct CompileSpec
+        <a class="headerlink" href="#cpp-api-structtrtorch-1-1compilespec--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <ul class="simple">
+        <li>
+         <p>
+          Defined in
+          <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
+           <span class="std std-ref">
+            File trtorch.h
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <h2 id="nested-relationships">
+        Nested Relationships
+        <a class="headerlink" href="#nested-relationships" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <h3 id="nested-types">
+        Nested Types
+        <a class="headerlink" href="#nested-types" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#exhale-class-classtrtorch-1-1compilespec-1-1datatype">
+           <span class="std std-ref">
+            Class CompileSpec::DataType
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#exhale-struct-structtrtorch-1-1compilespec-1-1device">
+           <span class="std std-ref">
+            Struct CompileSpec::Device
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType.html#exhale-class-classtrtorch-1-1compilespec-1-1device-1-1devicetype">
+           <span class="std std-ref">
+            Class Device::DeviceType
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1InputRange.html#exhale-struct-structtrtorch-1-1compilespec-1-1inputrange">
+           <span class="std std-ref">
+            Struct CompileSpec::InputRange
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <h2 id="struct-documentation">
+        Struct Documentation
+        <a class="headerlink" href="#struct-documentation" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <dl class="cpp struct">
+        <dt id="_CPPv4N7trtorch11CompileSpecE">
+         <span class="target" id="structtrtorch_1_1CompileSpec">
+         </span>
+         <em class="property">
+          struct
+         </em>
+         <code class="sig-prename descclassname">
+          trtorch
+          <code class="sig-prename descclassname">
+           ::
+          </code>
+         </code>
+         <code class="sig-name descname">
+          CompileSpec
+         </code>
+         <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpecE" title="Permalink to this definition">
+          ¶
+         </a>
+         <br/>
+        </dt>
+        <dd>
+         <p>
+          Settings data structure for TRTorch compilation
+         </p>
+         <div class="breathe-sectiondef docutils container">
+          <p class="breathe-sectiondef-title rubric">
+           Public Types
+          </p>
+          <dl class="cpp enum">
+           <dt id="_CPPv4N7trtorch11CompileSpec16EngineCapabilityE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1aa71db6514a40de30d2e18ac8c467306d">
+            </span>
+            <em class="property">
+             enum
+            </em>
+            <code class="sig-name descname">
+             EngineCapability
+            </code>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec16EngineCapabilityE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Emum for selecting engine capability
+            </p>
+            <p>
+             <em>
+              Values:
+             </em>
+            </p>
+            <dl class="cpp enumerator">
+             <dt id="_CPPv4N7trtorch11CompileSpec16EngineCapability8kDEFAULTE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1aa71db6514a40de30d2e18ac8c467306da2eb05989f1bbfd98f356f4f3ac2ba2ec">
+              </span>
+              <em class="property">
+               enumerator
+              </em>
+              <code class="sig-name descname">
+               kDEFAULT
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec16EngineCapability8kDEFAULTE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp enumerator">
+             <dt id="_CPPv4N7trtorch11CompileSpec16EngineCapability9kSAFE_GPUE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1aa71db6514a40de30d2e18ac8c467306dad2298f1c40120466f5d4dc4e664095d0">
+              </span>
+              <em class="property">
+               enumerator
+              </em>
+              <code class="sig-name descname">
+               kSAFE_GPU
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec16EngineCapability9kSAFE_GPUE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp enumerator">
+             <dt id="_CPPv4N7trtorch11CompileSpec16EngineCapability9kSAFE_DLAE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1aa71db6514a40de30d2e18ac8c467306da5b44fe262f772396a08fbf720d156a64">
+              </span>
+              <em class="property">
+               enumerator
+              </em>
+              <code class="sig-name descname">
+               kSAFE_DLA
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec16EngineCapability9kSAFE_DLAE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+           </dd>
+          </dl>
+         </div>
+         <div class="breathe-sectiondef docutils container">
+          <p class="breathe-sectiondef-title rubric">
+           Public Functions
+          </p>
+          <dl class="cpp function">
+           <dt id="_CPPv4N7trtorch11CompileSpec11CompileSpecENSt6vectorI10InputRangeEE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a52eea422469a8b8274cc460dd5f34183">
+            </span>
+            <code class="sig-name descname">
+             CompileSpec
+            </code>
+            <span class="sig-paren">
+             (
+            </span>
+            std::vector&lt;
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec10InputRangeE" title="trtorch::CompileSpec::InputRange">
+             InputRange
+            </a>
+            &gt;
+            <em>
+             input_ranges
+            </em>
+            <span class="sig-paren">
+             )
+            </span>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec11CompileSpecENSt6vectorI10InputRangeEE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Construct a new Extra Info object from input ranges. Each entry in the vector represents a input and should be provided in call order.
+            </p>
+            <p>
+             Use this constructor if you want to use dynamic shape
+            </p>
+            <p>
+            </p>
+            <dl class="simple">
+             <dt>
+              <strong>
+               Parameters
+              </strong>
+             </dt>
+             <dd>
+              <ul class="breatheparameterlist simple">
+               <li>
+                <p>
+                 <code class="docutils literal notranslate">
+                  <span class="pre">
+                   input_ranges
+                  </span>
+                 </code>
+                 :
+                </p>
+               </li>
+              </ul>
+             </dd>
+            </dl>
+           </dd>
+          </dl>
+          <dl class="cpp function">
+           <dt id="_CPPv4N7trtorch11CompileSpec11CompileSpecENSt6vectorINSt6vectorI7int64_tEEEE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a7c27e4dbb5f4a1f9359e89aea20b73f0">
+            </span>
+            <code class="sig-name descname">
+             CompileSpec
+            </code>
+            <span class="sig-paren">
+             (
+            </span>
+            std::vector&lt;std::vector&lt;int64_t&gt;&gt;
+            <em>
+             fixed_sizes
+            </em>
+            <span class="sig-paren">
+             )
+            </span>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec11CompileSpecENSt6vectorINSt6vectorI7int64_tEEEE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Construct a new Extra Info object Convienence constructor to set fixed input size from vectors describing size of input tensors. Each entry in the vector represents a input and should be provided in call order.
+            </p>
+            <p>
+            </p>
+            <dl class="simple">
+             <dt>
+              <strong>
+               Parameters
+              </strong>
+             </dt>
+             <dd>
+              <ul class="breatheparameterlist simple">
+               <li>
+                <p>
+                 <code class="docutils literal notranslate">
+                  <span class="pre">
+                   fixed_sizes
+                  </span>
+                 </code>
+                 :
+                </p>
+               </li>
+              </ul>
+             </dd>
+            </dl>
+           </dd>
+          </dl>
+          <dl class="cpp function">
+           <dt id="_CPPv4N7trtorch11CompileSpec11CompileSpecENSt6vectorIN3c108ArrayRefI7int64_tEEEE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a424d61b4431be06f901ea5e9db8a218d">
+            </span>
+            <code class="sig-name descname">
+             CompileSpec
+            </code>
+            <span class="sig-paren">
+             (
+            </span>
+            std::vector&lt;c10::ArrayRef&lt;int64_t&gt;&gt;
+            <em>
+             fixed_sizes
+            </em>
+            <span class="sig-paren">
+             )
+            </span>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec11CompileSpecENSt6vectorIN3c108ArrayRefI7int64_tEEEE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Construct a new Extra Info object Convienence constructor to set fixed input size from c10::ArrayRef’s (the output of tensor.sizes()) describing size of input tensors. Each entry in the vector represents a input and should be provided in call order.
+            </p>
+            <p>
+            </p>
+            <dl class="simple">
+             <dt>
+              <strong>
+               Parameters
+              </strong>
+             </dt>
+             <dd>
+              <ul class="breatheparameterlist simple">
+               <li>
+                <p>
+                 <code class="docutils literal notranslate">
+                  <span class="pre">
+                   fixed_sizes
+                  </span>
+                 </code>
+                 :
+                </p>
+               </li>
+              </ul>
+             </dd>
+            </dl>
+           </dd>
+          </dl>
+         </div>
+         <div class="breathe-sectiondef docutils container">
+          <p class="breathe-sectiondef-title rubric">
+           Public Members
+          </p>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec12input_rangesE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1aff5c962f8825da28665369ed23819973">
+            </span>
+            std::vector&lt;
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec10InputRangeE" title="trtorch::CompileSpec::InputRange">
+             InputRange
+            </a>
+            &gt;
+            <code class="sig-name descname">
+             input_ranges
+            </code>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12input_rangesE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Sizes for inputs to engine, can either be a single size or a range defined by Min, Optimal, Max sizes
+            </p>
+            <p>
+             Order is should match call order
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec12op_precisionE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a83fbfdc17f74895df26dd72456ce88b3">
+            </span>
+            <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+             DataType
+            </a>
+            <code class="sig-name descname">
+             op_precision
+            </code>
+            =
+            <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+             DataType
+            </a>
+            ::kFloat
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12op_precisionE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Default operating precision for the engine
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec12disable_tf32E">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a0daef036d4cbdac49dda3c9cd284a661">
+            </span>
+            bool
+            <code class="sig-name descname">
+             disable_tf32
+            </code>
+            = false
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12disable_tf32E" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Prevent Float32 layers from using TF32 data format
+            </p>
+            <p>
+             TF32 computes inner products by rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas. This is the behavior of FP32 layers by default.
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec5refitE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a637f91d7d5b05ad01d7f4a38ab1e4f46">
+            </span>
+            bool
+            <code class="sig-name descname">
+             refit
+            </code>
+            = false
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5refitE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Build a refitable engine
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec5debugE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a41b6a0160fe90aaa1ab793e24b520695">
+            </span>
+            bool
+            <code class="sig-name descname">
+             debug
+            </code>
+            = false
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5debugE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Build a debugable engine
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec12strict_typesE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a747b0876a548a086dcd1d517502440f1">
+            </span>
+            bool
+            <code class="sig-name descname">
+             strict_types
+            </code>
+            = false
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12strict_typesE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Restrict operating type to only set default operation precision (op_precision)
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec6deviceE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1ac8fe649895f3edc2d14be6bc4da048f6">
+            </span>
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec6DeviceE" title="trtorch::CompileSpec::Device">
+             Device
+            </a>
+            <code class="sig-name descname">
+             device
+            </code>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6deviceE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec10capabilityE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a748993324b88633149f0b036eb6ecae8">
+            </span>
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec16EngineCapabilityE" title="trtorch::CompileSpec::EngineCapability">
+             EngineCapability
+            </a>
+            <code class="sig-name descname">
+             capability
+            </code>
+            =
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec16EngineCapabilityE" title="trtorch::CompileSpec::EngineCapability">
+             EngineCapability
+            </a>
+            ::
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec16EngineCapability8kDEFAULTE" title="trtorch::CompileSpec::EngineCapability::kDEFAULT">
+             kDEFAULT
+            </a>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10capabilityE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Sets the restrictions for the engine (CUDA Safety)
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec20num_min_timing_itersE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1ac2e265d6535d18879e19801a7e9576e7">
+            </span>
+            uint64_t
+            <code class="sig-name descname">
+             num_min_timing_iters
+            </code>
+            = 2
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec20num_min_timing_itersE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Number of minimization timing iterations used to select kernels
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec20num_avg_timing_itersE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a6f541f0765fef28e84ce6d83168228db">
+            </span>
+            uint64_t
+            <code class="sig-name descname">
+             num_avg_timing_iters
+            </code>
+            = 1
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec20num_avg_timing_itersE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Number of averaging timing iterations used to select kernels
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec14workspace_sizeE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a2a8af6ce57eafae2a755fc784cd2d772">
+            </span>
+            uint64_t
+            <code class="sig-name descname">
+             workspace_size
+            </code>
+            = 0
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec14workspace_sizeE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Maximum size of workspace given to TensorRT
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec14max_batch_sizeE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a6e5c2fa66676cbcab621bfed71dfe675">
+            </span>
+            uint64_t
+            <code class="sig-name descname">
+             max_batch_size
+            </code>
+            = 0
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec14max_batch_sizeE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec14ptq_calibratorE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1aa4ed6a40daf456cb361ac519ddaa36ee">
+            </span>
+            nvinfer1::IInt8Calibrator *
+            <code class="sig-name descname">
+             ptq_calibrator
+            </code>
+            = nullptr
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec14ptq_calibratorE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Calibration dataloaders for each input for post training quantizatiom
+            </p>
+           </dd>
+          </dl>
+         </div>
+         <dl class="cpp class">
+          <dt id="_CPPv4N7trtorch11CompileSpec8DataTypeE">
+           <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType">
+           </span>
+           <em class="property">
+            class
+           </em>
+           <code class="sig-name descname">
+            DataType
+           </code>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            Supported Data Types that can be used with TensorRT engines
+           </p>
+           <p>
+            This class is compatable with c10::DataTypes (but will check for TRT support) so there should not be a reason that you need to use this type explictly.
+           </p>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Types
+            </p>
+            <dl class="cpp enum">
+             <dt id="_CPPv4N7trtorch11CompileSpec8DataType5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1ac08f05731101a2949ebbe6c04ca32e88">
+              </span>
+              <em class="property">
+               enum
+              </em>
+              <code class="sig-name descname">
+               Value
+              </code>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Underlying enum class to support the
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               Class
+              </p>
+              <p>
+               In the case that you need to use the
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               class itself, interface using this enum vs. normal instatination
+              </p>
+              <p>
+               ex. trtorch::DataType type =
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType_1ac08f05731101a2949ebbe6c04ca32e88ac090aa40e966ee3966c8d64f841c92a3">
+                <span class="std std-ref">
+                 DataType::kFloat
+                </span>
+               </a>
+               ;
+              </p>
+              <p>
+               <em>
+                Values:
+               </em>
+              </p>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec8DataType5Value6kFloatE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1ac08f05731101a2949ebbe6c04ca32e88ac090aa40e966ee3966c8d64f841c92a3">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kFloat
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 FP32.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec8DataType5Value5kHalfE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1ac08f05731101a2949ebbe6c04ca32e88aba5b5b87a707d31dfba78a6a7addfd59">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kHalf
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 FP16.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec8DataType5Value5kCharE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1ac08f05731101a2949ebbe6c04ca32e88a99079db4e71ca9acf6c07b12d02898d3">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kChar
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 INT8.
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec8DataType8DataTypeEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1a0bb7b856a5c0f44eadccfef754556bb8">
+              </span>
+              <code class="sig-name descname">
+               DataType
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = default
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new Data Type object.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec8DataType8DataTypeE5Value">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1a1d3a2e87fcf8d64b3c1ab91bba44cd87">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              <code class="sig-name descname">
+               DataType
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataType5ValueE" title="trtorch::CompileSpec::DataType::Value">
+               Value
+              </a>
+              <em>
+               t
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               constructor from enum.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec8DataType8DataTypeEN3c1010ScalarTypeE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1a8b0bd932f0d8d4b9886e901083932657">
+              </span>
+              <code class="sig-name descname">
+               DataType
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ScalarType
+              <em>
+               t
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new Data Type object from torch type enums.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     t
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec8DataTypecv5ValueEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1acc87722fe2c7938a7bcb605f14a193a2">
+              </span>
+              <code class="sig-name descname">
+               operator Value
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Get the enum value of the
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               object.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 Value
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec8DataTypecvbEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1a78d248c72d1e689a76e0a34b8a64af15">
+              </span>
+              <code class="sig-name descname">
+               operator bool
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = delete
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec8DataTypeeqE8DataType">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1a574b12a97a74f12bef3f6c5900512cd8">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator==
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec8DataTypeeqEN8DataType5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1a2160131568cf21d53c3c9213dde8ddbc">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator==
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataType5ValueE" title="trtorch::CompileSpec::DataType::Value">
+               Value
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec8DataTypeneE8DataType">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1a0ecd7898cf0bd4faaaf2afa05272421c">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator!=
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec8DataTypeneEN8DataType5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1a015e5b9a223367ede262144d5ec598f7">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator!=
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataType5ValueE" title="trtorch::CompileSpec::DataType::Value">
+               Value
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+         <dl class="cpp struct">
+          <dt id="_CPPv4N7trtorch11CompileSpec6DeviceE">
+           <span class="target" id="structtrtorch_1_1CompileSpec_1_1Device">
+           </span>
+           <em class="property">
+            struct
+           </em>
+           <code class="sig-name descname">
+            Device
+           </code>
+           <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6DeviceE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec6Device6DeviceEv">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Device_1a6ea8248e3d60e9d094418e20cfdf04f0">
+              </span>
+              <code class="sig-name descname">
+               Device
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6Device6DeviceEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Constructor for
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#structtrtorch_1_1CompileSpec_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               structure
+              </p>
+             </dd>
+            </dl>
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Members
+            </p>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec6Device11device_typeE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Device_1a63f7fd4819375cb4f741c836f4833b1f">
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType.html#_CPPv4N7trtorch11CompileSpec6Device10DeviceTypeE" title="trtorch::CompileSpec::Device::DeviceType">
+               DeviceType
+              </a>
+              <code class="sig-name descname">
+               device_type
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6Device11device_typeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Setting data structure for device This struct will hold Target device related parameters such as device_type, gpu_id, dla_core.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec6Device6gpu_idE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Device_1ac7de9553e7f833eca60d3176398b6485">
+              </span>
+              int64_t
+              <code class="sig-name descname">
+               gpu_id
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6Device6gpu_idE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec6Device8dla_coreE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Device_1a0a59bb0504866d368ac843723400dd77">
+              </span>
+              int64_t
+              <code class="sig-name descname">
+               dla_core
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6Device8dla_coreE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec6Device18allow_gpu_fallbackE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Device_1aa6330934c582ae3761c1c371ec5618d6">
+              </span>
+              bool
+              <code class="sig-name descname">
+               allow_gpu_fallback
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6Device18allow_gpu_fallbackE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               (Only used when targeting DLA (device)) Lets engine run layers on GPU if they are not supported on DLA
+              </p>
+             </dd>
+            </dl>
+           </div>
+           <dl class="cpp class">
+            <dt id="_CPPv4N7trtorch11CompileSpec6Device10DeviceTypeE">
+             <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType">
+             </span>
+             <em class="property">
+              class
+             </em>
+             <code class="sig-name descname">
+              DeviceType
+             </code>
+             <br/>
+            </dt>
+            <dd>
+             <p>
+              Supported
+              <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#structtrtorch_1_1CompileSpec_1_1Device">
+               <span class="std std-ref">
+                Device
+               </span>
+              </a>
+              Types that can be used with TensorRT engines
+             </p>
+             <p>
+              This class is compatable with c10::DeviceTypes (but will check for TRT support) but the only applicable value is at::kCUDA, which maps to
+              <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a25cf1efb98e5c2639303fdecc1e6e901a1230fccd0d9367234e7fb21c2ab0a2a0">
+               <span class="std std-ref">
+                DeviceType::kGPU
+               </span>
+              </a>
+             </p>
+             <p>
+              To use the
+              <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1DataType">
+               <span class="std std-ref">
+                DataType
+               </span>
+              </a>
+              class itself, interface using the enum vs. normal instatination
+             </p>
+             <p>
+              ex. trtorch::DeviceType type =
+              <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a25cf1efb98e5c2639303fdecc1e6e901a1230fccd0d9367234e7fb21c2ab0a2a0">
+               <span class="std std-ref">
+                DeviceType::kGPU
+               </span>
+              </a>
+              ;
+             </p>
+             <div class="breathe-sectiondef docutils container">
+              <p class="breathe-sectiondef-title rubric">
+               Public Types
+              </p>
+              <dl class="cpp enum">
+               <dt id="_CPPv4N7trtorch11CompileSpec6Device10DeviceType5ValueE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a25cf1efb98e5c2639303fdecc1e6e901">
+                </span>
+                <em class="property">
+                 enum
+                </em>
+                <code class="sig-name descname">
+                 Value
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Underlying enum class to support the
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType">
+                  <span class="std std-ref">
+                   DeviceType
+                  </span>
+                 </a>
+                 Class
+                </p>
+                <p>
+                 In the case that you need to use the
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType">
+                  <span class="std std-ref">
+                   DeviceType
+                  </span>
+                 </a>
+                 class itself, interface using this enum vs. normal instatination
+                </p>
+                <p>
+                 ex. trtorch::DeviceType type =
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a25cf1efb98e5c2639303fdecc1e6e901a1230fccd0d9367234e7fb21c2ab0a2a0">
+                  <span class="std std-ref">
+                   DeviceType::kGPU
+                  </span>
+                 </a>
+                 ;
+                </p>
+                <p>
+                 <em>
+                  Values:
+                 </em>
+                </p>
+                <dl class="cpp enumerator">
+                 <dt id="_CPPv4N7trtorch11CompileSpec6Device10DeviceType5Value4kGPUE">
+                  <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a25cf1efb98e5c2639303fdecc1e6e901a1230fccd0d9367234e7fb21c2ab0a2a0">
+                  </span>
+                  <em class="property">
+                   enumerator
+                  </em>
+                  <code class="sig-name descname">
+                   kGPU
+                  </code>
+                  <br/>
+                 </dt>
+                 <dd>
+                  <p>
+                   Target GPU to run engine.
+                  </p>
+                 </dd>
+                </dl>
+                <dl class="cpp enumerator">
+                 <dt id="_CPPv4N7trtorch11CompileSpec6Device10DeviceType5Value4kDLAE">
+                  <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a25cf1efb98e5c2639303fdecc1e6e901ae065a3167abb043d91a9bcadbdf0ff9d">
+                  </span>
+                  <em class="property">
+                   enumerator
+                  </em>
+                  <code class="sig-name descname">
+                   kDLA
+                  </code>
+                  <br/>
+                 </dt>
+                 <dd>
+                  <p>
+                   Target DLA to run engine.
+                  </p>
+                 </dd>
+                </dl>
+               </dd>
+              </dl>
+             </div>
+             <div class="breathe-sectiondef docutils container">
+              <p class="breathe-sectiondef-title rubric">
+               Public Functions
+              </p>
+              <dl class="cpp function">
+               <dt id="_CPPv4N7trtorch11CompileSpec6Device10DeviceType10DeviceTypeEv">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a73f3dede0e24c580330f073779d6e8c4">
+                </span>
+                <code class="sig-name descname">
+                 DeviceType
+                </code>
+                <span class="sig-paren">
+                 (
+                </span>
+                <span class="sig-paren">
+                 )
+                </span>
+                = default
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Construct a new
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#structtrtorch_1_1CompileSpec_1_1Device">
+                  <span class="std std-ref">
+                   Device
+                  </span>
+                 </a>
+                 Type object.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp function">
+               <dt id="_CPPv4N7trtorch11CompileSpec6Device10DeviceType10DeviceTypeE5Value">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a4b0154a74f1cae022aa483eb6c00414a">
+                </span>
+                <em class="property">
+                 constexpr
+                </em>
+                <code class="sig-name descname">
+                 DeviceType
+                </code>
+                <span class="sig-paren">
+                 (
+                </span>
+                <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType.html#_CPPv4N7trtorch11CompileSpec6Device10DeviceType5ValueE" title="trtorch::CompileSpec::Device::DeviceType::Value">
+                 Value
+                </a>
+                <em>
+                 t
+                </em>
+                <span class="sig-paren">
+                 )
+                </span>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Construct a new
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#structtrtorch_1_1CompileSpec_1_1Device">
+                  <span class="std std-ref">
+                   Device
+                  </span>
+                 </a>
+                 Type object from internal enum.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp function">
+               <dt id="_CPPv4N7trtorch11CompileSpec6Device10DeviceType10DeviceTypeEN3c1010DeviceTypeE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a9cd16a5fe286edf91e8bd807c3ddd766">
+                </span>
+                <code class="sig-name descname">
+                 DeviceType
+                </code>
+                <span class="sig-paren">
+                 (
+                </span>
+                c10::DeviceType
+                <em>
+                 t
+                </em>
+                <span class="sig-paren">
+                 )
+                </span>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Construct a new
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#structtrtorch_1_1CompileSpec_1_1Device">
+                  <span class="std std-ref">
+                   Device
+                  </span>
+                 </a>
+                 Type object from torch device enums Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
+                </p>
+                <p>
+                </p>
+                <dl class="simple">
+                 <dt>
+                  <strong>
+                   Parameters
+                  </strong>
+                 </dt>
+                 <dd>
+                  <ul class="breatheparameterlist simple">
+                   <li>
+                    <p>
+                     <code class="docutils literal notranslate">
+                      <span class="pre">
+                       t
+                      </span>
+                     </code>
+                     :
+                    </p>
+                   </li>
+                  </ul>
+                 </dd>
+                </dl>
+               </dd>
+              </dl>
+              <dl class="cpp function">
+               <dt id="_CPPv4NK7trtorch11CompileSpec6Device10DeviceTypecv5ValueEv">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a2ea967154e94e3788d2409a828ef527b">
+                </span>
+                <code class="sig-name descname">
+                 operator Value
+                </code>
+                <span class="sig-paren">
+                 (
+                </span>
+                <span class="sig-paren">
+                 )
+                </span>
+                <em class="property">
+                 const
+                </em>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Get the internal value from the
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#structtrtorch_1_1CompileSpec_1_1Device">
+                  <span class="std std-ref">
+                   Device
+                  </span>
+                 </a>
+                 object.
+                </p>
+                <p>
+                </p>
+                <dl class="simple">
+                 <dt>
+                  <strong>
+                   Return
+                  </strong>
+                 </dt>
+                 <dd>
+                  <p>
+                   Value
+                  </p>
+                 </dd>
+                </dl>
+               </dd>
+              </dl>
+              <dl class="cpp function">
+               <dt id="_CPPv4N7trtorch11CompileSpec6Device10DeviceTypecvbEv">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a71c8f595f9bafb2b7145727787efee32">
+                </span>
+                <code class="sig-name descname">
+                 operator bool
+                </code>
+                <span class="sig-paren">
+                 (
+                </span>
+                <span class="sig-paren">
+                 )
+                </span>
+                = delete
+                <br/>
+               </dt>
+               <dd>
+               </dd>
+              </dl>
+              <dl class="cpp function">
+               <dt id="_CPPv4NK7trtorch11CompileSpec6Device10DeviceTypeeqE10DeviceType">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a578630589cbfbfdc6382739e7e21c9ab">
+                </span>
+                <em class="property">
+                 constexpr
+                </em>
+                bool
+                <code class="sig-name descname">
+                 operator==
+                </code>
+                <span class="sig-paren">
+                 (
+                </span>
+                <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType.html#_CPPv4N7trtorch11CompileSpec6Device10DeviceTypeE" title="trtorch::CompileSpec::Device::DeviceType">
+                 DeviceType
+                </a>
+                <em>
+                 other
+                </em>
+                <span class="sig-paren">
+                 )
+                </span>
+                <em class="property">
+                 const
+                </em>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Comparison operator for
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType">
+                  <span class="std std-ref">
+                   DeviceType
+                  </span>
+                 </a>
+                 .
+                </p>
+                <p>
+                </p>
+                <dl class="simple">
+                 <dt>
+                  <strong>
+                   Return
+                  </strong>
+                 </dt>
+                 <dd>
+                  <p>
+                   true
+                  </p>
+                 </dd>
+                 <dt>
+                  <strong>
+                   Return
+                  </strong>
+                 </dt>
+                 <dd>
+                  <p>
+                   false
+                  </p>
+                 </dd>
+                 <dt>
+                  <strong>
+                   Parameters
+                  </strong>
+                 </dt>
+                 <dd>
+                  <ul class="breatheparameterlist simple">
+                   <li>
+                    <p>
+                     <code class="docutils literal notranslate">
+                      <span class="pre">
+                       other
+                      </span>
+                     </code>
+                     :
+                    </p>
+                   </li>
+                  </ul>
+                 </dd>
+                </dl>
+               </dd>
+              </dl>
+              <dl class="cpp function">
+               <dt id="_CPPv4NK7trtorch11CompileSpec6Device10DeviceTypeneE10DeviceType">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType_1a5fede6ce6e24dd535fe63a72d1e779e4">
+                </span>
+                <em class="property">
+                 constexpr
+                </em>
+                bool
+                <code class="sig-name descname">
+                 operator!=
+                </code>
+                <span class="sig-paren">
+                 (
+                </span>
+                <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType.html#_CPPv4N7trtorch11CompileSpec6Device10DeviceTypeE" title="trtorch::CompileSpec::Device::DeviceType">
+                 DeviceType
+                </a>
+                <em>
+                 other
+                </em>
+                <span class="sig-paren">
+                 )
+                </span>
+                <em class="property">
+                 const
+                </em>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Comparison operator for
+                 <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType">
+                  <span class="std std-ref">
+                   DeviceType
+                  </span>
+                 </a>
+                 .
+                </p>
+                <p>
+                </p>
+                <dl class="simple">
+                 <dt>
+                  <strong>
+                   Return
+                  </strong>
+                 </dt>
+                 <dd>
+                  <p>
+                   true
+                  </p>
+                 </dd>
+                 <dt>
+                  <strong>
+                   Return
+                  </strong>
+                 </dt>
+                 <dd>
+                  <p>
+                   false
+                  </p>
+                 </dd>
+                 <dt>
+                  <strong>
+                   Parameters
+                  </strong>
+                 </dt>
+                 <dd>
+                  <ul class="breatheparameterlist simple">
+                   <li>
+                    <p>
+                     <code class="docutils literal notranslate">
+                      <span class="pre">
+                       other
+                      </span>
+                     </code>
+                     :
+                    </p>
+                   </li>
+                  </ul>
+                 </dd>
+                </dl>
+               </dd>
+              </dl>
+             </div>
+            </dd>
+           </dl>
+          </dd>
+         </dl>
+         <dl class="cpp struct">
+          <dt id="_CPPv4N7trtorch11CompileSpec10InputRangeE">
+           <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange">
+           </span>
+           <em class="property">
+            struct
+           </em>
+           <code class="sig-name descname">
+            InputRange
+           </code>
+           <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10InputRangeE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            A struct to hold an input range (used by TensorRT Optimization profile)
+           </p>
+           <p>
+            This struct can either hold a single vector representing an input shape, signifying a static input shape or a set of three input shapes representing the min, optiminal and max input shapes allowed for the engine.
+           </p>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeENSt6vectorI7int64_tEE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1aad0b9526637c0cfface509726eac187a">
+              </span>
+              <code class="sig-name descname">
+               InputRange
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               opt
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeENSt6vectorI7int64_tEE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new Input Range object for static input size from vector.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeEN3c108ArrayRefI7int64_tEE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1af2cf04230c9fa6e852c6074e587e339b">
+              </span>
+              <code class="sig-name descname">
+               InputRange
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               opt
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeEN3c108ArrayRefI7int64_tEE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new Input Range object static input size from c10::ArrayRef (the type produced by tensor.sizes())
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a6febb106b2f739b07b5300d9f28ff1be">
+              </span>
+              <code class="sig-name descname">
+               InputRange
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               min
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               opt
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               max
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new Input Range object dynamic input size from vectors for min, opt, and max supported sizes.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a8b33f7f460467554075ac5be6729952d">
+              </span>
+              <code class="sig-name descname">
+               InputRange
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               min
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               opt
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               max
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new Input Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Members
+            </p>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3minE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a7f17d246b04e8bd7b5cdb56d20196a54">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               min
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10InputRange3minE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Minimum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3optE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a20561ea4d5a7927fd52f4e702bb38794">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               opt
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10InputRange3optE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Optimal input size into the engine (gets best performace)
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3maxE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a6d04c16aca1bc125ab099064a28e2997">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               max
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec10InputRange3maxE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Maximum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+      </article>
+     </div>
+    </div>
+   </main>
+  </div>
+  <footer class="md-footer">
+   <div class="md-footer-nav">
+    <nav class="md-footer-nav__inner md-grid">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="namespace_trtorch__ptq.html" rel="prev" title="Namespace trtorch::ptq">
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
+       </i>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Previous
+        </span>
+        Namespace trtorch::ptq
+       </span>
+      </div>
+     </a>
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="structtrtorch_1_1CompileSpec_1_1Device.html" rel="next" title="Struct CompileSpec::Device">
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Next
+        </span>
+        Struct CompileSpec::Device
+       </span>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
+       </i>
+      </div>
+     </a>
+    </nav>
+   </div>
+   <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+     <div class="md-footer-copyright">
+      <div class="md-footer-copyright__highlight">
+       © Copyright 2020, NVIDIA Corporation.
+      </div>
+      Created using
+      <a href="http://www.sphinx-doc.org/">
+       Sphinx
+      </a>
+      3.1.2.
+             and
+      <a href="https://github.com/bashtage/sphinx-material/">
+       Material for
+              Sphinx
+      </a>
+     </div>
+    </div>
+   </div>
+  </footer>
+  <script src="../_static/javascripts/application.js">
+  </script>
+  <script>
+   app.initialize({version: "1.0.4", url: {base: ".."}})
+  </script>
+ </body>
+</html>

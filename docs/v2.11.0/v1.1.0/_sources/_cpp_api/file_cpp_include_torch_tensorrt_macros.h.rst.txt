@@ -1,0 +1,69 @@
+
+.. _file_cpp_include_torch_tensorrt_macros.h:
+
+File macros.h
+=============
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp_include_torch_tensorrt>` (``cpp/include/torch_tensorrt``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+Definition (``cpp/include/torch_tensorrt/macros.h``)
+----------------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+
+   program_listing_file_cpp_include_torch_tensorrt_macros.h.rst
+
+
+
+
+
+
+
+Included By
+-----------
+
+
+- :ref:`file_cpp_include_torch_tensorrt_logging.h`
+
+- :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+
+
+Namespaces
+----------
+
+
+- :ref:`namespace_torch_tensorrt`
+
+- :ref:`namespace_torch_tensorrt__torchscript`
+
+
+Defines
+-------
+
+
+- :ref:`exhale_define_macros_8h_1a18d295a837ac71add5578860b55e5502`
+
+- :ref:`exhale_define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e`
+
+- :ref:`exhale_define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827`
+
+- :ref:`exhale_define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268`
+
+- :ref:`exhale_define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883`
+
+- :ref:`exhale_define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b`
+
+- :ref:`exhale_define_macros_8h_1ad19939408f7be171a74a89928b36eb59`
+
+- :ref:`exhale_define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da`
+
