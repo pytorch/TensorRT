@@ -1,0 +1,441 @@
+
+
+.. _sphx_glr_tutorials__rendered_examples_dynamo:
+
+.. _torch_tensorrt_examples:
+
+Here we provide examples of Torch-TensorRT compilation of popular computer vision and language models.
+
+Dependencies
+------------------------------------
+
+Please install the following external dependencies (assuming you already have correct `torch`, `torch_tensorrt` and `tensorrt` libraries installed (`dependencies <https://github.com/pytorch/TensorRT?tab=readme-ov-file#dependencies>`_))
+
+.. code-block:: python
+
+    pip install -r requirements.txt
+
+
+Model Zoo
+------------------------------------
+* :ref:`torch_compile_resnet`: Compiling a ResNet model using the Torch Compile Frontend for ``torch_tensorrt.compile``
+* :ref:`torch_compile_transformer`: Compiling a Transformer model using ``torch.compile``
+* :ref:`torch_compile_stable_diffusion`: Compiling a Stable Diffusion model using ``torch.compile``
+* :ref:`_torch_compile_gpt2`: Compiling a GPT2 model using ``torch.compile``
+* :ref:`_torch_export_gpt2`: Compiling a GPT2 model using AOT workflow (`ir=dynamo`)
+* :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
+* :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
+* :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
+
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_compile_stable_diffusion_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_stable_diffusion.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling Stable Diffusion model using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Cross runtime compilation for windows example =================================================...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_cross_runtime_compilation_for_windows_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_cross_runtime_compilation_for_windows.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">cross runtime compilation limitations:</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Compilation is an expensive operation as it involves many graph transformations, translations a...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_refit_engine_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_refit_engine_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Refitting Torch-TensorRT Programs with New Weights</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_compile_transformers_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_transformers_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling BERT using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model GPT2 optimized using torch.compile frontend...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_compile_gpt2_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_gpt2.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the Torch-TensorRT torch.compile frontend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.compi...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_compile_advanced_usage_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_advanced_usage.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_cudagraphs_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_engine_caching_bert_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_bert_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="The TensorRT runtime module acts as a wrapper around a PyTorch model (or subgraph) that has bee...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_pre_allocated_output_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_pre_allocated_output_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_compile_resnet_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_resnet_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling ResNet with dynamic shapes using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_flux_dev_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_flux_dev.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_gpt2_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_gpt2.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the dynamo backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular Llama2 model.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_llama2_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_llama2.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the dynamo backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a converter for a custom kernel using...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_auto_generate_converters_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_converters.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Automatically Generate a Converter for a Custom Kernel</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a plugin for a custom kernel using To...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_auto_generate_plugin_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugin.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_converter_overloading_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_converter_overloading.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Weight streaming in TensorRT is a powerful feature designed to overcome GPU memory limitations ...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_weight_streaming_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_weight_streaming_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Weight Streaming</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_mutable_torchtrt_module_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_mutable_torchtrt_module_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model Segment Anything Model 2 (SAM2) optimized u...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_sam2_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_sam2.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling SAM2 using the dynamo backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Here we demonstrate how to deploy a model quantized to INT8 or FP8 using the Dynamo frontend of...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_vgg16_ptq_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_vgg16_ptq.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Deploy Quantized Models using Torch-TensorRT</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="As model sizes increase, the cost of compilation will as well. With AOT methods like torch.dyna...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_engine_caching_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Engine Caching</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how a developer could include a custom kernel in a TensorRT engine ...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_custom_kernel_plugins_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_custom_kernel_plugins.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</div>
+    </div>
+
+
+.. raw:: html
+
+    </div>
+
+
+.. toctree::
+   :hidden:
+
+   /tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
+   /tutorials/_rendered_examples/dynamo/cross_runtime_compilation_for_windows
+   /tutorials/_rendered_examples/dynamo/refit_engine_example
+   /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
+   /tutorials/_rendered_examples/dynamo/torch_compile_gpt2
+   /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
+   /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
+   /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
+   /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
+   /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
+   /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
+   /tutorials/_rendered_examples/dynamo/torch_export_gpt2
+   /tutorials/_rendered_examples/dynamo/torch_export_llama2
+   /tutorials/_rendered_examples/dynamo/auto_generate_converters
+   /tutorials/_rendered_examples/dynamo/auto_generate_plugin
+   /tutorials/_rendered_examples/dynamo/converter_overloading
+   /tutorials/_rendered_examples/dynamo/weight_streaming_example
+   /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
+   /tutorials/_rendered_examples/dynamo/torch_export_sam2
+   /tutorials/_rendered_examples/dynamo/vgg16_ptq
+   /tutorials/_rendered_examples/dynamo/engine_caching_example
+   /tutorials/_rendered_examples/dynamo/custom_kernel_plugins
+
