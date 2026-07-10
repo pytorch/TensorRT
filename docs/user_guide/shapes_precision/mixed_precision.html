@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=5c7cdbc6"></script>
+    <script src="../../_static/documentation_options.js?v=7445bb52"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -638,7 +638,19 @@ For example,</p>
 </section>
 <section id="fp32-accumulation">
 <h2>FP32 Accumulation<a class="headerlink" href="#fp32-accumulation" title="Link to this heading">#</a></h2>
-<p>When <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code> is set, Torch-TensorRT will attempt to use FP32 accumulation for matmul layers, even if the input and output tensors are in FP16. This is particularly useful for models that are sensitive to numerical errors introduced by lower-precision accumulation.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code> is set, Torch-TensorRT uses FP32 accumulation for FP16
+matmul layers while retaining FP16 inputs and outputs. This is particularly useful
+for models that are sensitive to numerical errors introduced by lower-precision
+accumulation.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">decompose_attention=True</span></code> is also set, this behavior extends across the
+complete decomposed FP16 scaled dot product attention calculation. Query, key, and
+value tensors are promoted to FP32; the score matmul, scaling and masking, softmax,
+and value matmul remain in FP32; and only the final attention output is cast back to
+FP16.</p>
+<p>The attention-specific behavior requires <code class="docutils literal notranslate"><span class="pre">decompose_attention=True</span></code>. If attention
+is not decomposed, <code class="docutils literal notranslate"><span class="pre">use_fp32_acc</span></code> still applies to other eligible FP16 matmul
+layers, but does not alter the TensorRT attention layer. The option has no effect on
+FP32 or BF16 inputs.</p>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
 <p>When enabling <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code>, strong typing (explicit typing) is required — this is always enabled in the Dynamo path.</p>

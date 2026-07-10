@@ -643,7 +643,9 @@ Compilation Settings for Distributed Workloads
      - Set to ``True`` for dynamic sequence lengths in LLM generation loops.
    * - ``use_fp32_acc``
      - ``False``
-     - Use FP32 accumulation for FP16 models. Improves numerical accuracy.
+     - Use FP32 accumulation for FP16 matmul layers. With
+       ``decompose_attention=True``, keep the complete decomposed FP16 attention
+       calculation in FP32 and cast only its final output back to FP16.
 
 ----
 
