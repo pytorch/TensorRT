@@ -1,4 +1,6 @@
+#include <torch/torch.h>
 #include <bitset>
+
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
