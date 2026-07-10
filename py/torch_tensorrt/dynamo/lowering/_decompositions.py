@@ -1,5 +1,6 @@
 import logging
 from enum import Enum, auto
+from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
@@ -467,7 +468,18 @@ def scaled_dot_product_attention_decomposition(
     *,
     scale: Optional[float] = None,
     enable_gqa: bool = False,
+    use_fp32_acc: bool = False,
 ) -> torch.Tensor:
+    output_dtype = query.dtype
+    promote_intermediates = use_fp32_acc and query.dtype == torch.float16
+    if promote_intermediates:
+        # FP32 accumulation must span the complete attention calculation. Casting
+        # each matmul output back to FP16 separately rounds QK scores and attention
+        # probabilities before the following operation
+        query = query.float()
+        key = key.float()
+        value = value.float()
+
     L, S = query.size(-2), key.size(-2)
     device = query.device
 
@@ -504,7 +516,8 @@ def scaled_dot_product_attention_decomposition(
         attn_weight = attn_weight + attn_bias
 
     attn_weight = torch.softmax(attn_weight, dim=-1)
-    return torch.matmul(attn_weight, value)
+    output = torch.matmul(attn_weight, value)
+    return output.to(output_dtype) if promote_intermediates else output
 
 
 @register_torch_trt_decomposition(
@@ -519,6 +532,7 @@ def scaled_dot_product_flash_attention_decomposition(
     return_debug_mask: bool = False,
     *,
     scale: Optional[float] = None,
+    use_fp32_acc: bool = False,
 ) -> Tuple[
     torch.Tensor,
     torch.Tensor,
@@ -531,7 +545,14 @@ def scaled_dot_product_flash_attention_decomposition(
     torch.Tensor,
 ]:
     attn = scaled_dot_product_attention_decomposition(
-        query, key, value, None, dropout_p, is_causal, scale=scale
+        query,
+        key,
+        value,
+        None,
+        dropout_p,
+        is_causal,
+        scale=scale,
+        use_fp32_acc=use_fp32_acc,
     )
     return attn, None, None, None, 0, 0, None, None, None
 
@@ -549,9 +570,17 @@ def scaled_dot_product_efficient_attention_decomposition(
     is_causal: bool = False,
     *,
     scale: Optional[float] = None,
+    use_fp32_acc: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     attn = scaled_dot_product_attention_decomposition(
-        query, key, value, attn_bias, dropout_p, is_causal, scale=scale
+        query,
+        key,
+        value,
+        attn_bias,
+        dropout_p,
+        is_causal,
+        scale=scale,
+        use_fp32_acc=use_fp32_acc,
     )
     return attn, None, None, None
 
@@ -570,6 +599,7 @@ def scaled_dot_product_cudnn_attention_decomposition(
     return_debug_mask: bool = False,
     *,
     scale: Optional[float] = None,
+    use_fp32_acc: bool = False,
 ) -> Tuple[
     torch.Tensor,
     torch.Tensor,
@@ -582,7 +612,14 @@ def scaled_dot_product_cudnn_attention_decomposition(
     torch.Tensor,
 ]:
     attn = scaled_dot_product_attention_decomposition(
-        query, key, value, attn_bias, dropout_p, is_causal, scale=scale
+        query,
+        key,
+        value,
+        attn_bias,
+        dropout_p,
+        is_causal,
+        scale=scale,
+        use_fp32_acc=use_fp32_acc,
     )
     return attn, None, None, None, 0, 0, None, None, None
 
@@ -651,13 +688,41 @@ ATTENTION_DECOMPOSITION_OPS = {
 }
 
 
+def _enable_fp32_accumulation(
+    decomposition: Callable[..., Any],
+) -> Callable[..., Any]:
+    @wraps(decomposition)
+    def fp32_accumulation_decomposition(*args: Any, **kwargs: Any) -> Any:
+        kwargs["use_fp32_acc"] = True
+        return decomposition(*args, **kwargs)
+
+    return fp32_accumulation_decomposition
+
+
+FP32_ACC_ATTENTION_DECOMPOSITIONS = {
+    aten.scaled_dot_product_attention.default: _enable_fp32_accumulation(
+        scaled_dot_product_attention_decomposition
+    ),
+    aten._scaled_dot_product_flash_attention.default: _enable_fp32_accumulation(
+        scaled_dot_product_flash_attention_decomposition
+    ),
+    aten._scaled_dot_product_efficient_attention.default: _enable_fp32_accumulation(
+        scaled_dot_product_efficient_attention_decomposition
+    ),
+    aten._scaled_dot_product_cudnn_attention.default: _enable_fp32_accumulation(
+        scaled_dot_product_cudnn_attention_decomposition
+    ),
+}
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
     decompose_attention: bool = False,
     use_distributed_mode_trace: bool = False,
+    use_fp32_acc: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
     trt_decomps = (
-        TORCH_TRT_DECOMPOSITIONS
+        dict(TORCH_TRT_DECOMPOSITIONS)
         if decompose_attention
         else {
             k: v
@@ -665,6 +730,8 @@ def get_decompositions(
             if k not in ATTENTION_DECOMPOSITION_OPS
         }
     )
+    if decompose_attention and use_fp32_acc:
+        trt_decomps.update(FP32_ACC_ATTENTION_DECOMPOSITIONS)
 
     # For distributed (DTensor) models, allow aten.linear to decompose to addmm
     # so that DTensor's sharding dispatch can find a strategy.

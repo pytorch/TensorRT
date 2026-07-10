@@ -13,15 +13,7 @@ if importlib.util.find_spec("transformers"):
 @pytest.mark.critical
 @pytest.mark.parametrize(
     "dtype",
-    [
-        pytest.param(
-            torch.float16,
-            marks=pytest.mark.skip(
-                reason="skip fp16 for now due to TRT's numeric diff"
-            ),
-        ),
-        torch.float32,
-    ],
+    [torch.float16, torch.float32],
 )
 @pytest.mark.parametrize("decompose_attention", [True, False])
 @unittest.skipIf(
@@ -42,7 +34,15 @@ def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
         .to(dtype)
     )
 
-    input_ids = torch.randint(1, 10000, (1, 64), dtype=torch.int64, device="cuda")
+    generator = torch.Generator(device="cuda").manual_seed(15)
+    input_ids = torch.randint(
+        1,
+        10000,
+        (1, 64),
+        dtype=torch.int64,
+        device="cuda",
+        generator=generator,
+    )
     position_ids = torch.arange(64).unsqueeze(0).cuda()
 
     seq_len = torch.export.Dim("seq_len", min=1, max=128)
