@@ -270,6 +270,16 @@ def build_libtorchtrt_cxx11_abi(
         else:
             cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
 
+    # Persist bazel's action cache across builds when a cache dir is provided.
+    # The C++/CUDA compile is the serial long pole; with a warm --disk_cache an
+    # unchanged (or partially-changed) tree reuses cached action outputs, turning
+    # a from-scratch rebuild into seconds. CI sets BAZEL_DISK_CACHE and restores/
+    # saves the dir via actions/cache (coarse key); no-op locally unless opted in.
+    disk_cache = os.environ.get("BAZEL_DISK_CACHE")
+    if disk_cache:
+        cmd.append(f"--disk_cache={disk_cache}")
+        print(f"Using bazel --disk_cache={disk_cache}")
+
     env = os.environ.copy()
     if "TORCH_PATH" not in env:
         stable_torch_path = resolve_torch_path()

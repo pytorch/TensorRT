@@ -212,6 +212,69 @@ def run_suite(
     return 0
 
 
+# Path prefixes whose changes cannot affect any GPU test outcome. A PR touching
+# ONLY these can skip the whole test matrix.
+_NO_TEST_IMPACT = (
+    "docs/",
+    "docsrc/",
+    "tools/",
+    "notebooks/",
+    "examples/",
+    ".devcontainer/",
+    "README",
+    "CHANGELOG",
+    "LICENSE",
+    ".gitignore",
+    ".pre-commit",
+    ".flake8",
+)
+
+
+def _owned_dirs(s: Suite) -> set[str]:
+    """Repo-relative directories a suite owns — the directory of each path target
+    (glob tails dropped, file targets mapped to their dir). Coarse on purpose:
+    change-based selection must OVER-select (never miss a suite a change breaks)."""
+    dirs: set[str] = set()
+    for var in s.variants:
+        fv = s.for_variant(var)
+        cwd = fv["cwd"].rstrip("/")
+        for p in fv["paths"] or (".",):
+            t = p.split("*")[0].strip("/")  # drop any glob tail
+            full = f"{cwd}/{t}" if t and t != "." else cwd
+            base = full.rsplit("/", 1)[-1]
+            dirs.add(full.rsplit("/", 1)[0] if "." in base else full)
+    return dirs
+
+
+def affected_suites(changed: list[str]) -> set[str] | None:
+    """Suite names a `changed` file set can affect.
+
+    Returns ``None`` when the change set can affect ANYTHING — any file that is
+    neither a no-test-impact path nor owned by a specific suite (i.e. library
+    source, build files, a shared conftest/harness). The caller then runs the
+    full selection (safe default). An empty set means "nothing to test" (e.g. a
+    docs-only PR). This never narrows away a suite a change could break.
+    """
+    owned = {s.name: _owned_dirs(s) for s in SUITES}
+    hit: set[str] = set()
+    for f in changed:
+        f = f.strip()
+        if not f:
+            continue
+        if any(f.startswith(p) for p in _NO_TEST_IMPACT):
+            continue  # no test impact
+        matched = {
+            name
+            for name, dirs in owned.items()
+            if any(f == d or f.startswith(d + "/") for d in dirs)
+        }
+        if matched:
+            hit |= matched
+        else:
+            return None  # source / build / shared-test change → cannot narrow
+    return hit
+
+
 def select(
     *,
     lane: str | None = None,
@@ -219,10 +282,20 @@ def select(
     variant: str | None = None,
     platform: str | None = None,
     names: list[str] | None = None,
+    changed: list[str] | None = None,
 ) -> list[tuple[Suite, Variant]]:
-    """All (suite, variant) jobs matching the filters. No filter on an axis = all."""
+    """All (suite, variant) jobs matching the filters. No filter on an axis = all.
+
+    ``changed`` (a list of repo-relative changed paths) narrows to only the
+    affected suites — but ONLY when every change is confined to test dirs; any
+    source/build/shared change keeps the full pool (see ``affected_suites``).
+    """
     jobs: list[tuple[Suite, Variant]] = []
     pool = [by_name(n) for n in names] if names else list(SUITES)
+    if changed is not None:
+        aff = affected_suites(changed)
+        if aff is not None:  # None → a broad change → do not narrow
+            pool = [s for s in pool if s.name in aff]
     for s in pool:
         if lane is not None and lane not in s.lanes:
             continue

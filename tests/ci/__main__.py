@@ -59,11 +59,30 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return rc
 
 
+def _read_changed(args: argparse.Namespace) -> list[str] | None:
+    """Changed-file list for path-based selection, from ``--changed-from`` (a
+    file path, or ``-`` for stdin; one repo-relative path per line). Returns
+    ``None`` when not supplied → no narrowing (run everything the filters select)."""
+    src = getattr(args, "changed_from", None)
+    if not src:
+        return None
+    if src == "-":
+        text = sys.stdin.read()
+    else:
+        with open(src, encoding="utf-8") as fh:
+            text = fh.read()
+    return [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+
 def _cmd_run_lane(args: argparse.Namespace) -> int:
     """Run every suite in a lane/tier, continuing past failures (so one consolidated
     report sees them all). Returns non-zero if any suite failed."""
     jobs = select(
-        lane=args.lane, tier=args.tier, variant=args.variant, platform=args.platform
+        lane=args.lane,
+        tier=args.tier,
+        variant=args.variant,
+        platform=args.platform,
+        changed=_read_changed(args),
     )
     if not jobs:
         print("::warning::no suites match the given filters", file=sys.stderr)
@@ -76,7 +95,11 @@ def _cmd_run_lane(args: argparse.Namespace) -> int:
 
 def _cmd_matrix(args: argparse.Namespace) -> int:
     include = matrix(
-        lane=args.lane, tier=args.tier, variant=args.variant, platform=args.platform
+        lane=args.lane,
+        tier=args.tier,
+        variant=args.variant,
+        platform=args.platform,
+        changed=_read_changed(args),
     )
     if not include:
         print("::warning::matrix is empty for the given filters", file=sys.stderr)
@@ -161,6 +184,12 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--variant", choices=("standard", "rtx"))
     sp.add_argument("--platform", choices=("linux-x86_64", "windows"))
     sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument(
+        "--changed-from",
+        metavar="FILE",
+        help="narrow to suites affected by these changed files (a file, or '-' "
+        "for stdin; one repo-relative path per line). Broad changes → no narrowing.",
+    )
     sp.set_defaults(fn=_cmd_run_lane)
 
     sp = sub.add_parser("matrix", help="emit a GitHub Actions matrix as JSON")
@@ -169,6 +198,12 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--tier", choices=("l0", "l1", "l2"))
     sp.add_argument("--variant", choices=("standard", "rtx"))
     sp.add_argument("--platform", choices=("linux-x86_64", "windows"))
+    sp.add_argument(
+        "--changed-from",
+        metavar="FILE",
+        help="narrow to suites affected by these changed files (a file, or '-' "
+        "for stdin; one repo-relative path per line). Broad changes → no narrowing.",
+    )
     sp.set_defaults(fn=_cmd_matrix)
 
     sub.add_parser("doctor", help="validate the manifest").set_defaults(fn=_cmd_doctor)
