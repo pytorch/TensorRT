@@ -7,14 +7,14 @@ module(
 bazel_dep(name = "googletest", version = "1.14.0")
 bazel_dep(name = "platforms", version = "0.0.10")
 bazel_dep(name = "rules_cc", version = "0.0.9")
-bazel_dep(name = "rules_python", version = "0.34.0")
+bazel_dep(name = "rules_python", version = "2.2.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     ignore_root_user_error = True,
-    python_version = "3.12",
+    python_version = "3.14",
 )
 
 bazel_dep(name = "rules_pkg", version = "1.0.1")
@@ -45,7 +45,7 @@ torch_nccl_detect(name = "torch_nccl")
 new_local_repository(
     name = "torch_tensorrt",
     build_file = "@//third_party/torch_tensorrt:BUILD",
-    path = "/usr/local/lib/python3.12/dist-packages/torch_tensorrt/",
+    path = "/usr/local/lib/python3.14/dist-packages/torch_tensorrt/",
 )
 
 
@@ -67,7 +67,7 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 new_local_repository(
     name = "libtorch",
-    path = "/usr/local/lib/python3.12/dist-packages/torch/",
+    path = "/usr/local/lib/python3.14/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
@@ -94,7 +94,7 @@ new_git_repository(
 # It directly references a system-installed PyTorch package, which breaks hermeticity
 new_local_repository(
     name = "torch_l4t",
-    path = "/usr/local/lib/python3.12/dist-packages/torch/",
+    path = "/usr/local/lib/python3.14/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
