@@ -112,6 +112,22 @@ h2.sec { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; colo
 .chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border);
   background: var(--surface); color: var(--muted); }
 
+/* failure category tags — colour encodes triage kind:
+   bug=real regression (red) · infra=OOM/resource (purple) · env=setup/feature gap (amber) */
+.cat { display: inline-block; font-size: 10.5px; font-weight: 650; letter-spacing: .02em;
+  padding: 1px 7px; border-radius: 999px; border: 1px solid transparent;
+  vertical-align: middle; white-space: nowrap; }
+.cat.bug     { color: var(--fail);   background: var(--fail-bg);   border-color: var(--fail-line); }
+.cat.infra   { color: var(--cancel); background: var(--cancel-bg); border-color: var(--cancel-line); }
+.cat.env     { color: var(--run);    background: var(--run-bg);    border-color: var(--run-line); }
+.cat.unknown { color: var(--skip);   background: var(--skip-bg);   border-color: var(--skip-line); }
+/* config-correlation hint (e.g. "RTX only", "cu132 only") */
+.cfgpat { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 1px 7px;
+  border-radius: 999px; margin-left: 4px; vertical-align: middle; white-space: nowrap;
+  color: var(--accent); background: transparent; border: 1px dashed var(--accent); }
+.agg-tally { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.agg-tally .cat { font-weight: 700; }
+
 /* platform board */
 .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);

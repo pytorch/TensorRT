@@ -43,6 +43,16 @@ Platform = Literal["linux-x86_64", "windows"]
 ALL_VARIANTS: tuple[Variant, ...] = ("standard", "rtx")
 ALL_PLATFORMS: tuple[Platform, ...] = ("linux-x86_64", "windows")
 
+# xdist worker counts (`-n`). GPU tests are MEMORY-bound, not CPU-bound: each
+# worker builds its own TensorRT engine, so N workers ≈ N× peak GPU memory.
+# `-n auto` (= CPU count, up to ~48 on big runners) is a footgun here — it OOMs
+# the model/runtime suites on real 24 GB runners, and an OOM'd engine build fails
+# `assert cuda_engine` and then *reruns*, doubling wall-clock. So workers are
+# tiered by worst-case engine size, not by core count:
+_LIGHT = "8"  # small single-op / graph tests (conversion, partitioning, hlo)
+_HEAVY = "4"  # full compile+execute suites (lowering, runtime) — OOM'd at -n 8
+_MODEL = "2"  # real models / LLMs (ResNet, BERT, Llama) — biggest engines
+
 
 @dataclass(frozen=True)
 class Suite:
@@ -115,7 +125,7 @@ _L0: list[Suite] = [
         tier="l0",
         lanes=("fast", "full"),
         paths=("runtime/test_000_*",),
-        jobs="8",
+        jobs=_HEAVY,
     ),
     Suite(
         "dynamo-partitioning-smoke",
@@ -131,7 +141,7 @@ _L0: list[Suite] = [
         tier="l0",
         lanes=("fast", "full"),
         paths=("lowering/",),
-        jobs="8",
+        jobs=_HEAVY,
     ),
     Suite(
         "py-core",
@@ -159,7 +169,7 @@ _L1: list[Suite] = [
         tier="l1",
         lanes=("full",),
         paths=("runtime/test_001_*",),
-        jobs="8",
+        jobs=_HEAVY,
     ),
     Suite(
         "dynamo-partitioning",
@@ -218,7 +228,7 @@ _L2: list[Suite] = [
         paths=("models/test_models.py", "models/test_dyn_models.py"),
         markers="not critical",
         ir="torch_compile",
-        jobs="auto",
+        jobs=_MODEL,
     ),
     Suite(
         "dynamo-models",
@@ -226,14 +236,14 @@ _L2: list[Suite] = [
         lanes=("full", "nightly"),
         paths=("models/",),
         markers="not critical",
-        jobs="auto",
+        jobs=_MODEL,
     ),
     Suite(
         "dynamo-llm",
         tier="l2",
         lanes=("nightly",),
         paths=("llm/",),
-        jobs="auto",
+        jobs=_MODEL,
     ),
     Suite(
         "dynamo-runtime-full",
@@ -241,7 +251,7 @@ _L2: list[Suite] = [
         lanes=("full", "nightly"),
         paths=("runtime/",),
         keyword="not test_000_ and not test_001_",
-        jobs="auto",
+        jobs=_HEAVY,
     ),
     Suite(
         "executorch",
@@ -330,7 +340,7 @@ _PYTHON_ONLY: list[Suite] = [
         tier="l1",
         lanes=("python-only",),
         paths=("runtime/",),
-        jobs="8",
+        jobs=_HEAVY,
         # Runs for BOTH backends: the PYTHON_ONLY=1 wheel is validated against
         # standard TensorRT and TensorRT-RTX (variants default to both).
     ),

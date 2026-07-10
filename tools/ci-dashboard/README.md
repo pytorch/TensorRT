@@ -37,13 +37,13 @@ reachable over your tailnet/LAN — the startup log prints the Tailscale + LAN U
   the RTX and python-only variants, jetpack…), sorted worst-first, with a live
   status badge. A summary strip up top counts failing / running / queued /
   passing at a glance.
-- **Drill in** — open a platform to see its jobs as a **python × cuda × tier**
-  grid. Green/red cells; L0/L1/L2 tiers are labelled with the pytest paths they
-  run (pulled from `tests/py/utils/ci_helpers.sh`).
+- **Drill in** — open a platform to see its jobs as a **python × cuda × suite**
+  grid. Green/red cells; each suite is labelled with the pytest paths it runs
+  (read from the `tests/ci` manifest — the same data CI runs).
 - **Click a red cell** — a drawer shows every failing test with its error, the
   **source file:line it maps to** (local path + a GitHub link pinned to the run's
-  commit), and a **copy-paste command to reproduce it locally** via the same
-  tier function CI used.
+  commit), and a **copy-paste command to reproduce it locally** — the exact
+  `python -m tests.ci run <suite>` command CI used, narrowed to the failing tests.
 - **Relevant logs, captured** — the drawer then pulls that job's log and extracts
   just the **pytest FAILURES block per failing test** (traceback + captured
   stdout/stderr), so you read the actual failure without scrolling a 1 MB log.
@@ -76,8 +76,12 @@ platform on open, out-of-band badge polling, the failure drawer).
   the failing test name + traceback is one cheap API call
   (`…/check-runs/{id}/annotations`) — no wheel or junit download. We then
   `git grep` the test symbol in `tests/` to resolve it to `file:line`.
-- **Tier → paths** live in `TIER_MAP`, a mirror of the `trt_tier_*` selectors in
-  `tests/py/utils/ci_helpers.sh`. If a tier is added/renamed there, add it here.
+- **Suite → paths / reproduce command** come straight from the `tests/ci`
+  manifest (`tests/ci/suites.py`) via `info_for()` — the CI names each test job
+  `<suite>-<variant>`, which is exactly a manifest suite, so there is nothing to
+  keep in sync. A small `TIER_MAP` remains only as a fallback so historical,
+  pre-migration runs (tier-named) still resolve; it can be dropped once those age
+  out.
 
 ## Limitations
 

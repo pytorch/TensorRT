@@ -14,9 +14,11 @@ GitHub check-run *annotation* (via pytest-results-action), so the failing test
 name + traceback is one cheap API call away — no wheel/junit download needed.
 
 Job names encode the whole matrix, e.g.
-    core / L2 dynamo distributed tests / L2-dynamo-distributed-tests--3.12-cu130
-We parse that into {group/tier, python, cuda, kind} and map the tier back to the
-pytest paths in tests/py/utils/ci_helpers.sh so a red cell points at code.
+    test / dynamo-converters-standard / dynamo-converters-standard--3.12-cu130
+We parse that into {group, python, cuda, kind}; the group is a `<suite>-<variant>`
+from the tests/ci manifest (tests/ci/suites.py — the SAME data CI runs), so a red
+cell maps to the suite's pytest paths and its exact `python -m tests.ci run`
+reproduce command. Pre-migration runs (tier-named) fall back to the legacy map.
 """
 
 from __future__ import annotations
@@ -41,11 +43,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
 REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 
-# ── Tier → source mapping ────────────────────────────────────────────────────
-# Mirrors the trt_tier_* selectors in tests/py/utils/ci_helpers.sh (the single
-# source of truth for "what does each CI tier run"). Keys are normalized job
-# group names (see _norm()); `paths` are repo-relative; `fn` is the shell tier
-# function you'd invoke locally to reproduce.
+# ── tests/ci manifest (single source of truth) ───────────────────────────────
+# The dashboard resolves a red CI cell back to "what ran + how to reproduce" from
+# the SAME manifest CI and the `just` recipes use (tests/ci/suites.py). CI names
+# each test job `<suite>-<variant>` (tests/ci → linux-test.yml), so the group the
+# dashboard parses out of a job IS a manifest suite — no duplicated path lists to
+# drift. Imported best-effort: a checkout predating the manifest falls back to the
+# legacy TIER_MAP below.
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+try:
+    from tests.ci import SUITES as _SUITES  # noqa: E402
+except Exception:  # pragma: no cover — manifest absent on pre-migration branches
+    _SUITES = ()
+
+# ── Legacy tier → source mapping (fallback) ──────────────────────────────────
+# Kept only so historical, pre-migration runs (named "L2 dynamo core tests", not
+# "<suite>-<variant>") still resolve. New runs go through the manifest above.
+# Keys are normalized job group names (see _norm()); `fn` is the old shell tier.
 TIER_MAP = {
     "l0 dynamo converter tests": dict(
         fn="trt_tier_l0_converter", paths=["tests/py/dynamo/conversion/"]
@@ -123,8 +138,71 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
 
 
-def tier_for(group: str):
-    return TIER_MAP.get(_norm(group))
+# ── manifest-backed resolution (group → what ran + how to reproduce) ──────────
+def _suite_group_index():
+    """Map a normalized CI job group to ``(suite, variant)``.
+
+    CI names each test job ``<suite>-<variant>`` so the parsed group is exactly a
+    manifest suite. Index both the ``<suite>-<variant>`` and bare ``<suite>``
+    forms; per-variant ``paths`` overrides (e.g. RTX) are applied at lookup."""
+    idx = {}
+    for s in _SUITES:
+        for v in s.variants:
+            idx.setdefault(_norm(f"{s.name}-{v}"), (s, v))
+        idx.setdefault(_norm(s.name), (s, s.variants[0]))
+    return idx
+
+
+_SUITE_INDEX = _suite_group_index()
+# Longest keys first so 'dynamo runtime smoke' wins over 'dynamo runtime'.
+_SUITE_KEYS = sorted(_SUITE_INDEX, key=len, reverse=True)
+
+
+def _suite_repro(suite, variant, kexpr=""):
+    """The exact command CI ran for this suite (what `just suite` invokes)."""
+    var = f" --variant {variant}" if variant and variant != "standard" else ""
+    ka = f' -- -k "{kexpr}"' if kexpr else ""
+    return (
+        f"TRT_PYTEST_RERUNS=0 uv run --no-sync python -m tests.ci "
+        f"run {suite.name}{var}{ka}"
+    )
+
+
+def info_for(group: str):
+    """Resolve a CI job group → ``{paths, repro, label}`` from the tests/ci
+    manifest, falling back to the legacy ``TIER_MAP`` for pre-migration runs.
+
+    ``paths`` are repo-relative (``cwd`` joined with the suite's pytest
+    positionals) so a red cell still points at code. ``repro(kexpr)`` returns the
+    local reproduce command, narrowed to the failing tests when ``kexpr`` given.
+    """
+    g = _norm(group)
+    hit = _SUITE_INDEX.get(g) or next(
+        (_SUITE_INDEX[k] for k in _SUITE_KEYS if k in g), None
+    )
+    if hit:
+        s, v = hit
+        fv = s.for_variant(v)
+        cwd = fv["cwd"].rstrip("/")
+        paths = [cwd if p in (".", "./") else f"{cwd}/{p}" for p in fv["paths"]]
+        paths = paths or [cwd]
+        return dict(
+            paths=paths,
+            repro=lambda kexpr="", _s=s, _v=v: _suite_repro(_s, _v, kexpr),
+            label=f"{s.name} · {v}",
+        )
+    t = TIER_MAP.get(g)
+    if t:
+        return dict(
+            paths=t["paths"],
+            repro=lambda kexpr="", _t=t: (
+                'source tests/py/utils/ci_helpers.sh && PYTHON="uv run '
+                f'--no-sync python" TRT_PYTEST_RERUNS=0 {_t["fn"]}'
+                + (f' -k "{kexpr}"' if kexpr else "")
+            ),
+            label=None,
+        )
+    return None
 
 
 # ── gh plumbing (cached) ─────────────────────────────────────────────────────
@@ -514,6 +592,133 @@ RANK = {"fail": 0, "run": 1, "queue": 2, "cancel": 3, "pass": 4, "skip": 5}
 DIDNT_RUN = ("skip", "cancel")
 
 
+# ── failure categorization ───────────────────────────────────────────────────
+# Triage-at-a-glance: the judgment a human makes reading each traceback — is this
+# infra (OOM/resource → retry/parallelism, not a code bug), an env/import gap, a
+# converter gap, or a real regression (numerical/assertion)? First pattern wins,
+# so order is most-specific → most-generic. `kind` drives the tag colour:
+#   infra = "probably not your bug"  ·  env/gap = setup/feature hole  ·  bug = real.
+# NOTE: an OOM often surfaces AS an AssertionError ("assert cuda_engine"); the OOM
+# signatures below are listed first on purpose so they win over the generic assert.
+_FAIL_CATS = [
+    (
+        "oom",
+        "GPU / resource",
+        "infra",
+        re.compile(
+            r"OutOfMemory|out of memory|createCaskHardwareInfo|\bCask\b|"
+            r"build_serialized_network returned None|assert cuda_engine|cuda_engine\b|"
+            r"catchCudaError|cudaError|cuInit|defaultAllocator|no CUDA GPUs|"
+            r"CUDA error|cudaMalloc|device-side assert",
+            re.I,
+        ),
+    ),
+    (
+        "timeout",
+        "timeout",
+        "infra",
+        re.compile(r"timed out|timeout|deadline exceeded|took too long", re.I),
+    ),
+    (
+        "import",
+        "import / collection",
+        "env",
+        re.compile(
+            r"ModuleNotFoundError|ImportError|No module named|cannot import name|"
+            r"error collecting|errors during collection|failed to import",
+            re.I,
+        ),
+    ),
+    (
+        "unsupported",
+        "unsupported op",
+        "env",
+        re.compile(
+            r"no converter|not support|unsupported|Could not find any implementation|"
+            r"UnsupportedOperator|no implementation for",
+            re.I,
+        ),
+    ),
+    (
+        "numerical",
+        "numerical / accuracy",
+        "bug",
+        re.compile(
+            r"not close|Mismatched elements|cosine|tolerance|allclose|"
+            r"Max absolute difference|relative difference|accuracy|atol|rtol",
+            re.I,
+        ),
+    ),
+    (
+        "assertion",
+        "assertion",
+        "bug",
+        re.compile(r"\bAssertionError\b|^\s*assert\s", re.I | re.M),
+    ),
+    (
+        "typeerr",
+        "type / shape",
+        "bug",
+        re.compile(
+            r"\b(TypeError|AttributeError|KeyError|IndexError|ValueError)\b|"
+            r"shape mismatch|size mismatch|dtype",
+            re.I,
+        ),
+    ),
+    (
+        "runtime",
+        "runtime error",
+        "bug",
+        re.compile(r"\b(RuntimeError|NotImplementedError)\b", re.I),
+    ),
+]
+
+
+# Roll-up labels for the per-run category tally (kind → human summary word).
+_KIND_LABEL = {
+    "bug": "real bug",
+    "env": "env / gap",
+    "infra": "infra / OOM",
+    "unknown": "uncategorized",
+}
+
+
+def categorize_failure(message):
+    """Classify a failure's error text → {key, label, kind}. `kind` ∈
+    {infra, env, bug, unknown} and drives the tag colour."""
+    text = message or ""
+    for key, label, kind, rx in _FAIL_CATS:
+        if rx.search(text):
+            return dict(key=key, label=label, kind=kind)
+    return dict(key="other", label="error", kind="unknown")
+
+
+def _cat_tag(cat):
+    return (
+        f'<span class="cat {cat["kind"]}" '
+        f'title="{e(cat["label"])} — {cat["kind"]}">{e(cat["label"])}</span>'
+    )
+
+
+def _config_pattern(occ, all_pys, all_cudas):
+    """Which configuration a failure correlates with — the strongest diagnostic
+    signal after the category. Only asserts "X only" when X is a strict subset of
+    what actually ran (so we never claim a pattern that isn't real)."""
+    fpys = {o["py"] for o in occ if o.get("py")}
+    fcudas = {o["cuda"] for o in occ if o.get("cuda")}
+    fplats = {o["plat"] for o in occ}
+    bits = []
+    if fplats and all("RTX" in p or "rtx" in p for p in fplats):
+        bits.append("RTX only")
+    if fplats and all("py-only" in p for p in fplats):
+        bits.append("python-only")
+    if len(all_cudas) > 1 and len(fcudas) == 1 and fcudas < all_cudas:
+        bits.append(f"{next(iter(fcudas))} only")
+    if len(all_pys) > 1 and len(fpys) == 1 and fpys < all_pys:
+        bits.append(f"py{next(iter(fpys))} only")
+    return bits
+
+
 def rel_time(iso):
     if not iso:
         return ""
@@ -688,10 +893,10 @@ def render_platform(run_id, sha, platform, refresh=False):
     for (_, gname), gjobs in sorted(
         groups.items(), key=lambda kv: (kv[0][0], kv[0][1])
     ):
-        tier = tier_for(gname)
+        info = info_for(gname)
         tierpath = (
-            f'<span class="tierpath">{e(", ".join(tier["paths"]))}</span>'
-            if tier
+            f'<span class="tierpath">{e(", ".join(info["paths"]))}</span>'
+            if info
             else ""
         )
         cells, rows = [], []
@@ -770,7 +975,7 @@ def render_failures(job_id, sha, platform, tier, py, cuda, url):
             + f'<div class="muted">Could not load annotations: {e(data["error"])}</div>'
         )
     fails = data["failures"]
-    tinfo = tier_for(tier)
+    info = info_for(tier)
     body = []
     if not fails:
         loglink = (
@@ -792,11 +997,13 @@ def render_failures(job_id, sha, platform, tier, py, cuda, url):
                 f'<div class="floc">↳ <a href="{e(gh_url)}" target="_blank" rel="noopener">'
                 f'<code>{e(f["file"])}:{f["line"]}</code> ↗</a></div>'
             )
+        cat = categorize_failure(f["message"])
         body.append(
-            f'<div class="fail-item"><div class="ftest">{e(f["test"] or "failure")}</div>'
+            f'<div class="fail-item"><div class="ftest">{e(f["test"] or "failure")}'
+            f" {_cat_tag(cat)}</div>"
             f'{loc}<pre>{e(f["message"])}</pre></div>'
         )
-    if tinfo:
+    if info:
         leaves = []
         for f in fails:
             if f["test"]:
@@ -804,11 +1011,8 @@ def render_failures(job_id, sha, platform, tier, py, cuda, url):
                 leaf = re.sub(r"\[.*$", "", leaf)
                 if leaf and leaf not in leaves:
                     leaves.append(leaf)
-        k = f' -k "{" or ".join(leaves[:6])}"' if leaves else ""
-        cmd = (
-            f"source tests/py/utils/ci_helpers.sh && "
-            f'PYTHON="uv run --no-sync python" TRT_PYTEST_RERUNS=0 {tinfo["fn"]}{k}'
-        )
+        kexpr = " or ".join(leaves[:6])
+        cmd = info["repro"](kexpr)
         body.append(
             f'<div class="repro"><button class="copy" onclick="copyPre(this)">copy</button>'
             f'<div class="lbl">reproduce locally</div><code>{e(cmd)}</code></div>'
@@ -887,29 +1091,60 @@ def render_aggregate(branch, refresh=False):
                 )
             )
 
+    # Config universe (what actually ran) so "X only" hints are real subsets.
+    test_jobs = [j for _, j in alljobs if j["kind"] == "test"]
+    all_pys = {j["python"] for j in test_jobs if j["python"]}
+    all_cudas = {j["cuda"] for j in test_jobs if j["cuda"]}
+
+    # Categorize once per row (from the sample traceback) so we can tally + tag.
+    for a in agg.values():
+        a["sample"] = next((o["msg"] for o in a["occ"] if o["msg"]), "")
+        a["cat"] = categorize_failure(a["sample"] or a["test"])
+
+    # Real regressions (bug) first, then env/gap, infra last; ties → most cells.
+    _KIND_RANK = {"bug": 0, "env": 1, "unknown": 2, "infra": 3}
     rows = sorted(
         agg.values(),
-        key=lambda a: (-len({o["plat"] for o in a["occ"]}), -len(a["occ"]), a["test"]),
+        key=lambda a: (
+            _KIND_RANK.get(a["cat"]["kind"], 2),
+            -len({o["plat"] for o in a["occ"]}),
+            -len(a["occ"]),
+            a["test"],
+        ),
     )
     out = []
     for a in rows:
         plats = sorted({o["plat"] for o in a["occ"]})
+        ncells = len(a["occ"])
         loc = ""
         if a["file"]:
             gh_url = f'https://github.com/{repo_slug()}/blob/{runs[0].get("headSha","")}/{a["file"]}#L{a["line"]}'
             loc = f'<div class="agg-file">↳ <a href="{e(gh_url)}" target="_blank" rel="noopener"><code>{e(a["file"])}:{a["line"]}</code> ↗</a></div>'
         chips = "".join(f'<span class="chip">{e(p)}</span>' for p in plats)
-        sample = next((o["msg"] for o in a["occ"] if o["msg"]), "")
+        pat = _config_pattern(a["occ"], all_pys, all_cudas)
+        patchips = "".join(f'<span class="cfgpat">{e(p)}</span>' for p in pat)
         out.append(f"""<details class="agg-row-d">
       <summary class="agg-row">
-        <div><div class="agg-test">{e(a["test"])}</div>{loc}</div>
-        <span class="agg-count"><span class="dot fail"></span>{len(plats)} platform{"s" if len(plats)!=1 else ""}</span>
+        <div><div class="agg-test">{e(a["test"])} {_cat_tag(a["cat"])}{patchips}</div>{loc}</div>
+        <span class="agg-count"><span class="dot fail"></span>{len(plats)} platform{"s" if len(plats)!=1 else ""} · {ncells} cell{"s" if ncells!=1 else ""}</span>
       </summary>
-      <div class="agg-detail"><div class="chips">{chips}</div>{f"<pre>{e(sample)}</pre>" if sample else ""}</div>
+      <div class="agg-detail"><div class="chips">{chips}</div>{f"<pre>{e(a['sample'])}</pre>" if a["sample"] else ""}</div>
     </details>""")
+    # Category tally — an instant read on the run's character (infra flakes vs regressions).
+    tally = {}
+    for a in rows:
+        tally.setdefault(a["cat"]["kind"], dict(n=0, label=a["cat"]["label"]))["n"] += 1
+    order = ["bug", "env", "unknown", "infra"]
+    tstr = " · ".join(
+        f'<span class="cat {k}">{tally[k]["n"]} {e(_KIND_LABEL[k])}</span>'
+        for k in order
+        if k in tally
+    )
     header = (
-        f'<div class="agg-head-row">{len(rows)} distinct failing test'
-        f'{"s" if len(rows)!=1 else ""} across {len({o["plat"] for a in rows for o in a["occ"]})} platforms'
+        f'<div class="agg-head-row"><span>{len(rows)} distinct failing test'
+        f'{"s" if len(rows)!=1 else ""} across '
+        f'{len({o["plat"] for a in rows for o in a["occ"]})} platforms</span>'
+        f'<span class="agg-tally">{tstr}</span>'
         f'<button class="btn small" hx-get="/ui/aggregate?branch={e(branch)}&refresh=1" '
         f'hx-target="#agg" hx-swap="innerHTML">↻ rescan</button></div>'
     )
