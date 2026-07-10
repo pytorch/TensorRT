@@ -1,7 +1,7 @@
 import logging
 import math
 import operator
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple
 
 import torch
 from torch._subclasses.fake_tensor import FakeTensorMode
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # NOTE: add.Scalar / sub.Scalar are NOT in this set.  (a+bi)+s = (a+s)+bi
 # adds the scalar only to the real part, but on the [...,2] layout
 # add.Scalar would add to both parts.  Those need explicit rewrites.
-_ELEMENTWISE_SAFE: frozenset = frozenset(
+_ELEMENTWISE_SAFE: FrozenSet[Any] = frozenset(
     {
         # Arithmetic — component-wise operations are correct by construction
         torch.ops.aten.add.Tensor,
@@ -72,7 +72,7 @@ _ELEMENTWISE_SAFE: frozenset = frozenset(
 )
 
 
-def _complex_unpacker(*ops: object) -> Callable:
+def _complex_unpacker(*ops: object) -> Callable[..., Any]:
     """Decorator that registers a rewrite method for a complex aten op into a real value subgraph.
 
     Usage::
@@ -84,7 +84,7 @@ def _complex_unpacker(*ops: object) -> Callable:
     ``@_register_unpackers`` when the class is fully defined.
     """
 
-    def decorator(fn: Callable) -> Callable:
+    def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         fn._complex_unpacker_ops = ops
         return fn
 
@@ -94,7 +94,7 @@ def _complex_unpacker(*ops: object) -> Callable:
 def _register_unpackers(cls: type) -> type:
     """Class decorator that builds ``cls._DISPATCH`` from all methods tagged
     with ``@_complex_unpacker``.  Applied once at class-definition time."""
-    dispatch: dict = {}
+    dispatch: Dict[Any, Any] = {}
     for attr in vars(cls).values():
         for op in getattr(attr, "_complex_unpacker_ops", ()):
             dispatch[op] = attr
@@ -276,7 +276,7 @@ class ComplexGraphRewriter:
         elif input_node.op == "get_attr":
             # Sanitize dots from nested-module targets (e.g. "block1.freq")
             # so register_buffer does not raise KeyError on dotted names.
-            sanitized = input_node.target.replace(".", "__")  # type: ignore
+            sanitized = input_node.target.replace(".", "__")
             new_attr_name = sanitized + "_unpacked_complex"
             with unset_fake_temporarily():
                 original_tensor = self.get_attr_tensor(input_node.target)  # type: ignore
@@ -1277,7 +1277,7 @@ class ComplexGraphRewriter:
             return False
         with SubgraphBuilder(self.gm.graph, node) as b:
             out = b(torch.ops.aten.scalar_tensor.default, 0.0)
-            out.kwargs = {"dtype": torch.float32}  # type: ignore[assignment]
+            out.kwargs = {"dtype": torch.float32}
             node.replace_all_uses_with(out)
             self.gm.graph.erase_node(node)
             return True
@@ -1557,7 +1557,7 @@ class ComplexGraphRewriter:
         during the detection phase (or by each rewrite handler as it emits new
         nodes), so this is a direct metadata lookup — no shape heuristics needed.
         """
-        return n.meta.get("is_complex_layout", False)
+        return bool(n.meta.get("is_complex_layout", False))
 
     @_complex_unpacker(torch.ops.aten.mm.default)
     def _rewrite_mm(self, node: Node) -> bool:
@@ -1809,16 +1809,19 @@ class ComplexGraphRewriter:
         """
         from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 
-        fake_inputs = []
+        fake_inputs: List[Optional[torch.Tensor]] = []
         for node in self.gm.graph.nodes:
             if node.op == "placeholder":
                 if "val" in node.meta:
                     fake_val = node.meta["val"]
-                    fake_inputs.append(
-                        fake_val.to("cuda")
-                        if fake_val.device.type == "cuda"
-                        else fake_val
-                    )
+                    if fake_val is None:
+                        # present-but-None placeholder = a real None input
+                        # (e.g. an optional/None transformer input, common in diffusers)
+                        fake_inputs.append(None)
+                    elif fake_val.device.type == "cuda":
+                        fake_inputs.append(fake_val.to("cuda"))
+                    else:
+                        fake_inputs.append(fake_val)
                 else:
                     fake_tensor = torch.empty(
                         [s if s != 0 else 1 for s in node.meta["tensor_meta"].shape],
@@ -1987,7 +1990,7 @@ def _get_complex_input_names(gm: GraphModule) -> List[str]:
     return names
 
 
-def _get_complex_input_dtypes(gm: GraphModule) -> dict:
+def _get_complex_input_dtypes(gm: GraphModule) -> Dict[str, Any]:
     """Return a mapping of placeholder name -> complex dtype for complex-dtype inputs.
 
     Used by the post-partition boundary pass to know which inputs were complex128
