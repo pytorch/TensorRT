@@ -17,11 +17,13 @@ from torch_tensorrt.executorch.partitioner import (  # noqa: E402
 )
 
 
-# A realistic single-engine edge program so partition() runs the *real*
-# _get_engine_info_from_edge_program / _parse_device_id path. That is what
-# guards "an engine node is present and its device is extractable at partition()
-# time" -- a monkeypatched extractor would not. Mirrors the mocked edge programs
-# in tests/py/dynamo/executorch/test_backend.py.
+# A realistic engine node so partition() runs the *real* per-partition
+# _get_engine_info_for_node / _parse_device_id path. target_device is now
+# derived from each partition's OWN engine node (so a coalesced multi-engine
+# graph labels each delegate with its correct GPU), which means the engine node
+# must live in the partition's node list -- a monkeypatched extractor would not
+# guard that. Mirrors the mocked edge programs in
+# tests/py/dynamo/executorch/test_backend.py.
 class _SchemaTarget:
     def __init__(self, name):
         self._schema = SimpleNamespace(name=name)
@@ -36,6 +38,7 @@ def _engine_node(device_id):
         target=_SchemaTarget("tensorrt::no_op_placeholder_for_execute_engine"),
         args=(["x"], *engine_info),
         name="trt_node",
+        meta={},
     )
 
 
@@ -47,17 +50,25 @@ def _edge_program(*nodes):
 
 
 class _FakeCapabilityPartitioner:
-    def __init__(self, *args, **kwargs):
-        pass
+    # One partition per graph node -- each TRT engine node becomes its own
+    # partition, as the real CapabilityBasedPartitioner does here -- so the
+    # per-partition device resolution under test runs against the engine node
+    # that actually belongs to each partition.
+    def __init__(self, graph_module, *args, **kwargs):
+        self._graph_module = graph_module
 
     def propose_partitions(self):
-        return [SimpleNamespace(id=1, nodes=[SimpleNamespace(meta={})])]
+        return [
+            SimpleNamespace(id=i, nodes=[node])
+            for i, node in enumerate(self._graph_module.graph.nodes)
+        ]
 
 
 @pytest.fixture(autouse=True)
 def _stub_partition_internals(monkeypatch):
-    # Both need a real fx GraphModule, so stub them out -- the engine-info
-    # extraction under test still runs for real against the mocked node.
+    # The partition proposal needs a real fx GraphModule, so stub it out -- the
+    # per-partition engine-info extraction under test still runs for real
+    # against the mocked engine nodes.
     monkeypatch.setattr(
         "torch_tensorrt.executorch.partitioner.CapabilityBasedPartitioner",
         _FakeCapabilityPartitioner,
@@ -68,8 +79,8 @@ def _stub_partition_internals(monkeypatch):
     )
 
 
-def _target_device(result):
-    spec = result.partition_tags["tensorrt_1"]
+def _target_device(result, tag="tensorrt_0"):
+    spec = result.partition_tags[tag]
     for cs in spec.compile_specs:
         if cs.key == _TARGET_DEVICE_COMPILE_SPEC_KEY:
             return cs.value
@@ -84,14 +95,49 @@ def test_target_device_derived_for_default_gpu():
 
 @pytest.mark.unit
 def test_target_device_derived_for_nonzero_gpu():
-    # The bug this fixes: a cuda:1 engine must not be mislabeled cuda:0.
+    # A cuda:1 engine must not be mislabeled cuda:0.
     result = TensorRTPartitioner().partition(_edge_program(_engine_node("1")))
     assert _target_device(result) == b"cuda:1"
 
 
 @pytest.mark.unit
-def test_target_device_falls_back_to_cuda0_on_multiple_engines():
-    # >1 engine node -> real extraction raises -> contract fallback to cuda:0.
+def test_per_partition_devices_for_coalesced_multi_engine():
+    # The fix in this PR: each partition is labeled from its OWN engine's device,
+    # so a coalesced multi-engine graph is not stamped with a single
+    # whole-program device.
+    result = TensorRTPartitioner().partition(
+        _edge_program(_engine_node("0"), _engine_node("1"))
+    )
+    assert _target_device(result, "tensorrt_0") == b"cuda:0"
+    assert _target_device(result, "tensorrt_1") == b"cuda:1"
+
+
+@pytest.mark.unit
+def test_target_device_falls_back_to_cuda0_on_malformed_partition():
+    # A partition whose nodes carry no extractable engine makes the real
+    # extraction raise; the broadened except must fall back to cuda:0 rather
+    # than abort the export.
+    bad_node = SimpleNamespace(
+        op="call_function", target=SimpleNamespace(), name="x", meta={}
+    )
+    result = TensorRTPartitioner().partition(_edge_program(bad_node))
+    assert _target_device(result) == b"cuda:0"
+
+
+@pytest.mark.unit
+def test_target_device_falls_back_to_cuda0_when_partition_has_multiple_engines(
+    monkeypatch,
+):
+    # A single partition holding >1 engine node is ambiguous, so device
+    # resolution must fall back to cuda:0 rather than guess.
+    monkeypatch.setattr(
+        "torch_tensorrt.executorch.partitioner.CapabilityBasedPartitioner",
+        lambda *args, **kwargs: SimpleNamespace(
+            propose_partitions=lambda: [
+                SimpleNamespace(id=0, nodes=[_engine_node("1"), _engine_node("2")])
+            ]
+        ),
+    )
     result = TensorRTPartitioner().partition(
         _edge_program(_engine_node("1"), _engine_node("2"))
     )
@@ -99,18 +145,9 @@ def test_target_device_falls_back_to_cuda0_on_multiple_engines():
 
 
 @pytest.mark.unit
-def test_target_device_falls_back_to_cuda0_on_malformed_graph():
-    # An unexpected graph shape makes the real extraction raise; the broadened
-    # except must still fall back to cuda:0 rather than abort the export.
-    bad_node = SimpleNamespace(op="call_function", target=SimpleNamespace(), name="x")
-    result = TensorRTPartitioner().partition(_edge_program(bad_node))
-    assert _target_device(result) == b"cuda:0"
-
-
-@pytest.mark.unit
 def test_explicit_target_device_used_verbatim():
     # Engine reports cuda:0, but the caller pinned cuda:3 -> the pin wins and
-    # extraction is skipped entirely.
+    # per-partition extraction is skipped entirely.
     partitioner = TensorRTPartitioner(
         compile_specs=[CompileSpec(_TARGET_DEVICE_COMPILE_SPEC_KEY, b"cuda:3")]
     )
