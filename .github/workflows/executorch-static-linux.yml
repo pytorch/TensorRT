@@ -99,11 +99,13 @@ jobs:
         # this is to verify the end user's workflow
         python -m pip install pyyaml executorch
 
+        # export the model to a .pte file
+        python examples/torchtrt_executorch_example/export_static_shape.py --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
+        # verify the c++ reference runner can run the model
+        .github/scripts/verify-executorch-reference-runner.sh "${RUNNER_TEMP}/torchtrt-python.pte"
+
         # Build the no-compile-for-users Python runtime/delegate wheel.
-        export TORCH_TENSORRT_EXECUTORCH_DELEGATE_VERSION="$(python -c 'import torch_tensorrt; print(torch_tensorrt.__version__)')"
         python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist packaging/executorch_delegate
         python -m pip install --no-deps --force-reinstall dist/torch_tensorrt_executorch_delegate-*.whl
         python -c 'from torch_tensorrt_executorch_delegate import runtime; assert runtime().backend_registry.is_available("TensorRTBackend")'
-        python examples/torchtrt_executorch_example/export_static_shape.py --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
         python examples/executorch_reference_runner/load_model.py --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1
-        .github/scripts/verify-executorch-reference-runner.sh
