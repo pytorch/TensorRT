@@ -1,0 +1,13 @@
+.. _exhale_function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2:
+
+Function torch_tensorrt::torchscript::convert_method_to_trt_engine
+==================================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::torchscript::convert_method_to_trt_engine(const torch::jit::Module&, std::string, CompileSpec)

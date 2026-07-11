@@ -5,11 +5,14 @@ import logging
 import os
 import platform
 import warnings
-from typing import Any, Collection, List, Optional, Sequence, Union
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
+import sympy
 import torch
 from torch.export import ExportedProgram
+from torch.export.graph_signature import InputKind
 from torch.fx.node import Target
+from torch.utils._sympy.numbers import int_oo
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
@@ -175,7 +178,10 @@ def cross_compile_for_windows(
         engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
         engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -186,7 +192,10 @@ def cross_compile_for_windows(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
-        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -271,8 +280,11 @@ def cross_compile_for_windows(
 
     if use_fp32_acc:
         logger.debug(
-            "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
-                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
         )
 
     # Aliasing inputs to arg_inputs for better understanding
@@ -366,6 +378,7 @@ def cross_compile_for_windows(
             enable_experimental_decompositions,
             decompose_attention,
             use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
         )
     )
 
@@ -396,6 +409,7 @@ def cross_compile_for_windows(
         trt_arg_inputs,
         trt_kwarg_inputs,
         settings,
+        graph_signature=exported_program.graph_signature,
     )
     return trt_gm
 
@@ -531,7 +545,10 @@ def compile(
         engine_cache_dir (str): Directory to store the cached TRT engines
         engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -550,7 +567,10 @@ def compile(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
-        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -651,8 +671,11 @@ def compile(
 
     if use_fp32_acc:
         logger.debug(
-            "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
-                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
         )
 
     # Aliasing inputs to arg_inputs for better understanding
@@ -750,6 +773,7 @@ def compile(
             enable_experimental_decompositions,
             decompose_attention,
             use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
         )
     )
 
@@ -782,6 +806,7 @@ def compile(
         trt_kwarg_inputs,
         settings,
         engine_cache,
+        graph_signature=exported_program.graph_signature,
     )
     return trt_gm
 
@@ -886,6 +911,192 @@ def _insert_complex_io_adapters(
         partitioned_module.recompile()
 
 
+def _build_user_symbol_bounds(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: dict[Any, Any],
+    graph_signature: torch.export.graph_signature.ExportGraphSignature,
+) -> Dict[sympy.Symbol, Tuple[int, int]]:
+    """Map ``sympy.Symbol -> (min, max)`` from dynamic ``Input``s, used to
+    fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
+
+    Validates against finite exporter bounds: ``user_max > exp_max`` and
+    ``user_min < exp_min`` raise (TRT would reject those shapes at runtime);
+    a strict subset narrows the engine profile to the user's bounds (info
+    log only); the ``user_min=1, exp_min=2`` case warns -- it's PyTorch's
+    0/1 specialization artifact, not a user error.
+    """
+    # ep.module() strips lifted params/buffers from the graph, so all_placeholders
+    # only contains USER_INPUT nodes, but graph_signature.input_specs still lists
+    # all specs (PARAMETER, BUFFER, USER_INPUT). A positional zip misaligns.
+    # Use name-based lookup keyed on graph_signature USER_INPUT names instead.
+    placeholder_by_name = {n.name: n for n in gm.graph.nodes if n.op == "placeholder"}
+    user_input_names = [
+        spec.arg.name
+        for spec in graph_signature.input_specs
+        if spec.kind == InputKind.USER_INPUT and hasattr(spec.arg, "name")
+    ]
+    placeholders = [
+        placeholder_by_name[name]
+        for name in user_input_names
+        if name in placeholder_by_name
+    ]
+
+    # Use _in_spec.flatten_up_to to preserve export-time kwarg ordering.
+    # Fall back to name-based kwarg lookup when the arg/kwarg split differs
+    # from export time (which would cause flatten_up_to to raise an arity error).
+    in_spec = getattr(gm, "_in_spec", None)
+    try:
+        if in_spec is None:
+            raise AttributeError("_in_spec not found on graph module")
+        flat_inputs = in_spec.flatten_up_to(
+            (tuple(sample_arg_inputs), sample_kwarg_inputs)
+        )
+    except (ValueError, AttributeError):
+        flat_inputs = list(sample_arg_inputs)
+        if isinstance(sample_kwarg_inputs, dict):
+            for name in user_input_names[len(sample_arg_inputs) :]:
+                if name in sample_kwarg_inputs:
+                    flat_inputs.append(sample_kwarg_inputs[name])
+
+    user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
+
+    for node, inp in zip(placeholders, flat_inputs):
+        if not (isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC):
+            continue
+        fake_val = node.meta.get("val")
+        if not isinstance(fake_val, torch.Tensor):
+            continue
+
+        min_shape = inp.shape["min_shape"]
+        max_shape = inp.shape["max_shape"]
+
+        if len(fake_val.size()) != len(min_shape):
+            raise ValueError(
+                f"Input '{node.target}' has {len(fake_val.size())} dimensions in "
+                f"the exported program, but the provided Input specifies "
+                f"{len(min_shape)} dimensions. Ensure Input.min_shape, "
+                f"Input.opt_shape, and Input.max_shape each have "
+                f"{len(fake_val.size())} entries."
+            )
+
+        for d, dim in enumerate(fake_val.size()):
+            if not isinstance(dim, torch.SymInt):
+                if min_shape[d] != dim or max_shape[d] != dim:
+                    raise ValueError(
+                        f"Input '{node.target}' dim {d} is static (size={int(dim)}) "
+                        f"in the exported program, but the provided Input has "
+                        f"min_shape[{d}]={min_shape[d]}, max_shape[{d}]={max_shape[d]}. "
+                        f"Static dimensions must be fixed."
+                    )
+                continue
+            expr = dim.node.expr
+            # Composite exprs (e.g. ``2*s0``) are recomputed by
+            # ``ShapeEnv.bound_sympy``; overriding them directly would lie.
+            if not isinstance(expr, sympy.Symbol):
+                logger.debug(
+                    "Input '%s' dim %d is a composite symbolic expression (%s) "
+                    "bounded by another dynamic dimension; its range will be "
+                    "derived from constituent symbols via bound_sympy.",
+                    node.target,
+                    d,
+                    expr,
+                )
+                continue
+            if expr in user_symbol_bounds:
+                continue
+            user_min = int(min_shape[d])
+            user_max = int(max_shape[d])
+            user_symbol_bounds[expr] = (user_min, user_max)
+            logger.debug(
+                "Recorded user-supplied bounds for %s: [%d, %d]",
+                expr,
+                user_min,
+                user_max,
+            )
+
+            # The exported program may already bound this symbol to a finite
+            # range (e.g. Dim("batch", min=10, max=20)). The compiled TRT
+            # engine's optimization profile follows that range; any shape
+            # outside it is rejected by TensorRT at runtime
+            # (IExecutionContext::setInputShape "satisfyProfile" check).
+            # Validate the user's Input range against it here -- at compile
+            # time -- before they hit that opaque runtime error on a shape
+            # they explicitly declared in Input.min_shape / Input.max_shape.
+            shape_env = getattr(dim.node, "shape_env", None)
+            if shape_env is None:
+                continue
+            exp_range = shape_env.var_to_range.get(expr)
+            if exp_range is None:
+                continue
+            exp_lower = exp_range.lower
+            exp_upper = exp_range.upper
+            exp_max_unbounded = exp_upper is int_oo or exp_upper == sympy.oo
+            if exp_max_unbounded:
+                # Dim.DYNAMIC: user fills the gap (intended use).
+                continue
+            try:
+                exp_min = int(exp_lower)
+                exp_max = int(exp_upper)
+            except (TypeError, ValueError):
+                continue
+            if user_min == exp_min and user_max == exp_max:
+                continue
+
+            mismatch = (
+                f"Dynamic dimension '{expr}': "
+                f"Input range [{user_min}, {user_max}] vs "
+                f"exported program range [{exp_min}, {exp_max}]."
+            )
+
+            if user_max > exp_max:
+                raise ValueError(
+                    f"{mismatch} Input.max_shape ({user_max}) exceeds the "
+                    f"exported program's max ({exp_max}). The program was "
+                    f"exported with this dimension bounded to "
+                    f"[{exp_min}, {exp_max}], so the compiled TensorRT engine "
+                    f"cannot accept shapes above {exp_max}. Either re-export "
+                    f"with Dim('{expr}', max={user_max}) or set "
+                    f"Input.max_shape <= {exp_max}."
+                )
+
+            if user_min < exp_min:
+                # 1->2 is the 0/1 specialization artifact, not a user error.
+                if user_min == 1 and exp_min == 2:
+                    logger.warning(
+                        "%s Input.min_shape=1 but the exported program's min "
+                        "is 2 (PyTorch 0/1 specialization -- Dim(min=1) is "
+                        "recorded as min=2). The compiled engine's min will "
+                        "be 2.",
+                        mismatch,
+                    )
+                    continue
+                raise ValueError(
+                    f"{mismatch} Input.min_shape ({user_min}) is below the "
+                    f"exported program's min ({exp_min}). The program was "
+                    f"exported with this dimension bounded to "
+                    f"[{exp_min}, {exp_max}], so the compiled TensorRT engine "
+                    f"cannot accept shapes below {exp_min}. Either re-export "
+                    f"with Dim('{expr}', min={user_min}) or set "
+                    f"Input.min_shape >= {exp_min}."
+                )
+
+            # Strict subset: engine profile narrows to the user's bounds
+            # (applied in ``extract_var_range_info``). Not a warning -- the
+            # user got exactly what they asked for.
+            logger.info(
+                "%s Narrowing engine profile to user bounds [%d, %d] "
+                "(exported program range was [%d, %d]).",
+                mismatch,
+                user_min,
+                user_max,
+                exp_min,
+                exp_max,
+            )
+
+    return user_symbol_bounds
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -894,6 +1105,7 @@ def compile_module(
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
     *,
+    graph_signature: Optional[torch.export.graph_signature.ExportGraphSignature] = None,
     _debugger_config: Optional[DebuggerConfig] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -924,6 +1136,18 @@ def compile_module(
             "fallback_data_dependent_ops runs data-dependent ops in PyTorch, which "
             "is incompatible with require_full_compilation=True; enable only one."
         )
+
+    # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
+    # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
+    # graph_signature is None on the torch.compile path, which has no ExportedProgram.
+    user_symbol_bounds = (
+        _build_user_symbol_bounds(
+            gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
+        )
+        if graph_signature is not None
+        else {}
+    )
+
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
 
@@ -1129,6 +1353,7 @@ def compile_module(
             submodule,
             profile_source_bounds=profile_source_bounds,
             num_profiles=num_profiles,
+            user_symbol_bounds=user_symbol_bounds,
         )
 
         assert submodule_inputs is not None
@@ -1347,7 +1572,10 @@ def convert_exported_program_to_serialized_trt_engine(
         engine_cache_dir (str): Directory to store the cached TRT engines
         engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
@@ -1356,7 +1584,10 @@ def convert_exported_program_to_serialized_trt_engine(
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model.
-        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:
@@ -1443,8 +1674,11 @@ def convert_exported_program_to_serialized_trt_engine(
 
     if use_fp32_acc:
         logger.debug(
-            "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
-                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
         )
 
     # Aliasing inputs to arg_inputs for better understanding
@@ -1530,6 +1764,7 @@ def convert_exported_program_to_serialized_trt_engine(
             enable_experimental_decompositions,
             decompose_attention,
             use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
         )
     )
 

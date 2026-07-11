@@ -1,0 +1,13 @@
+.. _exhale_function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1:
+
+Function torch_tensorrt::dump_build_info
+========================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::dump_build_info()

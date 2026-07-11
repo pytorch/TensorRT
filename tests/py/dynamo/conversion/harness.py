@@ -331,7 +331,11 @@ class DispatchTestCase(TRTTestCase):
             if enable_passes:
                 exported_program = pre_export_lowering(exported_program, settings)
                 exported_program = exported_program.run_decompositions(
-                    get_decompositions(False, settings.decompose_attention)
+                    get_decompositions(
+                        False,
+                        settings.decompose_attention,
+                        use_fp32_acc=settings.use_fp32_acc,
+                    )
                 )
             fx_module = exported_program.module()
         else:

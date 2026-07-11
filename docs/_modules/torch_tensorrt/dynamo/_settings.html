@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=6773ad31"></script>
+    <script src="../../../_static/documentation_options.js?v=7445bb52"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -571,7 +571,10 @@ document.write(`
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
-<span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.</span>
+<span class="sd">        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16</span>
+<span class="sd">            inputs and outputs. When combined with ``decompose_attention=True``, the complete</span>
+<span class="sd">            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its</span>
+<span class="sd">            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.</span>
 <span class="sd">        refit_identical_engine_weights (bool): Whether to refit the engine with identical weights</span>
 <span class="sd">        strip_engine_weights (bool): Whether to strip the engine weights</span>
 <span class="sd">        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored</span>
@@ -590,7 +593,10 @@ document.write(`
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
 <span class="sd">        offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines</span>
-<span class="sd">        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.</span>
+<span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
+<span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
+<span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
+<span class="sd">            the final output back to FP16.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">    &quot;&quot;&quot;</span>

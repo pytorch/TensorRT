@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=6773ad31"></script>
+    <script src="../../_static/documentation_options.js?v=7445bb52"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -689,9 +689,11 @@ compile models that use double without changing the model code.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">use_fp32_acc</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
-<td><p>Insert FP32 cast nodes around matmul layers so that accumulation happens in
-FP32 even when the network runs in FP16. Improves numerical accuracy for
-transformer models at a small throughput cost.</p></td>
+<td><p>Use FP32 accumulation for FP16 matmul layers while retaining FP16 inputs and
+outputs. When combined with <code class="docutils literal notranslate"><span class="pre">decompose_attention=True</span></code>, the complete
+decomposed FP16 scaled dot product attention calculation runs in FP32 and only
+its final output is cast back to FP16. This option has no effect on FP32 or
+BF16 inputs and may increase memory use or reduce throughput.</p></td>
 </tr>
 </tbody>
 </table>
@@ -947,8 +949,10 @@ model contains <code class="docutils literal notranslate"><span class="pre">DTen
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
-<td><p>Decompose attention layers into smaller ops. We have converters for handling attention ops,
-but if you want to decompose them into smaller ops, you can set this to True.</p></td>
+<td><p>Decompose attention layers into smaller operations instead of using the attention
+converters. When combined with <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code>, decomposed FP16 attention
+keeps its intermediate calculation in FP32 and casts only the final output back
+to FP16.</p></td>
 </tr>
 </tbody>
 </table>

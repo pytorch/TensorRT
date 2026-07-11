@@ -85,6 +85,7 @@ def aot_torch_tensorrt_aten_backend(
             settings.enable_experimental_decompositions,
             settings.decompose_attention,
             settings.use_distributed_mode_trace,
+            use_fp32_acc=settings.use_fp32_acc,
         )
         # This is added since detach lowering leads to alias nodes
         # Error - View operation returned a tensor that is the same as the input base tensor
@@ -132,7 +133,9 @@ def aot_torch_tensorrt_aten_backend(
             _pretraced_backend, settings=aot_settings, engine_cache=engine_cache
         )
         aot_decomps = get_decompositions(
-            settings.enable_experimental_decompositions, settings.decompose_attention
+            settings.enable_experimental_decompositions,
+            settings.decompose_attention,
+            use_fp32_acc=settings.use_fp32_acc,
         )
         # Remove detach decompositions to avoid alias node errors.
         to_delete = {k for k in aot_decomps if "detach" in k._name}
@@ -334,6 +337,7 @@ def _pretraced_backend(
                         settings.enable_experimental_decompositions,
                         settings.decompose_attention,
                         settings.use_distributed_mode_trace,
+                        use_fp32_acc=settings.use_fp32_acc,
                     ),
                 )
 

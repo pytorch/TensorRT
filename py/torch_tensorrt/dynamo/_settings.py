@@ -93,7 +93,10 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
         refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
         strip_engine_weights (bool): Whether to strip the engine weights
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
@@ -112,7 +115,10 @@ class CompilationSettings:
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
-        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
     """
