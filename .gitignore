@@ -86,3 +86,6 @@ CLAUDE.md
 /compile_commands.json
 /external/
 build-executorch/
+packaging/executorch_delegate/build/
+packaging/executorch_delegate/dist/
+

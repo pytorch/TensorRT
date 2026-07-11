@@ -79,6 +79,28 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 
 ## Load And Run A `.pte` Model
 
+### Python
+
+Install the complete prebuilt Python runtime and delegate:
+
+```bash
+pip install "torch-tensorrt[executorch]"
+```
+
+Load and run the model without an ExecuTorch checkout or native build:
+
+```bash
+python examples/executorch_reference_runner/load_model.py \
+  --model_path=model.pte \
+  --num_runs=1
+```
+
+The extra installs `executorch` and the matching
+`torch-tensorrt-executorch-delegate` wheel. That wheel contains an ExecuTorch
+Python runtime with `TensorRTBackend` linked into its backend registry.
+
+### C++
+
 Run the reference runner against a Torch-TensorRT compiled ExecuTorch model:
 
 ```bash

@@ -99,12 +99,6 @@ RELEASE = False
 CI_BUILD = False
 USE_TRT_RTX = False
 
-EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
-EXTRAS_REQUIRE = {
-    "executorch": [EXECUTORCH_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT],
-}
-
 
 if "--use-rtx" in sys.argv:
     USE_TRT_RTX = True
@@ -188,6 +182,16 @@ if RELEASE:
     __version__ = os.environ.get("BUILD_VERSION")
 else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
+
+EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
+EXECUTORCH_DELEGATE_REQUIREMENT = (
+    f"torch-tensorrt-executorch-delegate=={__version__}; "
+    "platform_system == 'Linux' and platform_machine == 'x86_64'"
+)
+EXTRAS_REQUIRE = {
+    "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_DELEGATE_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_DELEGATE_REQUIREMENT],
+}
 
 if "--ci" in sys.argv:
     sys.argv.remove("--ci")
