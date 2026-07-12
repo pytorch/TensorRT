@@ -1230,3 +1230,48 @@ def test_split_then_mul_then_cat():
             return torch.cat([a * b, b * a], dim=1)
 
     _check_op(M(), (torch.randn(3, 4, dtype=torch.complex64),), "split_mul_cat")
+
+
+@pytest.mark.unit
+def test_scalar_literal_near_view_as_complex():
+    """Regression for #4378.
+
+    A Python float literal (here the ``1/sqrt(dim)`` attention scale) sitting near
+    a ``view_as_complex`` mul used to crash ``complex_graph_detection``: the
+    complex-mul match pattern ``mul(x, y)`` also matches the *scalar* multiply
+    ``out * scale``, so a ``float`` lands in ``match.nodes_map``; the match filter
+    then did ``original_node.name`` on it → ``AttributeError: 'float' object has
+    no attribute 'name'``.  The filter now skips non-``fx.Node`` values, so the
+    pass must complete and the real-in/real-out result stay equivalent.
+    """
+    import math
+
+    class ComplexRoPEWithScale(nn.Module):
+        def __init__(self, dim: int, seq_len: int):
+            super().__init__()
+            freqs = torch.polar(
+                torch.ones(seq_len, dim // 2),
+                torch.arange(seq_len * dim // 2, dtype=torch.float).reshape(
+                    seq_len, dim // 2
+                ),
+            )
+            self.register_buffer("freqs_cis", freqs)
+            self.scale = 1.0 / math.sqrt(dim)  # becomes a float literal in the graph
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            xc = torch.view_as_complex(x.float().reshape(*x.shape[:-1], -1, 2))
+            out = torch.view_as_real(xc * self.freqs_cis).flatten(-2)
+            # scalar float literal near the complex mul — the #4378 trigger
+            return (out * self.scale).to(x.dtype)
+
+    B, L, D = 2, 16, 32
+    x = torch.randn(B, L, D)
+    model = ComplexRoPEWithScale(dim=D, seq_len=L).eval()
+
+    with torch.no_grad():
+        ref = model(x)
+        exp = torch.export.export(model, (x,))
+    gm = exp.module()
+    # Must not raise "AttributeError: 'float' object has no attribute 'name'".
+    complex_graph_detection(gm, CompilationSettings())
+    torch.testing.assert_close(gm(x), ref, rtol=_RTOL, atol=_ATOL)
