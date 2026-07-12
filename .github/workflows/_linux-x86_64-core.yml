@@ -96,6 +96,7 @@ jobs:
       trigger-event: ${{ github.event_name }}
       architecture: "x86_64"
       use-rtx: ${{ inputs.use-rtx }}
+      build-executorch-delegate: ${{ !inputs.use-rtx }}
       pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
 
   # Standard-TRT only: ExecuTorch static build is not part of the RTX matrix.
