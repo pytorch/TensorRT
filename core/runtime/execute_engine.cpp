@@ -390,15 +390,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           compiled_engine->cudagraph.capture_begin();
           ctx->enqueueV3(recording_stream);
           compiled_engine->cudagraph.capture_end();
-          // Newer torch reworked at::cuda::CUDAGraph: capture_end() no longer
-          // instantiates the executable graph here, and the C++ replay() (unlike
-          // the Python wrapper) does not instantiate on demand -- it throws
-          // "replay before instantiated". Instantiate explicitly once the graph
-          // is captured. Guarded by has_graph_exec() so it stays correct if a
-          // future torch goes back to instantiating inside capture_end().
-          if (!compiled_engine->cudagraph.has_graph_exec()) {
-            compiled_engine->cudagraph.instantiate();
-          }
+          // Current torch instantiates the executable graph inside capture_end()
+          // (keep_graph=false default) and replay() instantiates on demand, so no
+          // explicit instantiate() is needed -- calling it here would throw
+          // ("intended to be called by the user only when keep_graph=true").
 
           if (compiled_engine->profile_execution) {
             cudaError_t debug_dump_err = cudaGraphDebugDotPrint(
