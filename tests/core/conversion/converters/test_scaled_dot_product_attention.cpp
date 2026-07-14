@@ -89,8 +89,8 @@ TEST(Converters, ATenScaledDotProductAttnMaskBoolDoesNotProduceNaN) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {query, key, value, attn_mask});
 
-  ASSERT_FALSE(torch::isnan(jit_results[0]).any().item<bool>());
-  ASSERT_FALSE(torch::isnan(trt_results[0]).any().item<bool>());
+  ASSERT_FALSE(at::isnan(jit_results[0]).any().item<bool>());
+  ASSERT_FALSE(at::isnan(trt_results[0]).any().item<bool>());
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
