@@ -14,7 +14,9 @@
 #include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
+#include "core/runtime/RuntimeSettings.h"
 #include "core/runtime/TRTEngineProfiler.h"
+#include "core/runtime/TRTRuntimeConfig.h"
 #include "core/runtime/TensorRTBindingNames.h"
 #include "core/util/prelude.h"
 
@@ -47,7 +49,8 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>, // Platform
     std::tuple<std::string, std::string>, // Resource Allocation Strategy
-    std::tuple<std::string, std::string>>; // requires_native_multidevice
+    std::tuple<std::string, std::string> // requires_native_multidevice
+    >;
 
 struct TorchTRTRuntimeStates {
   // Indicates whether CUDAGraphs were enabled in the previous execute_engine
@@ -121,7 +124,6 @@ struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
   std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
-  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
   bool output_tensors_are_unowned = false;
   std::string name;
@@ -151,7 +153,8 @@ struct TRTEngine : torch::CustomClassHolder {
       bool requires_output_allocator = false,
       const std::string& serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
-          TRTEngine::ResourceAllocationStrategy::kStatic);
+          TRTEngine::ResourceAllocationStrategy::kStatic,
+      RuntimeSettings runtime_settings = RuntimeSettings{});
 
   TRTEngine(std::vector<std::string> serialized_info);
 
@@ -166,7 +169,8 @@ struct TRTEngine : torch::CustomClassHolder {
       bool requires_output_allocator = false,
       const std::string& serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
-          TRTEngine::ResourceAllocationStrategy::kStatic);
+          TRTEngine::ResourceAllocationStrategy::kStatic,
+      RuntimeSettings runtime_settings = RuntimeSettings{});
 
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
@@ -273,6 +277,65 @@ struct TRTEngine : torch::CustomClassHolder {
   ResourceAllocationStrategy resource_allocation_strategy = kStatic;
   void set_resource_allocation_strategy(ResourceAllocationStrategy new_strategy);
   ResourceAllocationStrategy get_resource_allocation_strategy();
+
+  // Owns the canonical `RuntimeSettings` plus the live `IRuntimeConfig` derived
+  // from them.
+  TRTRuntimeConfig runtime_cfg;
+
+  [[nodiscard]] RuntimeSettings const& runtime_settings() const noexcept {
+    return runtime_cfg.settings();
+  }
+
+  // Setter. Returns true iff the settings actually changed -- consumers can
+  // read the diff result to decide whether to invalidate dependent state. On
+  // change, invalidates the live ``IRuntimeConfig`` (the next ``exec_ctx()``
+  // getter call rebuilds with the new settings).
+  [[nodiscard]] bool runtime_settings(RuntimeSettings new_settings);
+
+  // Whether the engine has any input binding with a dynamic dimension. Computed
+  // once during construction; used by `is_monolithic_capturable`.
+  bool has_dynamic_inputs = false;
+
+  // Monolithic-capturability check used when this engine is wrapped by an outer whole-graph
+  // capture (e.g. CudaGraphsTorchTensorRTModule). Non-RTX builds always return true.
+  bool is_monolithic_capturable(cudaStream_t stream) const;
+
+  // Disable TensorRT-RTX native CUDA graph capture on this engine (one-shot, invoked when
+  // an outer stream capture is detected around execute_engine). No-op on non-RTX or when
+  // already disabled.
+  void disable_rtx_native_cudagraphs();
+
+  // Obtains the execution context. Materializes it lazily on first call using
+  // the current settings from ``runtime_cfg`` and subsequent calls return the
+  // cached instance until invalidated.
+  // Returns a raw pointer owned by the internal ``shared_ptr``; do not store
+  // across an invalidate. Returned pointer is never null (the underlying
+  // factory throws if creation fails).
+  nvinfer1::IExecutionContext* exec_ctx();
+
+  // Drop the live execution context without recreating. The next ``exec_ctx()``
+  // call rebuilds from the current ``runtime_cfg`` settings.
+  void invalidate_exec_ctx() noexcept;
+
+  // True iff the execution context has been materialized. Probes WITHOUT
+  // triggering creation; for tests/introspection.
+  [[nodiscard]] bool has_exec_ctx() const noexcept;
+
+  [[nodiscard]] int64_t num_execution_contexts_created() const noexcept {
+    return num_execution_contexts_created_;
+  }
+
+ private:
+  // Backing storage for the execution context. External code reaches it only
+  // through ``exec_ctx()`` / ``invalidate_exec_ctx()`` / ``has_exec_ctx()``.
+  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx_;
+
+  // Single entry point that (re)creates exec_ctx_ via runtime_cfg.create_execution_context.
+  // Bumps ``num_execution_contexts_created_``. Called from ``exec_ctx()`` when
+  // the cached context is null.
+  void recreate_execution_context();
+
+  int64_t num_execution_contexts_created_ = 0;
 };
 
 } // namespace runtime
