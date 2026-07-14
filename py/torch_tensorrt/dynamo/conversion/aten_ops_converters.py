@@ -1215,8 +1215,15 @@ def aten_ops_slice(
     )
 
 
+def cumsum_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    return not ENABLED_FEATURES.tensorrt_rtx
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.cumsum.default,
+    capability_validator=cumsum_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
