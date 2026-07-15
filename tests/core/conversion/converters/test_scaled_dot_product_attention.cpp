@@ -79,7 +79,8 @@ TEST(Converters, ATenScaledDotProductAttnMaskBoolDoesNotProduceNaN) {
   auto value = at::arange(16, {at::kCUDA}).to(at::kFloat).reshape({1, 1, 4, 4}) / 11.0;
   auto attn_mask =
       at::tensor(
-          {1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1}, at::TensorOptions().dtype(at::kBool).device(at::kCUDA))
+          {true, false, true, false, false, true, false, true, true, true, false, false, false, false, true, true},
+          at::TensorOptions().device(at::kCUDA))
           .reshape({1, 1, 4, 4});
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {query, key, value, attn_mask});

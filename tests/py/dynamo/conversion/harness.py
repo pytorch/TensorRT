@@ -311,11 +311,12 @@ class DispatchTestCase(TRTTestCase):
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
+            device = default_device()
+            mod = mod.to(device.to(torch.device))
             if torch_export_dynamic_shapes is None:
                 torch_export_dynamic_shapes = get_dynamic_shapes_args(
                     mod, original_inputs
                 )
-            device = default_device()
             torch_export_inputs = get_torch_inputs(original_inputs, device)
             exported_program = torch.export.export(
                 mod,
