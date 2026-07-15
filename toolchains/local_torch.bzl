@@ -93,6 +93,12 @@ def _local_torch_impl(ctx):
         if child.exists:
             ctx.symlink(child, sub)
 
+    # CUDA PyTorch wheels keep some transitive shared-library dependencies in
+    # a sibling nvidia package directory rather than under torch/lib.
+    nvidia_path = torch_path.dirname.get_child("nvidia")
+    if nvidia_path.exists:
+        ctx.symlink(nvidia_path, "nvidia")
+
     ctx.file("BUILD", ctx.read(Label("@//third_party/libtorch:BUILD")))
 
 local_torch = repository_rule(
