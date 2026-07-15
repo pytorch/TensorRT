@@ -114,21 +114,15 @@ print("Refit successfully!")
 #
 # There are a number of settings you can use to control the refit process
 #
-# Weight Map Cache
+# Output Verification
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # Weight refitting works by matching the weights of the compiled module with the new weights from
-# the user supplied ExportedProgram. Since 1:1 name matching from PyTorch to TensorRT is hard to accomplish,
-# the only gaurenteed way to match weights at *refit-time* is to pass the new ExportedProgram through the
-# early phases of the compilation process to generate near identical weight names. This can be expensive
-# and is not always necessary.
+# the user supplied ExportedProgram. To do this, the new ExportedProgram is passed through the early
+# phases of the compilation process to generate near identical weight names, which are then used to
+# refit the existing TensorRT engine in place without rebuilding it.
 #
-# To avoid this, **At initial compile**, Torch-TensorRt will attempt to cache a direct mapping from PyTorch
-# weights to TensorRT weights. This cache is stored in the compiled module as metadata and can be used
-# to speed up refit. If the cache is not present, the refit system will fallback to rebuilding the mapping at
-# refit-time. Use of this cache is controlled by the ``use_weight_map_cache`` parameter.
-#
-# Since the cache uses a heuristic based system for matching PyTorch and TensorRT weights, you may want to verify the refitting. This can be done by setting
+# You may want to verify the refitting. This can be done by setting
 # ``verify_output`` to True and providing sample ``arg_inputs`` and ``kwarg_inputs``. When this is done, the refit
 # system will run the refitted module and the user supplied module on the same inputs and compare the outputs.
 #
