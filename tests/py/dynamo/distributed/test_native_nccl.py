@@ -45,7 +45,6 @@ import os
 import sys
 import threading
 import unittest
-from contextlib import nullcontext
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -89,6 +88,21 @@ def has_nccl_collectives() -> bool:
         return bool(ENABLED_FEATURES.native_trt_collectives) or bool(
             ENABLED_FEATURES.trtllm_for_nccl
         )
+    except Exception:
+        return False
+
+
+def _cpp_runtime_available() -> bool:
+    """Return True when the C++ Torch-TensorRT runtime extension is loaded.
+
+    When True, _TRTEngine registers neither its opaque type nor the Python
+    tensorrt::execute_engine custom op (see _TRTEngine.py:1376), so
+    TestPythonRuntimePickle cannot run and must be skipped.
+    """
+    try:
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(ENABLED_FEATURES.torch_tensorrt_runtime)
     except Exception:
         return False
 
@@ -1204,7 +1218,6 @@ class TestNcclOpsSingleRank(unittest.TestCase):
                 backend="torch_tensorrt",
                 dynamic=False,
                 options={
-                    "use_python_runtime": True,
                     "min_block_size": 1,
                     "use_distributed_mode_trace": True,
                 },
@@ -1323,6 +1336,10 @@ class TestNcclOpsSingleRank(unittest.TestCase):
     not has_nccl_collectives(),
     "Skipped: No NCCL collective support (neither native TRT collectives nor TRT-LLM).",
 )
+@unittest.skipIf(
+    _cpp_runtime_available(),
+    "Skipped: Python runtime (_TRTEngine) op not registered when C++ extension is available.",
+)
 class TestPythonRuntimePickle(unittest.TestCase):
     """Verifies that _nccl_comm is stripped on pickle and reset on unpickle.
 
@@ -1344,8 +1361,12 @@ class TestPythonRuntimePickle(unittest.TestCase):
             dist.destroy_process_group()
 
     def _compile_small_model(self) -> Any:
-        """Return a compiled module backed by a Python ``TRTEngine``."""
-        import torch_tensorrt
+        """Return a compiled module backed by a Python ``TRTEngine``.
+
+        This class is only reached when ENABLED_FEATURES.torch_tensorrt_runtime=False
+        (C++ extension not installed), so setup_engine() naturally instantiates
+        _TRTEngine without any patching needed.
+        """
 
         class LinearModel(nn.Module):
             def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -1359,21 +1380,18 @@ class TestPythonRuntimePickle(unittest.TestCase):
                 backend="torch_tensorrt",
                 dynamic=False,
                 options={
-                    "use_python_runtime": True,
                     "min_block_size": 1,
                 },
             )
-            _ = trt_model(inp)  # trigger compilation
+            _ = trt_model(inp)  # trigger compilation → setup_engine() → _TRTEngine
         return trt_model
 
     @classmethod
     def _find_python_trt_engine(cls, obj: Any) -> Any:
         """Walk a compiled module and return the Python ``TRTEngine`` instance.
 
-        With the unified runtime, the wrapping ``TorchTensorRTModule`` is the
-        same regardless of backend; ``use_python_runtime=True`` causes its
-        ``.engine`` attribute to be a Python ``TRTEngine`` (vs the C++
-        ``torch.classes.tensorrt.Engine`` otherwise).
+        Only meaningful when C++ extension is absent (ENABLED_FEATURES.torch_tensorrt_runtime=False),
+        which is enforced by the class-level skipIf decorator.
         """
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
             TorchTensorRTModule,
@@ -1633,7 +1651,6 @@ def _multirank_reduce_scatter_all_reduce_ops(
             backend="torch_tensorrt",
             dynamic=False,
             options={
-                "use_python_runtime": True,
                 "min_block_size": 1,
                 "use_distributed_mode_trace": True,
             },
@@ -1736,7 +1753,6 @@ def _multirank_distributed_mode_tp_model(
             backend="torch_tensorrt",
             dynamic=False,
             options={
-                "use_python_runtime": True,
                 "min_block_size": 1,
                 "use_distributed_mode_trace": True,
             },
@@ -1770,6 +1786,10 @@ def _multirank_distributed_mode_subgroup(
     # New subgroup with all ranks (different group object from WORLD)
     subgroup = dist.new_group(ranks=list(range(world_size)))
     sg_name = subgroup.group_name
+    # Force subgroup NCCL comm init — PyTorch creates ncclComm_t lazily on first
+    # collective; bind_nccl_comm() in execute_engine reads getCommPtr() which is 0
+    # until at least one collective has run on the group.
+    dist.barrier(group=subgroup)
 
     class AllReduceModel(nn.Module):
         def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -1791,7 +1811,6 @@ def _multirank_distributed_mode_subgroup(
             backend="torch_tensorrt",
             dynamic=False,
             options={
-                "use_python_runtime": True,
                 "min_block_size": 1,
                 "use_distributed_mode_trace": True,
             },
@@ -1872,6 +1891,9 @@ def _multirank_distributed_mode_context_switch(
     sg2 = dist.new_group(ranks=list(range(world_size)))
     sg1_name = sg1.group_name
     sg2_name = sg2.group_name
+    # Force both subgroup NCCL comms to init before TRT tries to bind them.
+    dist.barrier(group=sg1)
+    dist.barrier(group=sg2)
 
     class AllReduceModel(nn.Module):
         def __init__(self, name: str) -> None:
@@ -1893,7 +1915,6 @@ def _multirank_distributed_mode_context_switch(
                 backend="torch_tensorrt",
                 dynamic=False,
                 options={
-                    "use_python_runtime": True,
                     "min_block_size": 1,
                     "use_distributed_mode_trace": True,
                 },
@@ -1947,50 +1968,41 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
     expected_sum = world_size * (world_size + 1) // 2
     expected = torch.full((1, 4), float(expected_sum), device=device)
 
-    for label, use_python_runtime in [("cpp", False), ("python", True)]:
-        # ---- Step 1: compile + run with default world group ----
-        model = AllReduceModel(world_name).to(device).eval()
+    # ---- Step 1: compile + run with default world group ----
+    model = AllReduceModel(world_name).to(device).eval()
 
-        with distributed_context(world_group):
-            trt_model = torch.compile(
-                model,
-                backend="torch_tensorrt",
-                dynamic=False,
-                options={
-                    "use_python_runtime": use_python_runtime,
-                    "min_block_size": 1,
-                    "use_distributed_mode_trace": True,
-                },
-            )
-            with torch.no_grad():
-                out_world = trt_model(inp)
+    with distributed_context(world_group):
+        trt_model = torch.compile(
+            model,
+            backend="torch_tensorrt",
+            dynamic=False,
+            options={
+                "min_block_size": 1,
+                "use_distributed_mode_trace": True,
+            },
+        )
+        with torch.no_grad():
+            out_world = trt_model(inp)
 
-        _check_close(out_world, expected, f"[{label}] world group rank={rank}")
+    _check_close(out_world, expected, f"world group rank={rank}")
 
-        # ---- Step 2: migrate to subgroup via distributed_context(subgroup, model) ----
-        # This calls set_distributed_mode() which resets nccl_initialized on the
-        # C++ engine, and keeps _state.pg = subgroup active for the Python runtime's
-        # lazy setup_nccl_comm() call.
-        with distributed_context(subgroup, trt_model) as migrated_model:
-            with torch.no_grad():
-                out_sub = migrated_model(inp)
+    # ---- Step 2: migrate to subgroup via distributed_context(subgroup, model) ----
+    # set_distributed_mode() resets nccl_initialized on the C++ engine so
+    # bind_nccl_comm() re-runs on the next forward with the new group name.
+    with distributed_context(subgroup, trt_model) as migrated_model:
+        with torch.no_grad():
+            out_sub = migrated_model(inp)
 
-        _check_close(out_sub, expected, f"[{label}] migrated to subgroup rank={rank}")
+    _check_close(out_sub, expected, f"migrated to subgroup rank={rank}")
 
-        # ---- Step 3: set_distributed_mode (persistent, outside context) ----
-        subgroup2 = dist.new_group(ranks=list(range(world_size)))
-        torch_tensorrt.distributed.set_distributed_mode(subgroup2, trt_model)
-        # _state.pg is NOT set here — Python runtime falls back to world group
-        # for lazy setup_nccl_comm; C++ runtime uses the pinned group name.
-        # For C++ runtime only (Python runtime needs _state.pg active):
-        if not use_python_runtime:
-            with torch.no_grad():
-                out_pin = trt_model(inp)
-            _check_close(
-                out_pin, expected, f"[{label}] set_distributed_mode rank={rank}"
-            )
+    # ---- Step 3: set_distributed_mode (persistent, outside context) ----
+    subgroup2 = dist.new_group(ranks=list(range(world_size)))
+    torch_tensorrt.distributed.set_distributed_mode(subgroup2, trt_model)
+    with torch.no_grad():
+        out_pin = trt_model(inp)
+    _check_close(out_pin, expected, f"set_distributed_mode rank={rank}")
 
-        print(f"[Rank {rank}] PASS _multirank_pg_migration [{label}]", flush=True)
+    print(f"[Rank {rank}] PASS _multirank_pg_migration", flush=True)
 
 
 # ============================================================================
@@ -2096,7 +2108,7 @@ class TestMultirankNccl(MultiProcessTestCase):
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_distributed_mode_subgroup(self) -> None:
-        """distributed_context() with a non-default TP subgroup routes NCCL correctly."""
+        """C++ runtime with a non-default TP subgroup routes NCCL correctly."""
         device = self._init_dist()
         _multirank_distributed_mode_subgroup(self.rank, self.world_size, device)
 
@@ -2112,7 +2124,7 @@ class TestMultirankNccl(MultiProcessTestCase):
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_distributed_mode_context_switch(self) -> None:
-        """Switching distributed_context between two subgroups routes to correct communicator."""
+        """C++ runtime: switching distributed_context between two subgroups routes correctly."""
         device = self._init_dist()
         _multirank_distributed_mode_context_switch(self.rank, self.world_size, device)
 
@@ -2140,8 +2152,12 @@ def run_multirank_tests() -> None:
         _multirank_all_gather_correctness,
         _multirank_reduce_scatter_all_reduce_ops,
         _multirank_all_to_all_correctness,
-        _multirank_scatter_correctness,
-        _multirank_gather_correctness,
+        lambda r, ws, dev: [
+            _multirank_scatter_correctness(i, r, ws, dev) for i in range(ws)
+        ],
+        lambda r, ws, dev: [
+            _multirank_gather_correctness(i, r, ws, dev) for i in range(ws)
+        ],
         _multirank_distributed_mode_tp_model,
         _multirank_distributed_mode_subgroup,
         _multirank_cpp_runtime_bind_nccl,
