@@ -353,7 +353,7 @@ TEST(Converters, ATenAnyDimNegativeNumericValueConvertsCorrectly) {
 
 TEST(Converters, ATenAnyDimNumericRowsWithCancellationConvertsCorrectly) {
   const auto graph = gen_any_dim_graph(1, false);
-  auto in = at::tensor({{1, -1}, {0, 0}}, at::TensorOptions().dtype(at::kInt).device(at::kCUDA));
+  auto in = at::tensor({1, -1, 0, 0}, at::TensorOptions().dtype(at::kInt).device(at::kCUDA)).reshape({2, 2});
   test_body(graph, in);
 }
 
@@ -365,7 +365,7 @@ TEST(Converters, ATenAnyDimFloatNumericValuesConvertsCorrectly) {
 
 TEST(Converters, ATenAnyDimHalfNumericValuesConvertsCorrectly) {
   const auto graph = gen_any_dim_graph(0, false);
-  auto in = at::tensor({1.0, -1.0}, at::TensorOptions().dtype(at::kHalf).device(at::kCUDA));
+  auto in = at::tensor({1.0, -1.0}, at::TensorOptions().dtype(at::kFloat).device(at::kCUDA)).to(at::kHalf);
   test_body(graph, in);
 }
 
