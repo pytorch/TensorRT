@@ -79,7 +79,8 @@ TEST(Converters, ATenScaledDotProductAttnMaskBoolDoesNotProduceNaN) {
   auto value = at::arange(16, {at::kCUDA}).to(at::kFloat).reshape({1, 1, 4, 4}) / 11.0;
   auto attn_mask =
       at::tensor(
-          {1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1}, at::TensorOptions().dtype(at::kBool).device(at::kCUDA))
+          {true, false, true, false, false, true, false, true, true, true, false, false, false, false, true, true},
+          at::TensorOptions().device(at::kCUDA))
           .reshape({1, 1, 4, 4});
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {query, key, value, attn_mask});
@@ -89,8 +90,8 @@ TEST(Converters, ATenScaledDotProductAttnMaskBoolDoesNotProduceNaN) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {query, key, value, attn_mask});
 
-  ASSERT_FALSE(torch::isnan(jit_results[0]).any().item<bool>());
-  ASSERT_FALSE(torch::isnan(trt_results[0]).any().item<bool>());
+  ASSERT_FALSE(at::isnan(jit_results[0]).any().item<bool>());
+  ASSERT_FALSE(at::isnan(trt_results[0]).any().item<bool>());
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 

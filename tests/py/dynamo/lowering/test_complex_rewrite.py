@@ -34,7 +34,6 @@ from typing import Any, Tuple
 import pytest
 import torch
 import torch.nn as nn
-
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.complex_graph_rewrite import (
     complex_graph_detection,
@@ -1230,3 +1229,22 @@ def test_split_then_mul_then_cat():
             return torch.cat([a * b, b * a], dim=1)
 
     _check_op(M(), (torch.randn(3, 4, dtype=torch.complex64),), "split_mul_cat")
+
+
+# ===========================================================================
+# 11. None-valued placeholder (optional/None input)
+# ===========================================================================
+
+
+@pytest.mark.unit
+def test_none_placeholder():
+    """opt=None — a present-but-None placeholder must survive metadata re-prop."""
+
+    class M(nn.Module):
+        def forward(self, z, opt):
+            out = z * z  # complex op triggers the rewrite + metadata re-prop
+            if opt is not None:
+                out = out + opt
+            return out
+
+    _check_op(M(), (_z(), None), "none_placeholder")
