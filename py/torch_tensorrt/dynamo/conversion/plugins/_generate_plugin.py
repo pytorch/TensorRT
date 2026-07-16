@@ -6,14 +6,12 @@ from types import FunctionType
 from typing import Any, Callable, Tuple
 
 import numpy as np
-import numpy.typing as npt
 import sympy
 import torch
 from sympy import lambdify
 from torch._dynamo.source import LocalSource
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
-
 from torch_tensorrt._features import needs_qdp_plugin
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -24,11 +22,11 @@ def _patch_trt_validator_issubclass() -> None:
     # at several sites in ``tensorrt_bindings.plugin._validate`` (``register``,
     # ``impl``, ``aot_impl``, autotune). Before Python 3.13, CPython quietly
     # unwrapped ``types.GenericAlias`` to its ``__origin__`` for ``issubclass``,
-    # so ``issubclass(npt.NDArray[np.float64], TensorDesc)`` returned ``False``
-    # without raising. Python 3.13 tightened that path: the same call now
+    # so ``issubclass(np.ndarray[Any, np.dtype[np.float64]], TensorDesc)``
+    # returned ``False`` without raising. Python 3.13 tightened that path: the same call now
     # raises ``TypeError: issubclass() arg 1 must be a class``, breaking every
-    # plugin that declares a scalar attribute as ``npt.NDArray[dtype]`` (which
-    # we do — and must do — to bypass a separate scalar-conversion bug in TRT's
+    # plugin that declares an ndarray scalar attribute (which we do — and must
+    # do — to bypass a separate scalar-conversion bug in TRT's
     # ``_TemplatePluginCreator.create_plugin``).
     #
     # We shadow ``issubclass`` in the validator's module globals with a wrapper
@@ -55,10 +53,13 @@ def _patch_trt_validator_issubclass() -> None:
 _patch_trt_validator_issubclass()
 
 
+# Use expanded ndarray annotations rather than ``numpy.typing.NDArray``.
+# Newer NumPy versions expose NDArray as a named type alias, which TensorRT
+# 11.0's annotation parser does not recognize as having an ndarray origin.
 _TORCH_SCHEMA_TYPE_TO_PLUGIN_ATTR_TYPE = {
-    "float": npt.NDArray[np.float64],
-    "int": npt.NDArray[np.int64],
-    "bool": npt.NDArray[np.bool_],
+    "float": np.ndarray[Any, np.dtype[np.float64]],
+    "int": np.ndarray[Any, np.dtype[np.int64]],
+    "bool": np.ndarray[Any, np.dtype[np.bool_]],
 }
 
 
