@@ -53,6 +53,20 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 )
             return False
 
+        settings = CONVERTERS.compilation_settings
+        if (
+            settings is not None
+            and settings.fallback_data_dependent_ops
+            and TorchTensorRTOperatorSupport._requires_output_allocator(node)
+        ):
+            # data-dependent output shape needs a TRT output allocator, which some
+            # runtimes cannot consume; honor the fallback and run the node in PyTorch
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            return False
+
         if (
             (node in CONVERTERS or node.op == "get_attr")
             and node_name not in self.torch_executed_ops

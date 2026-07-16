@@ -58,7 +58,10 @@ def fx_dynamo_testing_backend(
             gm,
             sample_inputs,
             trace_joint=False,
-            decompositions=get_decompositions(decompose_attention=decompose_attention),
+            decompositions=get_decompositions(
+                decompose_attention=decompose_attention,
+                use_fp32_acc=use_fp32_acc,
+            ),
         )
 
         gm = post_lowering(gm, settings)
@@ -178,8 +181,14 @@ def lower_graph_testing(
         torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
         testing_partitioning: Whether partitioning is being tested (to analyze only TRT-supported ops)
         use_fast_partitioner: Whether to use the fast or global partitioner
-        use_fp32_acc: This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.
-        decompose_attention: Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
+        use_fp32_acc: Enable FP32 accumulation for FP16 matmul layers while retaining FP16 inputs
+            and outputs. When combined with decompose_attention=True, the complete decomposed FP16
+            scaled dot product attention calculation runs in FP32 and only its final output is cast
+            back to FP16. This option has no effect on FP32 or BF16 inputs.
+        decompose_attention: Whether to decompose attention layers into smaller operations instead
+            of using the attention converters. When combined with use_fp32_acc=True, decomposed FP16
+            attention keeps its intermediate calculation in FP32 and casts only the final output
+            back to FP16.
     Returns:
         If testing_partitioning:
             List[torch.fx.GraphModule], Set, Set: List of partitioned graph outputs, unexpected ops seen, expected ops unseen

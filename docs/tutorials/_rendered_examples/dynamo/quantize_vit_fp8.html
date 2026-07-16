@@ -1,0 +1,975 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Quantize and Compile ViT with FP8 &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/nbsphinx-code-cells.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=d8482cd4"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/dynamo/quantize_vit_fp8';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Runtime &amp; Serialization" href="../../../user_guide/runtime_performance/index.html" />
+    <link rel="prev" title="Deploy Quantized Models using Torch-TensorRT" href="vgg16_ptq.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../user_guide/compilation/index.html">Compilation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/compilation_settings.html">CompilationSettings Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shared_dynamic_dims_example.html">Example: Sharing Dynamic Dimensions Across Inputs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/unsupported_ops.html">Handling Unsupported Operators</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../../user_guide/shapes_precision/index.html">Precision &amp; Quantization</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/shapes_precision/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/shapes_precision/quantization.html">Quantization (INT8 / FP8 / FP4)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Example: ViT FP8 Quantization</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../user_guide/runtime_performance/index.html">Runtime &amp; Serialization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/runtime_api.html">Runtime API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/runtime_settings.html">Runtime Settings (TensorRT-RTX)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/using_dla.html">DLA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/mutable_module.html">MutableTorchTensorRTModule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/performance_tuning.html">Performance Tuning Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../user_guide/index.html" class="nav-link">User Guide</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="../../../user_guide/shapes_precision/index.html" class="nav-link">Precision &amp; Quantization</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Quantize...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="Quantize-and-Compile-ViT-with-FP8">
+<h1>Quantize and Compile ViT with FP8<a class="headerlink" href="#Quantize-and-Compile-ViT-with-FP8" title="Link to this heading">#</a></h1>
+<p>This example demonstrates post-training FP8 quantization of a Hugging Face ViT model with NVIDIA ModelOpt, then compilation with the Torch-TensorRT Dynamo backend. There are two methods to compile the model with Torch-TensorRT: 1. IAttention path: converts attention to TRT IAttention Layer 2. Decomposed path: uses original attention implementation, which decomposes attention into multiple layers.</p>
+<p>Requirements:</p>
+<ul class="simple">
+<li><p>NVIDIA GPU with FP8 support (Hopper or newer)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nvidia-modelopt&gt;=0.45.0</span></code> that supports the Hugging Face quantization recipes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">transformers</span></code> to load the ViT model</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch-tensorrt&gt;=2.13.0</span></code> which converts attention to TRT IAttention Layer</p></li>
+</ul>
+<section id="Imports">
+<h2>Imports<a class="headerlink" href="#Imports" title="Link to this heading">#</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import tempfile
+from collections import OrderedDict
+
+import modelopt.torch.quantization as mtq
+import numpy as np
+import tensorrt as trt
+import torch
+import torch_tensorrt
+from modelopt.recipe import load_recipe
+from modelopt.torch.quantization.utils import export_torch_mode
+from transformers import ViTForImageClassification
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Optional-layer-profiler-and-benchmark-function-(Python-TensorRT-runtime)">
+<h2>Optional layer profiler and benchmark function (Python TensorRT runtime)<a class="headerlink" href="#Optional-layer-profiler-and-benchmark-function-(Python-TensorRT-runtime)" title="Link to this heading">#</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def _format_report(timings: OrderedDict[str, list[float]], n_iters: int) -&gt; str:
+    &quot;&quot;&quot;Format layer timings into a trtexec-style profiling summary.&quot;&quot;&quot;
+    if not timings:
+        return &quot;(no profiling data collected)&quot;
+
+    total_time = sum(sum(ts) for ts in timings.values())
+
+    lines: list[str] = []
+    lines.append(f&quot;=== Profile ({n_iters} iterations) ===&quot;)
+    lines.append(
+        f&quot;{&#39;Time(ms)&#39;:&gt;12s} {&#39;Avg.(ms)&#39;:&gt;12s} {&#39;Median(ms)&#39;:&gt;12s} {&#39;Time(%)&#39;:&gt;9s}   Layer&quot;
+    )
+
+    for layer_name, ts in timings.items():
+        arr = np.array(ts)
+        t_sum = arr.sum()
+        t_avg = arr.mean()
+        t_med = float(np.median(arr))
+        t_pct = 100.0 * t_sum / total_time if total_time &gt; 0 else 0.0
+        lines.append(
+            f&quot;{t_sum:12.2f} {t_avg:12.4f} {t_med:12.4f} {t_pct:8.1f}   {layer_name}&quot;
+        )
+
+    return &quot;\n&quot;.join(lines)
+
+
+class TorchTRTLayerProfiler(trt.IProfiler):
+    &quot;&quot;&quot;Collect per-layer timings across many runs via ``trt.IProfiler``.&quot;&quot;&quot;
+
+    def __init__(self):
+        super().__init__()
+        self._timings: OrderedDict[str, list[float]] = OrderedDict()
+        self._iterations: int = 0
+        self._last_layer: str | None = None
+
+    def report_layer_time(self, layer_name: str, ms: float) -&gt; None:
+        if layer_name not in self._timings:
+            self._timings[layer_name] = []
+        self._timings[layer_name].append(ms)
+
+        if self._last_layer is None or layer_name == next(iter(self._timings)):
+            if self._last_layer is not None:
+                self._iterations += 1
+        self._last_layer = layer_name
+
+    def reset(self) -&gt; None:
+        self._timings.clear()
+        self._iterations = 0
+        self._last_layer = None
+
+    def report(self) -&gt; str:
+        n_iters = self._iterations
+        first_layer_count = len(next(iter(self._timings.values()), []))
+        if first_layer_count &gt; n_iters:
+            n_iters = first_layer_count
+        text = _format_report(self._timings, n_iters)
+        print(text)
+        return text
+
+
+def benchmark_tensorrt(
+    trt_compiled,
+    input_tensor: torch.Tensor,
+    *,
+    enable_profiling: bool = False,
+    num_warmup: int = 10,
+    num_runs: int = 50,
+):
+    with torch.no_grad():
+        for _ in range(num_warmup):
+            trt_compiled(input_tensor)
+        torch.cuda.synchronize()
+
+        with torch_tensorrt.runtime.enable_cudagraphs(trt_compiled) as cg_model:
+            start_events = [
+                torch.cuda.Event(enable_timing=True) for _ in range(num_runs)
+            ]
+            end_events = [torch.cuda.Event(enable_timing=True) for _ in range(num_runs)]
+            results = []
+            for i in range(num_runs):
+                start_events[i].record()
+                result = cg_model(input_tensor)
+                results.append(result.logits.sum().item())
+                end_events[i].record()
+            torch.cuda.synchronize()
+            latencies = [s.elapsed_time(e) for s, e in zip(start_events, end_events)]
+
+        latencies = np.array(latencies)
+        print(f&quot;\nLatency over {num_runs} runs (ms):&quot;)
+        print(f&quot;  Mean:   {np.mean(latencies):.2f}&quot;)
+        print(f&quot;  Median: {np.median(latencies):.2f}&quot;)
+        print(f&quot;  Min:    {np.min(latencies):.2f}&quot;)
+        print(f&quot;  Max:    {np.max(latencies):.2f}&quot;)
+        print(f&quot;  P90:    {np.percentile(latencies, 90):.2f}&quot;)
+        print(f&quot;  P95:    {np.percentile(latencies, 95):.2f}&quot;)
+        print(f&quot;  P99:    {np.percentile(latencies, 99):.2f}&quot;)
+        print(f&quot;  Avg logits sum: {np.mean(results):.2f}&quot;)
+
+        if enable_profiling and hasattr(trt_compiled, &quot;engine&quot;):
+            profiler = TorchTRTLayerProfiler()
+            trt_compiled.engine.context.profiler = profiler
+            torch_results = []
+            for _ in range(num_runs):
+                result = trt_compiled(input_tensor)
+                torch_results.append(result.logits.sum().item())
+            torch.cuda.synchronize()
+            print(f&quot;  Avg logits sum (no cudagraphs): {np.mean(torch_results):.2f}&quot;)
+            profiler.report()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Configuration-and-calibration-data">
+<h2>Configuration and calibration data<a class="headerlink" href="#Configuration-and-calibration-data" title="Link to this heading">#</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>BATCH_SIZE = 128
+input_tensor = torch.rand((BATCH_SIZE, 3, 224, 224), dtype=torch.float16).cuda()
+
+calibration_dataloader = [
+    torch.rand((BATCH_SIZE, 3, 224, 224), dtype=torch.float16) for _ in range(2)
+]
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Define-function-to-quantize-ViT-to-FP8-using-ModelOpt">
+<h2>Define function to quantize ViT to FP8 using ModelOpt<a class="headerlink" href="#Define-function-to-quantize-ViT-to-FP8-using-ModelOpt" title="Link to this heading">#</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def quantize_model(model: torch.nn.Module) -&gt; torch.nn.Module:
+    # ModelOpt&#39;s HF plugin expects attention modules to expose ``config``.
+    for mod in model.modules():
+        if mod.__class__.__name__ == &quot;ViTAttention&quot;:
+            mod.config = model.config
+
+    def calibration_loop(model):
+        for batch in calibration_dataloader:
+            model(batch.cuda())
+
+    recipe = load_recipe(&quot;huggingface/vit/ptq/fp8&quot;)
+    quant_cfg = recipe.quantize.model_dump()
+    # You can also define your own quant_cfg to specify which layers to quantize, like this:
+    # quant_cfg = {
+    #     &quot;quant_cfg&quot;: {
+    #         &quot;*&quot;: {&quot;enable&quot;: False},
+    #         &quot;*weight_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+    #         &quot;*input_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+    #         &quot;*output_quantizer&quot;: {&quot;enable&quot;: False},
+    #         &quot;*[qkv]_bmm_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+    #         &quot;*softmax_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+    #         &quot;*bmm2_output_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+    #     },
+    #     &quot;algorithm&quot;: &quot;max&quot;,
+    # }
+
+    mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
+    return model
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Define-function-to-compile-with-Torch-TensorRT">
+<h2>Define function to compile with Torch-TensorRT<a class="headerlink" href="#Define-function-to-compile-with-Torch-TensorRT" title="Link to this heading">#</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def compile_tensorrt(
+    model: torch.nn.Module, dynamic: bool = False, decompose_attention: bool = False
+):
+    if dynamic:
+        inputs = [
+            torch_tensorrt.Input(
+                min_shape=(1, 3, 224, 224),
+                opt_shape=(BATCH_SIZE, 3, 224, 224),
+                max_shape=(1024, 3, 224, 224),
+                dtype=torch.float16,
+            )
+        ]
+    else:
+        inputs = [torch.rand((BATCH_SIZE, 3, 224, 224), dtype=torch.float16).cuda()]
+
+    with tempfile.TemporaryDirectory() as debug_dir:
+        with export_torch_mode(), torch_tensorrt.dynamo.Debugger(
+            log_level=&quot;info&quot;,
+            save_layer_info=True,
+            logging_dir=debug_dir,
+        ):
+            trt_compiled = torch_tensorrt.compile(
+                model,
+                ir=&quot;dynamo&quot;,
+                inputs=inputs,
+                use_explicit_typing=True,
+                truncate_double=True,
+                use_python_runtime=True,
+                decompose_attention=decompose_attention,
+            )
+
+    return trt_compiled
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Instantiate-ViT-model-and-quantize-it">
+<h2>Instantiate ViT model and quantize it<a class="headerlink" href="#Instantiate-ViT-model-and-quantize-it" title="Link to this heading">#</a></h2>
+<p>Both “eager” and “sdpa” attn_implementation work for IAttention path, but only “eager” works for decomposed path. For demonstration purposes, we use “eager” attn_implementation here so that both paths can share the same model.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model = (
+    ViTForImageClassification.from_pretrained(
+        &quot;google/vit-large-patch16-224&quot;,
+        hidden_act=&quot;gelu_fast&quot;,
+        attn_implementation=&quot;eager&quot;,
+    )
+    .eval()
+    .half()
+    .cuda()
+)
+
+quantized_model = quantize_model(model)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Compile-quantized-model-with-Torch-TensorRT:-IAttention-path">
+<h2>Compile quantized model with Torch-TensorRT: IAttention path<a class="headerlink" href="#Compile-quantized-model-with-Torch-TensorRT:-IAttention-path" title="Link to this heading">#</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>trt_compiled_iattention = compile_tensorrt(
+    quantized_model,
+    decompose_attention=False,  # False for IAttention path
+)
+</pre></div>
+</div>
+</div>
+<p>IAttention path benchmark inference</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>benchmark_tensorrt(
+    trt_compiled_iattention,
+    input_tensor,
+)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Compile-quantized-model-with-Torch-TensorRT:-Decomposed-path">
+<h2>Compile quantized model with Torch-TensorRT: Decomposed path<a class="headerlink" href="#Compile-quantized-model-with-Torch-TensorRT:-Decomposed-path" title="Link to this heading">#</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>trt_compiled_decomposed = compile_tensorrt(
+    quantized_model,
+    decompose_attention=True,  # True for decomposed path
+)
+</pre></div>
+</div>
+</div>
+<p>Decomposed path benchmark inference</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>benchmark_tensorrt(
+    trt_compiled_decomposed,
+    input_tensor,
+)
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="vgg16_ptq.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Deploy Quantized Models using Torch-TensorRT</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../../../user_guide/runtime_performance/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Runtime &amp; Serialization</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Imports">Imports</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Optional-layer-profiler-and-benchmark-function-(Python-TensorRT-runtime)">Optional layer profiler and benchmark function (Python TensorRT runtime)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Configuration-and-calibration-data">Configuration and calibration data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Define-function-to-quantize-ViT-to-FP8-using-ModelOpt">Define function to quantize ViT to FP8 using ModelOpt</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Define-function-to-compile-with-Torch-TensorRT">Define function to compile with Torch-TensorRT</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Instantiate-ViT-model-and-quantize-it">Instantiate ViT model and quantize it</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Compile-quantized-model-with-Torch-TensorRT:-IAttention-path">Compile quantized model with Torch-TensorRT: IAttention path</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Compile-quantized-model-with-Torch-TensorRT:-Decomposed-path">Compile quantized model with Torch-TensorRT: Decomposed path</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/dynamo/quantize_vit_fp8.ipynb">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../_sources/tutorials/_rendered_examples/dynamo/quantize_vit_fp8.ipynb.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

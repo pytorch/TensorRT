@@ -1,10 +1,13 @@
 import logging
+import math
 from typing import Optional, Tuple, Union
 
 import tensorrt as trt
 from tensorrt import ITensor as TRTTensor
+import torch
 from torch.fx.node import Target
 from torch_tensorrt._utils import is_tensorrt_version_supported
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -15,6 +18,41 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+# FP8 E4M3 max representable magnitude. Softmax output is bounded to [0, 1],
+# so 1/448 saturates exactly at 1.0 and is data-independent (no calibration needed).
+_FP8_E4M3_MAX = 448.0
+
+
+def _maybe_set_fp8_softmax(
+    ctx: ConversionContext,
+    name: str,
+    attention_layer: trt.IAttention,
+) -> bool:
+    """Set FP8 softmax normalization quantization on the IAttention layer if the current
+    node was annotated with a softmax FP8 scale by the fp8_attention_softmax lowering pass.
+
+    Returns True if FP8 normalization was configured (caller must set decomposable=False).
+    """
+    if ctx.current_node is None:
+        return False
+    scale_val = ctx.current_node.meta.get("_fp8_softmax_scale")
+    if scale_val is None:
+        return False
+    # Scale dtype must match the IAttention output (= pre-quant Q/K/V) dtype;
+    # using float32 unconditionally fails TRT compilation on some platforms.
+    output_dtype = _enums.dtype._from(attention_layer.get_output(0).dtype).to(
+        torch.dtype
+    )
+    scale_tensor = get_trt_tensor(
+        ctx,
+        torch.tensor(scale_val, dtype=output_dtype),
+        name + "_softmax_fp8_scale",
+        dtype=output_dtype,
+    )
+    attention_layer.normalization_quantize_to_type = trt.DataType.FP8
+    attention_layer.normalization_quantize_scale = scale_tensor
+    return True
 
 
 def _normalize_attention_mask_rank(
@@ -178,6 +216,18 @@ def scaled_dot_product_attention(
     Returns:
         TRTTensor: Attention output tensor with shape [batch, heads, seq_len, head_dim]
     """
+    # When FP8 softmax normalization is active (modelopt FP8 MHA pattern) TRT's
+    # FP8 MHA fusion requires the Q/DQ output to feed IAttention via a single
+    # same-dtype Mul; any HALF<->FLOAT cast inserted by the default dynamic
+    # 1/sqrt(D) computation breaks the fusion.  Use a static same-dtype scalar
+    # scale computed from the concrete head_dim.
+    fp8_norm_active = (
+        ctx.current_node is not None
+        and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
+    )
+    if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
+        scale = 1.0 / math.sqrt(query.shape[-1])
+
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
         q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
@@ -291,7 +341,8 @@ def scaled_dot_product_attention(
 
     if mask_tensor is not None:
         attention_layer.mask = mask_tensor
-    attention_layer.decomposable = True
+    fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
+    attention_layer.decomposable = not fp8_norm
     attention_output = attention_layer.get_output(0)
     return attention_output
 
@@ -319,6 +370,13 @@ def scaled_dot_product_flash_attention(
     Optional[TRTTensor],
     Optional[TRTTensor],
 ]:
+    fp8_norm_active = (
+        ctx.current_node is not None
+        and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
+    )
+    if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
+        scale = 1.0 / math.sqrt(query.shape[-1])
+
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
         q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
@@ -367,7 +425,8 @@ def scaled_dot_product_flash_attention(
     )
     assert attention_layer is not None, "attention layer is None"
 
-    attention_layer.decomposable = True
+    fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
+    attention_layer.decomposable = not fp8_norm
 
     attention_output = attention_layer.get_output(0)
     return attention_output, None, None, None, 0.0, 0.0, None, None, None
@@ -387,6 +446,13 @@ def scaled_dot_product_efficient_attention(
     is_causal: bool = False,
     scale: Optional[float] = None,
 ) -> Tuple[TRTTensor, Optional[TRTTensor], Optional[TRTTensor], Optional[TRTTensor]]:
+    fp8_norm_active = (
+        ctx.current_node is not None
+        and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
+    )
+    if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
+        scale = 1.0 / math.sqrt(query.shape[-1])
+
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
         q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
@@ -444,6 +510,7 @@ def scaled_dot_product_efficient_attention(
 
     mask_tensor = None
     if attn_bias is not None:
+        attn_bias = get_trt_tensor(ctx, attn_bias, name + "_attn_bias")
         if attn_bias.dtype == trt.DataType.BOOL:
             mask_tensor = attn_bias
         elif attn_bias.dtype != query.dtype:
@@ -523,7 +590,8 @@ def scaled_dot_product_efficient_attention(
     if mask_tensor is not None:
         attention_layer.mask = mask_tensor
 
-    attention_layer.decomposable = True
+    fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
+    attention_layer.decomposable = not fp8_norm
 
     attention_output = attention_layer.get_output(0)
     return attention_output, None, None, None

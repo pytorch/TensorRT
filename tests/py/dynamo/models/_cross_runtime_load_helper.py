@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import sys
 
 
 def _build_small_conv_model(torch):
@@ -76,11 +77,20 @@ def _hide_so_files(pkg_dir: str) -> list[tuple[str, str]]:
     lib_dir = os.path.join(pkg_dir, "lib")
     if not os.path.isdir(lib_dir):
         return []
+    # Linux/macOS uses `libtorchtrt*` (the `lib` prefix); Windows uses
+    # `torchtrt*.dll` / `torchtrt*.lib` (no prefix). See ``_features.py``
+    # for the matching read side.
+    patterns = (
+        ["torchtrt*.dll", "torchtrt*.lib"]
+        if sys.platform.startswith("win")
+        else ["libtorchtrt*"]
+    )
     moved: list[tuple[str, str]] = []
-    for path in glob.glob(os.path.join(lib_dir, "libtorchtrt*")):
-        bak = path + ".bak"
-        os.rename(path, bak)
-        moved.append((bak, path))
+    for pattern in patterns:
+        for path in glob.glob(os.path.join(lib_dir, pattern)):
+            bak = path + ".bak"
+            os.rename(path, bak)
+            moved.append((bak, path))
     return moved
 
 

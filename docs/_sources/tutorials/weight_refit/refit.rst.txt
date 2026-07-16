@@ -88,7 +88,6 @@ API
         arg_inputs=None,
         kwarg_inputs=None,
         verify_output=False,
-        use_weight_map_cache=True,
         in_place=False,
     )
 
@@ -113,12 +112,6 @@ API
     Run a numerical check comparing the output of the refitted TRT engine against
     PyTorch on the provided sample inputs. Useful for catching silent refit failures
     during development.
-
-``use_weight_map_cache`` (``bool``, default ``True``)
-    When torch-tensorrt programs are compiled, the TRTIntpereter builds a map of which
-    exported program nodes correspond to which TensorRT layers. This mapping is stored as metadata in serialized
-    torch-tensorrt programs. This cache is not gaurenteed to be an exact match but to a new
-    unseen exported program but when it does, it reduces refit time by ~50%.
 
 ``in_place`` (``bool``, default ``False``)
     If ``True``, modify the compiled module in-place rather than returning a copy.

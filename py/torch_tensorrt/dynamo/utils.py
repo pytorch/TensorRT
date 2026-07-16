@@ -187,6 +187,7 @@ def get_torch_tensor(
     if input.is_shape_tensor:
         # TODO: All the shape tensors we've encountered so far are plain integers.
         # Validate this assumption on more models.
+        assert isinstance(input.shape, dict)
         return input.shape["opt_shape"][0]
 
     if len(mode) > 0:
@@ -406,9 +407,16 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
     return any(isinstance(dim, torch.SymInt) for dim in tensor)
 
 
-def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional[int]]:
-    """
-    This function returns the min, max, opt values of a symbolic integer.
+def extract_var_range_info(
+    symbolic_integer: torch.SymInt,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+) -> Dict[str, Optional[int]]:
+    """Return ``{min, max, opt}`` for a symbolic integer.
+
+    ``user_symbol_bounds`` (read-only ``{sym: (min, max)}``) is consulted only
+    when the exporter's upper is unbounded; finite exporter bounds always win.
+    The lower is intersected with the exporter's so the 0/1 specialization
+    survives even if the user passes ``min_shape=0``.
     """
     node = symbolic_integer.node
     expr = node.expr
@@ -435,13 +443,42 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional
         or expr.xreplace(var_to_val_map)
     )
     assert var_range, var_val
-    min_val, max_val = (
-        int(var_range.lower),
-        int(var_range.upper) if var_range.upper != int_oo else None,
-    )
+
+    # ``var_to_range`` returns ``int_oo`` for unbounded; ``bound_sympy`` (used
+    # for composite exprs like ``s0+s1``) returns ``sympy.oo`` instead. They
+    # are distinct objects -- check both, else ``int(sympy.oo)`` raises.
+    def _bound_to_int_or_none(value: Any) -> Optional[int]:
+        if value is int_oo or value is -int_oo:
+            return None
+        if value == sympy.oo or value == -sympy.oo:
+            return None
+        try:
+            return int(value)
+        except (TypeError, OverflowError, AttributeError):
+            return None
+
+    min_val_opt = _bound_to_int_or_none(var_range.lower)
+    max_val = _bound_to_int_or_none(var_range.upper)
+    # Unbounded lower shouldn't happen for tensor dims; fall back to 1.
+    min_val = min_val_opt if min_val_opt is not None else 1
 
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
+
+    # Apply user bounds whenever present. ``_build_user_symbol_bounds`` already
+    # rejects user ranges that exceed the exporter, so the only cases reaching
+    # here are: Dim.DYNAMIC (max_val is None), strict subset, or the 1->2
+    # specialization. Clamp defensively in case validation was skipped (no
+    # ShapeEnv access path).
+    if (
+        user_symbol_bounds
+        and isinstance(expr, sympy.Symbol)
+        and expr in user_symbol_bounds
+    ):
+        user_min, user_max = user_symbol_bounds[expr]
+        min_val = max(min_val, int(user_min))
+        max_val = int(user_max) if max_val is None else min(max_val, int(user_max))
+
     min_max_opt: Dict[str, Optional[int]] = {}
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
@@ -449,6 +486,69 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional
         min_max_opt["opt"] = int(var_val)
 
     return min_max_opt
+
+
+def validate_optimization_profiles(input_specs: Sequence[Input]) -> int:
+    """Validate multi-profile inputs and return the number of profiles.
+
+    ``Input.profiles`` is an ordered list; the list index is the TRT
+    optimization-profile index selected at runtime. Every dynamic input that
+    declares ``profiles`` must declare the *same number* of profiles.
+    Static inputs (or dynamic inputs without profiles) are allowed and reuse
+    their single shape in every profile.
+
+    Returns the number of *declared* optimization profiles, i.e. ``0`` when no
+    input declares ``profiles`` (the multi-profile feature is unused and the
+    actual profile count is decided downstream: ``0`` for fully static engines,
+    ``1`` for dynamic ones).
+    """
+    num_profiles = 0
+    for inp in input_specs:
+        profiles = getattr(inp, "profiles", None)
+        if not profiles:
+            continue
+        if num_profiles == 0:
+            num_profiles = len(profiles)
+        elif len(profiles) != num_profiles:
+            raise ValueError(
+                "All inputs declaring optimization profiles must declare the same "
+                f"number of profiles, found both {num_profiles} and {len(profiles)}."
+            )
+    return num_profiles
+
+
+def extract_var_range_info_for_profile(
+    symbolic_integer: torch.SymInt,
+    symbol_values: Dict[str, int],
+) -> int:
+    """Evaluate a symbolic dimension at a single profile corner.
+
+    ``symbol_values`` maps source symbol name (e.g. ``"s0"``) to the concrete
+    integer value of that symbol at one corner (min / opt / max) of a profile.
+    The intermediate ``SymInt`` expression (e.g. ``s0/4``) is evaluated by
+    substituting those values. Shape ops in export produce affine expressions
+    that are monotonic in each source symbol, so per-corner substitution is
+    exact.
+    """
+    node = symbolic_integer.node
+    expr = node.expr
+    # A fully-static expression may already be a Python/sympy integer.
+    if isinstance(expr, int):
+        return int(expr)
+    free_symbols: Any = getattr(expr, "free_symbols", set())
+    substitution = {
+        sym: symbol_values[sym.name]
+        for sym in free_symbols
+        if getattr(sym, "name", None) in symbol_values
+    }
+    evaluated = expr.xreplace(substitution) if substitution else expr
+    if getattr(evaluated, "free_symbols", set()):
+        # A free symbol was missing from symbol_values; caller should fall back.
+        raise KeyError(
+            f"Could not fully evaluate symbolic dim {expr} with symbol values "
+            f"{symbol_values} (unresolved free symbols remain)."
+        )
+    return int(evaluated)
 
 
 def unwrap_tensor_shape(

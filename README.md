@@ -5,7 +5,7 @@ Torch-TensorRT
 <h4> Easily achieve the best inference performance for any PyTorch model on the NVIDIA platform. </h4>
 
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
-[![pytorch](https://img.shields.io/badge/PyTorch-2.13-green)](https://download.pytorch.org/whl/nightly/cu130)
+[![pytorch](https://img.shields.io/badge/PyTorch-2.14-green)](https://download.pytorch.org/whl/nightly/cu132)
 [![cuda](https://img.shields.io/badge/CUDA-13.2-green)](https://developer.nvidia.com/cuda-downloads)
 [![trt](https://img.shields.io/badge/TensorRT-11.0.0-green)](https://github.com/nvidia/tensorrt)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
@@ -121,7 +121,7 @@ auto results = trt_mod.forward({input_tensor});
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 8.1.1
-- Libtorch 2.13.0.dev (latest nightly)
+- Libtorch 2.14.0.dev (latest nightly)
 - CUDA 13.2 (CUDA 12.6 on Jetson)
 - TensorRT 11.0.0.114 (TensorRT 10.3 on Jetson)
 

@@ -93,7 +93,16 @@ cc_library(
     }),
     copts = [
         "-pthread",
-    ],
+    ] + select({
+        # The plugins pull in <ATen/cuda/CUDAEvent.h> / torch/torch.h, whose
+        # structs use alignas(c10::hardware_destructive_interference_size).
+        # GCC 12+ flags that ABI-sensitive constant via -Winterference-size
+        # (fatal under -Werror), so silence it on GCC/Clang. Do NOT pass it to
+        # MSVC: cl.exe reads -Wno-interference-size as /W<arg> and fails with
+        # "D8021: invalid numeric argument".
+        ":windows": [],
+        "//conditions:default": ["-Wno-interference-size"],
+    }),
     linkopts = [
         "-lpthread",
     ],

@@ -29,10 +29,6 @@ if importlib.util.find_spec("torchvision"):
 
 
 @unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
-@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
@@ -85,10 +81,6 @@ def test_mapping():
 
 
 @unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
-@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
@@ -125,7 +117,6 @@ def test_conv_refit_with_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
         verify_output=True,
     )
 
@@ -144,10 +135,6 @@ def test_conv_refit_with_weightmap():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -185,7 +172,6 @@ def test_batch_norm_refit_one_engine_with_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
         verify_output=True,
     )
 
@@ -204,10 +190,6 @@ def test_batch_norm_refit_one_engine_with_weightmap():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -245,7 +227,6 @@ def test_batch_norm_refit_one_engine_without_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=False,
         verify_output=True,
     )
 
@@ -264,10 +245,6 @@ def test_batch_norm_refit_one_engine_without_weightmap():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -296,7 +273,6 @@ def test_refit_one_engine_with_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
         verify_output=True,
     )
 
@@ -315,118 +291,6 @@ def test_refit_one_engine_with_weightmap():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.refit,
-    "Refit feature is not supported in Python 3.13 or higher",
-)
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"),
-    "torchvision is not installed",
-)
-@pytest.mark.unit
-def test_refit_one_engine_no_map_with_weightmap():
-    model = models.resnet18(pretrained=False).eval().to("cuda")
-    model2 = models.resnet18(pretrained=True).eval().to("cuda")
-    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
-    min_block_size = 1
-    exp_program = torch.export.export(model, tuple(inputs))
-    exp_program2 = torch.export.export(model2, tuple(inputs))
-
-    trt_gm = torchtrt.dynamo.compile(
-        exp_program,
-        tuple(inputs),
-        min_block_size=min_block_size,
-        immutable_weights=False,
-    )
-
-    trt_gm._run_on_acc_0.weight_name_map = None
-
-    new_trt_gm = refit_module_weights(
-        compiled_module=trt_gm,
-        new_weight_module=exp_program2,
-        arg_inputs=inputs,
-        use_weight_map_cache=True,
-    )
-
-    # Check the output
-    model2.to("cuda")
-    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
-        *inputs
-    )
-    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
-        assertions.assertTrue(
-            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
-            "Refit Result is not correct. Refit failed",
-        )
-        # Clean up model env
-
-    torch._dynamo.reset()
-
-
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.refit,
-    "Refit feature is not supported in Python 3.13 or higher",
-)
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"),
-    "torchvision is not installed",
-)
-@pytest.mark.unit
-def test_refit_one_engine_with_wrong_weightmap():
-    model = models.resnet18(pretrained=False).eval().to("cuda")
-    model2 = models.resnet18(pretrained=True).eval().to("cuda")
-    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
-    min_block_size = 1
-    exp_program = torch.export.export(model, tuple(inputs))
-    exp_program2 = torch.export.export(model2, tuple(inputs))
-
-    trt_gm = torchtrt.dynamo.compile(
-        exp_program,
-        tuple(inputs),
-        min_block_size=min_block_size,
-        immutable_weights=False,
-    )
-    # Manually Deleted all batch norm layer. This suppose to fail the fast refit
-    trt_gm._run_on_acc_0.weight_name_map = {
-        k: v
-        for k, v in trt_gm._run_on_acc_0.weight_name_map.items()
-        if "[SCALE]" not in k
-    }
-
-    new_trt_gm = refit_module_weights(
-        compiled_module=trt_gm,
-        new_weight_module=exp_program2,
-        arg_inputs=inputs,
-        use_weight_map_cache=True,
-    )
-
-    # Check the output
-    model2.to("cuda")
-    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
-        *inputs
-    )
-    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
-        assertions.assertTrue(
-            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
-            "Refit Result is not correct. Refit failed",
-        )
-        # Clean up model env
-
-    torch._dynamo.reset()
-
-
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not importlib.util.find_spec("transformers"),
     "transformers is required to run this test",
@@ -460,7 +324,6 @@ def test_refit_one_engine_bert_with_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -483,12 +346,8 @@ def test_refit_one_engine_bert_with_weightmap():
 
 
 @unittest.skipIf(
-    not importlib.util.find_spec("torchvision"),
-    "torchvision is not installed",
-)
-@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
+    "Torch-TensorRT C++ runtime is not available",
 )
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
@@ -522,7 +381,6 @@ def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -541,10 +399,6 @@ def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"),
-    "torchvision is not installed",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -573,7 +427,6 @@ def test_refit_one_engine_python_runtime_with_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -591,10 +444,6 @@ def test_refit_one_engine_python_runtime_with_weightmap():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -642,7 +491,6 @@ def test_refit_multiple_engine_with_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -704,7 +552,6 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
     )
     model2.cuda()
     # Check the output
@@ -721,14 +568,6 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"),
-    "torchvision is not installed",
-)
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -757,7 +596,6 @@ def test_refit_one_engine_without_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -775,10 +613,6 @@ def test_refit_one_engine_without_weightmap():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not importlib.util.find_spec("transformers"),
     "transformers is required to run this test",
@@ -812,7 +646,6 @@ def test_refit_one_engine_bert_without_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -835,12 +668,8 @@ def test_refit_one_engine_bert_without_weightmap():
 
 
 @unittest.skipIf(
-    not importlib.util.find_spec("torchvision"),
-    "torchvision is not installed",
-)
-@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
+    "Torch-TensorRT C++ runtime is not available",
 )
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
@@ -872,7 +701,6 @@ def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -890,10 +718,6 @@ def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"),
-    "torchvision is not installed",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -922,7 +746,6 @@ def test_refit_one_engine_python_runtime_without_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -940,10 +763,6 @@ def test_refit_one_engine_python_runtime_without_weightmap():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -991,7 +810,6 @@ def test_refit_multiple_engine_without_weightmap():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -1014,8 +832,8 @@ def test_refit_multiple_engine_without_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @unittest.skipIf(
-    torch_trt.ENABLED_FEATURES.tensorrt_rtx and sys.platform == "win32",
-    "cumsum refit errors out on TensorRT-RTX on Windows",
+    torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+    "cumsum is not supported on TensorRT-RTX (build_serialized_network returns None on Linux as well as Windows)",
 )
 @pytest.mark.unit
 def test_refit_cumsum():
@@ -1051,7 +869,6 @@ def test_refit_cumsum():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
     )
 
     model2.to("cuda")
@@ -1068,10 +885,6 @@ def test_refit_cumsum():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -1124,7 +937,6 @@ def test_complex_buffer_refit():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
         verify_output=True,
     )
 
@@ -1139,10 +951,6 @@ def test_complex_buffer_refit():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -1195,7 +1003,6 @@ def test_complex_buffer_with_real_param_refit():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
         verify_output=True,
     )
 
@@ -1210,10 +1017,6 @@ def test_complex_buffer_with_real_param_refit():
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "TorchScript Frontend is not available",
-)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
@@ -1264,7 +1067,6 @@ def test_dual_complex_buffer_refit():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
-        use_weight_map_cache=True,
         verify_output=True,
     )
 

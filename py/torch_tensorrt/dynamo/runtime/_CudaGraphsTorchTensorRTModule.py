@@ -145,10 +145,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
             TorchTensorRTModule,
         )
-        from torch_tensorrt.dynamo.runtime._TRTEngine import (
-            TRTEngine,
-            _get_cuda_graph_strategy,
-        )
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
         for name, mod in self.compiled_module.named_modules():
             if not (
@@ -170,10 +167,8 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             # Disable RTX-native CUDA graphs on this engine so they don't
             # interfere with the outer monolithic capture.
             if engine._rtx_native_cudagraphs:
-                engine.runtime_config.cuda_graph_strategy = _get_cuda_graph_strategy(
-                    "disabled"
-                )
-                engine.context = engine._create_execution_context()
+                disabled = engine.runtime_settings.merge(cuda_graph_strategy="disabled")
+                engine.update_runtime_settings(disabled)
                 engine._rtx_native_cudagraphs = False
                 logger.info(
                     f"Disabled RTX-native CUDA graphs for '{name}' "

@@ -1,4 +1,3 @@
-import gc
 import logging
 import os
 import warnings
@@ -13,7 +12,6 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    Union,
 )
 
 import numpy as np
@@ -26,7 +24,6 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._enums import dtype
-from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
@@ -52,7 +49,7 @@ from torch_tensorrt.dynamo.utils import (
     DYNAMIC_DIM,
     deallocate_module,
     get_cpu_memory_usage,
-    to_torch_device,
+    validate_optimization_profiles,
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -71,7 +68,6 @@ class TRTInterpreterResult(NamedTuple):
     engine: trt.ICudaEngine
     input_names: List[str]
     output_names: List[str]
-    weight_name_map: Optional[dict[Any, Any]]
     requires_output_allocator: bool
     requires_native_multidevice: bool
 
@@ -120,12 +116,28 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 + "\n".join(f"{i}" for i in missing_ops)
             )
 
+        # Optimization profiles. Profiles are an ordered list on
+        # ``Input.profiles``; profile index i is built from each input's
+        # ``profiles[i]``. The count is derived from the input specs (submodule
+        # inputs inherit the same number of profiles via propagation). It is
+        # ``0`` when no input declares ``profiles``, in which case we fall back
+        # to the historical behavior: a single profile for dynamic inputs and
+        # none for fully static engines.
+        self.optimization_profile_count: int = validate_optimization_profiles(
+            input_specs
+        )
+        has_dynamic_input = any(
+            input_spec.shape_mode == Input._ShapeMode.DYNAMIC
+            for input_spec in input_specs
+        )
+        num_profiles = (
+            self.optimization_profile_count
+            if self.optimization_profile_count
+            else (1 if has_dynamic_input else 0)
+        )
         self.optimization_profiles: Optional[List[trt.IOptimizationProfile]] = (
-            [self.builder.create_optimization_profile()]
-            if any(
-                input_spec.shape_mode == Input._ShapeMode.DYNAMIC
-                for input_spec in input_specs
-            )
+            [self.builder.create_optimization_profile() for _ in range(num_profiles)]
+            if num_profiles > 0
             else None
         )
 
@@ -146,7 +158,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         # Mapping of constants to shapes and dtypes
         self.const_mapping: Dict[str, Tuple[Sequence[int], str]] = {}
-        self.weight_name_map: Optional[Dict[str, Any]] = None
 
         # Engine cache for storing and reusing TRT engines
         self.engine_cache = engine_cache
@@ -198,6 +209,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         tactic_sources: Optional[int] = None,
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
+
+        # Enable TRT's native multi-device runtime preview feature when the
+        # Torch-TRT runtime was built with NCCL collectives support. Without
+        # this, IBuilder::buildEngineWithConfig() rejects networks that contain
+        # IDistCollectiveLayer with "PreviewFeature::kMULTIDEVICE_RUNTIME_10_16
+        # is not enabled in the builder config".
+        if ENABLED_FEATURES.native_trt_collectives and hasattr(
+            trt.PreviewFeature, "MULTIDEVICE_RUNTIME_10_16"
+        ):
+            builder_config.set_preview_feature(
+                trt.PreviewFeature.MULTIDEVICE_RUNTIME_10_16, True
+            )
 
         if self._debugger_config and self._debugger_config.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
@@ -386,216 +409,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
         )
 
-    @staticmethod
-    def find_weight(
-        weight_name: str,
-        weight_refit_map: dict[str, Any],
-        state_dict: dict[str, Any],
-        device: torch.device,
-    ) -> str:
-        """
-        We need to build map from engine weight name to state_dict weight name.
-        The purpose of this function is to find the corresponding weight name in module state_dict.
-
-        weight_name: the target weight name we want to search for
-        np_map: the map from weight name to np values in INetworkDefinition
-        state_dict: state of the graph module
-        """
-        with unset_fake_temporarily():
-            network_weight = weight_refit_map[weight_name].to(device)
-            for sd_w_name, sd_weight in state_dict.items():
-                if TRTInterpreter.check_weight_equal(sd_weight, network_weight, device):
-                    del state_dict[sd_w_name]
-                    return sd_w_name
-            return ""
-
-    @staticmethod
-    def check_weight_equal(
-        sd_weight: torch.tensor,
-        network_weight: Union[torch.Tensor, np.ndarray],
-        device: torch.device,
-    ) -> Any:
-        with unset_fake_temporarily():
-            if network_weight.device != device:
-                network_weight = network_weight.to(device)
-            try:
-                return sd_weight.shape == network_weight.shape and torch.all(
-                    torch.abs(sd_weight - network_weight) < 0.01
-                )
-            except Exception:
-                return torch.all(sd_weight == network_weight)
-
-    @needs_refit  # type: ignore
-    def _save_weight_mapping(self) -> None:
-        """
-        Construct the weight name mapping from engine weight name to state_dict weight name.
-        Cache the weight name for future refitting usecases.
-        Two-stage weight name tracing:
-        1. Name transformation from engine weight name to state_dict weight name
-        2. Value mapping that, for each weight in INetworkDefinition search for identical weight in state_dict
-        """
-
-        MODULE_MAP = {
-            "SCALE": (
-                trt.IScaleLayer,
-                [
-                    (
-                        "scale",
-                        "SCALE",
-                        ("weight", "bias", "running_mean", "running_var"),
-                    ),
-                    (
-                        "shift",
-                        "SHIFT",
-                        ("weight", "bias", "running_mean", "running_var"),
-                    ),
-                ],
-            ),
-            "CONVOLUTION": (
-                trt.IConvolutionLayer,
-                [("kernel", "KERNEL", "weight"), ("bias", "BIAS", "bias")],
-            ),
-            "DECONVOLUTION": (
-                trt.IDeconvolutionLayer,
-                [("kernel", "KERNEL", "weight"), ("bias", "BIAS", "bias")],
-            ),
-            "CONSTANT": (
-                trt.IConstantLayer,
-                [("weights", "CONSTANT", ("weight", "bias"))],
-            ),
-        }
-        """
-        The structure of this map is:
-        {
-            layer_type: (
-                Corresponding ILayer type to cast,
-                [
-                    (
-                        ILayer weight attribute,
-                        Weight name postfix in TRT Engine,
-                        Weight name postfix in state_dict
-                    ),
-                    ...
-                ]
-            )
-        }
-        """
-        _LOGGER.info("Building weight name mapping...")
-        # Stage 1: Name mapping
-        torch_device = to_torch_device(self.compilation_settings.device)
-        sd = {k: v.to(torch_device) for k, v in self.module.state_dict().items()}
-        weight_name_map: dict[str, Any] = {}
-        weight_refit_map = self.ctx.weight_refit_map
-        constant_mapping = {k: v for k, v in weight_refit_map.items() if v.numel() == 1}
-        net = self.ctx.net
-        for i in range(net.num_layers):
-            layer = net[i]
-            layer_type: str = layer.type.name
-            if layer_type in MODULE_MAP:
-                # Name mapping
-                for weight_type, weight_name, torch_attr in MODULE_MAP[layer_type][1]:
-                    engine_weight_name = f"{layer.name} {weight_name}"
-                    # Infer the corresponding weight name(s) in state_dict
-                    sd_weight_name_list = (
-                        layer.name.split("-")[-1]
-                        .replace("[", "")
-                        .replace("]", "")
-                        .split("/")
-                    )
-                    sd_weight_name: Any = ".".join(
-                        [i for i in sd_weight_name_list[:-1] if i]
-                    )
-                    suffix = sd_weight_name_list[-1]
-                    # Retrieve each weight name(s) in state_dict
-                    if layer_type == "CONSTANT":
-                        if (
-                            "embedding" in suffix
-                            or "weight" in suffix
-                            or "mm_other" in suffix
-                        ):
-                            sd_weight_name = f"{sd_weight_name}.weight"
-                        elif "running_mean" in suffix:
-                            sd_weight_name = f"{sd_weight_name}.running_mean"
-                        elif "running_var" in suffix:
-                            sd_weight_name = f"{sd_weight_name}.running_var"
-                        elif "bias" in suffix:
-                            sd_weight_name = f"{sd_weight_name}.bias"
-                        else:
-                            sd_weight_name = f"{sd_weight_name}.unknown"
-                    elif layer_type == "SCALE":
-                        # Batch norm needs all weights to calculate scale and shift
-                        sd_weight_name = [f"{sd_weight_name}.{n}" for n in torch_attr]
-                    else:
-                        sd_weight_name = f"{sd_weight_name}.{torch_attr}"
-
-                    if engine_weight_name in weight_refit_map:
-                        weight_name_map[engine_weight_name] = sd_weight_name
-
-        # Stage 2: Value mapping
-        for engine_weight_name, sd_weight_name in weight_name_map.items():
-            if "SCALE" in engine_weight_name:
-                # There is no direct connection in batch_norm layer. So skip it
-                pass
-            elif sd_weight_name not in sd or not TRTInterpreter.check_weight_equal(
-                sd[sd_weight_name], weight_refit_map[engine_weight_name], torch_device
-            ):
-                weight_name_map[engine_weight_name] = TRTInterpreter.find_weight(
-                    engine_weight_name, weight_refit_map, sd, torch_device
-                )
-                if (
-                    weight_name_map[engine_weight_name] != ""
-                    and engine_weight_name in constant_mapping
-                ):
-                    # If the weight is found in state_dict, remove it from constant_mapping
-                    del constant_mapping[engine_weight_name]
-
-            weight_name_map[engine_weight_name] = [
-                weight_name_map[engine_weight_name],
-                weight_refit_map[engine_weight_name].dtype,
-            ]
-
-        # Stage 3: Slice matching for unmatched non-scalar CONSTANT weights.
-        # complex_graph_detection unpacks complex buffers to real:
-        #   freqs (S,D complex64) → freqs_unpacked_complex (S,D,2 float32)
-        # The real and imag slices (freqs_unpacked_complex[...,0] and [...,1]) are
-        # embedded as separate TRT constants, but their shapes differ from the source
-        # buffer, so Stage 2 value matching fails. Here we try selecting each slice
-        # along the last dimension of every sd entry to find the match.
-        for engine_weight_name, val in list(weight_name_map.items()):
-            if not isinstance(val, list) or len(val) != 2:
-                continue
-            sd_weight_name, dtype_val = val
-            if sd_weight_name != "" or engine_weight_name not in weight_refit_map:
-                continue
-            ew_tensor = weight_refit_map[engine_weight_name].to(torch_device)
-            if ew_tensor.numel() <= 1:
-                continue  # scalars are handled via constant_mapping
-            matched = False
-            for sd_key, sd_tensor in sd.items():
-                if sd_tensor.dim() < 1 or sd_tensor.shape[-1] < 2:
-                    continue
-                last_dim = sd_tensor.dim() - 1
-                for idx in range(sd_tensor.shape[last_dim]):
-                    sd_slice = sd_tensor.select(last_dim, idx)
-                    if TRTInterpreter.check_weight_equal(
-                        sd_slice, ew_tensor, torch_device
-                    ):
-                        weight_name_map[engine_weight_name] = [
-                            (sd_key, last_dim, idx),
-                            dtype_val,
-                        ]
-                        matched = True
-                        break
-                if matched:
-                    break
-
-        weight_name_map["constant_mapping"] = constant_mapping
-        self.weight_name_map = weight_name_map
-
-        del weight_refit_map, sd
-        gc.collect()
-        torch.cuda.empty_cache()
-
     def run(
         self,
         strict_type_constraints: bool = False,
@@ -613,9 +426,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.debug(
             f"CPU memory usage after network construction: {get_cpu_memory_usage()} MB"
         )
-
-        if not self.compilation_settings.immutable_weights:
-            self._save_weight_mapping()
 
         if self.compilation_settings.offload_module_to_cpu:
             deallocate_module(self.module)
@@ -669,7 +479,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             cuda_engine,
             self._input_names,
             self._output_names,
-            self.weight_name_map,
             self.ctx.requires_output_allocator,
             self.ctx.requires_native_multidevice,
         )
@@ -697,6 +506,36 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         return trt_node
 
+    def _per_profile_shapes(
+        self, current_input: Input
+    ) -> List[Tuple[Sequence[int], Sequence[int], Sequence[int]]]:
+        """Return ``(min, opt, max)`` shapes for each optimization profile index.
+
+        - If multiple profiles are active and the input declares ``profiles``,
+          each entry uses the input's range at that profile index.
+        - If multiple profiles are active but the input has none (static-like
+          input reused across regimes), every entry repeats the union range.
+        - If no profiles are active, there is a single entry (the union range) —
+          the historical single-profile behavior.
+        """
+        assert isinstance(current_input.shape, dict)
+        union = (
+            current_input.shape["min_shape"],
+            current_input.shape["opt_shape"],
+            current_input.shape["max_shape"],
+        )
+        if not self.optimization_profile_count:
+            return [union]
+
+        result: List[Tuple[Sequence[int], Sequence[int], Sequence[int]]] = []
+        for i in range(self.optimization_profile_count):
+            if current_input.profiles and i < len(current_input.profiles):
+                prof = current_input.profiles[i]
+                result.append((prof["min_shape"], prof["opt_shape"], prof["max_shape"]))
+            else:
+                result.append(union)
+        return result
+
     def placeholder(self, target: str, args: Any, kwargs: Any) -> trt.ITensor:
         self._input_names.append(target)
         current_input = self.input_specs[self.input_specs_iter]
@@ -706,27 +545,43 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if current_input.shape_mode == Input._ShapeMode.DYNAMIC:
             assert isinstance(current_input.shape, dict)
             shape = []
-            min_shape = current_input.shape["min_shape"]
-            opt_shape = current_input.shape["opt_shape"]
-            max_shape = current_input.shape["max_shape"]
-            # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
-            assert len(min_shape) == len(opt_shape) == len(max_shape)
-            if current_input.is_shape_tensor:
-                # For shape_tensors, min/opt/max_shapes correspond to actual values
-                # of the shapes provided during runtime
-                self.optimization_profiles[0].set_shape_input(
-                    target, min_shape, opt_shape, max_shape
-                )
-                shape.append(len(opt_shape))
-            else:
-                self.optimization_profiles[0].set_shape(
-                    target, min_shape, opt_shape, max_shape
-                )
 
-                for i in range(len(min_shape)):
-                    if min_shape[i] == opt_shape[i] == max_shape[i]:
-                        shape.append(min_shape[i])
+            # Build the per-profile (min, opt, max) shapes for this input. Each
+            # TRT optimization profile index gets the input's corresponding
+            # profile range; inputs without profiles (e.g. static tensors reused
+            # across regimes) repeat their single union range in every profile.
+            per_profile_shapes = self._per_profile_shapes(current_input)
+
+            for profile_idx, opt_profile in enumerate(self.optimization_profiles):
+                min_shape, opt_shape, max_shape = per_profile_shapes[profile_idx]
+                assert len(min_shape) == len(opt_shape) == len(max_shape)
+                if current_input.is_shape_tensor:
+                    # For shape_tensors, min/opt/max_shapes correspond to actual
+                    # values of the shapes provided during runtime.
+                    opt_profile.set_shape_input(target, min_shape, opt_shape, max_shape)
+                else:
+                    opt_profile.set_shape(target, min_shape, opt_shape, max_shape)
+
+            # The INetwork input shape uses the union envelope to mark which
+            # dims are dynamic (-1). A dim is static only if it is identical
+            # across every profile's min/opt/max.
+            union_min = current_input.shape["min_shape"]
+            union_opt = current_input.shape["opt_shape"]
+            union_max = current_input.shape["max_shape"]
+            if current_input.is_shape_tensor:
+                shape.append(len(union_opt))
+            else:
+                for i in range(len(union_min)):
+                    dim_is_static = all(
+                        per_profile_shapes[p][0][i]
+                        == per_profile_shapes[p][1][i]
+                        == per_profile_shapes[p][2][i]
+                        == per_profile_shapes[0][0][i]
+                        for p in range(len(per_profile_shapes))
+                    )
+                    if dim_is_static:
+                        shape.append(union_min[i])
                     else:
                         # -1 to represent the dynamic dimension
                         shape.append(DYNAMIC_DIM)
@@ -791,6 +646,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_native_multidevice = True
             _LOGGER.debug(f"{target} requires native multi-device support")
 
+        self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=84daf132"></script>
+    <script src="../../../_static/documentation_options.js?v=d8482cd4"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -61,7 +61,7 @@
         </script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Handling Unsupported Operators" href="../../../user_guide/compilation/unsupported_ops.html" />
+    <link rel="next" title="Sharing Dynamic Dimensions Across Inputs" href="shared_dynamic_dims_example.html" />
     <link rel="prev" title="Dynamic shapes with Torch-TensorRT" href="../../../user_guide/compilation/dynamic_shapes.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -443,6 +443,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/compilation_settings.html">CompilationSettings Reference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shared_dynamic_dims_example.html">Example: Sharing Dynamic Dimensions Across Inputs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/compilation/unsupported_ops.html">Handling Unsupported Operators</a></li>
 </ul>
 </details></li>
@@ -451,11 +452,13 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/shapes_precision/quantization.html">Quantization (INT8 / FP8 / FP4)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantize_vit_fp8.html">Example: ViT FP8 Quantization</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../user_guide/runtime_performance/index.html">Runtime &amp; Serialization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/runtime_api.html">Runtime API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/runtime_settings.html">Runtime Settings (TensorRT-RTX)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/using_dla.html">DLA</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../user_guide/runtime_performance/serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
@@ -689,11 +692,11 @@ print(&quot;All three approaches produced identical results!&quot;)
       </div>
     </a>
     <a class="right-next"
-       href="../../../user_guide/compilation/unsupported_ops.html"
+       href="shared_dynamic_dims_example.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Handling Unsupported Operators</p>
+        <p class="prev-next-title">Sharing Dynamic Dimensions Across Inputs</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

@@ -11,19 +11,28 @@ from __future__ import annotations
 import base64
 import copy
 import logging
-import os
 import pickle
 import tempfile
 from contextlib import nullcontext
 from types import SimpleNamespace
-from typing import Any, ContextManager, Dict, List, Optional, Sequence, Tuple, cast
+from typing import (
+    Any,
+    ContextManager,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    cast,
+)
 
 import torch
 import torch.distributed as dist
 import torch_tensorrt
 from torch._library.opaque_object import register_opaque_type
 from torch._opaque_base import OpaqueBase
-from torch_tensorrt._enums import dtype
+from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -47,6 +56,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
+from torch_tensorrt.runtime._runtime_config import RuntimeSettings, TRTRuntimeConfig
 from torch_tensorrt.runtime._utils import (
     _is_switch_required,
     _select_rt_device,
@@ -57,6 +67,12 @@ from torch_tensorrt.runtime._utils import (
 import tensorrt as trt  # isort: skip
 
 logger = logging.getLogger(__name__)
+
+
+class _InputBindingInfo(NamedTuple):
+    name: str
+    expected_type: torch.dtype
+    is_shape_tensor: bool
 
 
 def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
@@ -238,19 +254,80 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
         self.resource_allocation_strategy = 0
-        # Initialized to ``None`` here so the destructor can safely save the
-        # cache even if ``_setup_engine`` never runs.
-        self.runtime_config: Any = None
-        self.runtime_cache: Any = None
         # When true, ``_execute_standard`` must skip manual torch.cuda.CUDAGraph
         # capture because TRT-RTX handles it internally.
         self._rtx_native_cudagraphs: bool = False
+        # Counts ``createExecutionContext`` invocations on this engine; each
+        # one (re)JITs the specialized kernel set on RTX, so tests assert on
+        # it. Mirrors ``TRTEngine::num_execution_contexts_created`` on the
+        # C++ side.
+        self._num_execution_contexts_created: int = 0
+        # Backing field for the ``context`` property. The property is the only
+        # API path to the IExecutionContext; lazy-creates on first read,
+        # rebuilds after ``invalidate_context()``. There is no setter, so
+        # external code cannot stash a stale or wrong-settings context here.
+        self._context: Optional[trt.IExecutionContext] = None
         # NCCL communicator is bound lazily on the first forward pass for
         # engines compiled with native multi-device collective layers.
         self._nccl_comm: Optional[Any] = None
 
+        # Owns RuntimeSettings + the live trt.IRuntimeConfig + the
+        # engine-implicit RuntimeCache. Hides all RTX feature gates.
+        # ``RuntimeSettings`` default; callers wanting non-defaults assign via
+        # the module's ``runtime_settings`` setter after compile.
+        self._trt_runtime_config: TRTRuntimeConfig = TRTRuntimeConfig(RuntimeSettings())
+        # Multiple optimization profiles. Manual selection by default:
+        # ``_active_profile_index`` is the profile currently loaded in the TRT
+        # context (default 0, reused across calls). ``_auto_select_profiles``
+        # opts into shape-based selection, re-evaluated on every forward.
+        self._active_profile_index = 0
+        self._auto_select_profiles = False
+
         self._load_serialized_info(serialized_info)
         self._setup_engine()
+
+    # --- public property forwards ---
+
+    @property
+    def runtime_settings(self) -> RuntimeSettings:
+        """The current ``RuntimeSettings`` for this engine.
+
+        Backed by ``self._trt_runtime_config.settings``; mutations go through
+        :meth:`update_runtime_settings`.
+        """
+        return self._trt_runtime_config.settings
+
+    @property
+    def runtime_config(self) -> Any:
+        """The live ``trt.IRuntimeConfig`` (or ``None`` on non-RTX builds)."""
+        return self._trt_runtime_config._live
+
+    @property
+    def context(self) -> trt.IExecutionContext:
+        """Lazily-materialized ``IExecutionContext``.
+
+        Reads create the context on first access; ``invalidate_context()``
+        drops the cached one. The property is the only path in: there is no
+        setter (write raises ``AttributeError``), so external code cannot
+        bypass the laziness or stash a stale/wrong-settings context.
+
+        Mirrors the cpp ``TRTEngine::exec_ctx()`` getter.
+        """
+        if self._context is None:
+            self._context = self._create_execution_context()
+        return self._context
+
+    def invalidate_context(self) -> None:
+        """Drop the live execution context. Next ``self.context`` read
+        rebuilds it with the then-current ``runtime_settings``. Called from
+        every settings-mutation path so reads of ``self.context`` always
+        observe up-to-date settings."""
+        self._context = None
+
+    def has_context(self) -> bool:
+        """True iff the execution context has been materialized. Probes
+        WITHOUT triggering creation; intended for tests/introspection."""
+        return self._context is not None
 
     def __del__(self) -> None:
         self.close()
@@ -304,14 +381,19 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
         self.resource_allocation_strategy = 0
-        # See ``__init__`` for the rationale: pre-init these so a destructor
-        # firing on a partially-loaded engine never trips an ``AttributeError``.
-        self.runtime_config = None
-        self.runtime_cache = None
         self._rtx_native_cudagraphs = False
+        self._num_execution_contexts_created = 0
+        self._context = None
         # NCCL communicators cannot be pickled; rebind lazily on the next
         # forward pass via setup_nccl_comm().
         self._nccl_comm = None
+        # RuntimeSettings are NOT serialized -- restore defaults. Callers
+        # who want runtime-mode overrides must reapply them post-load via
+        # ``mod.runtime_settings = ...`` (per ``TorchTensorRTModule``) or a runtime CM.
+        self._trt_runtime_config = TRTRuntimeConfig(RuntimeSettings())
+
+        self._active_profile_index = 0
+        self._auto_select_profiles = False
 
         serialized_info = list(state[0])
         engine_field = serialized_info[ENGINE_IDX]
@@ -373,7 +455,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         metadata = self.decode_metadata(self.serialized_metadata)
         self.settings = metadata.get("settings", CompilationSettings())
-        self.weight_name_map = metadata.get("weight_name_map")
         self.symbolic_shape_expressions = metadata.get("inout_symexprs")
         self.output_tensors_are_unowned = metadata.get(
             "output_tensors_are_unowned", False
@@ -400,45 +481,61 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self.serialized_metadata
 
     def close(self) -> None:
-        """Persist the runtime cache and release CUDA graph resources."""
-        self._save_runtime_cache()
+        """Release CUDA graph resources."""
         self.reset_captured_graph()
 
     def _create_execution_context(self) -> trt.IExecutionContext:
-        if ENABLED_FEATURES.tensorrt_rtx:
-            assert self.runtime_config is not None
-            context = self.cuda_engine.create_execution_context(self.runtime_config)
-        else:
-            strategy = (
-                trt.ExecutionContextAllocationStrategy.USER_MANAGED
-                if self.resource_allocation_strategy
-                else trt.ExecutionContextAllocationStrategy.STATIC
-            )
-            context = self.cuda_engine.create_execution_context(strategy)
+        alloc_strategy = (
+            trt.ExecutionContextAllocationStrategy.USER_MANAGED
+            if self.resource_allocation_strategy
+            else trt.ExecutionContextAllocationStrategy.STATIC
+        )
+        context = self._trt_runtime_config.create_execution_context(
+            self.cuda_engine, alloc_strategy
+        )
         assert context is not None, "Failed to create execution context"
+        self._num_execution_contexts_created += 1
         return context
+
+    def num_execution_contexts_created(self) -> int:
+        """Number of TRT ``createExecutionContext`` invocations on this engine.
+
+        Each call (re)JITs the specialized kernel set on RTX, so this is the
+        canonical counter for the setup-cost regression test.
+        """
+        return self._num_execution_contexts_created
 
     def _setup_engine(self) -> None:
         multi_gpu_device_check()
+        if self.serialized_target_platform == str(Platform.UNKNOWN):
+            raise RuntimeError(
+                "The serialized TensorRT engine target platform is unknown. "
+                "Torch-TensorRT cannot verify that the engine matches the loaded TensorRT runtime platform."
+            )
+
+        current_platform = str(Platform.current_platform())
+        if self.serialized_target_platform != current_platform:
+            raise RuntimeError(
+                "TensorRT engine was not built to target the loaded TensorRT runtime platform "
+                f"(target: {self.serialized_target_platform}, current: {current_platform})"
+            )
+
         self.runtime = trt.Runtime(TRT_LOGGER)
         self.cuda_engine = self.runtime.deserialize_cuda_engine(self.serialized_engine)
-        assert self.cuda_engine is not None, "Failed to deserialize TensorRT engine"
+        if self.cuda_engine is None:
+            raise RuntimeError("Unable to deserialize the TensorRT engine")
 
         if self.cuda_engine.streamable_weights_size > 0:
             budget_bytes = self.cuda_engine.get_weight_streaming_automatic_budget()
             logger.debug(f"Weight streaming budget set to {budget_bytes}B")
             self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
 
-        # On TensorRT-RTX, build the IRuntimeConfig (runtime cache,
-        # dynamic-shape kernel specialization strategy, and CUDA graph
-        # strategy) up front so the one-and-only execution context picks it up.
-        if ENABLED_FEATURES.tensorrt_rtx:
-            self._setup_runtime_config()
-            self._rtx_native_cudagraphs = (
-                self.settings.cuda_graph_strategy != "disabled"
-            )
-
-        self.context = self._create_execution_context()
+        # IExecutionContext is created lazily on first ``self.context`` read.
+        # Track the cudagraph-disabled-or-not state for the ``_execute_standard``
+        # path to consult.
+        self._rtx_native_cudagraphs = ENABLED_FEATURES.tensorrt_rtx and (
+            self.runtime_settings.cuda_graph_strategy != "disabled"
+        )
 
         if self._has_nccl_ops:
             from torch_tensorrt.distributed._nccl_utils import (
@@ -449,9 +546,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
             # For engines with native NCCL collective layers, all ranks must
             # have a live IExecutionContext before any rank executes a
-            # collective. Barrier here so a fast-compiling rank does not race
-            # ahead and issue an NCCL op while another rank is still inside
+            # collective. Materialize the context up front (mirrors the C++
+            # ctor's eager bind_nccl_comm path) and barrier so a fast-compiling
+            # rank does not race ahead
+            # and issue an NCCL op while another rank is still inside
             # deserialize_cuda_engine / create_execution_context.
+            #
+            # Trade-off: NCCL engines forfeit the "one createExecutionContext
+            # per setup" invariant the non-NCCL path enjoys. Any subsequent
+            # ``mod.runtime_settings = ...`` invalidates this eagerly-created
+            # context and triggers a second create on next execute.
+            _ = self.context  # property triggers create_execution_context
+
             if (
                 dist.is_available()
                 and dist.is_initialized()
@@ -483,6 +589,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             dtype._from(self.cuda_engine.get_tensor_dtype(input_name)).to(torch.dtype)
             for input_name in self.in_binding_names
         ]
+        self._input_binding_infos = [
+            _InputBindingInfo(
+                input_name,
+                self.input_dtypes[idx],
+                self.cuda_engine.is_shape_inference_io(input_name),
+            )
+            for idx, input_name in enumerate(self.in_binding_names)
+        ]
         self.output_dtypes = [
             dtype._from(self.cuda_engine.get_tensor_dtype(output_name)).to(torch.dtype)
             for output_name in self.out_binding_names
@@ -496,123 +610,204 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             for output_name in self.out_binding_names
         ]
         self.is_shape_inference_io = {
-            input_name: self.cuda_engine.is_shape_inference_io(input_name)
-            for input_name in self.in_binding_names
+            binding.name: binding.is_shape_tensor
+            for binding in self._input_binding_infos
         }
+        self._setup_optimization_profiles()
         if self.requires_output_allocator:
             self.create_output_allocator()
 
-    # --- TensorRT-RTX ---
+    # --- TensorRT-RTX runtime-config delegation ---
 
-    def _setup_runtime_config(self) -> None:
-        """Build an ``IRuntimeConfig`` with runtime cache and dynamic-shape strategy.
+    def update_runtime_settings(self, new_settings: RuntimeSettings) -> None:
+        """Apply new ``RuntimeSettings`` to this engine.
 
-        The runtime cache stores JIT compilation results so kernel/graph
-        compilation is not repeated across inference runs. The dynamic-shape
-        kernel specialization strategy controls how the JIT compiles
-        shape-specialized kernels (``lazy``, ``eager``, or ``none``).
+        Fast-paths on equality via ``TRTRuntimeConfig.set_settings``. On
+        change, the prior implicit cache (if any) is saved, the live
+        ``IRuntimeConfig`` is invalidated, and the ``IExecutionContext`` is
+        invalidated -- the next ``self.context`` read rebuilds it with the
+        new settings.
         """
-        self.runtime_config = self.cuda_engine.create_runtime_config()
-        alloc_strategy = (
-            trt.ExecutionContextAllocationStrategy.USER_MANAGED
-            if self.resource_allocation_strategy
-            else trt.ExecutionContextAllocationStrategy.STATIC
-        )
-        self.runtime_config.set_execution_context_allocation_strategy(alloc_strategy)
-        self.runtime_config.dynamic_shapes_kernel_specialization_strategy = (
-            _get_dynamic_shapes_kernel_strategy(
-                self.settings.dynamic_shapes_kernel_specialization_strategy
-            )
-        )
-        logger.info(
-            "Dynamic shapes kernel specialization strategy: "
-            f"{self.settings.dynamic_shapes_kernel_specialization_strategy}"
-        )
-        self.runtime_config.cuda_graph_strategy = _get_cuda_graph_strategy(
-            self.settings.cuda_graph_strategy
-        )
-        logger.info(f"CUDA graph strategy: {self.settings.cuda_graph_strategy}")
-        self.runtime_cache = self.runtime_config.create_runtime_cache()
-        self._load_runtime_cache()
-        self.runtime_config.set_runtime_cache(self.runtime_cache)
-        logger.info("TensorRT-RTX runtime cache configured")
-
-    def _load_runtime_cache(self) -> None:
-        """Load runtime cache from disk if it exists (with a shared file lock)."""
-        if self.runtime_cache is None:
+        if not self._trt_runtime_config.set_settings(new_settings):
             return
-        cache_path = self.settings.runtime_cache_path
-        if not os.path.isfile(cache_path):
-            logger.debug(f"No existing runtime cache at {cache_path}")
-            return
-        try:
-            from filelock import FileLock
-
-            lock = FileLock(cache_path + ".lock")
-            with lock.acquire(timeout=10):
-                with open(cache_path, "rb") as f:
-                    data = f.read()
-            if data:
-                self.runtime_cache.deserialize(data)
-                logger.info(f"Loaded runtime cache from {cache_path}")
-        except Exception as e:
-            logger.warning(f"Failed to load runtime cache: {e}")
-
-    def _save_runtime_cache(self) -> None:
-        """Save runtime cache to disk (with an exclusive file lock)."""
-        if self.runtime_cache is None:
-            return
-        try:
-            host_mem = self.runtime_cache.serialize()
-            if host_mem is None:
-                return
-            cache_path = self.settings.runtime_cache_path
-            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-
-            from filelock import FileLock
-
-            lock = FileLock(cache_path + ".lock")
-            with lock.acquire(timeout=10):
-                with open(cache_path, "wb") as f:
-                    f.write(memoryview(host_mem))
-            logger.info(f"Saved runtime cache to {cache_path}")
-        except Exception as e:
-            logger.warning(f"Failed to save runtime cache: {e}")
+        self.invalidate_context()
+        self._rtx_native_cudagraphs = ENABLED_FEATURES.tensorrt_rtx and (
+            self.runtime_settings.cuda_graph_strategy != "disabled"
+        )
+        self.runtime_states.context_changed = True
 
     def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
-        """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe.
-
-        On RTX, unsafe when the TRT-RTX context is not stream-capturable, or
-        when ``"lazy"`` kernel specialization can still fire (dynamic inputs).
-        """
-        if not ENABLED_FEATURES.tensorrt_rtx:
-            return True
+        """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe."""
         has_dynamic_input = any(DYNAMIC_DIM in shape for shape in self.input_shapes)
-        not_capturable = (
-            not self.context.is_stream_capturable(stream.cuda_stream),
-            (
-                self.settings.dynamic_shapes_kernel_specialization_strategy == "lazy"
-                and has_dynamic_input
-            ),
+        return self._trt_runtime_config.is_monolithic_capturable(
+            has_dynamic_input, self.context, stream
         )
-        return not any(not_capturable)
 
     def _enable_rtx_native_cudagraphs(self) -> None:
         """Switch this engine to TRT-RTX native CUDA graphs.
 
-        Sets the runtime config's ``cuda_graph_strategy`` to
-        ``WHOLE_GRAPH_CAPTURE`` and rebuilds the execution context so it
-        picks up the new strategy. No-op on non-RTX or when the runtime
-        config is not present.
+        Mutates settings via ``update_runtime_settings`` so the prior cache is
+        saved + a fresh context is created uniformly. No-op on non-RTX builds.
         """
-        if self.runtime_config is None:
+        if not ENABLED_FEATURES.tensorrt_rtx:
             return
-        self.runtime_config.cuda_graph_strategy = _get_cuda_graph_strategy(
-            "whole_graph_capture"
+        new_settings = self.runtime_settings.merge(
+            cuda_graph_strategy="whole_graph_capture"
         )
-        self.context = self._create_execution_context()
-        self._rtx_native_cudagraphs = True
+        self.update_runtime_settings(new_settings)
         logger.info("Switched to TRT-RTX native CUDA graphs")
+
+    def _setup_optimization_profiles(self) -> None:
+        """Cache per-profile shape ranges for the dynamic input dims from the TRT API.
+
+        Rebuilds the profile bounds via ``get_tensor_profile_shape`` so that
+        runtime profile selection works for engines compiled in-process, loaded
+        from cache, or deserialized from disk — no new serialization fields.
+        Populates:
+
+        - ``_profile_dynamic_dims``: a list indexed by input binding position
+          (parallel to ``in_binding_names``, reusing the same positional input ->
+          binding mapping the rest of the runtime relies on). Each entry is
+          ``[(dim_index, [(min, max), ...]), ...]`` storing only dims that vary
+          within a profile (``min != max``) or differ across profiles. A dim with
+          the same fixed extent in every profile cannot distinguish profiles, so
+          it is omitted (and validated later by TRT at ``set_input_shape``).
+          Shape-inference IO and all-static inputs get an empty list, so
+          auto-selection skips them by index with no name lookup.
+        """
+        self.num_optimization_profiles = self.cuda_engine.num_optimization_profiles
+        self._profile_dynamic_dims: List[List[Tuple[int, List[Tuple[int, int]]]]] = []
+
+        if self.num_optimization_profiles <= 1:
+            return
+
+        self._profile_dynamic_dims = [[] for _ in self._input_binding_infos]
+        for i, binding in enumerate(self._input_binding_infos):
+            name = binding.name
+            if binding.is_shape_tensor:
+                continue
+            # Gather [min, max] for every dim across every profile:
+            # dim -> [profile] -> (min, max).
+            per_dim: List[List[Tuple[int, int]]] = []
+            for p in range(self.num_optimization_profiles):
+                rmin, _, rmax = self.cuda_engine.get_tensor_profile_shape(name, p)
+                if not per_dim:
+                    per_dim = [[] for _ in range(len(rmin))]
+                for d, (lo, hi) in enumerate(zip(rmin, rmax)):
+                    per_dim[d].append((int(lo), int(hi)))
+            # Keep only dims that can distinguish profiles.
+            dynamic_dims: List[Tuple[int, List[Tuple[int, int]]]] = []
+            for d, ranges in enumerate(per_dim):
+                is_dynamic = any(
+                    lo != hi or (lo, hi) != ranges[0] for (lo, hi) in ranges
+                )
+                if is_dynamic:
+                    dynamic_dims.append((d, ranges))
+            self._profile_dynamic_dims[i] = dynamic_dims
+
+    # --- optimization profile selection ---
+
+    def set_active_profile(self, profile_index: int) -> None:
+        """Make ``profile_index`` the active TRT optimization profile (idempotent).
+
+        Manual-pin / public entry point: this runs outside ``_prepare_streams``'
+        stream choreography, so the switch's async copies aren't otherwise ordered
+        against the (later, separate) enqueue. Resolve the current stream and fully
+        synchronize to make the switch safe. Rare and not perf-critical. Mirrors
+        the C++ runtime.
+        """
+        stream = torch.cuda.current_stream(self._target_device)
+        self._set_active_profile_with_stream(profile_index, stream)
+        stream.synchronize()
+
+    def _set_active_profile_with_stream(
+        self, profile_index: int, stream: torch.cuda.Stream
+    ) -> None:
+        """Core profile switch issued on ``stream`` with no host synchronize.
+
+        The caller must guarantee a happens-before to the enqueue (e.g. issue on
+        the enqueue stream). Used by auto-selection, which switches on
+        ``_engine_stream`` before ``execute_async_v3``. Mirrors the C++ runtime.
+        """
+        if self.num_optimization_profiles <= 1:
+            return
+        if profile_index == self._active_profile_index:
+            return
+        self.context.set_optimization_profile_async(profile_index, stream.cuda_stream)
+        self._active_profile_index = profile_index
+        # A profile switch invalidates any captured CUDA graph and changes the
+        # context state, so force re-record / shape re-inference next run.
+        self.runtime_states.context_changed = True
+        self.reset_captured_graph()
+        self.shape_key = None
+        logger.debug(f"Switched to optimization profile index {profile_index}")
+
+    def _profile_fits(self, profile_index: int, inputs: Sequence[torch.Tensor]) -> bool:
+        """Whether every input's dynamic dims fit ``profile_index``'s ranges.
+
+        Indexed positionally by input (``inputs[i]`` <-> ``in_binding_names[i]``,
+        the same convention the rest of the runtime uses); empty entries
+        (shape-inference IO / all-static inputs) are skipped with no name lookup.
+        Static dims are not cached (they cannot distinguish profiles) and are
+        validated later by TRT at ``set_input_shape``.
+
+        Example ``_profile_dynamic_dims`` for an image input ``(1, 3, H, W)`` with
+        H/W dynamic across 3 profiles plus a fully-static second input::
+
+            self._profile_dynamic_dims = [
+                # input 0: dims 2 (H), 3 (W) vary; dims 0 (N=1) and 1 (channels=3) fixed -> omitted
+                [
+                    (2, [(224, 224), (256, 512), (256, 512)]),  # H   ranges for profiles 0,1,2
+                    (3, [(224, 224), (256, 512), (256, 512)]),  # W
+                ],
+                # input 1: fully static (and/or shape-inference IO) -> empty, skipped
+                [],
+            ]
+        """
+        num_to_check = min(len(inputs), len(self._profile_dynamic_dims))
+        for i in range(num_to_check):
+            dynamic_dims = self._profile_dynamic_dims[i]
+            if not dynamic_dims:
+                continue
+            shape = tuple(int(s) for s in inputs[i].shape)
+            for dim_index, ranges in dynamic_dims:
+                if dim_index < len(shape):
+                    lo, hi = ranges[profile_index]
+                    if not (lo <= shape[dim_index] <= hi):
+                        return False
+        return True
+
+    def _auto_select_profile(self, inputs: Sequence[torch.Tensor]) -> int:
+        """Select and activate the optimization profile for ``inputs``.
+
+        Keeps the currently active profile when it still fits, so alternating
+        shapes (e.g. decode/prefill) don't thrash between equally-valid profiles
+        (a switch invalidates the captured CUDA graph and forces shape
+        re-inference). Otherwise switches to the **first** profile whose
+        ``[min, max]`` ranges contain every input's dynamic dims, so overlapping
+        profiles resolve to the lowest matching index; pin manually via
+        ``optimization_profile(module, index)`` to force a specific profile. Owns
+        the switch (no-op when the active profile already fits) so callers need no
+        follow-up, and returns the resulting active profile index.
+        """
+        if self._profile_fits(self._active_profile_index, inputs):
+            return self._active_profile_index
+        # Switch on the engine stream so the change is ordered before the enqueue
+        # on that same stream (no host synchronize needed). _engine_stream is set
+        # by _prepare_streams on the execution paths; fall back to the current
+        # stream for out-of-band callers that haven't resolved an engine stream.
+        stream = self._engine_stream or torch.cuda.current_stream(self._target_device)
+        for p in range(self.num_optimization_profiles):
+            if self._profile_fits(p, inputs):
+                self._set_active_profile_with_stream(p, stream)
+                return p
+
+        raise RuntimeError(
+            "No optimization profile matches the input shapes "
+            f"{[tuple(t.shape) for t in inputs]}. Cached dynamic profile ranges: "
+            f"{self._profile_dynamic_dims}. Fix the input shapes or pin a profile "
+            "explicitly via optimization_profile(module, index)."
+        )
 
     # --- distributed / NCCL ---
 
@@ -656,23 +851,25 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         self._nccl_comm = comm_ptr
 
-        # Bind communicator to TRT execution context (PyCapsule required by TRT Python API)
-        if self.context is not None:
-            import ctypes
+        # Bind communicator to TRT execution context (PyCapsule required by TRT
+        # Python API). ``self.context`` is the lazy-create property; reading it
+        # here materializes the context if it hasn't been created yet (mirrors
+        # the cpp ``bind_nccl_comm`` path which also ensures the context first).
+        import ctypes
 
-            ctypes.pythonapi.PyCapsule_New.restype = ctypes.py_object
-            ctypes.pythonapi.PyCapsule_New.argtypes = [
-                ctypes.c_void_p,
-                ctypes.c_char_p,
-                ctypes.c_void_p,
-            ]
-            comm_capsule = ctypes.pythonapi.PyCapsule_New(comm_ptr, None, None)
-            ok = self.context.set_communicator(comm_capsule)
-            if not ok:
-                raise RuntimeError(
-                    f"TRT context.set_communicator() returned False for rank={dist.get_rank()}. "
-                    f"comm_ptr={comm_ptr:#x}. Failed to bind NCCL communicator to TRT execution context."
-                )
+        ctypes.pythonapi.PyCapsule_New.restype = ctypes.py_object
+        ctypes.pythonapi.PyCapsule_New.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_void_p,
+        ]
+        comm_capsule = ctypes.pythonapi.PyCapsule_New(comm_ptr, None, None)
+        ok = self.context.set_communicator(comm_capsule)
+        if not ok:
+            raise RuntimeError(
+                f"TRT context.set_communicator() returned False for rank={dist.get_rank()}. "
+                f"comm_ptr={comm_ptr:#x}. Failed to bind NCCL communicator to TRT execution context."
+            )
 
         logger.info(
             f"NCCL comm set up (rank={dist.get_rank()}, world_size={dist.get_world_size()})"
@@ -696,10 +893,27 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def device_memory_budget(self, budget_bytes: int) -> None:
         if budget_bytes < 0:
             budget_bytes = self.streamable_device_memory_budget
+        # TRT 11+ rejects setWeightStreamingBudgetV2 while a live
+        # IExecutionContext exists (its use_count must be 1). A captured
+        # cudagraph also keeps the context alive, so drop the graph first and
+        # then the context -- matching the C++ TRTEngine::set_device_memory_budget.
+        self.reset_captured_graph()
+        self.invalidate_context()
         self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
         if self.cuda_engine.weight_streaming_budget_v2 != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
-        self.context = self._create_execution_context()
+        # Eagerly materialise the replacement context now rather than letting
+        # the next forward build it lazily: a lazy create_execution_context()
+        # during torch.cuda.graph(...) capture performs GPU allocations that
+        # break the capture when the budget changes while cudagraphs are
+        # enabled (see test_weight_streaming_cudagraphs / test_runtime_state_change).
+        # When profiling is on, route through enable_profiling() so the profiler
+        # -- which lives on the context and was dropped by invalidate_context()
+        # -- is re-attached to the fresh context.
+        if self._profile_execution:
+            self.enable_profiling()
+        else:
+            _ = self.context
         self.runtime_states.context_changed = True
 
     def reset_captured_graph(self) -> None:
@@ -712,14 +926,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if self.resource_allocation_strategy == new_strategy:
             return
         self.resource_allocation_strategy = new_strategy
-        self.context = self._create_execution_context()
+        self.invalidate_context()
         self.runtime_states.context_changed = True
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         self.output_tensors_are_unowned = enabled
 
     def are_output_tensors_unowned(self) -> bool:
-        return self.output_tensors_are_unowned
+        return bool(self.output_tensors_are_unowned)
 
     # --- profiling / inspection ---
 
@@ -734,7 +948,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
     def disable_profiling(self) -> None:
         torch.cuda.synchronize()
-        self.context = self._create_execution_context()
+        self.invalidate_context()
         self._profile_execution = False
         self.runtime_states.context_changed = True
 
@@ -794,16 +1008,17 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         cudagraphs_enabled: bool,
         need_cudagraphs_record: bool,
     ) -> None:
-        for i, input_name in enumerate(self.in_binding_names):
+        for i, binding in enumerate(self._input_binding_infos):
+            input_name = binding.name
 
             assert (
-                contiguous_inputs[i].dtype == self.input_dtypes[i]
-            ), f"Dtype mismatch for input {input_name}. Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
+                contiguous_inputs[i].dtype == binding.expected_type
+            ), f"Dtype mismatch for input {input_name}. Expect {binding.expected_type}, got {contiguous_inputs[i].dtype}."
 
             if need_cudagraphs_record:
                 self._input_buffers[i] = contiguous_inputs[i].clone()
 
-            if self.is_shape_inference_io[input_name]:
+            if binding.is_shape_tensor:
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
@@ -882,7 +1097,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         ):
             # Captured CUDA graph was recorded against the old stream.
             self.runtime_states.context_changed = True
-        return caller_on_default
+        return bool(caller_on_default)
+
+    def _active_streams(self) -> Tuple[torch.cuda.Stream, torch.cuda.Stream]:
+        assert self._engine_stream is not None
+        assert self._caller_stream is not None
+        return self._engine_stream, self._caller_stream
 
     def _execute_standard(
         self, contiguous_inputs: List[torch.Tensor]
@@ -896,9 +1116,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             logger.warning(
                 "Manual CUDA graph capture is not guaranteed to work on "
                 "TRT-RTX (lazy kernel specialization or non-capturable "
-                "stream). Switching to TRT-RTX native CUDA graphs. Set "
-                'cuda_graph_strategy="whole_graph_capture" at compile '
-                "time to avoid this warning."
+                "stream). Switching to TRT-RTX native CUDA graphs. Apply "
+                'RuntimeSettings(cuda_graph_strategy="whole_graph_capture") '
+                "via the runtime_config CM or mod.runtime_settings setter "
+                "to avoid this warning."
             )
             self._enable_rtx_native_cudagraphs()
 
@@ -913,7 +1134,22 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # cudagraph recapture (set_runtime_states consumes and resets the
         # flag).
         caller_on_default = self._prepare_streams(contiguous_inputs)
+        engine_stream, caller_stream = self._active_streams()
+        # Validate shapes first so auto-selection is skipped entirely when the
+        # input shape is unchanged: the previously selected profile still fits, so
+        # it stays active. When the shape did change, _auto_select_profile keeps
+        # the active profile if it still fits (no-op) or switches otherwise; a
+        # switch sets context_changed (consumed by set_runtime_states regardless
+        # of order) and shape_changed is already true here. Manual pins are
+        # applied eagerly in set_optimization_profile, so only auto needs per-call
+        # selection.
         shape_changed = self.validate_input_shapes(contiguous_inputs)
+        if (
+            shape_changed
+            and self.num_optimization_profiles > 1
+            and self._auto_select_profiles
+        ):
+            self._auto_select_profile(contiguous_inputs)
         (
             need_cudagraphs_record,
             can_use_pre_allocated_outputs,
@@ -970,8 +1206,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
         with self._profile_section("TRTEngine:TensorRTRuntime"):
             if caller_on_default:
-                self._engine_stream.wait_stream(self._caller_stream)
-            with torch.cuda.stream(self._engine_stream):
+                engine_stream.wait_stream(caller_stream)
+            with torch.cuda.stream(engine_stream):
                 if self.resource_allocation_strategy:
                     self._dynamic_workspace = torch.empty(
                         self.cuda_engine.device_memory_size_v2,
@@ -985,22 +1221,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                         self.cudagraph = torch.cuda.CUDAGraph()
                         if self._profile_execution:
                             self.cudagraph.enable_debug_mode()
-                        with torch.cuda.graph(
-                            self.cudagraph, stream=self._engine_stream
-                        ):
-                            self.context.execute_async_v3(
-                                self._engine_stream.cuda_stream
-                            )
+                        with torch.cuda.graph(self.cudagraph, stream=engine_stream):
+                            self.context.execute_async_v3(engine_stream.cuda_stream)
                         if self._profile_execution:
                             self.cudagraph.debug_dump(
                                 f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
                             )
                     self.cudagraph.replay()  # type: ignore[union-attr]
                 else:
-                    self.context.execute_async_v3(self._engine_stream.cuda_stream)
+                    self.context.execute_async_v3(engine_stream.cuda_stream)
 
             if caller_on_default:
-                self._caller_stream.wait_stream(self._engine_stream)
+                caller_stream.wait_stream(engine_stream)
 
         if self.use_pre_allocated_outputs and (
             self.output_tensors_are_unowned
@@ -1026,6 +1258,23 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 "incompatible runtime modes. Please disable one of the two."
             )
 
+        # Resolve the engine stream first so the optimization-profile switch below
+        # is applied after the stream is chosen (mirrors the C++ runtime ordering).
+        caller_on_default = self._prepare_streams(contiguous_inputs)
+
+        # Validate shapes first so auto-selection is skipped entirely when the
+        # input shape is unchanged: the previously selected profile still fits.
+        # When the shape did change, _auto_select_profile keeps the active profile
+        # if it still fits (no-op) or switches otherwise. Manual pins are applied
+        # eagerly, so only auto needs per-call selection.
+        shape_changed = self.validate_input_shapes(contiguous_inputs)
+        if (
+            shape_changed
+            and self.num_optimization_profiles > 1
+            and self._auto_select_profiles
+        ):
+            self._auto_select_profile(contiguous_inputs)
+
         with self._profile_section("TRTEngine:ProcessInputs"):
             self.setup_input_tensors(contiguous_inputs, False, False)
 
@@ -1040,14 +1289,15 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                     )
 
         caller_on_default = self._prepare_streams(contiguous_inputs)
+        engine_stream, caller_stream = self._active_streams()
 
         with self._profile_section("TRTEngine:TensorRTRuntime"):
             if caller_on_default:
-                self._engine_stream.wait_stream(self._caller_stream)
-            with torch.cuda.stream(self._engine_stream):
-                self.context.execute_async_v3(self._engine_stream.cuda_stream)
+                engine_stream.wait_stream(caller_stream)
+            with torch.cuda.stream(engine_stream):
+                self.context.execute_async_v3(engine_stream.cuda_stream)
             if caller_on_default:
-                self._caller_stream.wait_stream(self._engine_stream)
+                caller_stream.wait_stream(engine_stream)
 
         outputs = []
         assert self.output_allocator is not None

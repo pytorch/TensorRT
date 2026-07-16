@@ -1,10 +1,14 @@
 import ast
 import importlib
 import sys
+import types
 from pathlib import Path
 
 import pytest
 import torch
+from torch._library.fake_class_registry import FakeScriptObject
+
+from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
 
 
 @pytest.mark.unit
@@ -144,3 +148,121 @@ def test_executorch_headers_are_not_dlfw_gated():
         isinstance(node, ast.Name) and node.id == "IS_DLFW_CI"
         for node in ast.walk(header_package_data)
     )
+
+
+def _stub_node(name, target=None):
+    return types.SimpleNamespace(name=name, target=name if target is None else target)
+
+
+def _stub_exported_program(constants, name_to_fqn=None):
+    sig = (
+        None
+        if name_to_fqn is None
+        else types.SimpleNamespace(inputs_to_lifted_custom_objs=name_to_fqn)
+    )
+    return types.SimpleNamespace(constants=constants, graph_signature=sig)
+
+
+@pytest.mark.unit
+def test_resolve_lifted_custom_obj_via_signature_fqn():
+    # Modern torch.export: placeholder name differs from the constants FQN key.
+    sentinel = object()
+    ep = _stub_exported_program({"engine_fqn": sentinel}, {"obj_engine": "engine_fqn"})
+    assert _resolve_lifted_custom_obj(ep, _stub_node("obj_engine")) is sentinel
+
+
+@pytest.mark.unit
+def test_resolve_lifted_custom_obj_legacy_fallback():
+    # No signature mapping: fall back to a direct name/target lookup.
+    sentinel = object()
+    ep = _stub_exported_program({"engine": sentinel}, name_to_fqn=None)
+    assert _resolve_lifted_custom_obj(ep, _stub_node("engine")) is sentinel
+
+
+@pytest.mark.unit
+def test_resolve_lifted_custom_obj_signature_present_name_absent_is_none():
+    # A present-but-incomplete mapping must not bind a different object by name.
+    ep = _stub_exported_program({"engine": object()}, {"some_other_obj": "x"})
+    assert _resolve_lifted_custom_obj(ep, _stub_node("engine")) is None
+
+
+@pytest.mark.unit
+def test_resolve_lifted_custom_obj_missing_is_none():
+    ep = _stub_exported_program({}, name_to_fqn=None)
+    assert _resolve_lifted_custom_obj(ep, _stub_node("missing")) is None
+
+
+@pytest.mark.unit
+def test_resolve_lifted_custom_obj_unwraps_fake_script_object():
+    class _Real:
+        pass
+
+    fake = FakeScriptObject(object(), "Engine", _Real())
+    ep = _stub_exported_program({"engine_fqn": fake}, {"obj_engine": "engine_fqn"})
+    resolved = _resolve_lifted_custom_obj(ep, _stub_node("obj_engine"))
+    assert not isinstance(resolved, FakeScriptObject)
+    assert isinstance(resolved, _Real)
+
+
+# --- per-partition target_device (TensorRTPartitioner) -----------------------
+# These exercise the partitioner directly, so they need ExecuTorch installed;
+# they run in the dedicated executorch CI job and skip elsewhere.
+
+
+@pytest.mark.unit
+def test_resolve_target_device_uses_partition_engine(monkeypatch):
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
+    from torch_tensorrt.executorch import partitioner as P
+
+    part = P.TensorRTPartitioner()
+    engine_node = object()
+    monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [engine_node])
+    info = ["0"] * (DEVICE_IDX + 1)
+    info[DEVICE_IDX] = "2"
+    monkeypatch.setattr(P, "_get_engine_info_for_node", lambda ep, n: info)
+
+    partition = types.SimpleNamespace(id=0, nodes=[engine_node])
+    assert part._resolve_target_device_for_partition(object(), partition) == b"cuda:2"
+
+
+@pytest.mark.unit
+def test_resolve_target_device_falls_back_when_not_one_engine(monkeypatch):
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.executorch import partitioner as P
+
+    part = P.TensorRTPartitioner()
+    partition = types.SimpleNamespace(id=1, nodes=[])
+
+    monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [])
+    assert part._resolve_target_device_for_partition(object(), partition) == b"cuda:0"
+
+    monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [object(), object()])
+    assert part._resolve_target_device_for_partition(object(), partition) == b"cuda:0"
+
+
+@pytest.mark.unit
+def test_per_partition_distinct_target_devices(monkeypatch):
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
+    from torch_tensorrt.executorch import partitioner as P
+
+    part = P.TensorRTPartitioner()
+    # Each partition's engine node carries its own device id as its value.
+    monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [nodes[0]])
+
+    def fake_info(ep, node):
+        info = ["0"] * (DEVICE_IDX + 1)
+        info[DEVICE_IDX] = str(node)
+        return info
+
+    monkeypatch.setattr(P, "_get_engine_info_for_node", fake_info)
+    d0 = part._resolve_target_device_for_partition(
+        object(), types.SimpleNamespace(id=0, nodes=["0"])
+    )
+    d1 = part._resolve_target_device_for_partition(
+        object(), types.SimpleNamespace(id=1, nodes=["1"])
+    )
+    assert d0 == b"cuda:0"
+    assert d1 == b"cuda:1"
+    assert d0 != d1

@@ -30,6 +30,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     serialize_binding_names,
     serialize_device_info,
 )
+from torch_tensorrt.runtime._runtime_config import RuntimeSettings
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         *,
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
-        weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
         requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
@@ -82,7 +82,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         Keyword Arguments:
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
-            weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding
@@ -109,7 +108,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             output_binding_names: Output tensor names in return order.
             name: Logical name for logging and serialization.
             settings: Compilation/runtime settings (device, lazy init, cross-compile, etc.).
-            weight_name_map: Engine weight name to ``state_dict`` key mapping (refit).
             requires_output_allocator: Engine needs TRT dynamic output allocation.
             symbolic_shape_expressions: Optional symbolic shape metadata from compile.
         """
@@ -124,11 +122,17 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.name = name
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
-        self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
         self.engine: Optional[Any] = None
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
+
+        # Per-engine runtime mode controls.
+        self._runtime_settings: RuntimeSettings = RuntimeSettings()
+        # Engine-implicit ``RuntimeCache``: built lazily when the user
+        # passes a path string via ``runtime_settings`` (the module owns the
+        # wrapper; the engine just holds a reference).
+        self._implicit_cache_handle: Any = None
         self.symbolic_shape_expressions = symbolic_shape_expressions
         self.requires_native_multidevice = requires_native_multidevice
         self.target_platform = (
@@ -175,7 +179,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         )
         metadata = {
             "settings": self.settings,
-            "weight_name_map": self.weight_name_map,
             "inout_symexprs": self.symbolic_shape_expressions,
             "output_tensors_are_unowned": (
                 False
@@ -183,7 +186,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 else self.engine.are_output_tensors_unowned()
             ),
         }
-
         engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
         engine_info[ABI_TARGET_IDX] = (
             torch.ops.tensorrt.ABI_VERSION()
@@ -225,8 +227,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = str(
             int(self.requires_native_multidevice)
         )
-        # rank/world_size are runtime facts; queried from ProcessGroup at execution time
-
+        # rank/world_size are runtime facts; queried from ProcessGroup at execution time.
+        # RuntimeSettings are intentionally NOT serialized: they're per-engine, in-memory
+        # init values, not part of the engine's identity (see pytorch/TensorRT#4310).
         return engine_info
 
     def get_engine(self) -> torch.classes.tensorrt.Engine:
@@ -271,6 +274,112 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.dynamically_allocate_resources
         )
 
+    # --- runtime-settings dispatch ----------------------------------------
+
+    @property
+    def runtime_settings(self) -> RuntimeSettings:
+        """The current ``RuntimeSettings``. Snapshot used by ``runtime_config`` CM enter/exit."""
+        return self._runtime_settings
+
+    @runtime_settings.setter
+    def runtime_settings(self, rs: RuntimeSettings) -> None:
+        """Apply ``RuntimeSettings`` to this engine (or stash for ``setup_engine``)."""
+        # 1. Normalize: path-string -> managed handle; everything else passes through.
+        rs_resolved = self._resolve_runtime_cache(rs)
+        # 2. Push to the engine if it exists; if not we stash for later.
+        if self.engine is not None:
+            self._send_to_engine(rs_resolved)
+        # 3. Store the resolved form so reads agree with what the engine sees.
+        self._runtime_settings = rs_resolved
+
+    def _resolve_runtime_cache(self, rs: RuntimeSettings) -> RuntimeSettings:
+        """Normalize ``rs.runtime_cache`` to ``None`` | ``RuntimeCache`` (never a path str).
+
+        Manages the ``_implicit_cache_handle`` slot as a side effect: builds a
+        fresh wrapper for a new path, reuses the existing one for the same
+        path, releases it (with save-on-swap) for non-path inputs.
+        """
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
+
+        rc = rs.runtime_cache
+
+        # Branch 1: not a non-empty path string (None / empty / handle / torchbind).
+        # Caller owns the handle's lifecycle -- release ours, pass rs through.
+        # Guard: if ``rc`` IS our managed wrapper (e.g. setup_engine re-applying
+        # a resolved rs), this is a no-op self-passback, not a release.
+        if not (isinstance(rc, str) and rc):
+            if rc is not self._implicit_cache_handle:
+                self._set_managed_handle(None)
+            return rs
+
+        # Branch 2: same path + wrapper still usable -> reuse. Keeps the CM
+        # enter/exit cycle cheap (no teardown/rebuild loses in-memory kernels).
+        old = self._implicit_cache_handle
+        if old is not None and old.path == rc and self._wrapper_still_attached(old):
+            return rs.merge(runtime_cache=old)
+
+        # Branch 3: build a fresh managed wrapper for this path. The facade
+        # auto-picks the torchbind sibling on cpp rt and the pure-Python
+        # handle on python-only rt. ``autosave_on_del=True`` is how implicit
+        # caches persist across runs.
+        new = RuntimeCache(path=rc, autosave_on_del=True)
+        # Explicitly load bytes here (which lands either in the runtime cache
+        # or pending bytes) as this cache is managed by this module, so a
+        # correct initial state is set.
+        try:
+            new.load()
+        except Exception as e:
+            logger.warning(
+                f"Failed to warm-load implicit runtime cache from {rc!r}: {e}"
+            )
+        self._set_managed_handle(new)
+        return rs.merge(runtime_cache=new)
+
+    def _set_managed_handle(self, new: Optional[Any]) -> None:
+        """Install ``new`` as the implicit handle; save the prior wrapper if displaced.
+
+        Save errors are swallowed (logged) so a transient disk failure during
+        a settings swap can't crash the user's assignment.
+        """
+        old = self._implicit_cache_handle
+        if old is not None and old is not new:
+            try:
+                old.save()
+            except Exception as e:
+                logger.warning(
+                    f"Failed to save prior implicit runtime cache on swap: {e}"
+                )
+        self._implicit_cache_handle = new
+
+    def _wrapper_still_attached(self, w: Any) -> bool:
+        """Is ``w`` reusable for the current runtime? Python rt always
+        accepts; cpp rt needs the torchbind sibling live (else the cpp
+        engine has no way to hold the same underlying ``IRuntimeCache``).
+        """
+        return not ENABLED_FEATURES.torch_tensorrt_runtime or w.is_cpp_runtime()
+
+    def _send_to_engine(self, rs: RuntimeSettings) -> None:
+        """Push ``rs`` to whichever engine flavor is attached."""
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+        from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
+        from torch_tensorrt.runtime._runtime_config import (
+            _CUDA_GRAPH_STRATEGY_MAP,
+            _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP,
+        )
+
+        if isinstance(self.engine, TRTEngine):
+            self.engine.update_runtime_settings(rs)
+        else:
+            # Strategies cross the boundary as ints (TorchBind ``int64_t``,
+            # mirroring the nvinfer1 enum integers on the cpp side).
+            self.engine.update_runtime_settings(
+                _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP[
+                    rs.dynamic_shapes_kernel_specialization_strategy
+                ],
+                _CUDA_GRAPH_STRATEGY_MAP[rs.cuda_graph_strategy],
+                _to_torchbind_handle(rs.runtime_cache),
+            )
+
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.
@@ -283,15 +392,19 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is not None:
             return
 
-        if ENABLED_FEATURES.torch_tensorrt_runtime:
-            self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
-        else:
+        if not ENABLED_FEATURES.torch_tensorrt_runtime:
             from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
             self.engine = TRTEngine(
                 self._pack_engine_info(),
                 profile_execution=self.profiling_enabled,
             )
+        else:
+            self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+
+        # Re-apply via the setter: resolves any path-string runtime_cache,
+        # dispatches to the engine, and writes back the resolved form.
+        self.runtime_settings = self._runtime_settings
 
         # requires_native_multidevice is set by the C++ constructor from the serialized REQUIRES_NATIVE_MULTIDEVICE_IDX field.
         if self.engine.requires_native_multidevice:
@@ -330,7 +443,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return encoded_metadata
 
     @staticmethod
-    def decode_metadata(encoded_metadata: bytes) -> Any:
+    def decode_metadata(encoded_metadata: Any) -> Any:
         dumped_metadata = base64.b64decode(encoded_metadata.encode("utf-8"))
         metadata = pickle.loads(dumped_metadata)
         return metadata
@@ -338,8 +451,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
         if self.engine is not None:
             engine_info = self._pack_engine_info()
-            assert isinstance(engine_info[ENGINE_IDX], (bytes, bytearray))
-            engine_info[ENGINE_IDX] = base64.b64encode(engine_info[ENGINE_IDX])
+            engine_bytes = engine_info[ENGINE_IDX]
+            assert isinstance(engine_bytes, (bytes, bytearray))
+            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes)
             return (
                 self.name,
                 engine_info,
@@ -348,8 +462,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             )
         elif self.serialized_engine:
             engine_info = self._pack_engine_info()
-            assert isinstance(engine_info[ENGINE_IDX], bytes)
-            engine_info[ENGINE_IDX] = base64.b64encode(engine_info[ENGINE_IDX])
+            engine_bytes = engine_info[ENGINE_IDX]
+            assert isinstance(engine_bytes, bytes)
+            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes)
             return (
                 self.name,
                 engine_info,
@@ -380,18 +495,28 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             )
 
             serialized_metadata = serialized_engine_info[SERIALIZED_METADATA_IDX]
-            assert isinstance(serialized_metadata, bytes)
+            # ``_pack_engine_info`` packs the metadata as a ``str``
+            # (base64-of-pickle.dumps decoded to utf-8); ``decode_metadata``
+            # expects the same. The assertion was inherited from an older
+            # bytes-typed format and never updated.
+            assert isinstance(serialized_metadata, str)
             metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
             self.settings = metadata["settings"]
-            self.weight_name_map = metadata["weight_name_map"]
             self.symbolic_shape_expressions = metadata["inout_symexprs"]
 
-            if ENABLED_FEATURES.torch_tensorrt_runtime:
-                self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
-            else:
+            # RuntimeSettings are NOT serialized; restore defaults. Caller can
+            # reapply via ``mod.runtime_settings = ...`` (per submodule) or a CM after load.
+            self._runtime_settings = RuntimeSettings()
+            # Mirror the settings reset on the implicit cache handle so a
+            # stale wrapper from prior use doesn't survive load_state_dict and
+            # silently write the fresh engine's cache bytes to the old path.
+            self._implicit_cache_handle = None
+            if not ENABLED_FEATURES.torch_tensorrt_runtime:
                 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
                 self.engine = TRTEngine(serialized_engine_info)
+            else:
+                self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
 
             self.engine.set_output_tensors_as_unowned(
                 metadata["output_tensors_are_unowned"]
@@ -404,6 +529,76 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
         self.target_device = self._resolve_target_device()
+
+    def set_optimization_profile(self, profile: Optional[Any]) -> None:
+        """Select the active TRT optimization profile for this engine.
+
+        ``profile`` may be a profile index (``int``), the string ``"auto"`` to
+        enable shape-based auto-selection, or ``None`` to clear any pin / auto
+        setting and reset to the default profile (index 0).
+        See :func:`torch_tensorrt.runtime.optimization_profile`.
+        """
+        if self.engine is None:
+            self.setup_engine()
+        assert self.engine is not None
+        engine = self.engine
+        # Drive the primitive engine API (set_active_profile / _auto_select_profiles)
+        # that both the Python and C++ runtimes expose under the same names, so
+        # this works regardless of the active runtime.
+        if not hasattr(engine, "set_active_profile"):
+            raise RuntimeError(
+                "This engine does not support optimization profile selection."
+            )
+        if profile is None:
+            engine._auto_select_profiles = False
+            engine.set_active_profile(0)
+            return
+        if isinstance(profile, str) and profile == "auto":
+            engine._auto_select_profiles = True
+            return
+        # Validate the profile index. ``num_optimization_profiles`` is exposed by
+        # both the Python and C++ runtimes under the same name.
+        if isinstance(profile, bool) or not isinstance(profile, int):
+            raise TypeError(
+                f"Optimization profile must be an integer index, got {type(profile)}"
+            )
+        num_profiles = engine.num_optimization_profiles
+        if not (0 <= profile < num_profiles):
+            raise ValueError(
+                f"Optimization profile index {profile} out of range "
+                f"[0, {num_profiles})"
+            )
+        engine._auto_select_profiles = False
+        engine.set_active_profile(profile)
+
+    def get_optimization_profile_state(self) -> Optional[Tuple[Any, ...]]:
+        """Return the engine's current ``(auto, active)`` profile state.
+
+        Used by the :func:`optimization_profile` context manager to save/restore
+        state across a ``with`` block. Returns ``None`` if unsupported.
+        """
+        if self.engine is None:
+            return None
+        engine = self.engine
+        if not hasattr(engine, "_active_profile_index"):
+            return None
+        return (
+            engine._auto_select_profiles,
+            engine._active_profile_index,
+        )
+
+    def restore_optimization_profile_state(
+        self, state: Optional[Tuple[Any, ...]]
+    ) -> None:
+        """Restore profile state captured by :meth:`get_optimization_profile_state`."""
+        if state is None or self.engine is None:
+            return
+        engine = self.engine
+        if not hasattr(engine, "set_active_profile"):
+            return
+        auto, active = state
+        engine._auto_select_profiles = auto
+        engine.set_active_profile(active)
 
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.get_engine().use_pre_allocated_outputs = enable

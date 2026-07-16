@@ -65,7 +65,7 @@ def trace(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -73,9 +73,12 @@ def trace(
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)
     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
-    # Constructing dynamic shape list as a nested dict
-    dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs)
-    dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
+    # Build dynamic shapes from the Input objects. Inputs carrying shared_dims
+    # share a Dim across inputs via the registry; the rest get an independent
+    # per-input Dim.
+    dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
+    dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs, dim_registry)
+    dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry))
     exp_program = export(
         mod,
         tuple(torch_arg_inputs),
@@ -87,49 +90,109 @@ def trace(
     return exp_program
 
 
-def get_dynamic_shapes_kwargs(inputs: Any) -> Union[dict[str, Any], list[Any]]:
+def _collect_inputs(obj: Any) -> list[Input]:
+    """Flatten an arg/kwarg input structure into a list of Input objects."""
+    if isinstance(obj, Input):
+        return [obj]
+    elif isinstance(obj, dict):
+        collected: list[Input] = []
+        for v in obj.values():
+            collected.extend(_collect_inputs(v))
+        return collected
+    elif isinstance(obj, (list, tuple)):
+        collected = []
+        for v in obj:
+            collected.extend(_collect_inputs(v))
+        return collected
+    return []
+
+
+def build_dim_registry(arg_inputs: Any, kwarg_inputs: Any) -> dict[str, Any]:
+    """Build a ``{name: torch.export.Dim}`` registry from Input.shared_dims.
+
+    The same name appearing on multiple inputs yields a single shared ``Dim``
+    instance, so ``torch.export`` treats those axes as one symbol. Conflicting
+    (min, max) ranges for the same name are rejected.
+    """
+    registry: dict[str, Any] = {}
+    bounds: dict[str, tuple[int, int]] = {}
+    for inp in _collect_inputs(arg_inputs) + _collect_inputs(kwarg_inputs):
+        shared_dims = getattr(inp, "shared_dims", None)
+        if not shared_dims or inp.shape_mode != Input._ShapeMode.DYNAMIC:
+            continue
+        assert isinstance(inp.shape, dict)
+        min_shape = inp.shape["min_shape"]
+        max_shape = inp.shape["max_shape"]
+        for axis, dim_name in shared_dims.items():
+            lo, hi = int(min_shape[axis]), int(max_shape[axis])
+            if dim_name in bounds:
+                if bounds[dim_name] != (lo, hi):
+                    raise ValueError(
+                        f"Dimension name '{dim_name}' is used with conflicting ranges "
+                        f"{bounds[dim_name]} and {(lo, hi)}. A shared named dimension "
+                        f"must have identical (min, max) on every input that uses it."
+                    )
+            else:
+                bounds[dim_name] = (lo, hi)
+                registry[dim_name] = Dim(dim_name, min=lo, max=hi)
+    return registry
+
+
+def get_dynamic_shapes_kwargs(
+    inputs: Any, dim_registry: Optional[dict[str, Any]] = None
+) -> Union[dict[str, Any], list[Any]]:
     if isinstance(inputs, dict):
         dynamic_shapes_kwarg = {}
         for k, v in inputs.items():
-            dynamic_shapes_kwarg[k] = get_dynamic_shapes_kwargs(v)
+            dynamic_shapes_kwarg[k] = get_dynamic_shapes_kwargs(v, dim_registry)
         return dynamic_shapes_kwarg
 
     elif isinstance(inputs, Input):
-        return get_dynamic_shapes(inputs)
+        return get_dynamic_shapes(inputs, dim_registry)
 
     elif isinstance(inputs, (list, tuple)):
         dynamic_shapes = []
         for input in inputs:
-            dynamic_shapes.append(get_dynamic_shapes(input))
+            dynamic_shapes.append(get_dynamic_shapes(input, dim_registry))
         return dynamic_shapes
 
     raise TypeError(f"Unknown type {type(inputs)}.")
 
 
-def get_dynamic_shapes_args(mod: torch.nn.Module, inputs: Any) -> dict[str, Any]:
+def get_dynamic_shapes_args(
+    mod: torch.nn.Module, inputs: Any, dim_registry: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     # dynamic_shape is a dict and cannot work without keys. Here we use position argument name
     # in forward function as the name
     args = list(signature(mod.forward).parameters.keys())
     dynamic_shapes = {}
     for input, input_name in zip(inputs, args[: len(inputs)]):
-        dynamic_shapes[input_name] = get_dynamic_shapes(input)
+        dynamic_shapes[input_name] = get_dynamic_shapes(input, dim_registry)
     return dynamic_shapes
 
 
-def get_dynamic_shapes(input: Input) -> dict[Any, Any]:
+def get_dynamic_shapes(
+    input: Input, dim_registry: Optional[dict[str, Any]] = None
+) -> dict[Any, Any]:
     if not isinstance(input, Input):
         # If the input is torch.Tensor, no dynamic is needed. Return empty dict
         return {}
     else:
         dynamic_dims = {}
         if input.shape_mode == Input._ShapeMode.DYNAMIC:
+            assert isinstance(input.shape, dict)
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
             max_shape = input.shape["max_shape"]
+            shared_dims = getattr(input, "shared_dims", None) or {}
             assert len(min_shape) == len(opt_shape) == len(max_shape)
             for dim in range(len(min_shape)):
                 if min_shape[dim] == opt_shape[dim] == max_shape[dim]:
                     continue
+                elif dim_registry is not None and dim in shared_dims:
+                    # Named axis: reuse the shared Dim so axes with the same
+                    # name across inputs become a single exported symbol.
+                    dynamic_dims[dim] = dim_registry[shared_dims[dim]]
                 else:
                     dynamic_dims[dim] = Dim(
                         input.name + "_" + str(dim),

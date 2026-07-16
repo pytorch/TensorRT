@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=84daf132"></script>
+    <script src="../_static/documentation_options.js?v=d8482cd4"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -555,25 +555,33 @@ by the wheel name: <code class="docutils literal notranslate"><span class="pre">
 <section id="example-rtx-only-features">
 <h2>Example: RTX-Only Features<a class="headerlink" href="#example-rtx-only-features" title="Link to this heading">#</a></h2>
 <p>The following minimal example compiles a toy convolutional model with dynamic
-input shapes and demonstrates two TensorRT-RTX-only <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code>
-keyword arguments:</p>
+input shapes and applies three TensorRT-RTX-only runtime knobs <strong>after</strong>
+compile, via <code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span></code>:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">runtime_cache_path</span></code> — path to an on-disk cache of JIT-compiled engines.
-The cache is populated on first use and reloaded on subsequent runs, so
-repeated invocations of the same compiled module skips JIT compilation. The
-default is a file under the system temp directory; set this to a persistent
-path (e.g. somewhere under your project) to share the cache across runs.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">dynamic_shapes_kernel_specialization_strategy</span></code> — controls how TensorRT-RTX
-specializes kernels for the current runtime shape. Accepts <code class="docutils literal notranslate"><span class="pre">&quot;lazy&quot;</span></code>
-(default; use a generic fallback kernel while a shape-specialized kernel
-compiles asynchronously), <code class="docutils literal notranslate"><span class="pre">&quot;eager&quot;</span></code> (block on the current shape until the
-specialized kernel is ready), or <code class="docutils literal notranslate"><span class="pre">&quot;none&quot;</span></code> (always use the generic kernel).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> — path to an on-disk cache of JIT-compiled kernels. The
+cache is populated on first use and reloaded on subsequent runs, so
+repeated invocations of the same compiled module skip JIT compilation. The
+default is a per-user file under the system temp directory; set this to a
+persistent path (e.g. somewhere under your project) to share the cache
+across runs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dynamic_shapes_kernel_specialization_strategy</span></code> — controls how
+TensorRT-RTX specializes kernels for the current runtime shape. Accepts
+<code class="docutils literal notranslate"><span class="pre">&quot;lazy&quot;</span></code> (default; use a generic fallback kernel while a
+shape-specialized kernel compiles asynchronously), <code class="docutils literal notranslate"><span class="pre">&quot;eager&quot;</span></code> (block on
+the current shape until the specialized kernel is ready), or <code class="docutils literal notranslate"><span class="pre">&quot;none&quot;</span></code>
+(always use the generic kernel).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code> — whether TensorRT-RTX captures and replays the
+engine internally as a CUDA graph. Accepts <code class="docutils literal notranslate"><span class="pre">&quot;disabled&quot;</span></code> (default) or
+<code class="docutils literal notranslate"><span class="pre">&quot;whole_graph_capture&quot;</span></code> (capture the engine’s forward and replay on
+subsequent calls — lower per-call CPU overhead, fixed input shapes
+required).</p></li>
 </ul>
-<p>Both keyword arguments are silently ignored on standard-TensorRT builds; they
-only take effect when the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt_rtx</span></code> wheel is installed.</p>
+<p>All three fields are no-ops on standard-TensorRT builds; they only take
+effect when the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt_rtx</span></code> wheel is installed.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeSettings</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">ToyConv</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
@@ -603,16 +611,33 @@ only take effect when the <code class="docutils literal notranslate"><span class
     <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">},</span>
     <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="c1"># RTX-only: persist JIT-compiled engines across runs.</span>
-    <span class="n">runtime_cache_path</span><span class="o">=</span><span class="s2">&quot;/tmp/my_rtx_cache.bin&quot;</span><span class="p">,</span>
-    <span class="c1"># RTX-only: &quot;lazy&quot; | &quot;eager&quot; | &quot;none&quot;.</span>
+<span class="p">)</span>
+
+<span class="c1"># RTX-only: persist JIT-compiled kernels across runs, eagerly specialize</span>
+<span class="c1"># for the current input shape, and let TensorRT-RTX capture+replay the</span>
+<span class="c1"># engine internally as a CUDA graph. Apply before first execute so the</span>
+<span class="c1"># engine&#39;s IExecutionContext picks the settings up on its single, lazy</span>
+<span class="c1"># create.</span>
+<span class="n">compiled</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span>
+    <span class="n">runtime_cache</span><span class="o">=</span><span class="s2">&quot;/tmp/my_rtx_cache.bin&quot;</span><span class="p">,</span>
     <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="o">=</span><span class="s2">&quot;eager&quot;</span><span class="p">,</span>
+    <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">out</span> <span class="o">=</span> <span class="n">compiled</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 </pre></div>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To both flip <code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code> <em>and</em> wrap the module for outer
+<code class="docutils literal notranslate"><span class="pre">torch.cuda.CUDAGraph</span></code> capture in a single context manager, prefer
+<code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">torch_tensorrt.runtime.enable_cudagraphs(compiled,</span> <span class="pre">cuda_graph_strategy=&quot;whole_graph_capture&quot;)</span> <span class="pre">as</span> <span class="pre">wrapped:</span></code>
+— see <a class="reference internal" href="../user_guide/runtime_performance/runtime_settings.html#runtime-settings"><span class="std std-ref">Runtime Settings (TensorRT-RTX)</span></a> for the full pattern.</p>
+</div>
+<p>For temporary (scoped) overrides, shared caches across multiple modules,
+combining a cuda-graph capture strategy with <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code>, and other
+advanced patterns, see <a class="reference internal" href="../user_guide/runtime_performance/runtime_settings.html#runtime-settings"><span class="std std-ref">Runtime Settings (TensorRT-RTX)</span></a>.</p>
 </section>
 <section id="compiling-from-source">
 <h2>Compiling From Source<a class="headerlink" href="#compiling-from-source" title="Link to this heading">#</a></h2>

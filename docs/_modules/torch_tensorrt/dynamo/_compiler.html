@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=84daf132"></script>
+    <script src="../../../_static/documentation_options.js?v=d8482cd4"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -481,11 +481,14 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">sympy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.graph_signature</span><span class="w"> </span><span class="kn">import</span> <span class="n">InputKind</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Target</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.utils._sympy.numbers</span><span class="w"> </span><span class="kn">import</span> <span class="n">int_oo</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span><span class="p">,</span> <span class="n">needs_cross_compile</span>
@@ -528,6 +531,7 @@ document.write(`
     <span class="n">prepare_inputs</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
+    <span class="n">validate_optimization_profiles</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
@@ -565,9 +569,6 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
-    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
-    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
-    <span class="n">cuda_graph_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CUDA_GRAPH_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -588,6 +589,7 @@ document.write(`
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
+    <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows</span>
@@ -646,16 +648,16 @@ document.write(`
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
-<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
-<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
-<span class="sd">        cuda_graph_strategy (str): Strategy for CUDA graph capture/replay (TensorRT-RTX only). Options: &quot;disabled&quot; (manual capture), &quot;whole_graph_capture&quot; (TRT-RTX handles internally). Default: &quot;disabled&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
 <span class="sd">        engine_cache_dir (Optional[str]): Directory to store the cached TRT engines</span>
 <span class="sd">        engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default</span>
 <span class="sd">        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.</span>
-<span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.</span>
+<span class="sd">        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16</span>
+<span class="sd">            inputs and outputs. When combined with ``decompose_attention=True``, the complete</span>
+<span class="sd">            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its</span>
+<span class="sd">            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.</span>
 <span class="sd">        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.</span>
 <span class="sd">        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.</span>
 <span class="sd">        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.</span>
@@ -666,8 +668,12 @@ document.write(`
 <span class="sd">        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.</span>
 <span class="sd">        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.</span>
-<span class="sd">        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.</span>
+<span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
+<span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
+<span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
+<span class="sd">            the final output back to FP16.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
+<span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -750,8 +756,11 @@ document.write(`
 
     <span class="k">if</span> <span class="n">use_fp32_acc</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. </span><span class="se">\</span>
-<span class="s2">                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation.&quot;</span>
+            <span class="s2">&quot;FP32 accumulation for FP16 matmul layers is enabled. If &quot;</span>
+            <span class="s2">&quot;decompose_attention is also enabled, the complete decomposed FP16 &quot;</span>
+            <span class="s2">&quot;scaled dot product attention calculation runs in FP32 and only its &quot;</span>
+            <span class="s2">&quot;final output is cast back to FP16. This option has no effect on FP32 &quot;</span>
+            <span class="s2">&quot;or BF16 inputs.&quot;</span>
         <span class="p">)</span>
 
     <span class="c1"># Aliasing inputs to arg_inputs for better understanding</span>
@@ -804,9 +813,6 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
-        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
-        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
-        <span class="s2">&quot;cuda_graph_strategy&quot;</span><span class="p">:</span> <span class="n">cuda_graph_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -823,6 +829,7 @@ document.write(`
         <span class="s2">&quot;dynamically_allocate_resources&quot;</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
         <span class="s2">&quot;decompose_attention&quot;</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">&quot;attn_bias_is_causal&quot;</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
+        <span class="s2">&quot;fallback_data_dependent_ops&quot;</span><span class="p">:</span> <span class="n">fallback_data_dependent_ops</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="c1"># disable the following settings is not supported for cross compilation for windows feature</span>
@@ -839,12 +846,6 @@ document.write(`
                 <span class="sa">f</span><span class="s2">&quot;arg: </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> is not supported for cross compilation for windows feature, hence it is disabled.&quot;</span>
             <span class="p">)</span>
 
-    <span class="k">if</span> <span class="s2">&quot;runtime_cache_path&quot;</span> <span class="ow">in</span> <span class="n">compilation_options</span><span class="p">:</span>
-        <span class="n">compilation_options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-            <span class="s2">&quot;runtime_cache_path is a JIT-time API and is not applicable to cross compilation for windows. Ignoring.&quot;</span>
-        <span class="p">)</span>
-
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
@@ -853,6 +854,7 @@ document.write(`
             <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
             <span class="n">decompose_attention</span><span class="p">,</span>
             <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+            <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
 
@@ -883,6 +885,7 @@ document.write(`
         <span class="n">trt_arg_inputs</span><span class="p">,</span>
         <span class="n">trt_kwarg_inputs</span><span class="p">,</span>
         <span class="n">settings</span><span class="p">,</span>
+        <span class="n">graph_signature</span><span class="o">=</span><span class="n">exported_program</span><span class="o">.</span><span class="n">graph_signature</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">trt_gm</span>
 
@@ -920,9 +923,6 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
-    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
-    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
-    <span class="n">cuda_graph_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CUDA_GRAPH_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -956,6 +956,7 @@ document.write(`
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
+    <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module for NVIDIA GPUs using TensorRT</span>
@@ -1016,16 +1017,16 @@ document.write(`
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
-<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
-<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
-<span class="sd">        cuda_graph_strategy (str): Strategy for CUDA graph capture/replay (TensorRT-RTX only). Options: &quot;disabled&quot; (manual capture), &quot;whole_graph_capture&quot; (TRT-RTX handles internally). Default: &quot;disabled&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
 <span class="sd">        engine_cache_dir (str): Directory to store the cached TRT engines</span>
 <span class="sd">        engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default</span>
 <span class="sd">        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.</span>
-<span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.</span>
+<span class="sd">        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16</span>
+<span class="sd">            inputs and outputs. When combined with ``decompose_attention=True``, the complete</span>
+<span class="sd">            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its</span>
+<span class="sd">            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.</span>
 <span class="sd">        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.</span>
 <span class="sd">        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.</span>
 <span class="sd">        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.</span>
@@ -1044,8 +1045,12 @@ document.write(`
 <span class="sd">        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.</span>
 <span class="sd">        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.</span>
-<span class="sd">        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.</span>
+<span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
+<span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
+<span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
+<span class="sd">            the final output back to FP16.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
+<span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -1144,8 +1149,11 @@ document.write(`
 
     <span class="k">if</span> <span class="n">use_fp32_acc</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. </span><span class="se">\</span>
-<span class="s2">                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation.&quot;</span>
+            <span class="s2">&quot;FP32 accumulation for FP16 matmul layers is enabled. If &quot;</span>
+            <span class="s2">&quot;decompose_attention is also enabled, the complete decomposed FP16 &quot;</span>
+            <span class="s2">&quot;scaled dot product attention calculation runs in FP32 and only its &quot;</span>
+            <span class="s2">&quot;final output is cast back to FP16. This option has no effect on FP32 &quot;</span>
+            <span class="s2">&quot;or BF16 inputs.&quot;</span>
         <span class="p">)</span>
 
     <span class="c1"># Aliasing inputs to arg_inputs for better understanding</span>
@@ -1206,9 +1214,6 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
-        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
-        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
-        <span class="s2">&quot;cuda_graph_strategy&quot;</span><span class="p">:</span> <span class="n">cuda_graph_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -1234,9 +1239,11 @@ document.write(`
         <span class="s2">&quot;dynamically_allocate_resources&quot;</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
         <span class="s2">&quot;decompose_attention&quot;</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">&quot;attn_bias_is_causal&quot;</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
+        <span class="s2">&quot;fallback_data_dependent_ops&quot;</span><span class="p">:</span> <span class="n">fallback_data_dependent_ops</span><span class="p">,</span>
     <span class="p">}</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage before lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
+
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
@@ -1244,6 +1251,7 @@ document.write(`
             <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
             <span class="n">decompose_attention</span><span class="p">,</span>
             <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+            <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
 
@@ -1271,7 +1279,12 @@ document.write(`
                 <span class="s2">&quot;Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True&quot;</span>
             <span class="p">)</span>
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">compile_module</span><span class="p">(</span>
-        <span class="n">gm</span><span class="p">,</span> <span class="n">trt_arg_inputs</span><span class="p">,</span> <span class="n">trt_kwarg_inputs</span><span class="p">,</span> <span class="n">settings</span><span class="p">,</span> <span class="n">engine_cache</span>
+        <span class="n">gm</span><span class="p">,</span>
+        <span class="n">trt_arg_inputs</span><span class="p">,</span>
+        <span class="n">trt_kwarg_inputs</span><span class="p">,</span>
+        <span class="n">settings</span><span class="p">,</span>
+        <span class="n">engine_cache</span><span class="p">,</span>
+        <span class="n">graph_signature</span><span class="o">=</span><span class="n">exported_program</span><span class="o">.</span><span class="n">graph_signature</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">trt_gm</span></div>
 
@@ -1377,6 +1390,192 @@ document.write(`
         <span class="n">partitioned_module</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_user_symbol_bounds</span><span class="p">(</span>
+    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">sample_arg_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span><span class="p">],</span>
+    <span class="n">sample_kwarg_inputs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">graph_signature</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">graph_signature</span><span class="o">.</span><span class="n">ExportGraphSignature</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">sympy</span><span class="o">.</span><span class="n">Symbol</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map ``sympy.Symbol -&gt; (min, max)`` from dynamic ``Input``s, used to</span>
+<span class="sd">    fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.</span>
+
+<span class="sd">    Validates against finite exporter bounds: ``user_max &gt; exp_max`` and</span>
+<span class="sd">    ``user_min &lt; exp_min`` raise (TRT would reject those shapes at runtime);</span>
+<span class="sd">    a strict subset narrows the engine profile to the user&#39;s bounds (info</span>
+<span class="sd">    log only); the ``user_min=1, exp_min=2`` case warns -- it&#39;s PyTorch&#39;s</span>
+<span class="sd">    0/1 specialization artifact, not a user error.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># ep.module() strips lifted params/buffers from the graph, so all_placeholders</span>
+    <span class="c1"># only contains USER_INPUT nodes, but graph_signature.input_specs still lists</span>
+    <span class="c1"># all specs (PARAMETER, BUFFER, USER_INPUT). A positional zip misaligns.</span>
+    <span class="c1"># Use name-based lookup keyed on graph_signature USER_INPUT names instead.</span>
+    <span class="n">placeholder_by_name</span> <span class="o">=</span> <span class="p">{</span><span class="n">n</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span><span class="p">}</span>
+    <span class="n">user_input_names</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">spec</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">graph_signature</span><span class="o">.</span><span class="n">input_specs</span>
+        <span class="k">if</span> <span class="n">spec</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="n">InputKind</span><span class="o">.</span><span class="n">USER_INPUT</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">arg</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">)</span>
+    <span class="p">]</span>
+    <span class="n">placeholders</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">placeholder_by_name</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">user_input_names</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">placeholder_by_name</span>
+    <span class="p">]</span>
+
+    <span class="c1"># Use _in_spec.flatten_up_to to preserve export-time kwarg ordering.</span>
+    <span class="c1"># Fall back to name-based kwarg lookup when the arg/kwarg split differs</span>
+    <span class="c1"># from export time (which would cause flatten_up_to to raise an arity error).</span>
+    <span class="n">in_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">&quot;_in_spec&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">in_spec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;_in_spec not found on graph module&quot;</span><span class="p">)</span>
+        <span class="n">flat_inputs</span> <span class="o">=</span> <span class="n">in_spec</span><span class="o">.</span><span class="n">flatten_up_to</span><span class="p">(</span>
+            <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">sample_arg_inputs</span><span class="p">),</span> <span class="n">sample_kwarg_inputs</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+        <span class="n">flat_inputs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sample_arg_inputs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sample_kwarg_inputs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">user_input_names</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">sample_arg_inputs</span><span class="p">)</span> <span class="p">:]:</span>
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">sample_kwarg_inputs</span><span class="p">:</span>
+                    <span class="n">flat_inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sample_kwarg_inputs</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+
+    <span class="n">user_symbol_bounds</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">sympy</span><span class="o">.</span><span class="n">Symbol</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">node</span><span class="p">,</span> <span class="n">inp</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">placeholders</span><span class="p">,</span> <span class="n">flat_inputs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="n">Input</span><span class="p">)</span> <span class="ow">and</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="n">fake_val</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;val&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fake_val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="k">continue</span>
+
+        <span class="n">min_shape</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span>
+        <span class="n">max_shape</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fake_val</span><span class="o">.</span><span class="n">size</span><span class="p">())</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Input &#39;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">&#39; has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fake_val</span><span class="o">.</span><span class="n">size</span><span class="p">())</span><span class="si">}</span><span class="s2"> dimensions in &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;the exported program, but the provided Input specifies &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span><span class="si">}</span><span class="s2"> dimensions. Ensure Input.min_shape, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Input.opt_shape, and Input.max_shape each have &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fake_val</span><span class="o">.</span><span class="n">size</span><span class="p">())</span><span class="si">}</span><span class="s2"> entries.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fake_val</span><span class="o">.</span><span class="n">size</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">SymInt</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">!=</span> <span class="n">dim</span> <span class="ow">or</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">!=</span> <span class="n">dim</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Input &#39;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">&#39; dim </span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2"> is static (size=</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span><span class="si">}</span><span class="s2">) &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;in the exported program, but the provided Input has &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;min_shape[</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">]=</span><span class="si">{</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2">, max_shape[</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">]=</span><span class="si">{</span><span class="n">max_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2">. &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Static dimensions must be fixed.&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">dim</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">expr</span>
+            <span class="c1"># Composite exprs (e.g. ``2*s0``) are recomputed by</span>
+            <span class="c1"># ``ShapeEnv.bound_sympy``; overriding them directly would lie.</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">sympy</span><span class="o">.</span><span class="n">Symbol</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Input &#39;</span><span class="si">%s</span><span class="s2">&#39; dim </span><span class="si">%d</span><span class="s2"> is a composite symbolic expression (</span><span class="si">%s</span><span class="s2">) &quot;</span>
+                    <span class="s2">&quot;bounded by another dynamic dimension; its range will be &quot;</span>
+                    <span class="s2">&quot;derived from constituent symbols via bound_sympy.&quot;</span><span class="p">,</span>
+                    <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">,</span>
+                    <span class="n">d</span><span class="p">,</span>
+                    <span class="n">expr</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">expr</span> <span class="ow">in</span> <span class="n">user_symbol_bounds</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">user_min</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">])</span>
+            <span class="n">user_max</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_shape</span><span class="p">[</span><span class="n">d</span><span class="p">])</span>
+            <span class="n">user_symbol_bounds</span><span class="p">[</span><span class="n">expr</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">user_min</span><span class="p">,</span> <span class="n">user_max</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Recorded user-supplied bounds for </span><span class="si">%s</span><span class="s2">: [</span><span class="si">%d</span><span class="s2">, </span><span class="si">%d</span><span class="s2">]&quot;</span><span class="p">,</span>
+                <span class="n">expr</span><span class="p">,</span>
+                <span class="n">user_min</span><span class="p">,</span>
+                <span class="n">user_max</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="c1"># The exported program may already bound this symbol to a finite</span>
+            <span class="c1"># range (e.g. Dim(&quot;batch&quot;, min=10, max=20)). The compiled TRT</span>
+            <span class="c1"># engine&#39;s optimization profile follows that range; any shape</span>
+            <span class="c1"># outside it is rejected by TensorRT at runtime</span>
+            <span class="c1"># (IExecutionContext::setInputShape &quot;satisfyProfile&quot; check).</span>
+            <span class="c1"># Validate the user&#39;s Input range against it here -- at compile</span>
+            <span class="c1"># time -- before they hit that opaque runtime error on a shape</span>
+            <span class="c1"># they explicitly declared in Input.min_shape / Input.max_shape.</span>
+            <span class="n">shape_env</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">dim</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="s2">&quot;shape_env&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">shape_env</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">exp_range</span> <span class="o">=</span> <span class="n">shape_env</span><span class="o">.</span><span class="n">var_to_range</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">exp_range</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">exp_lower</span> <span class="o">=</span> <span class="n">exp_range</span><span class="o">.</span><span class="n">lower</span>
+            <span class="n">exp_upper</span> <span class="o">=</span> <span class="n">exp_range</span><span class="o">.</span><span class="n">upper</span>
+            <span class="n">exp_max_unbounded</span> <span class="o">=</span> <span class="n">exp_upper</span> <span class="ow">is</span> <span class="n">int_oo</span> <span class="ow">or</span> <span class="n">exp_upper</span> <span class="o">==</span> <span class="n">sympy</span><span class="o">.</span><span class="n">oo</span>
+            <span class="k">if</span> <span class="n">exp_max_unbounded</span><span class="p">:</span>
+                <span class="c1"># Dim.DYNAMIC: user fills the gap (intended use).</span>
+                <span class="k">continue</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">exp_min</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">exp_lower</span><span class="p">)</span>
+                <span class="n">exp_max</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">exp_upper</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">user_min</span> <span class="o">==</span> <span class="n">exp_min</span> <span class="ow">and</span> <span class="n">user_max</span> <span class="o">==</span> <span class="n">exp_max</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">mismatch</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Dynamic dimension &#39;</span><span class="si">{</span><span class="n">expr</span><span class="si">}</span><span class="s2">&#39;: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Input range [</span><span class="si">{</span><span class="n">user_min</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">user_max</span><span class="si">}</span><span class="s2">] vs &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;exported program range [</span><span class="si">{</span><span class="n">exp_min</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">exp_max</span><span class="si">}</span><span class="s2">].&quot;</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">user_max</span> <span class="o">&gt;</span> <span class="n">exp_max</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">mismatch</span><span class="si">}</span><span class="s2"> Input.max_shape (</span><span class="si">{</span><span class="n">user_max</span><span class="si">}</span><span class="s2">) exceeds the &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;exported program&#39;s max (</span><span class="si">{</span><span class="n">exp_max</span><span class="si">}</span><span class="s2">). The program was &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;exported with this dimension bounded to &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">exp_min</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">exp_max</span><span class="si">}</span><span class="s2">], so the compiled TensorRT engine &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;cannot accept shapes above </span><span class="si">{</span><span class="n">exp_max</span><span class="si">}</span><span class="s2">. Either re-export &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;with Dim(&#39;</span><span class="si">{</span><span class="n">expr</span><span class="si">}</span><span class="s2">&#39;, max=</span><span class="si">{</span><span class="n">user_max</span><span class="si">}</span><span class="s2">) or set &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Input.max_shape &lt;= </span><span class="si">{</span><span class="n">exp_max</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">user_min</span> <span class="o">&lt;</span> <span class="n">exp_min</span><span class="p">:</span>
+                <span class="c1"># 1-&gt;2 is the 0/1 specialization artifact, not a user error.</span>
+                <span class="k">if</span> <span class="n">user_min</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">exp_min</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> Input.min_shape=1 but the exported program&#39;s min &quot;</span>
+                        <span class="s2">&quot;is 2 (PyTorch 0/1 specialization -- Dim(min=1) is &quot;</span>
+                        <span class="s2">&quot;recorded as min=2). The compiled engine&#39;s min will &quot;</span>
+                        <span class="s2">&quot;be 2.&quot;</span><span class="p">,</span>
+                        <span class="n">mismatch</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">mismatch</span><span class="si">}</span><span class="s2"> Input.min_shape (</span><span class="si">{</span><span class="n">user_min</span><span class="si">}</span><span class="s2">) is below the &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;exported program&#39;s min (</span><span class="si">{</span><span class="n">exp_min</span><span class="si">}</span><span class="s2">). The program was &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;exported with this dimension bounded to &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">exp_min</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">exp_max</span><span class="si">}</span><span class="s2">], so the compiled TensorRT engine &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;cannot accept shapes below </span><span class="si">{</span><span class="n">exp_min</span><span class="si">}</span><span class="s2">. Either re-export &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;with Dim(&#39;</span><span class="si">{</span><span class="n">expr</span><span class="si">}</span><span class="s2">&#39;, min=</span><span class="si">{</span><span class="n">user_min</span><span class="si">}</span><span class="s2">) or set &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Input.min_shape &gt;= </span><span class="si">{</span><span class="n">exp_min</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Strict subset: engine profile narrows to the user&#39;s bounds</span>
+            <span class="c1"># (applied in ``extract_var_range_info``). Not a warning -- the</span>
+            <span class="c1"># user got exactly what they asked for.</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> Narrowing engine profile to user bounds [</span><span class="si">%d</span><span class="s2">, </span><span class="si">%d</span><span class="s2">] &quot;</span>
+                <span class="s2">&quot;(exported program range was [</span><span class="si">%d</span><span class="s2">, </span><span class="si">%d</span><span class="s2">]).&quot;</span><span class="p">,</span>
+                <span class="n">mismatch</span><span class="p">,</span>
+                <span class="n">user_min</span><span class="p">,</span>
+                <span class="n">user_max</span><span class="p">,</span>
+                <span class="n">exp_min</span><span class="p">,</span>
+                <span class="n">exp_max</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">user_symbol_bounds</span>
+
+
 <span class="nd">@fn_supports_debugger</span>  <span class="c1"># type: ignore[misc]</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compile_module</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
@@ -1385,6 +1584,7 @@ document.write(`
     <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
     <span class="n">engine_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">BaseEngineCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
+    <span class="n">graph_signature</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">graph_signature</span><span class="o">.</span><span class="n">ExportGraphSignature</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">_debugger_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DebuggerConfig</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile a traced FX module</span>
@@ -1407,6 +1607,25 @@ document.write(`
     <span class="n">dryrun_tracker</span> <span class="o">=</span> <span class="n">DryRunTracker</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">sample_kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">sample_kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># fallback_data_dependent_ops runs data-dependent ops in PyTorch during</span>
+    <span class="c1"># partitioning, which cannot coexist with require_full_compilation.</span>
+    <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">fallback_data_dependent_ops</span> <span class="ow">and</span> <span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;fallback_data_dependent_ops runs data-dependent ops in PyTorch, which &quot;</span>
+            <span class="s2">&quot;is incompatible with require_full_compilation=True; enable only one.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.</span>
+    <span class="c1"># Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.</span>
+    <span class="c1"># graph_signature is None on the torch.compile path, which has no ExportedProgram.</span>
+    <span class="n">user_symbol_bounds</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">_build_user_symbol_bounds</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span> <span class="n">sample_arg_inputs</span><span class="p">,</span> <span class="n">sample_kwarg_inputs</span><span class="p">,</span> <span class="n">graph_signature</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">graph_signature</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="p">{}</span>
+    <span class="p">)</span>
 
     <span class="c1"># Configure user compilation settings to converters.</span>
     <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_compilation_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
@@ -1531,6 +1750,24 @@ document.write(`
         <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span>
 
     <span class="n">preserve_module_specs</span><span class="p">(</span><span class="n">original_in_spec</span><span class="p">,</span> <span class="n">original_out_spec</span><span class="p">,</span> <span class="n">partitioned_module</span><span class="p">)</span>
+
+    <span class="c1"># Multi-profile propagation: build the map from export source</span>
+    <span class="c1"># symbols to per-profile bounds once, from the top-level inputs, then reuse</span>
+    <span class="c1"># it to attach the same profiles (by index) to every TRT submodule&#39;s inputs.</span>
+    <span class="n">top_level_inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Input</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sample_arg_inputs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sample_kwarg_inputs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">top_level_inputs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">sample_kwarg_inputs</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="n">num_profiles</span> <span class="o">=</span> <span class="n">validate_optimization_profiles</span><span class="p">(</span><span class="n">top_level_inputs</span><span class="p">)</span>
+    <span class="n">profile_source_bounds</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">num_profiles</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Building engine(s) with </span><span class="si">{</span><span class="n">num_profiles</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="s2">&quot;optimization profiles (selected by index)&quot;</span>
+        <span class="p">)</span>
+        <span class="n">profile_source_bounds</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">build_profile_source_bounds</span><span class="p">(</span>
+            <span class="n">partitioned_module</span><span class="p">,</span> <span class="n">top_level_inputs</span><span class="p">,</span> <span class="n">num_profiles</span>
+        <span class="p">)</span>
+
     <span class="c1"># Store TRT replicas of Torch subgraphs</span>
     <span class="n">trt_modules</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="c1"># Iterate over all components that can be accelerated</span>
@@ -1588,8 +1825,15 @@ document.write(`
             <span class="p">]</span>
         <span class="p">)</span>
 
-        <span class="c1"># Get the submodule inputs for min, opt, max shapes of the graph inputs</span>
-        <span class="n">submodule_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span><span class="n">submodule</span><span class="p">)</span>
+        <span class="c1"># Get the submodule inputs for min, opt, max shapes of the graph inputs.</span>
+        <span class="c1"># With multi-profile compile, propagate the profiles (by index) to each</span>
+        <span class="c1"># submodule input by symbolic substitution.</span>
+        <span class="n">submodule_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span>
+            <span class="n">submodule</span><span class="p">,</span>
+            <span class="n">profile_source_bounds</span><span class="o">=</span><span class="n">profile_source_bounds</span><span class="p">,</span>
+            <span class="n">num_profiles</span><span class="o">=</span><span class="n">num_profiles</span><span class="p">,</span>
+            <span class="n">user_symbol_bounds</span><span class="o">=</span><span class="n">user_symbol_bounds</span><span class="p">,</span>
+        <span class="p">)</span>
 
         <span class="k">assert</span> <span class="n">submodule_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
@@ -1729,9 +1973,6 @@ document.write(`
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
-    <span class="n">runtime_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
-    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
-    <span class="n">cuda_graph_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CUDA_GRAPH_STRATEGY</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
@@ -1806,16 +2047,16 @@ document.write(`
 <span class="sd">        dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
-<span class="sd">        runtime_cache_path (str): Path to the runtime cache for TensorRT-RTX JIT compilation results. Not used for standard TensorRT.</span>
-<span class="sd">        dynamic_shapes_kernel_specialization_strategy (str): Strategy for dynamic shape kernel specialization at runtime (TensorRT-RTX only). Options: &quot;lazy&quot;, &quot;eager&quot;, &quot;none&quot;. Default: &quot;lazy&quot;.</span>
-<span class="sd">        cuda_graph_strategy (str): Strategy for CUDA graph capture/replay (TensorRT-RTX only). Options: &quot;disabled&quot; (manual capture), &quot;whole_graph_capture&quot; (TRT-RTX handles internally). Default: &quot;disabled&quot;.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
 <span class="sd">        engine_cache_dir (str): Directory to store the cached TRT engines</span>
 <span class="sd">        engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default</span>
 <span class="sd">        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.</span>
-<span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32.</span>
+<span class="sd">        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16</span>
+<span class="sd">            inputs and outputs. When combined with ``decompose_attention=True``, the complete</span>
+<span class="sd">            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its</span>
+<span class="sd">            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.</span>
 <span class="sd">        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.</span>
 <span class="sd">        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.</span>
 <span class="sd">        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.</span>
@@ -1824,7 +2065,10 @@ document.write(`
 <span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">        offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.</span>
 <span class="sd">        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model.</span>
-<span class="sd">        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.</span>
+<span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
+<span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
+<span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
+<span class="sd">            the final output back to FP16.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
@@ -1911,8 +2155,11 @@ document.write(`
 
     <span class="k">if</span> <span class="n">use_fp32_acc</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. </span><span class="se">\</span>
-<span class="s2">                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation.&quot;</span>
+            <span class="s2">&quot;FP32 accumulation for FP16 matmul layers is enabled. If &quot;</span>
+            <span class="s2">&quot;decompose_attention is also enabled, the complete decomposed FP16 &quot;</span>
+            <span class="s2">&quot;scaled dot product attention calculation runs in FP32 and only its &quot;</span>
+            <span class="s2">&quot;final output is cast back to FP16. This option has no effect on FP32 &quot;</span>
+            <span class="s2">&quot;or BF16 inputs.&quot;</span>
         <span class="p">)</span>
 
     <span class="c1"># Aliasing inputs to arg_inputs for better understanding</span>
@@ -1973,9 +2220,6 @@ document.write(`
         <span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
-        <span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">:</span> <span class="n">runtime_cache_path</span><span class="p">,</span>
-        <span class="s2">&quot;dynamic_shapes_kernel_specialization_strategy&quot;</span><span class="p">:</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">,</span>
-        <span class="s2">&quot;cuda_graph_strategy&quot;</span><span class="p">:</span> <span class="n">cuda_graph_strategy</span><span class="p">,</span>
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
@@ -1992,11 +2236,6 @@ document.write(`
         <span class="s2">&quot;decompose_attention&quot;</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">&quot;attn_bias_is_causal&quot;</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
     <span class="p">}</span>
-    <span class="k">if</span> <span class="s2">&quot;runtime_cache_path&quot;</span> <span class="ow">in</span> <span class="n">compilation_options</span><span class="p">:</span>
-        <span class="n">compilation_options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache_path&quot;</span><span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-            <span class="s2">&quot;runtime_cache_path is a JIT-time API and is not applicable to serialized engine export. Ignoring.&quot;</span>
-        <span class="p">)</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
@@ -2006,6 +2245,7 @@ document.write(`
             <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
             <span class="n">decompose_attention</span><span class="p">,</span>
             <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+            <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
 

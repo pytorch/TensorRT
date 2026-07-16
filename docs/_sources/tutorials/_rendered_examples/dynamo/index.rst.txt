@@ -276,6 +276,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="When a model takes multiple inputs whose dynamic axes must be equal at runtime — for example, H...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_shared_dynamic_dims_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_shared_dynamic_dims_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Sharing Dynamic Dimensions Across Inputs</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use Torch-TensorRT Autocast with PyTorch Autocast to compile a...">
 
 .. only:: html
@@ -429,6 +446,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="Autoregressive LLMs run in two very different shape regimes that share one set of weights (and ...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_multi_optimization_profiles_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_multi_optimization_profiles.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Multiple Optimization Profiles: Prefill vs Decode for Gemma-3</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="Basic example on how to use the hierarchical adjacency partitioner function and manually compil...">
 
 .. only:: html
@@ -526,6 +560,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Engine Caching</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates post-training FP8 quantization of a Hugging Face ViT model with NVIDI...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_quantize_vit_fp8_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_quantize_vit_fp8.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Quantize and Compile ViT with FP8</div>
     </div>
 
 
@@ -636,6 +687,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
    /tutorials/_rendered_examples/dynamo/auto_generate_plugins
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
+   /tutorials/_rendered_examples/dynamo/shared_dynamic_dims_example
    /tutorials/_rendered_examples/dynamo/autocast_example
    /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    /tutorials/_rendered_examples/dynamo/auto_generate_converters
@@ -645,12 +697,14 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example
    /tutorials/_rendered_examples/dynamo/aot_plugin
    /tutorials/_rendered_examples/dynamo/ptx_op
+   /tutorials/_rendered_examples/dynamo/multi_optimization_profiles
    /tutorials/_rendered_examples/dynamo/hierarchical_partitioner_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/weight_streaming_example
    /tutorials/_rendered_examples/dynamo/torch_export_sam2
    /tutorials/_rendered_examples/dynamo/vgg16_ptq
    /tutorials/_rendered_examples/dynamo/engine_caching_example
+   /tutorials/_rendered_examples/dynamo/quantize_vit_fp8
    /tutorials/_rendered_examples/dynamo/nvrtc_aot_plugin
    /tutorials/_rendered_examples/dynamo/llama2_flashinfer_rmsnorm
    /tutorials/_rendered_examples/dynamo/torch_export_3d_rope

@@ -14,7 +14,9 @@
 #include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
+#include "core/runtime/RuntimeSettings.h"
 #include "core/runtime/TRTEngineProfiler.h"
+#include "core/runtime/TRTRuntimeConfig.h"
 #include "core/runtime/TensorRTBindingNames.h"
 #include "core/util/prelude.h"
 
@@ -47,7 +49,8 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>, // Platform
     std::tuple<std::string, std::string>, // Resource Allocation Strategy
-    std::tuple<std::string, std::string>>; // requires_native_multidevice
+    std::tuple<std::string, std::string> // requires_native_multidevice
+    >;
 
 struct TorchTRTRuntimeStates {
   // Indicates whether CUDAGraphs were enabled in the previous execute_engine
@@ -121,7 +124,6 @@ struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
   std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
-  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
   bool output_tensors_are_unowned = false;
   std::string name;
@@ -151,7 +153,8 @@ struct TRTEngine : torch::CustomClassHolder {
       bool requires_output_allocator = false,
       const std::string& serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
-          TRTEngine::ResourceAllocationStrategy::kStatic);
+          TRTEngine::ResourceAllocationStrategy::kStatic,
+      RuntimeSettings runtime_settings = RuntimeSettings{});
 
   TRTEngine(std::vector<std::string> serialized_info);
 
@@ -166,7 +169,8 @@ struct TRTEngine : torch::CustomClassHolder {
       bool requires_output_allocator = false,
       const std::string& serialized_metadata = "",
       const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
-          TRTEngine::ResourceAllocationStrategy::kStatic);
+          TRTEngine::ResourceAllocationStrategy::kStatic,
+      RuntimeSettings runtime_settings = RuntimeSettings{});
 
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
@@ -211,12 +215,69 @@ struct TRTEngine : torch::CustomClassHolder {
   // Per-call formatted input buffers. In standard mode these are bound
   // directly to TRT; in CUDA graph mode they are async-copy sources for
   // persistent CUDA graph input staging buffers.
+  struct InputBindingInfo {
+    std::string name;
+    at::ScalarType expected_type;
+    bool is_shape_tensor;
+  };
+  std::vector<InputBindingInfo> input_binding_infos = {};
   std::vector<at::Tensor> active_input_tensors = {};
   std::list<std::vector<int64_t>> active_shape_tensor_values = {};
 
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
+
+  // --- Multiple optimization profiles ---
+  // State and helpers mirror the Python runtime (TRTEngine in _TRTEngine.py) so
+  // the C++ and Python runtimes are interchangeable: the same attribute and
+  // method names are exposed via torchbind in register_jit_hooks.cpp
+  // (``num_optimization_profiles``, ``_active_profile_index``,
+  // ``_auto_select_profiles``, ``set_active_profile``). Index validation lives
+  // in the runtime-agnostic TorchTensorRTModule.resolve_profile_index.
+  int64_t num_optimization_profiles = 1; // cuda_engine->getNbOptimizationProfiles()
+  int64_t active_profile_index = 0; // profile currently loaded in exec_ctx
+  bool auto_select_profiles = false; // opt-in shape-based selection (per call)
+  // A single input dimension whose extent varies across or within optimization
+  // profiles, paired with its [min, max] range for each profile index. Dims that
+  // are a fixed identical extent in every profile are NOT stored, so selection
+  // only inspects dims that can actually distinguish profiles.
+  struct DynamicProfileDim {
+    int32_t dim_index;
+    std::vector<std::pair<int64_t, int64_t>> profile_ranges; // indexed by profile index
+  };
+  // Indexed by input binding position (parallel to ``in_binding_names``, so it
+  // reuses the same positional input -> binding mapping the rest of the runtime
+  // relies on). Each entry holds only that input's dynamic dims; shape-inference
+  // IO and all-static inputs get an empty list. Built once in
+  // setup_optimization_profiles so auto-selection does no per-call string
+  // lookups.
+  std::vector<std::vector<DynamicProfileDim>> profile_dynamic_dims;
+
+  // Cache profile count + per-profile dim ranges purely from the TRT API
+  // (getNbOptimizationProfiles / getProfileShape) so selection works for any
+  // loaded engine with no extra serialized metadata.
+  void setup_input_binding_infos();
+  void setup_optimization_profiles();
+  // Switch the active TRT optimization profile (idempotent). Manual-pin /
+  // torchbind entry point: runs outside execute_engine's stream setup, so it
+  // resolves the current stream and fully synchronizes (rare, not perf-critical).
+  void set_active_profile(int64_t profile_index);
+  // Core switch issued on ``stream`` with no host synchronize: the caller must
+  // guarantee a happens-before to the enqueue (e.g. issue on the enqueue stream).
+  // Used by auto-selection, which switches on engine_stream before enqueueV3.
+  void set_active_profile_with_stream(int64_t profile_index, const c10::cuda::CUDAStream& stream);
+  // True if every input's dynamic dims fit profile ``profile_index``'s [min, max]
+  // ranges (positional inputs[i] <-> in_binding_names[i]; static / shape-inference
+  // IO inputs are skipped).
+  bool profile_fits(int64_t profile_index, const std::vector<at::Tensor>& inputs) const;
+  // Select and activate the optimization profile for ``inputs`` and return its
+  // index. Keeps the currently active profile when it still fits (no switch, no
+  // thrashing); otherwise switches to the first fitting profile. Owns the switch
+  // so callers need no follow-up. Called internally from the execute_engine run
+  // paths (guarded by num_optimization_profiles > 1 && auto_select_profiles);
+  // manual pins are applied eagerly via set_active_profile.
+  int64_t auto_select_profile(const std::vector<at::Tensor>& inputs);
 
   // Single placeholder buffer for empty tensor inputs (allocated once, reused)
   void* empty_tensor_placeholder = nullptr;
@@ -273,6 +334,65 @@ struct TRTEngine : torch::CustomClassHolder {
   ResourceAllocationStrategy resource_allocation_strategy = kStatic;
   void set_resource_allocation_strategy(ResourceAllocationStrategy new_strategy);
   ResourceAllocationStrategy get_resource_allocation_strategy();
+
+  // Owns the canonical `RuntimeSettings` plus the live `IRuntimeConfig` derived
+  // from them.
+  TRTRuntimeConfig runtime_cfg;
+
+  [[nodiscard]] RuntimeSettings const& runtime_settings() const noexcept {
+    return runtime_cfg.settings();
+  }
+
+  // Setter. Returns true iff the settings actually changed -- consumers can
+  // read the diff result to decide whether to invalidate dependent state. On
+  // change, invalidates the live ``IRuntimeConfig`` (the next ``exec_ctx()``
+  // getter call rebuilds with the new settings).
+  [[nodiscard]] bool runtime_settings(RuntimeSettings new_settings);
+
+  // Whether the engine has any input binding with a dynamic dimension. Computed
+  // once during construction; used by `is_monolithic_capturable`.
+  bool has_dynamic_inputs = false;
+
+  // Monolithic-capturability check used when this engine is wrapped by an outer whole-graph
+  // capture (e.g. CudaGraphsTorchTensorRTModule). Non-RTX builds always return true.
+  bool is_monolithic_capturable(cudaStream_t stream) const;
+
+  // Disable TensorRT-RTX native CUDA graph capture on this engine (one-shot, invoked when
+  // an outer stream capture is detected around execute_engine). No-op on non-RTX or when
+  // already disabled.
+  void disable_rtx_native_cudagraphs();
+
+  // Obtains the execution context. Materializes it lazily on first call using
+  // the current settings from ``runtime_cfg`` and subsequent calls return the
+  // cached instance until invalidated.
+  // Returns a raw pointer owned by the internal ``shared_ptr``; do not store
+  // across an invalidate. Returned pointer is never null (the underlying
+  // factory throws if creation fails).
+  nvinfer1::IExecutionContext* exec_ctx();
+
+  // Drop the live execution context without recreating. The next ``exec_ctx()``
+  // call rebuilds from the current ``runtime_cfg`` settings.
+  void invalidate_exec_ctx() noexcept;
+
+  // True iff the execution context has been materialized. Probes WITHOUT
+  // triggering creation; for tests/introspection.
+  [[nodiscard]] bool has_exec_ctx() const noexcept;
+
+  [[nodiscard]] int64_t num_execution_contexts_created() const noexcept {
+    return num_execution_contexts_created_;
+  }
+
+ private:
+  // Backing storage for the execution context. External code reaches it only
+  // through ``exec_ctx()`` / ``invalidate_exec_ctx()`` / ``has_exec_ctx()``.
+  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx_;
+
+  // Single entry point that (re)creates exec_ctx_ via runtime_cfg.create_execution_context.
+  // Bumps ``num_execution_contexts_created_``. Called from ``exec_ctx()`` when
+  // the cached context is null.
+  void recreate_execution_context();
+
+  int64_t num_execution_contexts_created_ = 0;
 };
 
 } // namespace runtime

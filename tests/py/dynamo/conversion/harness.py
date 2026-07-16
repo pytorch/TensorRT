@@ -311,11 +311,12 @@ class DispatchTestCase(TRTTestCase):
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
+            device = default_device()
+            mod = mod.to(device.to(torch.device))
             if torch_export_dynamic_shapes is None:
                 torch_export_dynamic_shapes = get_dynamic_shapes_args(
                     mod, original_inputs
                 )
-            device = default_device()
             torch_export_inputs = get_torch_inputs(original_inputs, device)
             exported_program = torch.export.export(
                 mod,
@@ -331,7 +332,11 @@ class DispatchTestCase(TRTTestCase):
             if enable_passes:
                 exported_program = pre_export_lowering(exported_program, settings)
                 exported_program = exported_program.run_decompositions(
-                    get_decompositions(False, settings.decompose_attention)
+                    get_decompositions(
+                        False,
+                        settings.decompose_attention,
+                        use_fp32_acc=settings.use_fp32_acc,
+                    )
                 )
             fx_module = exported_program.module()
         else:

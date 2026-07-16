@@ -1,0 +1,213 @@
+
+Full API
+--------
+
+Namespaces
+**********
+
+
+.. toctree::
+   :maxdepth: 5
+
+   namespace_torch_tensorrt.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   namespace_torch_tensorrt__logging.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   namespace_torch_tensorrt__ptq.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   namespace_torch_tensorrt__torchscript.rst
+
+Classes and Structs
+*******************
+
+
+.. toctree::
+   :maxdepth: 5
+
+   structtorch__tensorrt_1_1Device.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   structtorch__tensorrt_1_1Input.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   structtorch__tensorrt_1_1torchscript_1_1CompileSpec.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   classtorch__tensorrt_1_1DataType.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   classtorch__tensorrt_1_1Device_1_1DeviceType.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   classtorch__tensorrt_1_1TensorFormat.rst
+
+Enums
+*****
+
+
+.. toctree::
+   :maxdepth: 5
+
+   enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.rst
+
+Functions
+*********
+
+
+.. toctree::
+   :maxdepth: 5
+
+   function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_logging_8h_1a0c012cb374addd90eb1f42eaec570650.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_logging_8h_1af8f3443813315af7901903d25dd495cc.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_ptq_8h_1a9835f6e605dce1abf442a55b64d6dffa.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_ptq_8h_1a83ff2be7e0b80bc7434de415861dc039.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_torch__tensorrt_8h_1a710df824a7718b440e4bc17bf9693cef.rst
+
+Defines
+*******
+
+
+.. toctree::
+   :maxdepth: 5
+
+   define_macros_8h_1a18d295a837ac71add5578860b55e5502.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   define_macros_8h_1ad19939408f7be171a74a89928b36eb59.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.rst

@@ -134,9 +134,11 @@ Precision and Typing
        compile models that use double without changing the model code.
    * - ``use_fp32_acc``
      - ``False``
-     - Insert FP32 cast nodes around matmul layers so that accumulation happens in
-       FP32 even when the network runs in FP16. Improves numerical accuracy for
-       transformer models at a small throughput cost.
+     - Use FP32 accumulation for FP16 matmul layers while retaining FP16 inputs and
+       outputs. When combined with ``decompose_attention=True``, the complete
+       decomposed FP16 scaled dot product attention calculation runs in FP32 and only
+       its final output is cast back to FP16. This option has no effect on FP32 or
+       BF16 inputs and may increase memory use or reduce throughput.
 
 ----
 
@@ -336,8 +338,10 @@ Graph Partitioning
        model contains ``DTensor`` or other distributed tensors.
    * - ``decompose_attention``
      - ``False``
-     - Decompose attention layers into smaller ops. We have converters for handling attention ops,
-       but if you want to decompose them into smaller ops, you can set this to True.
+     - Decompose attention layers into smaller operations instead of using the attention
+       converters. When combined with ``use_fp32_acc=True``, decomposed FP16 attention
+       keeps its intermediate calculation in FP32 and casts only the final output back
+       to FP16.
 
 ----
 

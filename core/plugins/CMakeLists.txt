@@ -18,6 +18,15 @@ target_include_directories(${lib_name}
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )
 
+# The plugins pull in <ATen/cuda/CUDAEvent.h> / torch/torch.h, whose structs use
+# alignas(c10::hardware_destructive_interference_size). GCC 12+ flags that
+# ABI-sensitive constant via -Winterference-size (fatal under -Werror). Silence
+# it on GCC/Clang; MSVC has no such warning.
+target_compile_options(${lib_name}
+    PRIVATE
+        $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-Wno-interference-size>
+)
+
 target_link_libraries(${lib_name}
     PUBLIC
         TensorRT::nvinfer

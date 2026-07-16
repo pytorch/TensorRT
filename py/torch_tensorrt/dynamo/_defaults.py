@@ -38,9 +38,6 @@ SUPPORTED_KERNEL_PRECISIONS = {
 TIMING_CACHE_PATH = os.path.join(
     tempfile.gettempdir(), "torch_tensorrt_engine_cache", "timing_cache.bin"
 )
-RUNTIME_CACHE_PATH = os.path.join(
-    tempfile.gettempdir(), "torch_tensorrt_engine_cache", "runtime_cache.bin"
-)
 LAZY_ENGINE_INIT = False
 CACHE_BUILT_ENGINES = False
 REUSE_CACHED_ENGINES = False
@@ -69,8 +66,7 @@ CPU_MEMORY_BUDGET = None
 DYNAMICALLY_ALLOCATE_RESOURCES = False
 DECOMPOSE_ATTENTION = False
 ATTN_BIAS_IS_CAUSAL = True
-DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY = "lazy"
-CUDA_GRAPH_STRATEGY = "disabled"
+FALLBACK_DATA_DEPENDENT_OPS = False
 
 if platform.system() == "Linux":
     import pwd
@@ -83,6 +79,19 @@ else:
 
 DEBUG_LOGGING_DIR = os.path.join(
     tempfile.gettempdir(), f"torch_tensorrt_{current_user}/debug_logs"
+)
+
+# ---------------------------------------------------------------------------
+# Runtime-only knobs (see torch_tensorrt.runtime.RuntimeSettings). Defaults
+# live here to mirror compilation-settings convention; the dataclass imports
+# from this module.
+# ---------------------------------------------------------------------------
+DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY = "lazy"
+CUDA_GRAPH_STRATEGY = "disabled"
+# Default to a per-user temp file (mirrors ENGINE_CACHE_DIR). Users can override
+# via ``RuntimeSettings(runtime_cache="/different/path")`` or a runtime CM.
+RUNTIME_CACHE_PATH = os.path.join(
+    tempfile.gettempdir(), f"torch_tensorrt_{current_user}/runtime_cache.bin"
 )
 
 

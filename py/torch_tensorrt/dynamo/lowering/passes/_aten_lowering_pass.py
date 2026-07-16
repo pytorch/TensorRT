@@ -10,6 +10,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     trace_intermediate_node_outputs,
 )
 
+from .annotate_fp8_sdpa import annotate_fp8_sdpa
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
@@ -45,6 +46,7 @@ post_lowering_pass_list = [
     force_causal_efficient_attention,
     eliminate_sym_min_int64_max,
     normalize_negative_slice_stop,
+    annotate_fp8_sdpa,
 ]
 
 if not is_tegra_platform():

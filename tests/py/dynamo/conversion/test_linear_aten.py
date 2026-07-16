@@ -49,6 +49,19 @@ class TestLinearConverter(DispatchTestCase):
             LinearModel(), input_specs, use_dynamo_tracer=True, enable_passes=True
         )
 
+    def test_linear_with_rank_3_input_and_bias(self):
+        class LinearModel(torch.nn.Module):
+            def forward(self, x, weight, bias):
+                return torch.ops.aten.linear.default(x, weight, bias)
+
+        inputs = [
+            torch.randn(2, 3, 4).cuda(),
+            torch.randn(5, 4).cuda(),
+            torch.randn(5).cuda(),
+        ]
+
+        self.run_test(LinearModel(), inputs, use_dynamo_tracer=True, enable_passes=True)
+
 
 if __name__ == "__main__":
     run_tests()

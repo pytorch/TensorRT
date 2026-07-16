@@ -4,7 +4,7 @@ import collections.abc
 import copy
 import gc
 import logging
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence, Tuple
 
 import numpy as np
 import tensorrt as trt
@@ -12,7 +12,7 @@ import torch
 from torch.export import ExportedProgram
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._enums import dtype
-from torch_tensorrt._features import ENABLED_FEATURES, needs_refit
+from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._exporter import inline_torch_modules
@@ -22,9 +22,6 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
-from torch_tensorrt.dynamo.conversion.impl.normalization.ops import (
-    batch_norm_constant_folding,
-)
 from torch_tensorrt.dynamo.conversion.truncate_double import repair_double_inputs
 from torch_tensorrt.dynamo.lowering import (
     clean_up_graph_after_modifications,
@@ -41,7 +38,6 @@ from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 from torch_tensorrt.dynamo.utils import (
     check_module_output,
     check_output_equal,
-    get_model_device,
     get_torch_inputs,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -85,68 +81,11 @@ def construct_refit_mapping(
 
 
 @needs_refit  # type: ignore[misc]
-def construct_refit_mapping_from_weight_name_map(
-    weight_name_map: dict[Any, Any],
-    state_dict: dict[Any, Any],
-    settings: CompilationSettings,
-) -> dict[Any, Any]:
-    engine_weight_map = {}
-    for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
-        # Add more constant folding converters here
-        trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
-        torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
-        if engine_weight_name.split(" ")[-1] in ["SCALE", "SHIFT"]:
-            # Batch Norm Layer
-            params = {}
-            for w in sd_weight_name:
-                params[w.split(".")[-1]] = state_dict[w].cuda()
-            # Batch norm constant folding
-
-            scale, shift = batch_norm_constant_folding(**params, eps=1e-5)
-            # Set scale to scale or shift to shift
-            engine_weight_map[engine_weight_name] = eval(
-                engine_weight_name.split(" ")[-1].lower()
-            )
-
-        elif isinstance(sd_weight_name, tuple):
-            # Buffer-slice mapping created by Stage 3 of _save_weight_mapping.
-            # Encodes (state_dict_key, dim, index) for weights that are slices
-            # of a source buffer (e.g. real/imag parts of an unpacked complex buffer).
-            sd_key, dim, idx = sd_weight_name
-            if sd_key not in state_dict:
-                continue
-            engine_weight_map[engine_weight_name] = (
-                state_dict[sd_key].select(dim, idx).to(to_torch_device(settings.device))
-            )
-
-        elif sd_weight_name not in state_dict:
-            # If weights is not in sd, we can leave it unchanged
-            continue
-        else:
-
-            engine_weight_map[engine_weight_name] = state_dict[sd_weight_name].to(
-                to_torch_device(settings.device)
-            )
-
-        engine_weight_map[engine_weight_name] = (
-            engine_weight_map[engine_weight_name]
-            .clone()
-            .reshape(-1)
-            .contiguous()
-            .to(torch_dtype),
-            trt_dtype,
-        )
-
-    return engine_weight_map
-
-
-@needs_refit  # type: ignore[misc]
 def _refit_single_trt_engine_with_gm(
     new_gm: torch.fx.GraphModule,
     old_engine: trt.ICudaEngine,
     input_list: Sequence[Any],
     settings: CompilationSettings = CompilationSettings(),
-    weight_name_map: Optional[dict[str, List[str]]] = None,
 ) -> None:
     """
     Refit a TensorRT Engine in place
@@ -154,84 +93,25 @@ def _refit_single_trt_engine_with_gm(
 
     with unset_fake_temporarily():
         refitted = set()
-        torch_device = get_model_device(new_gm)
         refitter = trt.Refitter(old_engine, TRT_LOGGER)
         weight_list = refitter.get_all_weights()
 
-        if weight_name_map:
-            # Get the refitting mapping
-            trt_wt_location = (
-                trt.TensorLocation.DEVICE
-                if torch_device.type == "cuda"
-                else trt.TensorLocation.HOST
+        mapping = construct_refit_mapping(new_gm, input_list, settings)
+        trt_wt_location = trt.TensorLocation.HOST
+        for layer_name in weight_list:
+            if layer_name not in mapping:
+                raise AssertionError(f"{layer_name} is not found in weight mapping")
+            # Use Tensor to create weights
+            weight = mapping[layer_name]
+            trt_dtype = dtype._from(weight.dtype).to(trt.DataType)
+            trt_wt_tensor = trt.Weights(
+                trt_dtype, weight.data_ptr(), torch.numel(weight)
             )
+            refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+            refitted.add(layer_name)
 
-            constant_mapping: dict[str, Any] = weight_name_map.pop(
-                "constant_mapping", {}
-            )  # type: ignore
-            mapping = construct_refit_mapping_from_weight_name_map(
-                weight_name_map, new_gm.state_dict(), settings
-            )
-            constant_mapping_with_type = {}
-
-            for constant_name, val in constant_mapping.items():
-                weight_dtype = val.dtype
-                val_tensor = val.cuda()
-                trt_dtype = dtype._from(weight_dtype).to(trt.DataType)
-                torch_dtype = dtype._from(weight_dtype).to(torch.dtype)
-                constant_mapping_with_type[constant_name] = (
-                    val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
-                    trt_dtype,
-                )
-
-            mapping.update(constant_mapping_with_type)
-
-            for layer_name in weight_list:
-                if layer_name not in mapping:
-                    logger.warning(f"{layer_name} is not found in weight mapping.")
-                    continue
-                # Use Numpy to create weights
-                weight, weight_dtype = mapping[layer_name]
-                trt_wt_tensor = trt.Weights(
-                    weight_dtype, weight.data_ptr(), torch.numel(weight)
-                )
-                refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-            # get_missing_weights(): reports weights in connected engines
-            # that were not set.
-            missing_weights = refitter.get_missing_weights()
-            assert len(missing_weights) == 0, (
-                f"Fast refit failed: refitter.get_missing_weights() reports "
-                f"{len(missing_weights)} of {len(weight_list)} engine weight(s) "
-                f"were never set."
-            )
-            if ENABLED_FEATURES.tensorrt_rtx:
-                # Compare weights actually set vs all engine weights: catches
-                # weights in independent engines that get_missing_weights() may not report.
-                unset_weights = {w for w in weight_list if w not in mapping}
-                assert len(unset_weights) == 0, (
-                    f"Fast refit failed on TensorRT-RTX: {len(unset_weights)} of "
-                    f"{len(weight_list)} engine weight(s) had no entry in "
-                    f"weight_name_map. "
-                    f"Unset (showing up to 5): {sorted(unset_weights)[:5]}"
-                )
-
-        else:
-            mapping = construct_refit_mapping(new_gm, input_list, settings)
-            trt_wt_location = trt.TensorLocation.HOST
-            for layer_name in weight_list:
-                if layer_name not in mapping:
-                    raise AssertionError(f"{layer_name} is not found in weight mapping")
-                # Use Tensor to create weights
-                weight = mapping[layer_name]
-                trt_dtype = dtype._from(weight.dtype).to(trt.DataType)
-                trt_wt_tensor = trt.Weights(
-                    trt_dtype, weight.data_ptr(), torch.numel(weight)
-                )
-                refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-                refitted.add(layer_name)
-
-            if len(refitted) != len(weight_list):
-                logger.warning("Not all weights have been refitted!!!")
+        if len(refitted) != len(weight_list):
+            logger.warning("Not all weights have been refitted!!!")
 
         if not refitter.refit_cuda_engine():
             logger.error("Error: failed to refit new weights.")
@@ -245,7 +125,6 @@ def refit_module_weights(
     arg_inputs: Optional[Tuple[Any, ...]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
     verify_output: bool = False,
-    use_weight_map_cache: bool = True,
     in_place: bool = False,
 ) -> torch.fx.GraphModule:
     """
@@ -383,6 +262,7 @@ def refit_module_weights(
             settings.enable_experimental_decompositions,
             settings.decompose_attention,
             settings.use_distributed_mode_trace,
+            use_fp32_acc=settings.use_fp32_acc,
         )
     )
     new_gm = new_weight_module.module()
@@ -467,7 +347,6 @@ def refit_module_weights(
         # Extract engine from the submodule
         try:
             if inline_module:
-                weight_name_map = None
                 compiled_submodule = compiled_submodules_map[name]
                 # If this is a torch module, load the old state_dict
                 if "_run_on_acc" not in name:
@@ -478,58 +357,11 @@ def refit_module_weights(
                     engine = get_engine_from_encoded_engine(
                         engine_info[ENGINE_IDX], runtime
                     )
-                    if use_weight_map_cache:
-                        encoded_metadata = compiled_submodule.__getstate__()[0][
-                            SERIALIZED_METADATA_IDX
-                        ]
-                        weight_name_map = TorchTensorRTModule.decode_metadata(
-                            encoded_metadata
-                        )["weight_name_map"]
-                        if not weight_name_map:
-                            use_weight_map_cache = False
-                            logger.warning(
-                                "This engine does not have a weight map cache. Rebuilding the weight map"
-                            )
             else:
                 compiled_submodule = getattr(compiled_module, name)
                 if "_run_on_acc" not in name:
                     compiled_submodule.load_state_dict(new_submodule.state_dict())
                     continue
-
-                weight_name_map = None
-                if use_weight_map_cache:
-                    try:
-                        weight_name_map = compiled_submodule.weight_name_map
-                    except AttributeError:
-                        if isinstance(compiled_submodule, torch.nn.Module):
-                            # Torch retrace module
-                            assert not isinstance(
-                                compiled_submodule.engine,
-                                TRTEngine,
-                            ), (
-                                "Refitting a torch retraced module is only supported when "
-                                "the engine uses the C++ Torch-TensorRT runtime"
-                            )
-                            encoded_metadata = [
-                                engine
-                                for name, engine in compiled_submodules
-                                if name == "engine"
-                            ][0].__getstate__()[0][SERIALIZED_METADATA_IDX]
-                            weight_name_map = TorchTensorRTModule.decode_metadata(
-                                encoded_metadata
-                            )["weight_name_map"]
-
-                        if not isinstance(
-                            compiled_submodule, torch.fx.graph_module.GraphModule
-                        ):
-                            logger.warning(
-                                "The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map."
-                            )
-                    if not weight_name_map:
-                        use_weight_map_cache = False
-                        logger.warning(
-                            "This engine does not have a weight map cache. Rebuilding the weight map"
-                        )
 
                 # Rexporting the TRT compiled graph module and loading it back doesn't preserve
                 # the instance type; choose the engine handle based on the actual engine object.
@@ -561,26 +393,12 @@ def refit_module_weights(
                 to_torch_device(settings.device),
                 name,
             )
-        try:
-            _refit_single_trt_engine_with_gm(
-                new_gm=new_submodule,
-                old_engine=engine,
-                input_list=submodule_inputs,
-                settings=settings,
-                weight_name_map=weight_name_map,
-            )
-
-        except AssertionError as e:
-            # If fast_refit is used and failed, we fall back to regular refit
-            logger.warning(e)
-            if use_weight_map_cache and weight_name_map:
-                _refit_single_trt_engine_with_gm(
-                    new_gm=new_submodule,
-                    old_engine=engine,
-                    input_list=submodule_inputs,
-                    settings=settings,
-                    weight_name_map=None,
-                )
+        _refit_single_trt_engine_with_gm(
+            new_gm=new_submodule,
+            old_engine=engine,
+            input_list=submodule_inputs,
+            settings=settings,
+        )
 
         # clear EXCLUDE_WEIGHTS flag and set INCLUDE_REFIT flag to make the engine refittable
         serialization_config = engine.create_serialization_config()
@@ -646,19 +464,6 @@ def refit_module_weights(
         if outputs_match:
             logger.info("Refitting Succeed!")
         else:
-            if weight_name_map:
-                logger.warning(
-                    "Refitting with weight_name_map yielded incorrect result! The outputs do not match."
-                )
-                return refit_module_weights(
-                    compiled_module,
-                    new_weight_module,
-                    arg_inputs,
-                    kwarg_inputs,
-                    verify_output,
-                    use_weight_map_cache=False,
-                    in_place=in_place,
-                )
             logger.error("Refitting Failed! The outputs do not match.")
     else:
         logger.info("Refitting Completed! Output verification skipped.")

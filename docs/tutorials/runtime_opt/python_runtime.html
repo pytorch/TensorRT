@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=84daf132"></script>
+    <script src="../../_static/documentation_options.js?v=d8482cd4"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -59,7 +59,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Deployment" href="../deployment/index.html" />
-    <link rel="prev" title="Pre-allocated output buffer" href="../_rendered_examples/dynamo/pre_allocated_output_example.html" />
+    <link rel="prev" title="Multiple Optimization Profiles: Prefill vs Decode for Gemma-3" href="../_rendered_examples/dynamo/multi_optimization_profiles.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -496,6 +496,8 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi_optimization_profiles.html">Multiple Optimization Profiles (Prefill / Decode)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/multi_optimization_profiles.html">Example: Multiple optimization profiles (prefill/decode)</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Python vs C++ runtime</a></li>
 </ul>
 </details></li>
@@ -704,9 +706,6 @@ produced outside Torch-TensorRT):</p>
 </dd>
 <dt><code class="docutils literal notranslate"><span class="pre">settings</span></code> (<code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo._settings.CompilationSettings</span></code>, optional)</dt><dd><p>Device and runtime options (must match how the engine was built).</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">weight_name_map</span></code> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>, optional)</dt><dd><p>Mapping of TRT weight names to PyTorch state dict names. Required for refit
-support via <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.refit_module_weights()</span></code>.</p>
-</dd>
 <dt><code class="docutils literal notranslate"><span class="pre">requires_output_allocator</span></code> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>, default <code class="docutils literal notranslate"><span class="pre">False</span></code>)</dt><dd><p>Set to <code class="docutils literal notranslate"><span class="pre">True</span></code> if the engine contains data-dependent-shape ops (<code class="docutils literal notranslate"><span class="pre">nonzero</span></code>,
 <code class="docutils literal notranslate"><span class="pre">unique</span></code>, etc.) that require TRT’s output allocator.</p>
 </dd>
@@ -735,12 +734,12 @@ otherwise it uses the Python <code class="docutils literal notranslate"><span cl
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../_rendered_examples/dynamo/pre_allocated_output_example.html"
+       href="../_rendered_examples/dynamo/multi_optimization_profiles.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Pre-allocated output buffer</p>
+        <p class="prev-next-title">Multiple Optimization Profiles: Prefill vs Decode for Gemma-3</p>
       </div>
     </a>
     <a class="right-next"

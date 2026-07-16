@@ -7,7 +7,17 @@ import logging
 import platform
 import warnings
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 import torch
 from torch_tensorrt._enums import dtype
@@ -52,6 +62,7 @@ if ENABLED_FEATURES.dynamo_frontend:
     )
     from torch_tensorrt.dynamo._defaults import default_device
     from torch_tensorrt.dynamo._tracer import (
+        build_dim_registry,
         get_dynamic_shapes_args,
         get_dynamic_shapes_kwargs,
     )
@@ -296,7 +307,7 @@ def compile(
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
-        if arg_inputs is None and inputs is None:
+        if arg_inputs is None and inputs is None and not kwarg_inputs:
             raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
         elif arg_inputs is not None and inputs is not None:
@@ -304,15 +315,17 @@ def compile(
                 "'arg_inputs' and 'inputs' should not be used at the same time."
             )
         if inputs is not None:
-            arg_inputs = inputs
+            arg_inputs = inputs  # type: ignore[assignment]
 
         if kwarg_inputs is None:
             kwarg_inputs = {}
 
         from torch_tensorrt.dynamo.utils import prepare_inputs
 
-        if not isinstance(arg_inputs, collections.abc.Sequence):
-            arg_inputs = [arg_inputs]  # type: ignore
+        if arg_inputs is None:
+            arg_inputs = []
+        elif not isinstance(arg_inputs, collections.abc.Sequence):
+            arg_inputs = [arg_inputs]
 
         torchtrt_arg_inputs = prepare_inputs(arg_inputs)
         torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
@@ -401,7 +414,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs or arg_inputs  # type: ignore[assignment]
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -501,7 +514,7 @@ def convert_method_to_trt_engine(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = arg_inputs or inputs
+    arg_inputs = arg_inputs or inputs  # type: ignore[assignment]
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
@@ -728,11 +741,14 @@ def save(
 
                 - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes
                   parameter takes precedence.
-        kwargs: Additional format-specific kwargs. ``partitioners=`` and
-                ``compile_specs=`` are only used with ``output_format="executorch"``;
-                otherwise they are ignored with a warning. Pass
-                ``compile_specs=[CompileSpec("target_device", b"cuda:<i>")]`` to
-                override the default target device (``cuda:0``).
+        kwargs: Additional format-specific kwargs. ``partitioners=``,
+                ``compile_specs=``, and ``backend_config=`` are only used with
+                ``output_format="executorch"``; otherwise they are ignored with a
+                warning. Pass ``compile_specs=[CompileSpec("target_device",
+                b"cuda:<i>")]`` to override the default target device (``cuda:0``).
+                ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``
+                and is forwarded to ``to_executorch(config=...)`` to customize
+                ExecuTorch lowering (e.g. memory planning or device placement).
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -759,6 +775,7 @@ def save(
 
     executorch_partitioners = kwargs.pop("partitioners", None)
     executorch_compile_specs = kwargs.pop("compile_specs", None)
+    executorch_backend_config = kwargs.pop("backend_config", None)
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -768,7 +785,7 @@ def save(
         raise ImportError(
             "Saving in ExecuTorch format requires the executorch package "
             "with executorch.exir. Install with: pip install "
-            "\"executorch\" to use output_format='executorch'."
+            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
         )
 
     def _all_are_input_objects(obj: Any) -> bool:
@@ -821,8 +838,13 @@ def save(
                     "The explicit dynamic_shapes parameter takes precedence and Input shape specifications will be ignored."
                 )
         else:
-            inferred_dynamic_shapes = get_dynamic_shapes_args(module, arg_inputs)
-            inferred_dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
+            dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
+            inferred_dynamic_shapes = get_dynamic_shapes_args(
+                module, arg_inputs, dim_registry
+            )
+            inferred_dynamic_shapes.update(
+                get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry)
+            )
 
             if inferred_dynamic_shapes is not None:
                 dynamic_shapes = inferred_dynamic_shapes
@@ -830,8 +852,8 @@ def save(
                     f"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: {dynamic_shapes}"
                 )
 
-        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))  # type: ignore[arg-type]
-        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())  # type: ignore[assignment]
+        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))
+        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())
 
     else:
         # Mixed case: some inputs are Tensors, some are Input objects
@@ -878,6 +900,11 @@ def save(
     if executorch_compile_specs and output_format != "executorch":
         logger.warning(
             "compile_specs= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if executorch_backend_config and output_format != "executorch":
+        logger.warning(
+            "backend_config= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
     if output_format == "aot_inductor" and platform.system() != "Linux":
@@ -948,6 +975,7 @@ def save(
                     file_path,
                     partitioners=executorch_partitioners,
                     compile_specs=executorch_compile_specs,
+                    backend_config=executorch_backend_config,
                 )
             else:
                 raise RuntimeError(
@@ -1013,6 +1041,7 @@ def save(
                         file_path,
                         partitioners=executorch_partitioners,
                         compile_specs=executorch_compile_specs,
+                        backend_config=executorch_backend_config,
                     )
                 else:
                     raise RuntimeError(
@@ -1099,6 +1128,7 @@ def save(
                         file_path,
                         partitioners=executorch_partitioners,
                         compile_specs=executorch_compile_specs,
+                        backend_config=executorch_backend_config,
                     )
                 else:
                     raise RuntimeError(
@@ -1197,14 +1227,15 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
                     f"'{engine_node.target}' not found on graph module"
                 )
         elif engine_node.op == "placeholder":
-            constants = getattr(exp_program, "constants", {})
-            engine_obj = constants.get(engine_node.name) or constants.get(
-                engine_node.target
-            )
+            from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
+
+            engine_obj = _resolve_lifted_custom_obj(exp_program, engine_node)
             if engine_obj is None:
                 raise RuntimeError(
                     f"execute_engine node '{node.name}': placeholder engine "
-                    f"'{engine_node.name}' not found in exp_program.constants"
+                    f"'{engine_node.name}' did not resolve to a lifted "
+                    f"custom-object constant (available: "
+                    f"{sorted(getattr(exp_program, 'constants', {}) or {})})"
                 )
         else:
             raise RuntimeError(
@@ -1315,7 +1346,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     except ImportError:
         raise ImportError(
             "ExecuTorch is not installed. Install with: pip install "
-            "\"executorch\" to use output_format='executorch'."
+            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
     from torch_tensorrt.executorch import (
@@ -1361,7 +1392,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         partitioner=partitioners,
         compile_config=get_edge_compile_config(),
     )
-    executorch_program = edge_program.to_executorch()
+    executorch_program = edge_program.to_executorch(config=kwargs.get("backend_config"))
     with open(file_path, "wb") as f:
         executorch_program.write_to_file(f)
 

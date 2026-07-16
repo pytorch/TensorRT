@@ -1,18 +1,84 @@
 import logging
-from typing import Any, Dict, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
+import sympy
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
-
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import (
     COMPLEX_TO_REAL_DTYPE,
     contains_sym_int,
     extract_var_range_info,
+    extract_var_range_info_for_profile,
 )
 
 logger = logging.getLogger(__name__)
+
+# Per-profile source-symbol bounds, indexed by optimization-profile index:
+#   [ {symbol_name: {"min": int, "opt": int, "max": int}}, ... ]
+# Built at the top level from ``Input.profiles`` and the export symbols, then
+# propagated to submodule inputs by substituting into their SymInt expressions.
+ProfileSourceBounds = List[Dict[str, Dict[str, int]]]
+
+
+def _build_submodule_profiles(
+    input_shape: torch.Size,
+    union_min: Sequence[int],
+    union_opt: Sequence[int],
+    union_max: Sequence[int],
+    profile_source_bounds: ProfileSourceBounds,
+    num_profiles: int,
+) -> Optional[List[Dict[str, Tuple[int, ...]]]]:
+    """Evaluate per-profile min/opt/max for a (possibly symbolic) submodule shape.
+
+    For each profile (by index), substitute the profile's source-symbol values
+    into each SymInt dim and evaluate. Static dims and dims whose
+    symbols cannot be resolved fall back to the union value. Returns an ordered
+    list of profile dicts (one per profile index).
+    """
+    profiles: List[Dict[str, Tuple[int, ...]]] = []
+    for i in range(num_profiles):
+        sym_bounds = profile_source_bounds[i] if i < len(profile_source_bounds) else {}
+        p_min: List[int] = []
+        p_opt: List[int] = []
+        p_max: List[int] = []
+        for d, dim in enumerate(input_shape):
+            if isinstance(dim, torch.SymInt):
+                try:
+                    p_min.append(
+                        extract_var_range_info_for_profile(
+                            dim, {s: b["min"] for s, b in sym_bounds.items()}
+                        )
+                    )
+                    p_opt.append(
+                        extract_var_range_info_for_profile(
+                            dim, {s: b["opt"] for s, b in sym_bounds.items()}
+                        )
+                    )
+                    p_max.append(
+                        extract_var_range_info_for_profile(
+                            dim, {s: b["max"] for s, b in sym_bounds.items()}
+                        )
+                    )
+                except KeyError:
+                    # Symbol(s) not present in this profile's source bounds;
+                    # fall back to the union range for this dim.
+                    p_min.append(int(union_min[d]))
+                    p_opt.append(int(union_opt[d]))
+                    p_max.append(int(union_max[d]))
+            else:
+                p_min.append(int(dim))
+                p_opt.append(int(dim))
+                p_max.append(int(dim))
+        profiles.append(
+            {
+                "min_shape": tuple(p_min),
+                "opt_shape": tuple(p_opt),
+                "max_shape": tuple(p_max),
+            }
+        )
+    return profiles
 
 
 def construct_dynamic_input(
@@ -20,11 +86,20 @@ def construct_dynamic_input(
     input_dtype: torch.dtype,
     name: str = "",
     is_shape_tensor: bool = False,
+    profile_source_bounds: Optional[ProfileSourceBounds] = None,
+    num_profiles: int = 0,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
 ) -> Input:
     """
     Constructs a torch_tensorrt.Input based on a symbolic input
     Args:
         input_shape: A symbolic shape / regular shape of a tensor (which can have a  mix of SymInt nodes and static values)
+        profile_source_bounds: Optional per-profile source-symbol bounds used to
+            propagate optimization profiles to this (intermediate) input.
+        num_profiles: Number of profiles to emit when ``profile_source_bounds``
+            is provided.
+        user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
+            :func:`extract_var_range_info` to fill unbounded exporter uppers.
     Returns:
         A dynamic shaped torch_tensorrt.Input which has the properties of the symbolic shaped input.
     """
@@ -33,7 +108,9 @@ def construct_dynamic_input(
     max_shape = []
     for d, dim in enumerate(input_shape):
         if isinstance(dim, torch.SymInt):
-            min_max_opt = extract_var_range_info(dim)
+            min_max_opt = extract_var_range_info(
+                dim, user_symbol_bounds=user_symbol_bounds
+            )
             unwrapped_min_max_opt: Dict[str, int] = {}
             if "min" not in min_max_opt or min_max_opt["min"] is None:
                 logger.warning(
@@ -70,6 +147,34 @@ def construct_dynamic_input(
             opt_shape.append(dim)
             max_shape.append(dim)
 
+    # Multi-profile propagation: emit profiles for this intermediate input by
+    # substituting source-symbol values into its SymInt dims.
+    if profile_source_bounds and num_profiles:
+        profiles = _build_submodule_profiles(
+            input_shape,
+            min_shape,
+            opt_shape,
+            max_shape,
+            profile_source_bounds,
+            num_profiles,
+        )
+        if profiles is not None:
+            try:
+                return Input(
+                    profiles=profiles,
+                    dtype=input_dtype,
+                    name=name,
+                    is_shape_tensor=is_shape_tensor,
+                )
+            except (ValueError, TypeError) as e:
+                # Non-affine / non-monotonic expressions can yield invalid
+                # per-profile bounds; fall back to the single union profile.
+                logger.warning(
+                    f"Could not propagate optimization profiles to submodule input "
+                    f"'{name}' (shape {input_shape}): {e}. Falling back to the union "
+                    "range for this input."
+                )
+
     return Input(
         min_shape=min_shape,
         opt_shape=opt_shape,
@@ -85,9 +190,14 @@ def get_input(
     dtype: torch.dtype,
     name: str = "",
     is_shape_tensor: bool = False,
+    profile_source_bounds: Optional[ProfileSourceBounds] = None,
+    num_profiles: int = 0,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
 ) -> Input:
     """
-    Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs
+    Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs.
+
+    ``user_symbol_bounds`` is forwarded to :func:`construct_dynamic_input`.
     """
     if dtype in COMPLEX_TO_REAL_DTYPE:
         real_dtype = COMPLEX_TO_REAL_DTYPE[dtype]
@@ -106,6 +216,9 @@ def get_input(
             dtype,
             name=name,
             is_shape_tensor=is_shape_tensor,
+            profile_source_bounds=profile_source_bounds,
+            num_profiles=num_profiles,
+            user_symbol_bounds=user_symbol_bounds,
         )
     else:
         return Input(
@@ -113,12 +226,25 @@ def get_input(
         )
 
 
-def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
+def construct_submodule_inputs(
+    module: torch.fx.GraphModule,
+    profile_source_bounds: Optional[ProfileSourceBounds] = None,
+    num_profiles: int = 0,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+) -> Sequence[Input]:
     """
     Construct torch_tensorrt Inputs based on the module inputs.
     The module inputs will have meta data which has the shape and dtype info
     Args:
         module: Input FX GraphModule
+        profile_source_bounds: Optional per-profile source-symbol bounds. When
+            provided (multi-profile compile), each dynamic submodule input gets
+            ``profiles`` derived by substituting source symbols into its
+            symbolic shape.
+        num_profiles: Number of profiles corresponding to
+            ``profile_source_bounds``.
+        user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
+            :func:`get_input` to fill unbounded exporter uppers.
     Returns:
         Sequence of torch_tensorrt.Input's representing inputs to given module
     """
@@ -134,7 +260,14 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                     if isinstance(input_meta, (FakeTensor, torch.Tensor)):
                         input_shape = input_meta.size()
                         torchtrt_inputs.append(
-                            get_input(input_shape, input_meta.dtype, name=input.name)
+                            get_input(
+                                input_shape,
+                                input_meta.dtype,
+                                name=input.name,
+                                profile_source_bounds=profile_source_bounds,
+                                num_profiles=num_profiles,
+                                user_symbol_bounds=user_symbol_bounds,
+                            )
                         )
                     elif isinstance(input_meta, torch.SymInt):
                         # Assuming sym_integers | shape inputs always have torch.int64 dtype
@@ -144,6 +277,9 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                                 torch.int64,
                                 name=input.name,
                                 is_shape_tensor=True,
+                                profile_source_bounds=profile_source_bounds,
+                                num_profiles=num_profiles,
+                                user_symbol_bounds=user_symbol_bounds,
                             )
                         )
                     elif isinstance(input_meta, torch.SymFloat):
@@ -153,6 +289,7 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                                 torch.float32,
                                 name=input.name,
                                 is_shape_tensor=False,  # Only SymInt inputs are treated as shape tensors
+                                user_symbol_bounds=user_symbol_bounds,
                             )
                         )
                     else:
@@ -164,7 +301,12 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                     input_meta = input.meta["tensor_meta"]
                     input_shape = input_meta.shape
                     torchtrt_inputs.append(
-                        get_input(input_shape, input_meta.dtype, name=input.name)
+                        get_input(
+                            input_shape,
+                            input_meta.dtype,
+                            name=input.name,
+                            user_symbol_bounds=user_symbol_bounds,
+                        )
                     )
                 else:
                     raise AssertionError(
@@ -176,6 +318,63 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                 )
 
         return torchtrt_inputs
+
+
+def build_profile_source_bounds(
+    module: torch.fx.GraphModule,
+    top_level_inputs: Sequence[Input],
+    num_profiles: int,
+) -> ProfileSourceBounds:
+    """Map export source symbols to per-profile bounds from top-level inputs.
+
+    For each top-level placeholder whose ``Input`` declares ``profiles``, read the
+    export ``SymInt`` for each dynamic dim and record, per profile, the
+    ``min_shape`` / ``opt_shape`` / ``max_shape`` value of the corresponding source symbol. The
+    result feeds :func:`construct_submodule_inputs` so intermediate engines
+    inherit the same profiles (by index) via symbolic substitution.
+
+    Args:
+        module: Top-level (partitioned) GraphModule whose placeholders carry the
+            export symbolic shapes.
+        top_level_inputs: Ordered top-level Inputs (arg inputs followed by kwarg
+            inputs), aligned with the module placeholders.
+        num_profiles: Number of optimization profiles.
+    Returns:
+        A list indexed by optimization-profile index:
+        ``[{symbol_name: {"min": int, "opt": int, "max": int}}, ...]``
+    """
+    bounds: ProfileSourceBounds = [{} for _ in range(num_profiles)]
+    if not num_profiles:
+        return bounds
+
+    placeholders = [n for n in module.graph.nodes if n.op == "placeholder"]
+    with unset_fake_temporarily():
+        for ph, inp in zip(placeholders, top_level_inputs):
+            profiles = getattr(inp, "profiles", None)
+            if not profiles:
+                continue
+            if not ph.meta or "val" not in ph.meta:
+                continue
+            val = ph.meta["val"]
+            if not isinstance(val, (FakeTensor, torch.Tensor)):
+                continue
+            for d, dim in enumerate(val.size()):
+                if not isinstance(dim, torch.SymInt):
+                    continue
+                expr = dim.node.expr
+                # Top-level dynamic dims map directly to a single source symbol.
+                if not getattr(expr, "is_symbol", False):
+                    continue
+                sym_name = expr.name
+                for i, prof in enumerate(profiles):
+                    if i >= len(bounds) or d >= len(prof["min_shape"]):
+                        continue
+                    bounds[i][sym_name] = {
+                        "min": int(prof["min_shape"][d]),
+                        "opt": int(prof["opt_shape"][d]),
+                        "max": int(prof["max_shape"][d]),
+                    }
+    return bounds
 
 
 def run_shape_analysis(
