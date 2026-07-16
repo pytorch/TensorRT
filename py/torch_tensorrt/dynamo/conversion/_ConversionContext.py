@@ -3,6 +3,7 @@ from typing import Optional
 
 import torch
 import torch.fx
+
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.types import TRTNetwork
 
@@ -26,6 +27,7 @@ class ConversionContext:
     )
     requires_output_allocator: bool = False
     requires_native_multidevice: bool = False
+    requires_aliased_plugin_io: bool = False
     weight_refit_map: dict[str, torch.Tensor] = field(default_factory=dict)
     cpu_weights_reference_holder: list[torch.Tensor] = field(default_factory=list)
     current_node: Optional[torch.fx.Node] = field(default=None)

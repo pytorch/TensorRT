@@ -949,6 +949,17 @@ def get_output_metadata(
 def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]:
     output_dtypes = []
     if isinstance(output, torch.fx.node.Node):
+        if (
+            "val" not in output.meta
+            and "tensor_meta" not in output.meta
+            and output.op == "call_function"
+            and output.target is torch.ops.aten.copy_.default
+            and output.args
+        ):
+            # An in-place write-back ``aten.copy_(dest, src)`` left as a graph
+            # output by functionalization carries no metadata; a copy_ takes the
+            # dtype of its destination, so resolve to that.
+            return get_output_dtypes(output.args[0], truncate_double)
         if "val" in output.meta:
             output_meta = output.meta["val"]
             if output_meta is None:

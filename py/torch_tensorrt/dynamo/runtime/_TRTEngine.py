@@ -29,9 +29,10 @@ from typing import (
 
 import torch
 import torch.distributed as dist
-import torch_tensorrt
 from torch._library.opaque_object import register_opaque_type
 from torch._opaque_base import OpaqueBase
+
+import torch_tensorrt
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
@@ -613,6 +614,23 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             binding.name: binding.is_shape_tensor
             for binding in self._input_binding_infos
         }
+
+        # For QDP plugins with aliased I/O, the output binding must share the
+        # input binding's buffer at runtime; otherwise the in-place mutation is
+        # lost. Resolve the alias mapping to (output_idx -> input_idx) once so
+        # the forward path can rebind without per-call name lookups.
+        self.aliased_output_idx_to_input_idx: Dict[int, int] = {}
+        if hasattr(self.cuda_engine, "get_aliased_input_tensor"):
+            input_name_to_idx = {n: i for i, n in enumerate(self.in_binding_names)}
+            for out_idx, output_name in enumerate(self.out_binding_names):
+                aliased_input_name = self.cuda_engine.get_aliased_input_tensor(
+                    output_name
+                )
+                if aliased_input_name:
+                    self.aliased_output_idx_to_input_idx[out_idx] = input_name_to_idx[
+                        aliased_input_name
+                    ]
+
         self._setup_optimization_profiles()
         if self.requires_output_allocator:
             self.create_output_allocator()
@@ -1193,6 +1211,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                         "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                     )
                 outputs = self.create_output_tensors()
+
+                # Rebind aliased outputs to their paired input buffer so
+                # the in-place mutation lands in the caller's tensor.
+                for (
+                    out_idx,
+                    in_idx,
+                ) in self.aliased_output_idx_to_input_idx.items():
+                    outputs[out_idx] = contiguous_inputs[in_idx]
 
             for o, output_name in enumerate(self.out_binding_names):
                 if need_cudagraphs_record:

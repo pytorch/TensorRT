@@ -1184,6 +1184,16 @@ def compile_module(
     def contains_metadata(gm: torch.fx.GraphModule) -> bool:
         for node in gm.graph.nodes:
             if node.op != "output" and (not node.meta) and "val" not in node.meta:
+                # An in-place write-back aten.copy_(dest, src) left by
+                # functionalization carries no metadata but mirrors its
+                # destination's shape/dtype; it is resolved during conversion.
+                if (
+                    node.op == "call_function"
+                    and node.target is torch.ops.aten.copy_.default
+                    and node.args
+                    and getattr(node.args[0], "meta", None)
+                ):
+                    continue
                 logger.warning(
                     f"Node {node.name} of op type {node.op} does not have metadata. This could sometimes lead to undefined behavior."
                 )
