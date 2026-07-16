@@ -265,6 +265,10 @@ class TestEngineCache(TestCase):
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
     )
     @unittest.skipIf(
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        "Engine caching small model test is not supported on TensorRT-RTX",
+    )
+    @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_dynamo_compile_with_custom_engine_cache(self):
