@@ -1,9 +1,10 @@
 import operator
-from typing import Optional
+from typing import Optional, cast
+
+from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 
 import torch
 from torch.fx import GraphModule, Node
-from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 
 from .pass_utils import clean_up_graph_after_modifications
 
@@ -17,14 +18,14 @@ def _negative_symint_operand(x: object) -> Optional[object]:
         and x.target in (operator.neg, torch.ops.aten.neg.default)
         and len(x.args) == 1
     ):
-        return x.args[0]
+        return cast(object, x.args[0])
     return None
 
 
 def _rank(x: Node) -> Optional[int]:
     val = x.meta.get("val")
     if isinstance(val, torch.Tensor):
-        return val.dim()
+        return cast(int, val.dim())
     if hasattr(val, "shape"):
         return len(val.shape)
     return None
