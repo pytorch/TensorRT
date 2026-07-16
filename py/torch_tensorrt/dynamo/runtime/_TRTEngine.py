@@ -29,10 +29,9 @@ from typing import (
 
 import torch
 import torch.distributed as dist
+import torch_tensorrt
 from torch._library.opaque_object import register_opaque_type
 from torch._opaque_base import OpaqueBase
-
-import torch_tensorrt
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR

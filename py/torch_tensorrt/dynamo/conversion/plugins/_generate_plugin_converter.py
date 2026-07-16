@@ -4,7 +4,6 @@ import uuid
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
-import numpy.typing as npt
 import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Node, Target
@@ -43,80 +42,6 @@ def _coerce_plugin_attr_for_qdp(value: Any, attr_annotation: Any) -> Any:
             _unwrap_scalar_attr(value), dtype=_numpy_attr_dtype(attr_annotation)
         )
     return value
-
-
-_PYTHON_SCALAR_TO_NUMPY_DTYPE = {
-    float: np.float64,
-    int: np.int64,
-    bool: np.bool_,
-}
-
-
-def _patch_trtp_scalar_attr_roundtrip() -> None:
-    """Work around ``_TemplatePluginCreator.create_plugin`` calling
-    ``float(np.array([v]))`` on scalar plugin attrs and crashing because
-    ``f.data`` is always 1-d after the C++ PluginField round-trip. We
-    temporarily promote the annotation to ``npt.NDArray[dtype]``, run the
-    upstream path, then unwrap back to the declared Python scalar type.
-    Idempotent; no-op once upstream ships a fix.
-    """
-    try:
-        from tensorrt_bindings.plugin import _lib as _trtp_lib
-        from tensorrt_bindings.plugin._utils import _is_numpy_array
-    except ImportError:
-        return
-
-    creator_cls = getattr(_trtp_lib, "_TemplatePluginCreator", None)
-    if creator_cls is None or getattr(creator_cls, "_torch_trt_scalar_patched", False):
-        return
-
-    orig_create_plugin = creator_cls.create_plugin
-
-    def _patched_create_plugin(
-        self: Any,
-        name: str,
-        namespace: str,
-        fc: Any,
-        phase: Any,
-        qpcr: Any = None,
-    ) -> Any:
-        from tensorrt_bindings.plugin._lib import QDP_REGISTRY
-
-        desc = QDP_REGISTRY.get(f"{namespace}::{name}")
-        if desc is None:
-            return orig_create_plugin(self, name, namespace, fc, phase, qpcr)
-
-        scalar_attrs: dict[str, type] = {}
-        for f in fc:
-            ann = desc.input_attrs.get(f.name)
-            if ann is None or _is_numpy_array(ann):
-                continue
-            if not isinstance(ann, type):
-                continue
-            if ann in _PYTHON_SCALAR_TO_NUMPY_DTYPE:
-                scalar_attrs[f.name] = ann
-
-        if not scalar_attrs:
-            return orig_create_plugin(self, name, namespace, fc, phase, qpcr)
-
-        saved_annotations = {n: desc.input_attrs[n] for n in scalar_attrs}
-        for n, ann in scalar_attrs.items():
-            desc.input_attrs[n] = npt.NDArray[_PYTHON_SCALAR_TO_NUMPY_DTYPE[ann]]
-        try:
-            plg = orig_create_plugin(self, name, namespace, fc, phase, qpcr)
-        finally:
-            for n, ann in saved_annotations.items():
-                desc.input_attrs[n] = ann
-
-        for n, ann in scalar_attrs.items():
-            value = plg.attrs.get(n)
-            if isinstance(value, np.ndarray) and value.size == 1:
-                plg.attrs[n] = ann(value.reshape(()).item())
-
-        return plg
-
-    creator_cls.create_plugin = _patched_create_plugin
-    creator_cls._torch_trt_scalar_patched = True
 
 
 def _is_numpy_attr_annotation(annotation: Any) -> bool:
@@ -165,8 +90,6 @@ def _generate_plugin_converter(
             " higher to support for Triton based TensorRT plugins"
         )
     from tensorrt.plugin._lib import QDP_REGISTRY
-
-    _patch_trtp_scalar_attr_roundtrip()
 
     torch_target = getattr(getattr(torch.ops, namespace), op_name)
     overload_str = overload if overload else ""

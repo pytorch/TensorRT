@@ -1,8 +1,8 @@
 """Multi-input partial-mutation + multi-output coverage.
 
-Exercises the un-functionalize pass's multi-output branch, the alias-map
-build in ``_generate_plugin._generic_plugin_desc`` for ops where only one
-input is mutated, and the JIT impl's aliased-output ``copy_`` filter.
+Exercises the auto_functionalized wrapper converter's multi-output branch, the
+alias-map build in ``_generate_plugin._generic_plugin_desc`` for ops where only
+one input is mutated, and the JIT impl's aliased-output ``copy_`` filter.
 
 Only the *fresh* output is returned by the model. The aliased output is
 unused. This is deliberate: TRT's preview-feature ``ALIASED_PLUGIN_IO_10_03``

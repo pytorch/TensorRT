@@ -22,7 +22,6 @@ from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
-
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input

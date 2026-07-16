@@ -3,7 +3,6 @@ from typing import Optional
 
 import torch
 import torch.fx
-
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.types import TRTNetwork
 

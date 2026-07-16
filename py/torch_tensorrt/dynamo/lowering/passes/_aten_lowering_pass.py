@@ -3,7 +3,6 @@ import operator
 from typing import Any, Callable, Optional, Sequence, Union
 
 import torch
-
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
