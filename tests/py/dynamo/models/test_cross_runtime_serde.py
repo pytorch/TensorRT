@@ -32,6 +32,11 @@ skip_on_rtx = pytest.mark.skipif(
     reason="cross-runtime engine serde is not supported on TensorRT-RTX (Myelin execution-graph cache requirement)",
 )
 
+skip_python_to_cpp_on_windows = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Python-runtime artifacts cannot currently be loaded by the C++ runtime on Windows",
+)
+
 
 class SmallConvModel(torch.nn.Module):
     def __init__(self) -> None:
@@ -178,6 +183,7 @@ def test_save_python_load_python(tmpdir):
 
 
 @skip_on_rtx
+@skip_python_to_cpp_on_windows
 @pytest.mark.unit
 def test_save_python_load_cpp(tmpdir):
     """Save in Python-only subprocess, load in C++ runtime."""

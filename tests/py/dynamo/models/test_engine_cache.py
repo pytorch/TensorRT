@@ -2,6 +2,7 @@
 import importlib
 import os
 import shutil
+import tempfile
 import unittest
 from typing import Optional
 
@@ -263,6 +264,10 @@ class TestEngineCache(TestCase):
     @unittest.skipIf(
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    @unittest.skipIf(
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        "Engine caching small model test is not supported on TensorRT-RTX",
     )
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
@@ -645,11 +650,14 @@ class TestEngineCache(TestCase):
 
         model = models.resnet18(pretrained=True).eval().to("cuda")
 
-        engine_cache_dir = "/tmp/test_caching_small_model"
+        engine_cache_dir = os.path.join(
+            tempfile.gettempdir(), f"test_caching_small_model_{os.getpid()}"
+        )
+        timing_cache_path = os.path.join(engine_cache_dir, "timing_cache.bin")
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
-        def remove_timing_cache(path=TIMING_CACHE_PATH):
+        def remove_timing_cache(path=timing_cache_path):
             if os.path.exists(path):
                 os.remove(path)
 
@@ -666,6 +674,7 @@ class TestEngineCache(TestCase):
             reuse_cached_engines=False,
             strip_engine_weights=False,
             refit_identical_engine_weights=False,
+            timing_cache_path=timing_cache_path,
         )
         torch.cuda.empty_cache()
 
@@ -718,6 +727,7 @@ class TestEngineCache(TestCase):
                 immutable_weights=immutable_weights,
                 strip_engine_weights=strip_engine_weights,
                 refit_identical_engine_weights=refit_identical_engine_weights,
+                timing_cache_path=timing_cache_path,
             )
 
             if strip_engine_weights:

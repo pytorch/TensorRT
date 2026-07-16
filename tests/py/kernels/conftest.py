@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 import torch_tensorrt
+
+
+@pytest.fixture(autouse=True)
+def skip_cuda_132():
+    if torch.version.cuda == "13.2":
+        pytest.skip("Kernel tests are not supported on CUDA 13.2")
+
 
 skip_no_cuda = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA device required"
