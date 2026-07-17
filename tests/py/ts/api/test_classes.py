@@ -365,14 +365,25 @@ class TestTorchTensorRTModule(unittest.TestCase):
             TestTorchTensorRTModule._get_trt_mod(via_ts=True),
         ):
             trt_json = json.loads(trt_mod.get_layer_info())
-            [
-                self.assertTrue(k in trt_json.keys(), f"Key {k} is missing")
-                for k in ["Layers", "Bindings"]
-            ]
+            self.assertIn("Layers", trt_json)
             self.assertTrue(
                 len(trt_json["Layers"]) == num_layers
             ), "Not enough layers found"
-            self.assertTrue(len(trt_json["Bindings"]) == 2, "Not enough bindings found")
+
+            if "Bindings" in trt_json:
+                # TensorRT 10 and earlier report I/O names as a flat list.
+                binding_names = set(trt_json["Bindings"])
+            else:
+                # TensorRT 11 replaced ``Bindings`` with structured I/O metadata.
+                self.assertIn("I/O Tensors", trt_json)
+                io_tensors = trt_json["I/O Tensors"]
+                self.assertEqual(
+                    {tensor["IOMode"] for tensor in io_tensors},
+                    {"Input", "Output"},
+                )
+                binding_names = {tensor["Name"] for tensor in io_tensors}
+
+            self.assertEqual(binding_names, {"input_0", "output_0"})
 
 
 if __name__ == "__main__":

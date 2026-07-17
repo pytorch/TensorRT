@@ -215,7 +215,7 @@ jobs:
                 popd
                 pushd .
                 cd tests/py/ts
-                python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
+                python -m pytest -n 0 -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml api/
                 popd
 
     L1-dynamo-core-tests:
@@ -294,7 +294,7 @@ jobs:
                 set -euo pipefail
                 pushd .
                 cd tests/py/dynamo/
-                python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
+                python -m pytest -n 0 -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
                 popd
 
     L1-torch-compile-tests:

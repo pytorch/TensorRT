@@ -228,7 +228,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo/
-        ../../../packaging/vc_env_helper.bat python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
+        ../../../packaging/vc_env_helper.bat python -m pytest -n 0 -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
         popd
 
   L1-torch-compile-tests:
