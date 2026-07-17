@@ -13,6 +13,8 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
+from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
+from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .pass_manager import DynamoPassManager
@@ -24,6 +26,7 @@ from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .rule_based_autocast import rule_based_autocast
+from .normalize_negative_slice_stop import normalize_negative_slice_stop
 
 pre_lowering_pass_list = [
     remove_detach,
@@ -42,7 +45,10 @@ post_lowering_pass_list = [
     remove_num_users_is_0_nodes,
     complex_graph_detection,
     force_causal_efficient_attention,
+    eliminate_sym_min_int64_max,
+    normalize_negative_slice_stop,
     annotate_fp8_sdpa,
+    decompose_dynamic_slice_scatter,
 ]
 
 if not is_tegra_platform():

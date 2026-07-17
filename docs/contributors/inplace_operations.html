@@ -1,0 +1,1250 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>In-Place Operation Support &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=e9cf1df7"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'contributors/inplace_operations';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Legacy Frontends" href="../legacy.html" />
+    <link rel="prev" title="Export and Serialization" href="export_serialization.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">Architecture</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="system_overview.html">System Overview</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phases.html">Compiler Phases</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="lowering.html">Lowering Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partitioning.html">Partitioning Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="conversion.html">Conversion Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">Runtime Phase</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="lowering_passes.html">Built-in Dynamo Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="observer.html">Observer / Callback System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts_converters.html">Writing TorchScript Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Feature Design</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="engine_caching.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="weight_refit.html">Weight Refit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cuda_graphs.html">CUDAGraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="runtime_settings.html">Runtime Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_shapes.html">Dynamic Shape Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="complex_number_support.html">Complex Number Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autocast.html">Autocast and Precision Management</a></li>
+<li class="toctree-l1"><a class="reference internal" href="export_serialization.html">Export and Serialization</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">In-Place Operation Support</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../contributing.html" class="nav-link">Contributing</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">In-Place...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="in-place-operation-support">
+<span id="inplace-operations"></span><h1>In-Place Operation Support<a class="headerlink" href="#in-place-operation-support" title="Link to this heading">#</a></h1>
+<p>This document describes the design for native (non-plugin) in-place operator
+support in Torch-TensorRT. The motivating workload is streaming inference with a
+key/value cache (e.g. ZoomASR, autoregressive LLM decoding) where the cache is
+updated each step and the round-trip copy between PyTorch input buffer and
+TensorRT output buffer dominates per-step cost.</p>
+<p>Plugin-side aliasing (custom ops via
+<code class="docutils literal notranslate"><span class="pre">PreviewFeature.ALIASED_PLUGIN_IO_10_03</span></code>) is intentionally out of scope here.
+This design covers only built-in TensorRT operators and the runtime path for
+declaring that an engine output shares its buffer with one of its inputs.</p>
+<section id="implementation-status">
+<h2>Implementation Status<a class="headerlink" href="#implementation-status" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong>Implemented and verified end-to-end (C++ runtime path)</strong></p>
+<ul>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">aten.slice_scatter.default</span></code> decomposition is disabled; a converter
+handles it directly, emitting <code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> when the cache is a
+direct network input with a 4-D static shape and write on dim 2,
+otherwise falling back to a scatter sequence.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> (mapping <code class="docutils literal notranslate"><span class="pre">output_binding</span> <span class="pre">-&gt;</span> <span class="pre">(input_binding,</span> <span class="pre">kind)</span></code>) is
+plumbed from the converter through <code class="docutils literal notranslate"><span class="pre">TRTInterpreterResult</span></code>,
+<code class="docutils literal notranslate"><span class="pre">SerializedInterpreterResult</span></code>, the Python wrapper, and the serialized
+engine blob (new <code class="docutils literal notranslate"><span class="pre">ALIASED_IO_IDX</span></code> at ABI v10).</p></li>
+<li><p>The C++ runtime (<code class="docutils literal notranslate"><span class="pre">execute_engine</span></code>) honors the map: aliased outputs
+skip <code class="docutils literal notranslate"><span class="pre">at::empty</span></code> allocation, bind to the source input’s <code class="docutils literal notranslate"><span class="pre">data_ptr</span></code>,
+and are filtered from the user-facing return tuple. Pre-allocated
+outputs are disabled entirely when the engine has aliased I/O: an
+aliased output reuses the caller’s input storage (there is no
+allocation to amortize), and caching would pin a caller-owned tensor
+across calls. Outputs are allocated fresh each call, and a warning is
+logged if <code class="docutils literal notranslate"><span class="pre">use_pre_allocated_outputs</span></code> was requested on an aliased
+engine.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TRTEngine</span></code> constructor reconciles its build-time map against
+<code class="docutils literal notranslate"><span class="pre">ICudaEngine::getAliasedInputTensor</span></code> so the TRT API is the source of
+truth even for engines built outside Torch-TensorRT.</p></li>
+<li><p>Streaming use case (<code class="docutils literal notranslate"><span class="pre">user</span> <span class="pre">passes</span> <span class="pre">the</span> <span class="pre">same</span> <span class="pre">cache</span> <span class="pre">each</span> <span class="pre">step</span></code>) works
+end-to-end: identity and <code class="docutils literal notranslate"><span class="pre">data_ptr</span></code> of the user’s cache tensor are
+preserved across repeated calls; the engine writes in place.</p></li>
+</ul>
+</li>
+<li><p><strong>Also implemented</strong>: the <code class="docutils literal notranslate"><span class="pre">BUFFER</span></code> / <code class="docutils literal notranslate"><span class="pre">BUFFER_MUTATION</span></code> flow. A new
+<code class="docutils literal notranslate"><span class="pre">lift_mutated_buffers</span></code> pre-compile pass detects the trailing
+<code class="docutils literal notranslate"><span class="pre">aten.copy_(get_attr,</span> <span class="pre">value)</span></code> that <code class="docutils literal notranslate"><span class="pre">ExportedProgram.module()</span></code>
+generates for a BUFFER_MUTATION, converts the <code class="docutils literal notranslate"><span class="pre">get_attr</span></code> to a
+<code class="docutils literal notranslate"><span class="pre">placeholder</span></code>, and removes the trailing <code class="docutils literal notranslate"><span class="pre">copy_</span></code>. The buffer becomes
+an engine input binding so the KV-cache fast path can fire. The compiled
+module is wrapped in <code class="docutils literal notranslate"><span class="pre">BufferThreadingModule</span></code>, which owns the buffers
+as module state and threads them into each forward call. With aliased
+I/O the engine writes through the binding into the buffer’s storage and
+the buffer state persists across calls — the user just calls
+<code class="docutils literal notranslate"><span class="pre">module(x)</span></code> without managing the cache.</p></li>
+</ul>
+<section id="motivation">
+<h3>Motivation<a class="headerlink" href="#motivation" title="Link to this heading">#</a></h3>
+<p>PyTorch’s <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> runs functionalization during decomposition. By the
+time the FX graph reaches <code class="docutils literal notranslate"><span class="pre">TRTInterpreter</span></code> every in-place operation has been
+rewritten to a functional equivalent followed by a <code class="docutils literal notranslate"><span class="pre">copy_</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">x</span><span class="p">.</span><span class="n">add_</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="w">             </span><span class="err">→</span><span class="w">   </span><span class="n">x_new</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aten</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">);</span><span class="w"> </span><span class="n">x</span><span class="p">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">x_new</span><span class="p">)</span>
+<span class="n">cache</span><span class="p">.</span><span class="n">scatter_</span><span class="p">(...)</span><span class="w">   </span><span class="err">→</span><span class="w">   </span><span class="n">cache_new</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aten</span><span class="p">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+<span class="w">                          </span><span class="n">cache</span><span class="p">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">cache_new</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The compiled engine therefore produces a fresh output tensor and the wrapping
+module copies it back into the user’s input buffer. For workloads where the
+mutated tensor is the dominant tensor (KV cache, ring buffers in streaming ASR)
+this is a meaningful loss of bandwidth and an unnecessary allocation.</p>
+<p>TensorRT exposes two relevant primitives:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> — a built-in layer that performs a scatter into a
+static-shape cache and is automatically aliased to its cache input. The
+output binding shares device memory with the cache input.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ICudaEngine.getAliasedInputTensor(output_name)</span></code> — a runtime API that
+returns the input binding name an output is aliased with, or <code class="docutils literal notranslate"><span class="pre">nullptr</span></code> if
+the output is not aliased.</p></li>
+</ul>
+<p>This design wires those primitives through the Torch-TensorRT pipeline so the
+user can declare “this input is mutated” and the compiled engine will update it
+in place, with no post-engine copy.</p>
+</section>
+<section id="background-tensorrt-primitives">
+<h3>Background: TensorRT Primitives<a class="headerlink" href="#background-tensorrt-primitives" title="Link to this heading">#</a></h3>
+</section>
+</section>
+<section id="kvcacheupdate-operator">
+<h2>KVCacheUpdate Operator<a class="headerlink" href="#kvcacheupdate-operator" title="Link to this heading">#</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> performs <code class="docutils literal notranslate"><span class="pre">output[i,</span> <span class="pre">:,</span> <span class="pre">writeIndices[i]</span> <span class="pre">+</span> <span class="pre">s,</span> <span class="pre">:]</span> <span class="pre">=</span>
+<span class="pre">update[i,</span> <span class="pre">:,</span> <span class="pre">s,</span> <span class="pre">:]</span></code> and aliases <code class="docutils literal notranslate"><span class="pre">output</span></code> to <code class="docutils literal notranslate"><span class="pre">cache</span></code>. The cache layout is
+<code class="docutils literal notranslate"><span class="pre">[batch,</span> <span class="pre">num_heads,</span> <span class="pre">s_max,</span> <span class="pre">head_dim]</span></code> — the sequence axis (written to) is
+axis 2. Inputs:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cache</span></code> — shape <code class="docutils literal notranslate"><span class="pre">[b,</span> <span class="pre">num_heads,</span> <span class="pre">s_max,</span> <span class="pre">head_dim]</span></code>, network input, static
+<code class="docutils literal notranslate"><span class="pre">s_max</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">update</span></code> — shape <code class="docutils literal notranslate"><span class="pre">[b,</span> <span class="pre">num_heads,</span> <span class="pre">s,</span> <span class="pre">head_dim]</span></code> with <code class="docutils literal notranslate"><span class="pre">s</span> <span class="pre">≤</span> <span class="pre">s_max</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">writeIndices</span></code> — shape <code class="docutils literal notranslate"><span class="pre">[b]</span></code>, <code class="docutils literal notranslate"><span class="pre">int32</span></code> or <code class="docutils literal notranslate"><span class="pre">int64</span></code>, satisfying
+<code class="docutils literal notranslate"><span class="pre">writeIndices[i]</span> <span class="pre">+</span> <span class="pre">s</span> <span class="pre">&lt;=</span> <span class="pre">s_max</span></code>.</p></li>
+</ul>
+<p>The output is the updated cache, which must be a network output and shares
+memory with the cache input. K and V are independent layers. DLA is not
+supported. The maximum sequence length must be static; dynamic <code class="docutils literal notranslate"><span class="pre">s_max</span></code> is not
+permitted.</p>
+</section>
+<section id="aliased-i-o-query-api">
+<h2>Aliased I/O Query API<a class="headerlink" href="#aliased-i-o-query-api" title="Link to this heading">#</a></h2>
+<p>At runtime, <code class="docutils literal notranslate"><span class="pre">engine-&gt;getAliasedInputTensor(out_name)</span></code> returns the name of the
+input binding aliased with the given output, or <code class="docutils literal notranslate"><span class="pre">nullptr</span></code>. This is the source
+of truth for the runtime: regardless of how aliasing was established (via
+<code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> or any future API) the engine reports the
+post-build wiring through this single call.</p>
+<section id="design-overview">
+<h3>Design Overview<a class="headerlink" href="#design-overview" title="Link to this heading">#</a></h3>
+<p>The work is layered into two tiers.</p>
+</section>
+</section>
+<section id="tier-a-kvcacheupdate-fast-path">
+<h2>Tier A — KVCacheUpdate Fast Path<a class="headerlink" href="#tier-a-kvcacheupdate-fast-path" title="Link to this heading">#</a></h2>
+<p>A pattern-match lowering pass detects scatter-into-static-cache patterns and
+rewrites them to a marker op <code class="docutils literal notranslate"><span class="pre">torch_trt.kv_cache_update</span></code>. The converter for
+that marker emits <code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code>. Aliasing is automatic on the
+TensorRT side; the runtime sees it through <code class="docutils literal notranslate"><span class="pre">getAliasedInputTensor</span></code>.</p>
+</section>
+<section id="tier-b-general-input-output-aliasing">
+<h2>Tier B — General Input/Output Aliasing<a class="headerlink" href="#tier-b-general-input-output-aliasing" title="Link to this heading">#</a></h2>
+<p>For mutated inputs that do not match the KV-cache pattern, the user supplies a
+<code class="docutils literal notranslate"><span class="pre">mutated_inputs</span></code> argument to <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile()</span></code>. The
+converter records the pairing and the runtime treats the corresponding output
+binding as aliased to the input binding — same device pointer, no fresh
+allocation, and the input tensor is returned by identity.</p>
+<p>Whether Tier B can also use a public TensorRT network-build API to declare
+non-KV aliasing (without involving plugins) is an open question (see
+<a class="reference internal" href="#open-questions"><span class="std std-ref">Open Questions</span></a>). If TensorRT 10.x does not expose such an API, Tier B
+collapses to Tier A and ships only KV-cache support; the rest of this design
+still applies in that case.</p>
+<section id="user-facing-api">
+<h3>User-Facing API<a class="headerlink" href="#user-facing-api" title="Link to this heading">#</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">compile()</span></code> entry point gains one new keyword argument:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">compiled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exported_program</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">cache_k</span><span class="p">,</span> <span class="n">cache_v</span><span class="p">,</span> <span class="n">x</span><span class="p">],</span>
+    <span class="n">mutated_inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;cache_k&quot;</span><span class="p">:</span> <span class="s2">&quot;cache_k_out&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;cache_v&quot;</span><span class="p">:</span> <span class="s2">&quot;cache_v_out&quot;</span><span class="p">},</span>
+<span class="p">)</span>
+
+<span class="c1"># cache_k and cache_v are mutated in place; out[2] is the real output.</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">compiled</span><span class="p">(</span><span class="n">cache_k</span><span class="p">,</span> <span class="n">cache_v</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="n">cache_k</span>
+<span class="k">assert</span> <span class="n">out</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="n">cache_v</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">mutated_inputs</span></code> maps an input binding name (or index) to the output binding
+name (or index) that should alias it. When the compiled module is called, the
+aliased output positions in the returned tuple contain the <em>same</em> <code class="docutils literal notranslate"><span class="pre">at::Tensor</span></code>
+that was passed in — same storage, same <code class="docutils literal notranslate"><span class="pre">data_ptr()</span></code>, observably mutated.
+This mirrors PyTorch’s in-place op convention in which <code class="docutils literal notranslate"><span class="pre">x.add_(y)</span></code> returns
+<code class="docutils literal notranslate"><span class="pre">x</span></code>.</p>
+</section>
+<section id="implementation-phases">
+<h3>Implementation Phases<a class="headerlink" href="#implementation-phases" title="Link to this heading">#</a></h3>
+</section>
+</section>
+<section id="lowering">
+<h2>Lowering<a class="headerlink" href="#lowering" title="Link to this heading">#</a></h2>
+<p>A new post-lowering pass <code class="docutils literal notranslate"><span class="pre">mark_aliased_outputs</span></code> runs after
+<code class="docutils literal notranslate"><span class="pre">remove_input_alias_fixing_clones</span></code>. For each entry in <code class="docutils literal notranslate"><span class="pre">mutated_inputs</span></code>:</p>
+<ol class="arabic simple">
+<li><p>Resolve the input <code class="docutils literal notranslate"><span class="pre">placeholder</span></code> node and the corresponding output node.</p></li>
+<li><p>Tag the output node with <code class="docutils literal notranslate"><span class="pre">node.meta[&quot;aliased_input&quot;]</span> <span class="pre">=</span> <span class="pre">&quot;&lt;input_name&gt;&quot;</span></code>.</p></li>
+</ol>
+<p>The metadata travels through to <code class="docutils literal notranslate"><span class="pre">TRTInterpreter</span></code> and is the carrier for
+aliasing intent.</p>
+<p>A second lowering sub-pass detects KV-cache-shaped patterns among the
+aliased-output nodes:</p>
+<ul class="simple">
+<li><p>Scatter or <code class="docutils literal notranslate"><span class="pre">index_put</span></code> into a tensor of shape
+<code class="docutils literal notranslate"><span class="pre">[b,</span> <span class="pre">num_heads,</span> <span class="pre">s_max,</span> <span class="pre">head_dim]</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">writeIndices</span></code> is a <code class="docutils literal notranslate"><span class="pre">[b]</span></code>-shaped integer tensor.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">s_max</span></code> is static.</p></li>
+</ul>
+<p>Matching nodes are replaced with a <code class="docutils literal notranslate"><span class="pre">torch_trt.kv_cache_update</span></code> marker so the
+converter can emit <code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> directly. Non-matching aliased
+outputs fall through to Tier B.</p>
+</section>
+<section id="conversion">
+<h2>Conversion<a class="headerlink" href="#conversion" title="Link to this heading">#</a></h2>
+<p>Two touch points in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/_TRTInterpreter.py</span></code>:</p>
+<ol class="arabic simple">
+<li><p><strong>New converter</strong> for <code class="docutils literal notranslate"><span class="pre">torch_trt.kv_cache_update</span></code> which calls
+<code class="docutils literal notranslate"><span class="pre">net.add_kv_cache_update(cache,</span> <span class="pre">update,</span> <span class="pre">write_indices)</span></code>. The cache input
+must already be added via <code class="docutils literal notranslate"><span class="pre">net.add_input</span></code>; converters look up its
+<code class="docutils literal notranslate"><span class="pre">ITensor</span></code> handle via the conversion context.</p></li>
+<li><p><strong>``output()`` (around line 837)</strong> — when marking each output, check
+<code class="docutils literal notranslate"><span class="pre">node.meta[&quot;aliased_input&quot;]</span></code>. If present and the output came from
+<code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code>, no extra call is needed (TRT aliases automatically).
+For Tier B (if the public API exists) call the corresponding TRT method
+before <code class="docutils literal notranslate"><span class="pre">mark_output</span></code>.</p></li>
+</ol>
+<p>The interpreter records the alias map on its result type:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">TRTInterpreterResult</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// ...existing fields</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">unordered_map</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">aliased_io</span><span class="p">;</span><span class="w">  </span><span class="c1">// out_name → in_name</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>This map is the bridge from build-time intent to the runtime engine object.</p>
+</section>
+<section id="c-runtime-changes">
+<h2>C++ Runtime Changes<a class="headerlink" href="#c-runtime-changes" title="Link to this heading">#</a></h2>
+<p>All runtime work lives under <code class="docutils literal notranslate"><span class="pre">core/runtime/</span></code>.</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">TRTEngine</span></code> (<code class="docutils literal notranslate"><span class="pre">core/runtime/TRTEngine.h</span></code>)</dt><dd><p>Add one field:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">unordered_map</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">aliased_io</span><span class="p">;</span><span class="w">  </span><span class="c1">// out → in</span>
+</pre></div>
+</div>
+<p>Populated once at construction from two sources:</p>
+<ol class="arabic simple">
+<li><p>The serialized engine metadata (see <a class="reference internal" href="#serialization-format"><span class="std std-ref">Serialization Format Update</span></a>).</p></li>
+<li><p><strong>Source-of-truth reconciliation:</strong> for every output binding, query
+<code class="docutils literal notranslate"><span class="pre">cuda_engine-&gt;getAliasedInputTensor(out_name)</span></code> and merge the result
+into <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code>. This runs a single time in the <code class="docutils literal notranslate"><span class="pre">TRTEngine</span></code>
+constructor, not per execution, so the reconstructed map is reused across
+all calls.</p></li>
+</ol>
+<p>For the <code class="docutils literal notranslate"><span class="pre">kv_cache_update</span></code> kind the two sources are redundant: the engine
+reports the same aliasing through <code class="docutils literal notranslate"><span class="pre">getAliasedInputTensor</span></code>, so reconciliation
+alone can rebuild it — this is what lets engines built from external TensorRT
+plans (e.g. via <code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> from a non-Torch-TRT build flow) load
+transparently even with an empty serialized map. The serialized metadata is
+therefore strictly required only for the <code class="docutils literal notranslate"><span class="pre">user</span></code> kind, which TRT has no API
+to report, and to preserve the <code class="docutils literal notranslate"><span class="pre">kind</span></code> tag. We still serialize the KV
+entries for completeness and self-description; dropping them for KV-only
+engines and relying entirely on reconciliation would be a valid future
+simplification.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">execute_engine</span></code> (<code class="docutils literal notranslate"><span class="pre">core/runtime/execute_engine.cpp</span></code>)</dt><dd><p>Three narrow changes:</p>
+<ol class="arabic">
+<li><p><strong>Input binding</strong> — record each contiguous input’s <code class="docutils literal notranslate"><span class="pre">data_ptr()</span></code>
+keyed by binding name into a local <code class="docutils literal notranslate"><span class="pre">input_addrs</span></code> map. The existing
+<code class="docutils literal notranslate"><span class="pre">setTensorAddress</span></code> call is unchanged.</p></li>
+<li><p><strong>Output binding (~line 188)</strong> — branch:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="n">it</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">engine</span><span class="p">.</span><span class="n">aliased_io</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="n">out_name</span><span class="p">);</span>
+<span class="w">    </span><span class="n">it</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">engine</span><span class="p">.</span><span class="n">aliased_io</span><span class="p">.</span><span class="n">end</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Aliased output: bind the same device ptr as its input,</span>
+<span class="w">    </span><span class="c1">// do NOT allocate, and return the input tensor by identity.</span>
+<span class="w">    </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">aliased_ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">input_addrs</span><span class="p">.</span><span class="n">at</span><span class="p">(</span><span class="n">it</span><span class="o">-&gt;</span><span class="n">second</span><span class="p">);</span>
+<span class="w">    </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">setTensorAddress</span><span class="p">(</span><span class="n">out_name</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span><span class="w"> </span><span class="n">aliased_ptr</span><span class="p">);</span>
+<span class="w">    </span><span class="n">output_tensors</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">input_tensors_by_name</span><span class="p">.</span><span class="n">at</span><span class="p">(</span><span class="n">it</span><span class="o">-&gt;</span><span class="n">second</span><span class="p">));</span>
+<span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">empty</span><span class="p">(</span><span class="n">dims</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="p">).</span><span class="n">contiguous</span><span class="p">();</span>
+<span class="w">    </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">setTensorAddress</span><span class="p">(</span><span class="n">out_name</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span><span class="w"> </span><span class="n">out</span><span class="p">.</span><span class="n">data_ptr</span><span class="p">());</span>
+<span class="w">    </span><span class="n">output_tensors</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">out</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Shape consistency check</strong> — before binding, assert
+<code class="docutils literal notranslate"><span class="pre">dims</span> <span class="pre">==</span> <span class="pre">input_tensor.sizes()</span></code> for aliased pairs. A mismatch
+indicates compilation produced an output shape that differs from the
+input it claims to alias; abort with a clear error rather than silently
+corrupting memory.</p></li>
+</ol>
+</dd>
+<dt>Output allocator interaction</dt><dd><p>The existing <code class="docutils literal notranslate"><span class="pre">OutputAllocator</span></code> path (used when
+<code class="docutils literal notranslate"><span class="pre">requires_output_allocator=true</span></code>) is incompatible with aliasing by
+construction: aliasing requires the output’s storage to match the input’s,
+while the output allocator exists precisely because the output shape is not
+known ahead of time. <code class="docutils literal notranslate"><span class="pre">TRTEngine</span></code> construction validates that no binding
+appears in both <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> (as an output) and the
+<code class="docutils literal notranslate"><span class="pre">requires_output_allocator</span></code> set, throwing on construction if it does.</p>
+</dd>
+<dt>Stream and synchronization</dt><dd><p>Unchanged. Aliased I/O is a pointer-identity trick, not a synchronization
+trick. The pre-/post-enqueue stream handling remains valid.</p>
+</dd>
+<dt>CUDA Graph capture</dt><dd><p>Aliased I/O makes capture <em>more</em> deterministic — fewer allocations, stable
+addresses. The user-supplied input tensor’s <code class="docutils literal notranslate"><span class="pre">data_ptr()</span></code> must be stable
+across replays; if the caller passes a different tensor each call, capture
+is invalidated, the same as today for non-aliased inputs.</p>
+</dd>
+</dl>
+</section>
+<section id="python-runtime-changes">
+<h2>Python Runtime Changes<a class="headerlink" href="#python-runtime-changes" title="Link to this heading">#</a></h2>
+<p>The pure-Python runtime mirrors the C++ engine so a compiled artifact behaves
+identically on either runtime. It honors aliased I/O natively — it does <strong>not</strong>
+merely warn and fall back to fresh allocation. All work lives under
+<code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/runtime/_TRTEngine.py</span></code>.</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">TRTEngine</span></code> (<code class="docutils literal notranslate"><span class="pre">_TRTEngine.py</span></code>)</dt><dd><p>Add one field:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">self</span><span class="p">.</span><span class="n">aliased_io</span><span class="o">:</span><span class="w"> </span><span class="n">Dict</span><span class="p">[</span><span class="n">str</span><span class="p">,</span><span class="w"> </span><span class="n">Tuple</span><span class="p">[</span><span class="n">str</span><span class="p">,</span><span class="w"> </span><span class="n">str</span><span class="p">]]</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">out_name</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="p">(</span><span class="n">in_name</span><span class="p">,</span><span class="w"> </span><span class="n">kind</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Populated once at setup from two sources, exactly like the C++ constructor:</p>
+<ol class="arabic simple">
+<li><p>The serialized engine metadata (<code class="docutils literal notranslate"><span class="pre">ALIASED_IO_IDX</span></code>), decoded in
+<code class="docutils literal notranslate"><span class="pre">_load_serialized_info</span></code> (see <a class="reference internal" href="#serialization-format"><span class="std std-ref">Serialization Format Update</span></a>).</p></li>
+<li><p><strong>Source-of-truth reconciliation:</strong> <code class="docutils literal notranslate"><span class="pre">_reconcile_aliased_io</span></code> queries
+<code class="docutils literal notranslate"><span class="pre">cuda_engine.get_aliased_input_tensor(out_name)</span></code> for every output and
+merges the result. This runs a single time at setup, not per execution.</p></li>
+</ol>
+<p><code class="docutils literal notranslate"><span class="pre">kind=&quot;user&quot;</span></code> entries are preserved (TRT has no API to report them); a
+<code class="docutils literal notranslate"><span class="pre">kv_cache_update</span></code> alias the engine reports but the serialized map lacks is
+discovered; a disagreement is resolved in favor of the engine. The pass also
+recomputes <code class="docutils literal notranslate"><span class="pre">aliased_input_binding_names</span></code> so the per-call input loop tests
+membership in O(1) (parallel to the C++ <code class="docutils literal notranslate"><span class="pre">input_binding_infos</span></code> <code class="docutils literal notranslate"><span class="pre">is_aliased</span></code>
+flag).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">execute</span></code> (<code class="docutils literal notranslate"><span class="pre">_execute_standard</span></code> / <code class="docutils literal notranslate"><span class="pre">setup_input_tensors</span></code> / <code class="docutils literal notranslate"><span class="pre">create_output_tensors</span></code>)</dt><dd><p>Three narrow changes:</p>
+<ol class="arabic">
+<li><p><strong>Input binding</strong> — <code class="docutils literal notranslate"><span class="pre">setup_input_tensors</span></code> records each contiguous input’s
+tensor keyed by binding name into <code class="docutils literal notranslate"><span class="pre">self._bound_inputs_by_name</span></code>. For an
+aliased input it binds the user’s tensor directly and skips the cudagraph
+persistent staging-buffer clone (staging would break the aliasing).</p></li>
+<li><p><strong>Output binding</strong> — branch:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">alias</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">output_name</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">alias</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="c1"># Aliased output: reuse the source input tensor by identity, do</span>
+    <span class="c1"># NOT allocate, and bind the engine output to the same data_ptr.</span>
+    <span class="n">aliased_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bound_inputs_by_name</span><span class="p">[</span><span class="n">alias</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+    <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">aliased_input</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_tensor_address</span><span class="p">(</span><span class="n">output_name</span><span class="p">,</span> <span class="n">aliased_input</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">())</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_shapes</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="o">...</span><span class="p">)</span>
+    <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_tensor_address</span><span class="p">(</span><span class="n">output_name</span><span class="p">,</span> <span class="n">out</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>(allocation/identity reuse lives in <code class="docutils literal notranslate"><span class="pre">create_output_tensors</span></code>; the address
+binding and the cudagraph output-staging bypass live in
+<code class="docutils literal notranslate"><span class="pre">_execute_standard</span></code>.)</p>
+</li>
+<li><p><strong>Shape consistency check</strong> — <code class="docutils literal notranslate"><span class="pre">create_output_tensors</span></code> asserts
+<code class="docutils literal notranslate"><span class="pre">aliased_input.shape</span> <span class="pre">==</span> <span class="pre">output_shape</span></code> before reusing the input’s storage;
+a mismatch aborts rather than silently corrupting memory.</p></li>
+</ol>
+<p>Pre-allocated outputs are disabled entirely when <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> is non-empty
+(via the <code class="docutils literal notranslate"><span class="pre">has_aliased_io</span></code> argument to
+<code class="docutils literal notranslate"><span class="pre">TorchTRTRuntimeStates.set_runtime_states</span></code> and the cache-refresh guard); a
+warning is logged if <code class="docutils literal notranslate"><span class="pre">use_pre_allocated_outputs</span></code> was requested on an aliased
+engine.</p>
+</dd>
+<dt>Output allocator interaction</dt><dd><p>As in C++, the dynamic output-allocator path is incompatible with aliasing.
+<code class="docutils literal notranslate"><span class="pre">_reconcile_aliased_io</span></code> raises <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code> if an aliased output is
+present while <code class="docutils literal notranslate"><span class="pre">requires_output_allocator</span></code> is set.</p>
+</dd>
+<dt>Stream and synchronization / CUDA Graph capture</dt><dd><p>Unchanged and identical to the C++ runtime: aliased I/O is a pointer-identity
+trick, so the stream choreography and cudagraph record/replay paths behave the
+same as above, minus the aliased output-staging copy-back.</p>
+</dd>
+</dl>
+</section>
+<section id="serialization-format-update">
+<span id="serialization-format"></span><h2>Serialization Format Update<a class="headerlink" href="#serialization-format-update" title="Link to this heading">#</a></h2>
+<p>The C++ engine serialization format in <code class="docutils literal notranslate"><span class="pre">core/runtime/runtime.h</span></code> is a
+positional <code class="docutils literal notranslate"><span class="pre">std::vector&lt;std::string&gt;</span></code> indexed by an enum, gated by a string
+<code class="docutils literal notranslate"><span class="pre">ABI_VERSION</span></code>. The change is additive: one new index, one new field,
+one ABI bump.</p>
+<p>In <code class="docutils literal notranslate"><span class="pre">core/runtime/runtime.h</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">ABI_VERSION</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;10&quot;</span><span class="p">;</span><span class="w">  </span><span class="c1">// bumped from &quot;9&quot;</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">ABI_TARGET_IDX</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="c1">// ...existing entries unchanged...</span>
+<span class="w">    </span><span class="n">REQUIRES_NATIVE_MULTIDEVICE_IDX</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ALIASED_IO_IDX</span><span class="p">,</span><span class="w">             </span><span class="c1">// NEW</span>
+<span class="w">    </span><span class="n">SERIALIZATION_LEN</span><span class="p">,</span>
+<span class="p">}</span><span class="w"> </span><span class="n">SerializedInfoIndex</span><span class="p">;</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="nf">serialize_aliased_io</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">unordered_map</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">aliased_io</span><span class="p">);</span>
+<span class="n">std</span><span class="o">::</span><span class="n">unordered_map</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">deserialize_aliased_io</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">s</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Encoding follows the same convention as <code class="docutils literal notranslate"><span class="pre">serialize_bindings</span></code>: pairs joined
+with a key/value delimiter, records joined with a record delimiter. No JSON,
+no protobuf, no new dependencies. An empty map serializes to the empty
+string.</p>
+<p>In <code class="docutils literal notranslate"><span class="pre">core/runtime/TRTEngine.cpp</span></code>:</p>
+<ul>
+<li><p><strong>Constructor (line 85)</strong> delegates one extra deserialized argument to the
+primary constructor:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">deserialize_aliased_io</span><span class="p">(</span><span class="n">serialized_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">])</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>``serialize()`` (line 508)</strong> writes one extra entry:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">serialized_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">serialize_aliased_io</span><span class="p">(</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">aliased_io</span><span class="p">);</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>``__obj_flatten__()`` (line 484)</strong> gains a corresponding tuple so
+Python introspection sees the new field:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="p">(</span><span class="s">&quot;aliased_io&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">serialized_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">]),</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>``verify_serialization_fmt`` (line 471)</strong> is unchanged. Its existing length
+check (<code class="docutils literal notranslate"><span class="pre">size()</span> <span class="pre">==</span> <span class="pre">SERIALIZATION_LEN</span></code>) plus the ABI version check
+collectively reject any pre-bump engine cleanly.</p></li>
+</ul>
+<dl>
+<dt>Compatibility</dt><dd><p>Pre-bump engines (ABI <code class="docutils literal notranslate"><span class="pre">&quot;9&quot;</span></code>) are rejected by <code class="docutils literal notranslate"><span class="pre">verify_serialization_fmt</span></code>
+with the existing ABI mismatch error. Users recompile. This matches the
+behavior of all prior ABI bumps; the format is intentionally not
+forward/backward compatible across version changes.</p>
+<p>Engines with no aliased outputs serialize <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> to the empty
+string and take the existing allocate-fresh-output path at runtime. Zero
+behavioral change for unaffected users.</p>
+</dd>
+</dl>
+<section id="buffer-backed-kv-cache">
+<span id="buffer-style"></span><h3>Buffer-Backed KV Cache<a class="headerlink" href="#buffer-backed-kv-cache" title="Link to this heading">#</a></h3>
+<p>PyTorch’s canonical pattern for streaming inference is to hold the cache as a
+module buffer:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">StreamingKV</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">register_buffer</span><span class="p">(</span><span class="s2">&quot;cache_k&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">S_MAX</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_k</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_k</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">t</span><span class="p">:</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">x_k</span>
+        <span class="k">return</span> <span class="n">attention</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cache_k</span><span class="p">,</span> <span class="n">x_k</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">torch.export</span></code> captures this cleanly: <code class="docutils literal notranslate"><span class="pre">cache_k</span></code> becomes a <code class="docutils literal notranslate"><span class="pre">BUFFER</span></code>
+input in <code class="docutils literal notranslate"><span class="pre">graph_signature.input_specs</span></code> and the slice-write becomes a
+<code class="docutils literal notranslate"><span class="pre">BUFFER_MUTATION</span></code> output spec.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ExportedProgram.module()</span></code> rewrites this into a <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code> where the
+buffer is read via <code class="docutils literal notranslate"><span class="pre">get_attr</span></code> and the mutation is emitted as a trailing
+<code class="docutils literal notranslate"><span class="pre">aten.copy_(get_attr_buffer,</span> <span class="pre">slice_scatter_result)</span></code> node. Left alone,
+Torch-TensorRT’s constant-folding pass would bake the buffer into the
+engine as a weight; the slice-scatter would scatter against that constant
+and produce a result the engine discards.</p>
+<p>To preserve buffer state across calls and let the KV-cache aliasing fast
+path fire, a pre-compile pass <code class="docutils literal notranslate"><span class="pre">lift_mutated_buffers</span></code> runs after
+<code class="docutils literal notranslate"><span class="pre">ep.module()</span></code> and before <code class="docutils literal notranslate"><span class="pre">post_lowering</span></code>:</p>
+<ol class="arabic simple">
+<li><p>Scans for <code class="docutils literal notranslate"><span class="pre">aten.copy_.default(get_attr,</span> <span class="pre">_)</span></code> patterns — the marker for
+a BUFFER_MUTATION.</p></li>
+<li><p>For each match, converts the <code class="docutils literal notranslate"><span class="pre">get_attr</span></code> to a <code class="docutils literal notranslate"><span class="pre">placeholder</span></code>,
+redirects all uses, and erases the trailing <code class="docutils literal notranslate"><span class="pre">copy_</span></code>.</p></li>
+<li><p>Rebuilds the <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code> with the default <code class="docutils literal notranslate"><span class="pre">CodeGen</span></code> so the
+<code class="docutils literal notranslate"><span class="pre">forward</span></code> signature reflects the new placeholder set (the original
+<code class="docutils literal notranslate"><span class="pre">_PyTreeCodeGen</span></code> would re-impose the original arity through a stored
+pytree spec).</p></li>
+</ol>
+<p>The compiled result is wrapped in <code class="docutils literal notranslate"><span class="pre">BufferThreadingModule</span></code>, which owns
+the buffers as <code class="docutils literal notranslate"><span class="pre">register_buffer</span></code> state and threads them into the
+underlying compiled module on each forward call. Combined with the
+engine-level KV-cache aliasing, the engine writes directly into the
+buffer’s storage; the buffer is observably mutated and the next call
+reads the updated state. The user-facing API is just <code class="docutils literal notranslate"><span class="pre">module(x)</span></code>.</p>
+<p>Both the user-passed-cache pattern (caller owns the cache) and the
+buffer-backed pattern (module owns the cache) work and produce identical
+results.</p>
+</section>
+</section>
+<section id="side-effects-on-non-kv-buffer-mutations">
+<h2>Side effects on non-KV buffer mutations<a class="headerlink" href="#side-effects-on-non-kv-buffer-mutations" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">lift_mutated_buffers</span></code> keys off the generic <code class="docutils literal notranslate"><span class="pre">aten.copy_(get_attr,</span> <span class="pre">_)</span></code>
+marker, not off the KV-cache shape, so it lifts <em>every</em> mutated buffer — not
+only KV caches. This changes how any buffer-mutating module is compiled: the
+mutated buffer becomes an engine input binding and its trailing <code class="docutils literal notranslate"><span class="pre">copy_</span></code> is
+dropped, whereas previously it was constant-folded into the engine.</p>
+<p>For a mutation that also matches the KV-cache fast path this is the whole
+point — the engine aliases the output back into the buffer’s storage and the
+mutation is observable across calls. For a mutation that does <strong>not</strong> match
+the fast path (wrong rank/shape/dim, dynamic <code class="docutils literal notranslate"><span class="pre">s_max</span></code>, a plain elementwise
+<code class="docutils literal notranslate"><span class="pre">copy_</span></code>), the converter falls back to the scatter path and the output is
+<strong>not</strong> aliased. The buffer is still lifted to an input and threaded through
+<code class="docutils literal notranslate"><span class="pre">BufferThreadingModule</span></code>, so the mutated value is produced and carried
+forward correctly, but without the in-place aliasing benefit — behavior is
+equivalent to the pre-existing copy-back, just wired through a binding rather
+than a folded constant. Ordinary functional <code class="docutils literal notranslate"><span class="pre">.copy_</span></code> residue that is <em>not</em>
+a <code class="docutils literal notranslate"><span class="pre">get_attr</span></code> buffer mutation (e.g. the functionalization tail of an
+in-place op on an activation) does not match the <code class="docutils literal notranslate"><span class="pre">get_attr</span></code> first-arg
+pattern and is left untouched.</p>
+<section id="constraints-and-known-limitations">
+<h3>Constraints and Known Limitations<a class="headerlink" href="#constraints-and-known-limitations" title="Link to this heading">#</a></h3>
+<dl class="simple">
+<dt>Static cache shape (Tier A)</dt><dd><p><code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> requires static <code class="docutils literal notranslate"><span class="pre">s_max</span></code>. Streaming ASR with a
+fixed context window satisfies this; truly dynamic-length caches do not
+and fall through to Tier B.</p>
+</dd>
+<dt>Single-input aliasing</dt><dd><p>Each output binding aliases at most one input binding. There is no design
+here for an output that aliases multiple inputs; that has no clear
+semantics anyway.</p>
+</dd>
+<dt>Tensor identity through PyTorch</dt><dd><p>When <code class="docutils literal notranslate"><span class="pre">execute_engine</span></code> returns the aliased input tensor as one of its
+outputs, downstream code observes <code class="docutils literal notranslate"><span class="pre">out</span> <span class="pre">is</span> <span class="pre">input</span></code> as <code class="docutils literal notranslate"><span class="pre">True</span></code>. Wrappers in
+<code class="docutils literal notranslate"><span class="pre">_TorchTensorRTModule.forward()</span></code> that touch outputs (e.g. an unsuspecting
+<code class="docutils literal notranslate"><span class="pre">output.contiguous()</span></code>) must remain a no-op for already-contiguous
+tensors; this is the existing PyTorch contract and the design relies on
+it.</p>
+</dd>
+<dt>DLA</dt><dd><p><code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> is not supported on DLA. <code class="docutils literal notranslate"><span class="pre">mutated_inputs</span></code> on a
+DLA target raises at compile time.</p>
+</dd>
+<dt>User responsibility for buffer reuse</dt><dd><p>Buffers passed in via <code class="docutils literal notranslate"><span class="pre">mutated_inputs</span></code> are mutated by the engine. Users
+that need a pre-mutation snapshot must clone before calling. This is
+consistent with PyTorch in-place op semantics.</p>
+</dd>
+</dl>
+</section>
+<section id="open-questions">
+<span id="id1"></span><h3>Open Questions<a class="headerlink" href="#open-questions" title="Link to this heading">#</a></h3>
+<dl class="simple">
+<dt>Tier B network-build API</dt><dd><p><code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> aliases its output automatically, which fully
+covers Tier A. Whether TensorRT 10.x exposes a public network-build API
+for declaring output↔input aliasing on arbitrary layers (without involving
+the plugin path) is an open question. If such an API does not exist, Tier
+B is deferred and the design ships Tier A only — the runtime, lowering,
+and serialization changes described above remain valid; only the second
+lowering sub-pass and its corresponding converter route are unbuilt.</p>
+</dd>
+<dt>ZoomASR fit</dt><dd><p>The KVCacheUpdate constraints (static <code class="docutils literal notranslate"><span class="pre">s_max</span></code>, K/V split, <code class="docutils literal notranslate"><span class="pre">[b,</span> <span class="pre">d,</span> <span class="pre">s_max,</span>
+<span class="pre">h]</span></code> layout) need confirmation against the ZoomASR cache layout. If the
+model uses a different memory layout (e.g. <code class="docutils literal notranslate"><span class="pre">[b,</span> <span class="pre">s_max,</span> <span class="pre">num_heads,</span> <span class="pre">head_dim]</span></code>) a
+<code class="docutils literal notranslate"><span class="pre">permute</span></code> may be required, and the cost of that permute may exceed the
+savings from aliasing. A small benchmark on the actual model is the
+gating criterion before investing in pattern-matching.</p>
+</dd>
+</dl>
+</section>
+<section id="phased-rollout">
+<h3>Phased Rollout<a class="headerlink" href="#phased-rollout" title="Link to this heading">#</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Phase 1 — Tier A only.</strong> Lowering pass, converter for
+<code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code>, C++ runtime aliased-output path,
+serialization-format bump. This is the smallest end-to-end surface that
+solves the streaming-ASR / KV-cache use case.</p></li>
+<li><p><strong>Phase 2 — Tier B (general aliasing).</strong> Only if the TensorRT public API
+supports non-KV aliasing. Reuses the same runtime code path; new converter
+route. No further runtime or serialization changes.</p></li>
+<li><p><strong>Phase 3 — Auto-detection.</strong> Pattern-match common in-place residue
+post-functionalization (e.g. <code class="docutils literal notranslate"><span class="pre">copy_</span></code> of a scattered tensor back into
+the original input) so users do not need to specify <code class="docutils literal notranslate"><span class="pre">mutated_inputs</span></code>
+for the common case. Ergonomics-only; behavior identical to Phase 1/2.</p></li>
+</ol>
+</section>
+<section id="summary-of-code-touch-points">
+<h3>Summary of Code Touch Points<a class="headerlink" href="#summary-of-code-touch-points" title="Link to this heading">#</a></h3>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>File</p></th>
+<th class="head"><p>Change</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">core/runtime/runtime.h</span></code></p></td>
+<td><p>Bump <code class="docutils literal notranslate"><span class="pre">ABI_VERSION</span></code> to <code class="docutils literal notranslate"><span class="pre">&quot;10&quot;</span></code>; add <code class="docutils literal notranslate"><span class="pre">ALIASED_IO_IDX</span></code>;
+declare aliased-IO serialization helpers.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">core/runtime/runtime.cpp</span></code></p></td>
+<td><p>Implement <code class="docutils literal notranslate"><span class="pre">serialize_aliased_io</span></code> /
+<code class="docutils literal notranslate"><span class="pre">deserialize_aliased_io</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">core/runtime/TRTEngine.h</span></code></p></td>
+<td><p>Add <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> field; update constructor signatures.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">core/runtime/TRTEngine.cpp</span></code></p></td>
+<td><p>Read/write <code class="docutils literal notranslate"><span class="pre">ALIASED_IO_IDX</span></code>; populate from
+<code class="docutils literal notranslate"><span class="pre">getAliasedInputTensor</span></code> post-deserialize; add to
+<code class="docutils literal notranslate"><span class="pre">__obj_flatten__</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">core/runtime/execute_engine.cpp</span></code></p></td>
+<td><p>Branch in output binding loop: skip <code class="docutils literal notranslate"><span class="pre">at::empty</span></code> for aliased
+outputs, bind input <code class="docutils literal notranslate"><span class="pre">data_ptr</span></code>, return input tensor by identity.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">py/.../lowering/passes/</span></code></p></td>
+<td><p>New <code class="docutils literal notranslate"><span class="pre">mark_aliased_outputs</span></code> pass; KV-cache pattern matcher.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">py/.../conversion/_TRTInterpreter.py</span></code></p></td>
+<td><p>New converter for <code class="docutils literal notranslate"><span class="pre">torch_trt.kv_cache_update</span></code>; aliased-output
+handling in <code class="docutils literal notranslate"><span class="pre">output()</span></code>; <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> on
+<code class="docutils literal notranslate"><span class="pre">TRTInterpreterResult</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">py/.../dynamo/_compiler.py</span></code></p></td>
+<td><p>New <code class="docutils literal notranslate"><span class="pre">mutated_inputs</span></code> argument; plumb to lowering pass and
+engine builder.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="export_serialization.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Export and Serialization</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../legacy.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Legacy Frontends</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#implementation-status">Implementation Status</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#motivation">Motivation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#background-tensorrt-primitives">Background: TensorRT Primitives</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#kvcacheupdate-operator">KVCacheUpdate Operator</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#aliased-i-o-query-api">Aliased I/O Query API</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#design-overview">Design Overview</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tier-a-kvcacheupdate-fast-path">Tier A — KVCacheUpdate Fast Path</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tier-b-general-input-output-aliasing">Tier B — General Input/Output Aliasing</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#user-facing-api">User-Facing API</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#implementation-phases">Implementation Phases</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#lowering">Lowering</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#conversion">Conversion</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#c-runtime-changes">C++ Runtime Changes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#python-runtime-changes">Python Runtime Changes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#serialization-format-update">Serialization Format Update</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#buffer-backed-kv-cache">Buffer-Backed KV Cache</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#side-effects-on-non-kv-buffer-mutations">Side effects on non-KV buffer mutations</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#constraints-and-known-limitations">Constraints and Known Limitations</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#open-questions">Open Questions</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#phased-rollout">Phased Rollout</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#summary-of-code-touch-points">Summary of Code Touch Points</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/contributors/inplace_operations.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/contributors/inplace_operations.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

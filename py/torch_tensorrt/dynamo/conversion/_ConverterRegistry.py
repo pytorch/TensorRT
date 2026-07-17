@@ -163,6 +163,8 @@ def _has_dynamic_shapes(
                         break
             elif isinstance(meta_val, (SymFloat, SymInt, SymBool)):
                 is_shape_dynamic = True
+            elif isinstance(meta_val, (int, float, bool)):
+                is_shape_dynamic = False
             else:
                 shape = subnode.meta["val"].size()
                 is_shape_dynamic = any(

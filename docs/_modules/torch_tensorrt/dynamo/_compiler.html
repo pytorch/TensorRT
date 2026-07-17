@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=d8482cd4"></script>
+    <script src="../../../_static/documentation_options.js?v=e9cf1df7"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -518,6 +518,10 @@ document.write(`
     <span class="n">get_decompositions</span><span class="p">,</span>
     <span class="n">post_lowering</span><span class="p">,</span>
     <span class="n">pre_export_lowering</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering._buffer_lifting</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">inline_lifted_buffers_into_gm</span><span class="p">,</span>
+    <span class="n">lift_mutated_buffers</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.partitioning._resource_partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">resource_partition</span><span class="p">,</span>
@@ -1259,6 +1263,25 @@ document.write(`
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
+    <span class="c1"># Lift mutated buffers from get_attr to placeholders BEFORE post_lowering&#39;s</span>
+    <span class="c1"># constant_fold runs, so the engine sees them as input bindings (a</span>
+    <span class="c1"># prerequisite for IKVCacheUpdateLayer / aliased I/O to fire on a</span>
+    <span class="c1"># module-held cache). Returns a fresh GraphModule whose forward signature</span>
+    <span class="c1"># reflects the new placeholders.</span>
+    <span class="n">gm</span><span class="p">,</span> <span class="n">lifted_buffers</span> <span class="o">=</span> <span class="n">lift_mutated_buffers</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">lifted_buffers</span><span class="p">:</span>
+        <span class="c1"># Append each lifted buffer as an engine input AFTER the user inputs.</span>
+        <span class="c1"># Buffer tensors live on the gm&#39;s state; prepare an Input spec for</span>
+        <span class="c1"># each so engine building knows their shape/dtype/device.</span>
+        <span class="n">buffer_tensors</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">lifted_buffers</span><span class="p">]</span>
+        <span class="n">buffer_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">buffer_tensors</span><span class="p">)</span>
+        <span class="n">trt_arg_inputs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">trt_arg_inputs</span><span class="p">)</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">buffer_inputs</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Lifted </span><span class="si">%d</span><span class="s2"> mutable buffer(s) into engine inputs: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">lifted_buffers</span><span class="p">),</span>
+            <span class="p">[</span><span class="n">b</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">lifted_buffers</span><span class="p">],</span>
+        <span class="p">)</span>
+
     <span class="c1"># Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires</span>
     <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
@@ -1286,6 +1309,14 @@ document.write(`
         <span class="n">engine_cache</span><span class="p">,</span>
         <span class="n">graph_signature</span><span class="o">=</span><span class="n">exported_program</span><span class="o">.</span><span class="n">graph_signature</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="k">if</span> <span class="n">lifted_buffers</span><span class="p">:</span>
+        <span class="c1"># Inline buffers into the compiled gm as get_attr nodes + registered</span>
+        <span class="c1"># buffers. The resulting gm&#39;s forward takes only user inputs; buffers</span>
+        <span class="c1"># are read from module state on each call and threaded into the</span>
+        <span class="c1"># engine via get_attr nodes in the fx graph. This shape is naturally</span>
+        <span class="c1"># serializable by torch_tensorrt.save / torch.export (no external</span>
+        <span class="c1"># Python wrapper that would be lost on a round-trip).</span>
+        <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">inline_lifted_buffers_into_gm</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">lifted_buffers</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">trt_gm</span></div>
 
 
@@ -1990,11 +2021,26 @@ document.write(`
     <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_DISTRIBUTED_MODE_TRACE</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
+    <span class="n">lift_mutable_buffers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an ExportedProgram to a serialized TensorRT engine</span>
 
 <span class="sd">    Converts an ExportedProgram to a serialized TensorRT engine given a dictionary of conversion settings</span>
+
+<span class="sd">    When ``lift_mutable_buffers=True``, any module buffer that the model mutates</span>
+<span class="sd">    (a ``BUFFER_MUTATION`` in the EP&#39;s graph signature) is lifted from a baked-in</span>
+<span class="sd">    constant to an engine *input binding*. The resulting engine has additional</span>
+<span class="sd">    input bindings appended after the user-supplied inputs, in the order the</span>
+<span class="sd">    buffers appear in the EP. The caller is responsible for threading those</span>
+<span class="sd">    bindings at runtime — pass the current buffer values in on each call; the</span>
+<span class="sd">    engine writes through the binding via aliased I/O so the buffer&#39;s storage</span>
+<span class="sd">    is mutated in place. Use ``trt.ICudaEngine.get_aliased_input_tensor`` (or</span>
+<span class="sd">    the metadata exposed by ``TRTEngine`` via ``aliased_io``) to discover</span>
+<span class="sd">    which output binding aliases which input. The higher-level</span>
+<span class="sd">    :func:`torch_tensorrt.dynamo.compile` does this lifting and threading</span>
+<span class="sd">    automatically; this lower-level entry point exposes the same machinery</span>
+<span class="sd">    for callers that want to manage the bindings themselves.</span>
 
 <span class="sd">    Arguments:</span>
 <span class="sd">        exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``</span>
@@ -2252,6 +2298,25 @@ document.write(`
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
+
+    <span class="c1"># Optional: lift mutated module buffers from get_attr to placeholder so the</span>
+    <span class="c1"># engine treats them as input bindings (enabling KV-cache aliasing for</span>
+    <span class="c1"># module-held caches). The caller is responsible for threading the</span>
+    <span class="c1"># resulting bindings at runtime — they are appended after the user inputs</span>
+    <span class="c1"># in the order returned here.</span>
+    <span class="n">lifted_buffers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">lift_mutable_buffers</span><span class="p">:</span>
+        <span class="n">gm</span><span class="p">,</span> <span class="n">lifted_buffers</span> <span class="o">=</span> <span class="n">lift_mutated_buffers</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">lifted_buffers</span><span class="p">:</span>
+            <span class="n">buffer_tensors</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">lifted_buffers</span><span class="p">]</span>
+            <span class="n">buffer_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">buffer_tensors</span><span class="p">)</span>
+            <span class="n">trt_arg_inputs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">trt_arg_inputs</span><span class="p">)</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">buffer_inputs</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;lift_mutable_buffers=True: lifted </span><span class="si">%d</span><span class="s2"> buffer(s) into engine &quot;</span>
+                <span class="s2">&quot;inputs (appended after user inputs): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">lifted_buffers</span><span class="p">),</span>
+                <span class="p">[</span><span class="n">b</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">lifted_buffers</span><span class="p">],</span>
+            <span class="p">)</span>
 
     <span class="c1"># Apply lowering on the graph module</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>

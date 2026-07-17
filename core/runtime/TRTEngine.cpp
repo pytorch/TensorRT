@@ -97,7 +97,8 @@ TRTEngine::TRTEngine(
     bool requires_output_allocator,
     const std::string& serialized_metadata,
     const ResourceAllocationStrategy resource_allocation_strategy,
-    RuntimeSettings runtime_settings)
+    RuntimeSettings runtime_settings,
+    const std::unordered_map<std::string, AliasedIOSpec>& aliased_io)
     : TRTEngine(
           "deserialized_trt",
           serialized_engine,
@@ -109,7 +110,8 @@ TRTEngine::TRTEngine(
           requires_output_allocator,
           serialized_metadata,
           resource_allocation_strategy,
-          std::move(runtime_settings)) {}
+          std::move(runtime_settings),
+          aliased_io) {}
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
     : TRTEngine(
@@ -125,7 +127,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]))
                ? ResourceAllocationStrategy::kDynamic
                : ResourceAllocationStrategy::kStatic),
-          RuntimeSettings{}) {
+          RuntimeSettings{},
+          deserialize_aliased_io(serialized_info[ALIASED_IO_IDX])) {
   // Single visible marker that this engine was instantiated through the C++ runtime
   // entry point (i.e. torch.classes.tensorrt.Engine), distinguishing it from the Python
   // TRTEngine path. Tests look for this string in captured stderr to verify the
@@ -148,7 +151,8 @@ TRTEngine::TRTEngine(
     bool requires_output_allocator,
     const std::string& serialized_metadata,
     const ResourceAllocationStrategy resource_allocation_strategy,
-    RuntimeSettings runtime_settings) {
+    RuntimeSettings runtime_settings,
+    const std::unordered_map<std::string, AliasedIOSpec>& aliased_io) {
   this->runtime_cfg = TRTRuntimeConfig(std::move(runtime_settings));
   TORCHTRT_CHECK(
       target_platform._platform != Platform::PlatformEnum::kUNKNOWN,
@@ -280,9 +284,57 @@ TRTEngine::TRTEngine(
   }
 
   has_dynamic_inputs = engine_has_dynamic_inputs(cuda_engine.get(), in_binding_names);
-  // Cache input binding metadata used by the runtime hot path, then reconstruct
-  // optimization-profile info from the TRT API so multi-profile selection works
-  // for any loaded engine.
+
+  // Store the build-time aliased_io map as the starting point. Then reconcile
+  // against ICudaEngine::getAliasedInputTensor — that API is the source of
+  // truth for KV-cache-style aliasing (TRT-enforced via IKVCacheUpdateLayer)
+  // and may report aliases the build-time path didn't record (e.g. for
+  // engines built outside Torch-TensorRT). User-declared aliases (kind=kUser)
+  // are preserved as-is since TRT doesn't know about them.
+  this->aliased_io = aliased_io;
+  for (const auto& out_name : this->out_binding_names) {
+    // TRT returns nullptr / empty string for non-aliased outputs; any thrown
+    // exception is a real error in the engine state and propagates.
+    const char* aliased_in = cuda_engine->getAliasedInputTensor(out_name.c_str());
+    if (aliased_in == nullptr || aliased_in[0] == '\0') {
+      continue;
+    }
+    auto it = this->aliased_io.find(out_name);
+    if (it == this->aliased_io.end()) {
+      this->aliased_io[out_name] = AliasedIOSpec{std::string(aliased_in), AliasKind::kKVCacheUpdate};
+      LOG_DEBUG("aliased_io reconciliation: discovered " << out_name << " -> " << aliased_in << " (kv_cache_update)");
+    } else if (it->second.kind == AliasKind::kUser) {
+      // A kUser alias is declared by Torch-TensorRT, not TRT. TRT does not track
+      // user-declared aliases, so its view is not authoritative here; keep the
+      // build-time value (and kUser kind) as-is.
+    } else if (it->second.input_binding_name != std::string(aliased_in)) {
+      LOG_WARNING(
+          "aliased_io: build-time map disagrees with engine for output "
+          << out_name << " (build: " << it->second.input_binding_name << ", engine: " << aliased_in
+          << "); using engine value.");
+      it->second = AliasedIOSpec{std::string(aliased_in), AliasKind::kKVCacheUpdate};
+    }
+  }
+
+  // Precompute the set of input binding names that are the alias source of some
+  // output (for the O(1) per-call membership test) and validate every aliased
+  // output against the output allocator. The reconciliation loop above is
+  // engine-driven and only visits kv_cache_update outputs; user-declared aliases
+  // are never reported by TRT, so iterating the merged map here is what covers
+  // them too. Aliasing binds an output to an input's static storage, which is
+  // incompatible with the dynamic-allocation output-allocator path.
+  this->aliased_input_binding_names.clear();
+  for (const auto& kv : this->aliased_io) {
+    TORCHTRT_CHECK(
+        !this->requires_output_allocator,
+        "Aliased output " << kv.first
+                          << " is incompatible with dynamic output allocator. Aliasing requires fixed output shape.");
+    this->aliased_input_binding_names.insert(kv.second.input_binding_name);
+  }
+
+  // Cache input binding metadata used by the runtime hot path (depends on
+  // aliased_input_binding_names above), then reconstruct optimization-profile
+  // info from the TRT API so multi-profile selection works for any loaded engine.
   this->setup_input_binding_infos();
   this->setup_optimization_profiles();
 
@@ -527,7 +579,8 @@ FlattenedState TRTEngine::__obj_flatten__() {
       std::tuple("requires_output_allocator", serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]),
       std::tuple("target_platform", serialized_info[TARGET_PLATFORM_IDX]),
       std::tuple("resource_allocation_strategy", serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]),
-      std::tuple("requires_native_multidevice", serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]));
+      std::tuple("requires_native_multidevice", serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]),
+      std::tuple("aliased_io", serialized_info[ALIASED_IO_IDX]));
 }
 
 std::vector<std::string> TRTEngine::serialize() {
@@ -553,6 +606,7 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
   serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = this->requires_native_multidevice ? "1" : "0";
+  serialized_info[ALIASED_IO_IDX] = serialize_aliased_io(this->aliased_io);
   // rank/world_size are runtime facts (may differ at load time); not serialized.
   // RuntimeSettings are intentionally NOT serialized: they're per-engine, in-memory
   // initialization values, not part of the engine's identity.
@@ -571,7 +625,8 @@ void TRTEngine::setup_input_binding_infos() {
     input_binding_infos.push_back(
         {name,
          util::TRTDataTypeToScalarType(cuda_engine->getTensorDataType(name.c_str())),
-         cuda_engine->isShapeInferenceIO(name.c_str())});
+         cuda_engine->isShapeInferenceIO(name.c_str()),
+         aliased_input_binding_names.find(name) != aliased_input_binding_names.end()});
   }
 }
 

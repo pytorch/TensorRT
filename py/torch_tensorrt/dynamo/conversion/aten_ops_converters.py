@@ -816,6 +816,7 @@ def aten_ops_rsqrt(
     )
 
 
+@dynamo_tensorrt_converter(operator.neg, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.neg.default, supports_dynamic_shapes=True)
 def aten_ops_neg(
     ctx: ConversionContext,
@@ -1059,6 +1060,137 @@ def aten_ops_gather(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.select.gather(
         ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+    )
+
+
+def _index_copy_kv_eligible(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Validator for the KV-cache fast path of ``aten.index_copy.default``.
+
+    Returns True only for the narrow case our ``IKVCacheUpdateLayer``
+    emitter can handle without a graph break:
+
+    * Input is an FX placeholder (i.e. a network input — required for
+      aliasing).
+    * Input has rank 4 and fully static shape ``[b, d, s_max, h]``.
+    * ``dim`` argument is exactly ``2``.
+    * Source tensor has rank 4 with ``shape[2] == 1`` (single-position
+      write; matches HF's per-step ``StaticCache.update`` call).
+    * Batch is 1 (avoids writeIndices broadcasting; trivially extensible
+      to larger batches when needed).
+
+    Cases that fail this validator fall through to
+    ``aten_ops_index_copy_fallback``.
+    """
+    if len(node.args) < 4:
+        return False
+    input_node, dim, _index_node, src_node = node.args[:4]
+
+    if not isinstance(input_node, Node) or input_node.op != "placeholder":
+        return False
+    input_val = input_node.meta.get("val")
+    if input_val is None:
+        return False
+    input_shape = tuple(input_val.shape)
+    if len(input_shape) != 4:
+        return False
+    if any(not isinstance(s, int) or s < 0 for s in input_shape):
+        return False
+    if input_shape[0] != 1:
+        return False  # batch > 1 deferred; see index_copy.index_copy_kv
+
+    # IKVCacheUpdateLayer scatters along the sequence axis, which is axis 2 in
+    # the KV-cache layout it requires: ``[batch, num_heads, s_max, head_dim]``.
+    # A write on any other axis is not a cache-position update and cannot be
+    # expressed by the layer, so it must fall through to the scatter fallback.
+    if dim != 2:
+        return False
+
+    if not isinstance(src_node, Node):
+        return False
+    src_val = src_node.meta.get("val")
+    if src_val is None:
+        return False
+    src_shape = tuple(src_val.shape)
+    if len(src_shape) != 4 or not isinstance(src_shape[2], int) or src_shape[2] != 1:
+        return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_copy.default,
+    capability_validator=_index_copy_kv_eligible,
+    priority=ConverterPriority.HIGH,
+    supports_dynamic_shapes=False,
+)
+@enforce_tensor_types({0: (TRTTensor,), 2: (TRTTensor,), 3: (TRTTensor,)})
+def aten_ops_index_copy_kv(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.index_copy.index_copy_kv(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        dim=args[1],
+        index=args[2],
+        src=args[3],
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_copy.default,
+    supports_dynamic_shapes=False,
+)
+@enforce_tensor_types({0: (TRTTensor,), 2: (TRTTensor,), 3: (TRTTensor,)})
+def aten_ops_index_copy_fallback(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.index_copy.index_copy_fallback(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        dim=args[1],
+        index=args[2],
+        src=args[3],
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.slice_scatter.default, supports_dynamic_shapes=True
+)
+@enforce_tensor_types({0: (TRTTensor,), 1: (TRTTensor,)})
+def aten_ops_slice_scatter(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice_scatter.slice_scatter(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        src=args[1],
+        dim=args_bounds_check(args, 2, 0),
+        start=args_bounds_check(args, 3),
+        end=args_bounds_check(args, 4),
+        step=args_bounds_check(args, 5),
     )
 
 
@@ -2223,6 +2355,7 @@ def aten_ops_maximum(
     )
 
 
+@dynamo_tensorrt_converter(torch.sym_min, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.minimum.default, supports_dynamic_shapes=True)
 def aten_ops_minimum(
     ctx: ConversionContext,
