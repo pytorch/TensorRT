@@ -4086,6 +4086,12 @@ def aten_ops_linear(
 def scaled_dot_product_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
+    attn_mask = args_bounds_check(node.args, 3, None)
+    is_causal = args_bounds_check(node.args, 5, False)
+    if is_causal and attn_mask is not None:
+        _LOGGER.debug("Explicit attn_mask should not be set when is_causal=True.")
+        return False
+
     enable_gqa = node.kwargs.get("enable_gqa", False)
 
     query_shape, key_shape, value_shape = None, None, None

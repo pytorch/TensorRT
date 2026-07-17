@@ -3,10 +3,9 @@ import math
 from typing import Optional, Tuple, Union
 
 import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
-from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -230,121 +229,57 @@ def scaled_dot_product_attention(
 
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
-        q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
+        q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_q_dim", query, -1)
         sqrt_q_dim = impl.unary.sqrt(
             ctx, target, source_ir, f"{name}_sqrt_q_dim", q_dim
         )
-        scale_factor = impl.elementwise.div(
-            ctx, target, source_ir, f"{name}_div_1_sqrt_q_dim", 1, sqrt_q_dim
-        )  # fp32
-
-        # For TRT version < 11.0, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to torch.nn.functional.scaled_dot_product_attention
-        # NVBug: https://nvbugspro.nvidia.com/bug/6047232
-        if scale_factor.dtype != query.dtype:
-            if key.shape[-2] >= 512 and is_causal:
-                if is_tensorrt_version_supported("11.0"):
-                    scale_factor = cast_trt_tensor(
-                        ctx,
-                        scale_factor,
-                        query.dtype,
-                        name + "_cast_scale_factor",
-                        target,
-                        source_ir,
-                    )
-                else:
-                    _LOGGER.warning(
-                        "For TRT 10.x, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to `torch.nn.functional.scaled_dot_product_attention` in FP16/BF16. Thus, we use FP32 for the scale factor. If you want to use the accurate dtype, please set `decompose_attention=True` or upgrade to TRT 11.0 or later."
-                    )
+        sqrt_q_dim = cast_trt_tensor(
+            ctx, sqrt_q_dim, query.dtype, f"{name}_cast_sqrt_q_dim", target, source_ir
+        )
+        scaled_query = impl.elementwise.div(
+            ctx, target, source_ir, f"{name}_scaled_query", query, sqrt_q_dim
+        )
     else:
-        scale_factor = get_trt_tensor(ctx, scale, f"{name}_scale_factor", query.dtype)
-
-    mask_tensor = None
-    if attn_mask is not None:
-        attn_mask = get_trt_tensor(ctx, attn_mask, name + "_attn_mask")
-        if attn_mask.dtype == trt.DataType.BOOL:
-            mask_tensor = attn_mask
-        elif attn_mask.dtype != query.dtype:
-            mask_tensor = cast_trt_tensor(
-                ctx,
-                attn_mask,
-                query.dtype,
-                name + "_cast_attn_mask",
-                target,
-                source_ir,
-            )
-        else:
-            mask_tensor = attn_mask
-        mask_tensor = _normalize_attention_mask_rank(
-            ctx, mask_tensor, query, name + "_attn_mask"
+        scale = get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype)
+        scaled_query = impl.elementwise.mul(
+            ctx, target, source_ir, f"{name}_scaled_query", query, scale
         )
 
-    # TRT add_attention does not support is_causal=True together with an explicit
-    # mask.  When both are present, fold the causal lower-triangular mask into the
-    # user-supplied mask and pass use_causal=False to the layer.
-    use_causal = is_causal
-    if mask_tensor is not None and is_causal:
-        L = impl.shape.shape(ctx, target, source_ir, name + "_L", query, -2)
-        S = impl.shape.shape(ctx, target, source_ir, name + "_S", key, -2)
-        causal_mask = tril(ctx, target, source_ir, name + "_tril", L, S)
-        diff = len(query.shape) - len(causal_mask.shape)
-        causal_mask = prepend_ones(ctx, causal_mask, name + "_prepend_ones", diff)
-        if mask_tensor.dtype == trt.DataType.BOOL:
-            mask_tensor = impl.elementwise.logical_and(
-                ctx,
-                target,
-                source_ir,
-                name + "_causal_attn_and",
-                causal_mask,
-                mask_tensor,
-            )
-        else:
-            zero_bias = get_trt_tensor(ctx, 0.0, name + "_causal_zero", query.dtype)
-            neg_inf_bias = get_trt_tensor(
-                ctx, float("-inf"), name + "_causal_neg_inf", query.dtype
-            )
-            causal_additive_bias = impl.condition.where(
-                ctx,
-                target,
-                source_ir,
-                name + "_causal_additive",
-                zero_bias,
-                neg_inf_bias,
-                causal_mask,
-            )
-            mask_tensor = impl.elementwise.add(
-                ctx,
-                target,
-                source_ir,
-                name + "_mask_add_causal",
-                mask_tensor,
-                causal_additive_bias,
-            )
-        use_causal = False
-
-    scaled_query = impl.elementwise.mul(
-        ctx, target, source_ir, f"{name}_scaled_query", query, scale_factor
-    )
-    if scaled_query.dtype != query.dtype:
-        scaled_query = cast_trt_tensor(
-            ctx,
-            scaled_query,
-            query.dtype,
-            name + "_cast_scaled_query",
-            target,
-            source_ir,
-        )
-
-    attention_layer = ctx.net.add_attention(
-        scaled_query, key, value, trt.AttentionNormalizationOp.SOFTMAX, use_causal
+    attention_layer = ctx.net.add_attention_v2(
+        scaled_query,
+        key,
+        value,
+        trt.AttentionNormalizationOp.SOFTMAX,
+        trt.CausalMaskKind.NONE,
     )
     assert attention_layer is not None, "attention layer is None"
 
-    if mask_tensor is not None:
-        attention_layer.mask = mask_tensor
+    if is_causal:
+        attention_layer.causal_kind = trt.CausalMaskKind.LOWER_RIGHT
+    else:
+        if attn_mask is not None:
+            attn_mask = get_trt_tensor(ctx, attn_mask, f"{name}_attn_mask")
+            if attn_mask.dtype == trt.DataType.BOOL:
+                mask = attn_mask
+            elif attn_mask.dtype != query.dtype:
+                mask = cast_trt_tensor(
+                    ctx,
+                    attn_mask,
+                    query.dtype,
+                    f"{name}_cast_attn_mask",
+                    target,
+                    source_ir,
+                )
+            else:
+                mask = attn_mask
+            mask = _normalize_attention_mask_rank(
+                ctx, mask, query, f"{name}_normalize_attn_mask"
+            )
+            attention_layer.mask = mask
+
     fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
     attention_layer.decomposable = not fp8_norm
-    attention_output = attention_layer.get_output(0)
-    return attention_output
+    return attention_layer.get_output(0)
 
 
 def scaled_dot_product_flash_attention(
@@ -370,66 +305,18 @@ def scaled_dot_product_flash_attention(
     Optional[TRTTensor],
     Optional[TRTTensor],
 ]:
-    fp8_norm_active = (
-        ctx.current_node is not None
-        and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
+    sdpa_output = scaled_dot_product_attention(
+        ctx,
+        target,
+        source_ir,
+        name,
+        query,
+        key,
+        value,
+        is_causal=is_causal,
+        scale=scale,
     )
-    if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
-        scale = 1.0 / math.sqrt(query.shape[-1])
-
-    if scale is None:
-        # 1 / math.sqrt(query.size(-1))
-        q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
-        sqrt_q_dim = impl.unary.sqrt(
-            ctx, target, source_ir, f"{name}_sqrt_q_dim", q_dim
-        )
-        scale_factor = impl.elementwise.div(
-            ctx, target, source_ir, f"{name}_div_1_sqrt_q_dim", 1, sqrt_q_dim
-        )  # fp32
-
-        # For TRT version < 11.0, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to torch.nn.functional.scaled_dot_product_attention
-        # NVBug: https://nvbugspro.nvidia.com/bug/6047232
-        if scale_factor.dtype != query.dtype:
-            if key.shape[-2] >= 512 and is_causal:
-                if is_tensorrt_version_supported("11.0"):
-                    scale_factor = cast_trt_tensor(
-                        ctx,
-                        scale_factor,
-                        query.dtype,
-                        name + "_cast_scale_factor",
-                        target,
-                        source_ir,
-                    )
-                else:
-                    _LOGGER.warning(
-                        "For TRT 10.x, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to `torch.nn.functional.scaled_dot_product_attention` in FP16/BF16. Thus, we use FP32 for the scale factor. If you want to use the accurate dtype, please set `decompose_attention=True` or upgrade to TRT 11.0 or later."
-                    )
-    else:
-        scale_factor = get_trt_tensor(ctx, scale, f"{name}_scale_factor", query.dtype)
-
-    scaled_query = impl.elementwise.mul(
-        ctx, target, source_ir, f"{name}_scaled_query", query, scale_factor
-    )
-    if scaled_query.dtype != query.dtype:
-        scaled_query = cast_trt_tensor(
-            ctx,
-            scaled_query,
-            query.dtype,
-            name + "_cast_scaled_query",
-            target,
-            source_ir,
-        )
-
-    attention_layer = ctx.net.add_attention(
-        scaled_query, key, value, trt.AttentionNormalizationOp.SOFTMAX, is_causal
-    )
-    assert attention_layer is not None, "attention layer is None"
-
-    fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
-    attention_layer.decomposable = not fp8_norm
-
-    attention_output = attention_layer.get_output(0)
-    return attention_output, None, None, None, 0.0, 0.0, None, None, None
+    return sdpa_output, None, None, None, 0.0, 0.0, None, None, None
 
 
 def scaled_dot_product_efficient_attention(
@@ -455,146 +342,80 @@ def scaled_dot_product_efficient_attention(
 
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
-        q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
+        q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_q_dim", query, -1)
         sqrt_q_dim = impl.unary.sqrt(
             ctx, target, source_ir, f"{name}_sqrt_q_dim", q_dim
         )
-        scale_factor = impl.elementwise.div(
-            ctx, target, source_ir, f"{name}_div_1_sqrt_q_dim", 1, sqrt_q_dim
-        )  # fp32
-
-        # For TRT version < 11.0, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to torch.nn.functional.scaled_dot_product_attention
-        # NVBug: https://nvbugspro.nvidia.com/bug/6047232
-        if scale_factor.dtype != query.dtype:
-            if key.shape[-2] >= 512 and is_causal:
-                if is_tensorrt_version_supported("11.0"):
-                    scale_factor = cast_trt_tensor(
-                        ctx,
-                        scale_factor,
-                        query.dtype,
-                        name + "_cast_scale_factor",
-                        target,
-                        source_ir,
-                    )
-                else:
-                    _LOGGER.warning(
-                        "For TRT 10.x, when seq_len (dim: -2) of k/v >= 512, IAttentionLayer with causal=True returns significantly mismatched results compared to `torch.nn.functional.scaled_dot_product_attention` in FP16/BF16. Thus, we use FP32 for the scale factor. If you want to use the accurate dtype, please set `decompose_attention=True` or upgrade to TRT 11.0 or later."
-                    )
+        sqrt_q_dim = cast_trt_tensor(
+            ctx, sqrt_q_dim, query.dtype, f"{name}_cast_sqrt_q_dim", target, source_ir
+        )
+        scaled_query = impl.elementwise.div(
+            ctx, target, source_ir, f"{name}_scaled_query", query, sqrt_q_dim
+        )
     else:
-        scale_factor = get_trt_tensor(ctx, scale, f"{name}_scale_factor", query.dtype)
-
-    scaled_query = impl.elementwise.mul(
-        ctx, target, source_ir, f"{name}_scaled_query", query, scale_factor
-    )
-    if scaled_query.dtype != query.dtype:
-        scaled_query = cast_trt_tensor(
-            ctx,
-            scaled_query,
-            query.dtype,
-            name + "_cast_scaled_query",
-            target,
-            source_ir,
+        scale = get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype)
+        scaled_query = impl.elementwise.mul(
+            ctx, target, source_ir, f"{name}_scaled_query", query, scale
         )
 
-    if (
-        isinstance(scaled_query.shape[1], int)
-        and scaled_query.shape[1] < 0
-        and isinstance(key.shape[1], int)
-        and key.shape[1] > 0
-    ):
-        shuffle = ctx.net.add_shuffle(scaled_query)
-        shuffle.name = name + "_fix_query_num_heads"
-        shuffle.zero_is_placeholder = True
-        shuffle.reshape_dims = (0, key.shape[1], 0, 0)
-        scaled_query = shuffle.get_output(0)
-
-    mask_tensor = None
-    if attn_bias is not None:
-        attn_bias = get_trt_tensor(ctx, attn_bias, name + "_attn_bias")
-        if attn_bias.dtype == trt.DataType.BOOL:
-            mask_tensor = attn_bias
-        elif attn_bias.dtype != query.dtype:
-            mask_tensor = cast_trt_tensor(
-                ctx,
-                attn_bias,
-                query.dtype,
-                name + "_cast_attn_bias",
-                target,
-                source_ir,
-            )
-        else:
-            mask_tensor = attn_bias
-        mask_tensor = _normalize_attention_mask_rank(
-            ctx, mask_tensor, query, name + "_attn_bias"
-        )
-
-    # TensorRT IAttention does not allow setting both causal=True and mask.
-    # If both are requested, fold causal into mask and disable causal flag.
-    use_causal = is_causal
-    if mask_tensor is not None and is_causal:
-        L = impl.shape.shape(ctx, target, source_ir, name + "_L", query, -2)
-        S = impl.shape.shape(ctx, target, source_ir, name + "_S", key, -2)
-        causal_mask = tril(
-            ctx,
-            target,
-            source_ir,
-            name + "_tril",
-            L,
-            S,
-        )
-        diff = len(query.shape) - len(causal_mask.shape)
-        causal_mask = prepend_ones(ctx, causal_mask, name + "_prepend_ones", diff)
-
-        if mask_tensor.dtype == trt.DataType.BOOL:
-            mask_tensor = impl.elementwise.logical_and(
-                ctx,
-                target,
-                source_ir,
-                name + "_causal_attn_bias_and",
-                causal_mask,
-                mask_tensor,
-            )
-        else:
-            # Convert causal bool mask to additive bias mask:
-            # True -> 0.0 (keep), False -> -inf (block)
-            zero_bias = get_trt_tensor(
-                ctx, 0.0, name + "_causal_additive_bias_zero", query.dtype
-            )
-            neg_inf_bias = get_trt_tensor(
-                ctx, float("-inf"), name + "_causal_additive_bias_neg_inf", query.dtype
-            )
-            causal_additive_bias = impl.condition.where(
-                ctx,
-                target,
-                source_ir,
-                name + "_causal_additive_bias",
-                zero_bias,
-                neg_inf_bias,
-                causal_mask,
-            )
-            mask_tensor = impl.elementwise.add(
-                ctx,
-                target,
-                source_ir,
-                name + "_attn_bias_add_causal",
-                mask_tensor,
-                causal_additive_bias,
-            )
-        use_causal = False
-
-    attention_layer = ctx.net.add_attention(
-        scaled_query, key, value, trt.AttentionNormalizationOp.SOFTMAX, use_causal
+    attention_layer = ctx.net.add_attention_v2(
+        scaled_query,
+        key,
+        value,
+        trt.AttentionNormalizationOp.SOFTMAX,
+        trt.CausalMaskKind.NONE,
     )
     assert attention_layer is not None, "attention layer is None"
 
-    if mask_tensor is not None:
-        attention_layer.mask = mask_tensor
+    if is_causal:
+        if attn_bias is not None:
+            # TRT's IAttention layer does not support passing in both attn_bias/mask and causal mask at the same time,
+            # so we convert causal mask to an additive causal mask and add it to the attn_bias
+            attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
+
+            L = impl.shape.shape(ctx, target, source_ir, f"{name}_L", query, -2)
+            S = impl.shape.shape(ctx, target, source_ir, f"{name}_S", key, -2)
+            mask = tril(ctx, target, source_ir, f"{name}_tril", L, S)
+            # TODO: Whether explicitly prepend 1s to the mask shape is more performant or not?
+            # diff = len(query.shape) - len(mask.shape)
+            # if diff > 0:
+            #     mask = prepend_ones(ctx, mask, f"{name}_prepend_ones", diff)
+
+            # Convert causal bool mask to additive bias mask: True -> 0.0 (keep), False -> -inf (block)
+            zero_bias = get_trt_tensor(
+                ctx, 0.0, f"{name}_causal_additive_bias_zero", query.dtype
+            )
+            neg_inf_bias = get_trt_tensor(
+                ctx, float("-inf"), f"{name}_causal_additive_bias_neg_inf", query.dtype
+            )
+            additive_causal_mask = impl.condition.where(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_additive_causal_mask",
+                zero_bias,
+                neg_inf_bias,
+                mask,
+            )
+            mask = impl.elementwise.add(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_attn_bias_add_causal_mask",
+                attn_bias,
+                additive_causal_mask,
+            )
+            attention_layer.mask = mask
+        else:
+            attention_layer.causal_kind = trt.CausalMaskKind.LOWER_RIGHT
+    else:
+        if attn_bias is not None:
+            attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
+            attention_layer.mask = attn_bias
 
     fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
     attention_layer.decomposable = not fp8_norm
-
-    attention_output = attention_layer.get_output(0)
-    return attention_output, None, None, None
+    return attention_layer.get_output(0), None, None, None
 
 
 def scaled_dot_product_cudnn_attention(
