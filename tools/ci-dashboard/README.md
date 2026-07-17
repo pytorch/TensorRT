@@ -61,6 +61,24 @@ reachable over your tailnet/LAN — the startup log prints the Tailscale + LAN U
   collapsing whatever you've expanded. `↻ Refresh` (or `r`) forces a full reload;
   `/` focuses the branch box; the *failing only* toggle hides the green cards.
 
+## PR commands
+
+Comment these on a PR to control its CI without pushing a new commit (write
+access required; handled by `.github/workflows/retrigger-ci.yml`). They're also
+listed in the dashboard header under **PR commands** with copy buttons.
+
+| comment | effect |
+|---|---|
+| `/rerun` | re-run only the failed / cancelled jobs on the current commit |
+| `/rerun all` | re-run every job from scratch on the current commit |
+| `/cancel` | cancel stale “zombie” runs still in-flight on **old** commits of the PR |
+| `/cancel all` | cancel **every** in-flight run for the PR (full stop) |
+| `/test <lane> [backend]` | dispatch a fresh run at an exact lane — `lane` ∈ `fast\|full\|nightly`, `backend` ∈ `standard\|rtx\|both` (default `both`). e.g. `/test full rtx`, `/test nightly` |
+
+Typical unstick: `/cancel` to clear zombies, then `/rerun all` for a clean wave.
+Run everything on demand: `/test full` (or `/test nightly` for llm/kernels/distributed).
+(These take effect from `main`, since `issue_comment` workflows always run there.)
+
 ## How it works
 
 The server (`ci_dashboard.py`) is a thin, caching proxy over `gh`; all rendering

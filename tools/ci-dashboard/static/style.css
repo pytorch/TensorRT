@@ -236,3 +236,15 @@ h2.sec { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; colo
 .toast.show { opacity: 1; }
 .legend { display: flex; gap: 14px; color: var(--muted); font-size: 12px; margin: 4px 0 0; flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* PR command reference (collapsible) */
+.cmds { margin: 8px 0 0; font-size: 12px; }
+.cmds > summary { cursor: pointer; color: var(--muted); user-select: none; padding: 2px 0; }
+.cmds > summary:hover { color: var(--text); }
+.cmd-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 2px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; }
+.cmd { display: flex; align-items: center; gap: 10px; }
+.cmd code { font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; white-space: nowrap; min-width: 82px; }
+.cmd .copy { float: none; }
+.cmd .lbl { color: var(--muted); }

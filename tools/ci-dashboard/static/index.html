@@ -32,6 +32,18 @@
       <span><span class="dot skip"></span> didn’t run</span>
       <span class="muted">· open a platform for its python×cuda×tier grid · click a red cell for failing tests + code</span>
     </div>
+    <details class="cmds">
+      <summary>PR commands <span class="muted">— comment these on a PR to control its CI (write access)</span></summary>
+      <div class="cmd-list">
+        <div class="cmd"><code>/rerun</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">re-run only the failed / cancelled jobs (current commit)</span></div>
+        <div class="cmd"><code>/rerun all</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">re-run every job from scratch (current commit)</span></div>
+        <div class="cmd"><code>/cancel</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">cancel stale “zombie” runs still in-flight on old commits</span></div>
+        <div class="cmd"><code>/cancel all</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">cancel every in-flight run for the PR (full stop)</span></div>
+        <div class="cmd"><code>/test full</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">run the full suite (all tiers, both engines)</span></div>
+        <div class="cmd"><code>/test full rtx</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">full suite, RTX engine only (also <code>standard</code>)</span></div>
+        <div class="cmd"><code>/test nightly</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">everything incl. llm / kernels / distributed</span></div>
+      </div>
+    </details>
     <div id="content" hx-get="/ui/board?branch={{BRANCH}}" hx-trigger="load" hx-swap="innerHTML">
       <div class="empty-state"><span class="spinner"></span> loading {{BRANCH}}…</div>
     </div>
