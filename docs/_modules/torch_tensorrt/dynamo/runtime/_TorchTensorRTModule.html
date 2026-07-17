@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=aac63e80"></script>
+    <script src="../../../../_static/documentation_options.js?v=812adde3"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -490,6 +490,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._serialized_engine_layout</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ABI_TARGET_IDX</span><span class="p">,</span>
     <span class="n">ABI_VERSION</span><span class="p">,</span>
+    <span class="n">ALIASED_IO_IDX</span><span class="p">,</span>
     <span class="n">DEVICE_IDX</span><span class="p">,</span>
     <span class="n">ENGINE_IDX</span><span class="p">,</span>
     <span class="n">HW_COMPATIBLE_IDX</span><span class="p">,</span>
@@ -500,6 +501,8 @@ document.write(`
     <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">,</span>
     <span class="n">RESOURCE_ALLOCATION_STRATEGY_IDX</span><span class="p">,</span>
     <span class="n">SERIALIZATION_LEN</span><span class="p">,</span>
+    <span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="p">,</span>
+    <span class="n">SERIALIZED_ALIASED_IO_RECORD_DELIM</span><span class="p">,</span>
     <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">,</span>
     <span class="n">TARGET_PLATFORM_IDX</span><span class="p">,</span>
     <span class="n">SerializedTensorRTEngineFmt</span><span class="p">,</span>
@@ -516,6 +519,61 @@ document.write(`
     <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
 <span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">user_output_count</span><span class="p">(</span>
+    <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">aliased_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Derive the boundary between user-visible outputs and side-effect</span>
+<span class="sd">    aliased outputs.</span>
+
+<span class="sd">    By convention the TRTInterpreter appends side-effect aliased outputs</span>
+<span class="sd">    (those added on behalf of layers like ``IKVCacheUpdateLayer`` that</span>
+<span class="sd">    require their output to be a network output) to the END of</span>
+<span class="sd">    ``output_binding_names``. So the user-output count is one past the</span>
+<span class="sd">    index of the last name that is *not* in ``aliased_io``.</span>
+
+<span class="sd">    Returns ``len(output_binding_names)`` if no outputs are aliased OR</span>
+<span class="sd">    if every output is aliased (in which case we conservatively treat</span>
+<span class="sd">    them all as user-returned — a pure-side-effect engine is degenerate).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">aliased_io</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_binding_names</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">output_binding_names</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">output_binding_names</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">aliased_io</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_binding_names</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">serialize_aliased_io</span><span class="p">(</span><span class="n">aliased_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Encode aliased_io to ``output@input@kind`` records joined by ``%``.</span>
+
+<span class="sd">    Mirrors ``serialize_aliased_io`` in ``core/runtime/runtime_utils.cpp``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">aliased_io</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">out_name</span><span class="p">,</span> <span class="p">(</span><span class="n">in_name</span><span class="p">,</span> <span class="n">kind</span><span class="p">)</span> <span class="ow">in</span> <span class="n">aliased_io</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">out_name</span><span class="si">}{</span><span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="si">}{</span><span class="n">in_name</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="si">}{</span><span class="n">kind</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">SERIALIZED_ALIASED_IO_RECORD_DELIM</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">deserialize_aliased_io</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode the wire format produced by :func:`serialize_aliased_io`.&quot;&quot;&quot;</span>
+    <span class="n">out</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">out</span>
+    <span class="k">for</span> <span class="n">rec</span> <span class="ow">in</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">SERIALIZED_ALIASED_IO_RECORD_DELIM</span><span class="p">):</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Skipping malformed aliased_io record: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">rec</span><span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="n">out_name</span><span class="p">,</span> <span class="n">in_name</span><span class="p">,</span> <span class="n">kind</span> <span class="o">=</span> <span class="n">fields</span>
+        <span class="n">out</span><span class="p">[</span><span class="n">out_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">in_name</span><span class="p">,</span> <span class="n">kind</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">out</span>
 
 
 <div class="viewcode-block" id="TorchTensorRTModule">
@@ -545,6 +603,7 @@ document.write(`
         <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">requires_native_multidevice</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">aliased_io</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines</span>
@@ -615,6 +674,8 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">symbolic_shape_expressions</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_native_multidevice</span> <span class="o">=</span> <span class="n">requires_native_multidevice</span>
+        <span class="c1"># Map of output binding name -&gt; (input binding name, kind_str)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">aliased_io</span> <span class="ow">or</span> <span class="p">{})</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_cross_compile_for_windows</span>
@@ -708,6 +769,7 @@ document.write(`
         <span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_NATIVE_MULTIDEVICE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
             <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requires_native_multidevice</span><span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">serialize_aliased_io</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">)</span>
         <span class="c1"># rank/world_size are runtime facts; queried from ProcessGroup at execution time.</span>
         <span class="c1"># RuntimeSettings are intentionally NOT serialized: they&#39;re per-engine, in-memory</span>
         <span class="c1"># init values, not part of the engine&#39;s identity (see pytorch/TensorRT#4310).</span>
@@ -856,7 +918,7 @@ document.write(`
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Strategies cross the boundary as ints (TorchBind ``int64_t``,</span>
             <span class="c1"># mirroring the nvinfer1 enum integers on the cpp side).</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">update_runtime_settings</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_engine</span><span class="p">()</span><span class="o">.</span><span class="n">update_runtime_settings</span><span class="p">(</span>
                 <span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span><span class="p">[</span>
                     <span class="n">rs</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span>
                 <span class="p">],</span>
@@ -1151,9 +1213,27 @@ document.write(`
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">input_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 
-        <span class="n">outputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="p">(</span><span class="n">input_tensors</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
+        <span class="n">outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="p">(</span>
+            <span class="nb">list</span><span class="p">(</span><span class="n">input_tensors</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span>
+        <span class="p">)</span>
+
+        <span class="c1"># The interpreter may have appended extra &quot;side-effect&quot; outputs to</span>
+        <span class="c1"># satisfy the network-output requirement of aliased layers (e.g.</span>
+        <span class="c1"># IKVCacheUpdateLayer). Truncate to the user-facing count; mutation</span>
+        <span class="c1"># effects are visible on the corresponding input tensors. The</span>
+        <span class="c1"># boundary is derived from output_binding_names + aliased_io — no</span>
+        <span class="c1"># extra state needed.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="n">user_output_count</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
+                <span class="n">outputs</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>
+
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># Pure side-effect engine (model has no return value).</span>
+            <span class="k">return</span> <span class="p">()</span>
 
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span></div>
 

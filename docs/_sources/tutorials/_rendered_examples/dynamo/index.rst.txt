@@ -89,6 +89,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="This example shows the simplest in-place pattern: the caller owns a buffer (e.g. a KV cache), p...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_aliased_io_user_inputs_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_aliased_io_user_inputs.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">In-place aliased I/O: caller-owned tensors</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="Compilation is an expensive operation as it involves many graph transformations, translations a...">
 
 .. only:: html
@@ -203,6 +220,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This is the PyTorch-canonical pattern for streaming inference: the cache lives inside the model...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_aliased_io_buffers_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_aliased_io_buffers.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">In-place aliased I/O: module-owned buffers</div>
     </div>
 
 
@@ -373,6 +407,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Saving Models with Dynamic Shapes - Both Methods</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="A realistic single-layer transformer attention block with a static-shape KV cache held as modul...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_aliased_io_kv_attention_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_aliased_io_kv_attention.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Streaming attention with a static KV cache</div>
     </div>
 
 
@@ -676,6 +727,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
    /tutorials/_rendered_examples/dynamo/dynamic_memory_allocation
    /tutorials/_rendered_examples/dynamo/debugger_example
+   /tutorials/_rendered_examples/dynamo/aliased_io_user_inputs
    /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/cross_runtime_compilation_for_windows
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
@@ -683,6 +735,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
+   /tutorials/_rendered_examples/dynamo/aliased_io_buffers
    /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
    /tutorials/_rendered_examples/dynamo/auto_generate_plugins
@@ -693,6 +746,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/auto_generate_converters
    /tutorials/_rendered_examples/dynamo/low_cpu_memory_compilation
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods
+   /tutorials/_rendered_examples/dynamo/aliased_io_kv_attention
    /tutorials/_rendered_examples/dynamo/converter_overloading
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example
    /tutorials/_rendered_examples/dynamo/aot_plugin
