@@ -105,7 +105,7 @@ jobs:
         .github/scripts/verify-executorch-reference-runner.sh "${RUNNER_TEMP}/torchtrt-python.pte"
 
         # Build the no-compile-for-users Python runtime/delegate wheel.
-        python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist packaging/executorch_delegate
+        python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-delegate
         python -m pip install --no-deps --force-reinstall dist/torch_tensorrt_executorch_delegate-*.whl
         python -c 'from torch_tensorrt_executorch_delegate import runtime; assert runtime().backend_registry.is_available("TensorRTBackend")'
         python examples/executorch_reference_runner/load_model.py --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1

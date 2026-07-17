@@ -86,6 +86,5 @@ CLAUDE.md
 /compile_commands.json
 /external/
 build-executorch/
-packaging/executorch_delegate/build/
-packaging/executorch_delegate/dist/
-
+py/torch-tensorrt-executorch-delegate/build/
+py/torch-tensorrt-executorch-delegate/dist/

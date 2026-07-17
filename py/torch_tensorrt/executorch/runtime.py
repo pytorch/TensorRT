@@ -20,7 +20,9 @@ def _runtime():
 class Program:
     """A loaded ExecuTorch program backed by TensorRTBackend."""
 
-    def __init__(self, program: Any) -> None:
+    def __init__(self, program: Any, data: bytes) -> None:
+        # ExecuTorch's BufferDataLoader references this memory without copying it.
+        self._data = data
         self._program = program
 
     @property
@@ -52,7 +54,8 @@ def load(path: Union[str, Path]) -> Program:
     model_path = Path(path)
     if not model_path.is_file():
         raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
-    return Program(_runtime().load_program(model_path.read_bytes()))
+    data = model_path.read_bytes()
+    return Program(_runtime().load_program(data), data)
 
 
 __all__ = ["Program", "load"]

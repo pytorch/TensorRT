@@ -331,7 +331,7 @@ jobs:
           export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
           export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
           ${CONDA_RUN} python -m pip wheel --no-build-isolation --no-deps \
-            --wheel-dir dist packaging/executorch_delegate
+            --wheel-dir dist py/torch-tensorrt-executorch-delegate
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
         env:
