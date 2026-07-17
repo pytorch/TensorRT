@@ -30,7 +30,9 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           REVIEW_STATE: ${{ github.event.review.state }}
-          HAS_FULL_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'ci: full') }}"
+          # Either the explicit ci:full label or the repo's "Force All Tests" label
+          # requests the full lane (the latter was previously a no-op here).
+          HAS_FULL_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'ci: full') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]') }}"
           # Exact array-element match: 'backend: TensorRT' != 'backend: TensorRT-RTX'.
           HAS_RTX_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'backend: TensorRT-RTX') }}"
           HAS_STD_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'backend: TensorRT') }}"

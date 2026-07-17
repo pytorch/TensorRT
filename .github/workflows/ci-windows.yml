@@ -27,7 +27,11 @@ on:
         default: both
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Label churn (auto-labels + ci:full / Force-All) each fire a `labeled` event →
+  # a fresh run; cancel-in-progress would then have each cancel the previous. Give
+  # label/unlabel events their OWN per-label group so they never cancel the commit
+  # pipeline — only real pushes (synchronize) supersede each other.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && format('-label-{0}', github.event.label.name) || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -36,6 +40,12 @@ permissions:
 
 jobs:
   decide:
+    # A label event only warrants running the pipeline when the label controls CI;
+    # auto-labels (component:*, cla signed) must not spawn work — and would each
+    # start a full run once ci:full is present. Non-label events always proceed.
+    if: >-
+      github.event.action != 'labeled' ||
+      contains(fromJSON('["ci: full", "Force All Tests[L0+L1+L2]", "backend: TensorRT", "backend: TensorRT-RTX"]'), github.event.label.name)
     uses: ./.github/workflows/_decide.yml
 
   # Generate the windows build matrix once (shared across channels;
