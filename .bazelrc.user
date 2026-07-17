@@ -1,0 +1,7 @@
+# Local build overrides for memory-constrained machines.
+# When RAM is limited, a full-core debug build (one heavy C++ action per core) OOM kills the Bazel server.
+#
+# Cap concurrent actions and let Bazel schedule against a RAM budget. Tune
+# --jobs up/down based on how much headroom `free -g` shows during a build.
+build --jobs=6
+build --local_resources=memory=HOST_RAM*.7
