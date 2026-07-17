@@ -36,6 +36,8 @@ jobs:
           # Exact array-element match: 'backend: TensorRT' != 'backend: TensorRT-RTX'.
           HAS_RTX_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'backend: TensorRT-RTX') }}"
           HAS_STD_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'backend: TensorRT') }}"
+          # "Force All Tests" means every backend too, not just the full tiers.
+          HAS_FORCE_ALL_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]') }}"
           DISPATCH_LANE: ${{ github.event.inputs.lane }}
           DISPATCH_BACKEND: ${{ github.event.inputs.backend }}
         run: |
@@ -57,6 +59,7 @@ jobs:
               if   [ "$HAS_RTX_LABEL" = "true" ] && [ "$HAS_STD_LABEL" = "true" ]; then backend=both
               elif [ "$HAS_RTX_LABEL" = "true" ]; then backend=rtx
               elif [ "$HAS_STD_LABEL" = "true" ]; then backend=standard
+              elif [ "$HAS_FORCE_ALL_LABEL" = "true" ]; then backend=both  # Force All → every backend
               else backend=standard; fi ;;
             *)                  backend=both ;;   # push / approval / schedule
           esac
