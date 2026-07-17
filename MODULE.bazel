@@ -32,8 +32,8 @@ git_override(
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(
     module_name = "hedron_compile_commands",
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
     commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
 )
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
@@ -178,10 +178,10 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-11.0.0.114",
+    strip_prefix = "TensorRT-11.1.0.106",
     type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/tars/TensorRT-Enterprise-11.0.0.114-Linux-x86_64-cuda-13.2-Release-external.tar.zst",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.1.0/tars/TensorRT-Enterprise-11.1.0.106-Linux-x86_64-cuda-13.3-Release-external.tar.zst",
     ],
 )
 
@@ -198,10 +198,10 @@ http_archive(
 http_archive(
     name = "tensorrt_sbsa",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-11.0.0.114",
+    strip_prefix = "TensorRT-11.1.0.106",
     type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/tars/TensorRT-Enterprise-11.0.0.114-Linux-aarch64-cuda-13.2-Release-external.tar.zst",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.1.0/tars/TensorRT-Enterprise-11.1.0.106-Linux-aarch64-cuda-13.3-Release-external.tar.zst",
     ],
 )
 
@@ -217,9 +217,9 @@ http_archive(
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-11.0.0.114",
+    strip_prefix = "TensorRT-11.1.0.106",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/zip/TensorRT-Enterprise-11.0.0.114-Windows-amd64-cuda-13.2-Release-external.zip",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.1.0/zip/TensorRT-Enterprise-11.1.0.106-Windows-amd64-cuda-13.3-Release-external.zip",
     ],
 )
 
