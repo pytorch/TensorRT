@@ -1,13 +1,12 @@
 import base64
 import copy
 import operator
-from typing import Any, Dict, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 import torch
 from torch._export.non_strict_utils import make_constraints
 from torch._guards import detect_fake_mode
 from torch._library.fake_class_registry import FakeScriptObject
-from torch._subclasses.fake_tensor import FakeTensor
 from torch.export import ExportedProgram, ExportGraphSignature
 from torch.export._trace import _combine_args
 from torch.export.exported_program import (
@@ -202,12 +201,11 @@ def lift(
                 # Copy the node meta into this new placeholder node
                 const_placeholder_node.meta = node.meta
                 if isinstance(lift_val, torch.Tensor):
-                    const_placeholder_node.meta["val"] = cast(
-                        FakeTensor,
-                        torch.empty_strided(
-                            tuple(lift_val.shape),
-                            tuple([1] * len(lift_val.shape)),
-                        ),
+                    # Fakify the source constant through the graph's own fake_mode
+                    # so the placeholder meta preserves its dtype, device and
+                    # stride without allocating a real tensor on lift_val.device.
+                    const_placeholder_node.meta["val"] = fake_mode.from_tensor(
+                        lift_val, static_shapes=True
                     )
 
                 node.replace_all_uses_with(const_placeholder_node)
