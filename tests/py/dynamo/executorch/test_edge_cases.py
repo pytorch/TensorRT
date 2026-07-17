@@ -1,10 +1,13 @@
+import os
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 from torch_tensorrt._compile import (
     _count_executorch_engine_nodes,
     _validate_executorch_engine_info,
+    _write_external_tensor_data,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     REQUIRES_OUTPUT_ALLOCATOR_IDX,
@@ -47,3 +50,39 @@ def test_count_executorch_engine_nodes_handles_execute_and_placeholder():
     )
 
     assert _count_executorch_engine_nodes(exp_program) == 2
+
+
+@pytest.mark.unit
+def test_write_external_tensor_data_writes_when_present(tmp_path):
+    # A program with external named data (e.g. a CudaPartitioner delegate's
+    # weights) must have its .ptd written into the .pte's directory.
+    prog = SimpleNamespace(
+        _tensor_data={"forward": b"weights"},
+        write_tensor_data_to_file=MagicMock(),
+    )
+    pte = tmp_path / "model.pte"
+    _write_external_tensor_data(prog, str(pte))
+    prog.write_tensor_data_to_file.assert_called_once_with(
+        os.path.dirname(os.path.abspath(str(pte)))
+    )
+
+
+@pytest.mark.unit
+def test_write_external_tensor_data_noop_when_empty(tmp_path):
+    # TRT-only programs have empty _tensor_data (falsy) -> no .ptd written.
+    prog = SimpleNamespace(
+        _tensor_data={},
+        write_tensor_data_to_file=MagicMock(),
+    )
+    _write_external_tensor_data(prog, str(tmp_path / "model.pte"))
+    prog.write_tensor_data_to_file.assert_not_called()
+
+
+@pytest.mark.unit
+def test_write_external_tensor_data_fails_loud_without_attr(tmp_path):
+    # _tensor_data always exists on a real ExecutorchProgram; it is accessed
+    # directly (no getattr default) so a future rename fails loudly instead of
+    # silently skipping the .ptd write and reintroducing the null-weights crash.
+    prog = SimpleNamespace(write_tensor_data_to_file=MagicMock())
+    with pytest.raises(AttributeError):
+        _write_external_tensor_data(prog, str(tmp_path / "model.pte"))

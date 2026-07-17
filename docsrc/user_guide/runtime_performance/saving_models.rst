@@ -22,6 +22,7 @@ specifying the `output_format` flag. Here are the options `output_format` will a
 * `exported_program` : This is the default. We perform transformations on the graphmodule first and use `torch.export.save` to save the module.
 * `torchscript` : We trace the graphmodule via `torch.jit.trace` and save it via `torch.jit.save`.
 * `PT2 Format` : This is a next generation runtime for PyTorch models, allowing them to run in Python and in C++
+* `executorch` : We lower the graphmodule to an ExecuTorch ``.pte`` program, delegating the TensorRT engines to the ExecuTorch backend. Linux-only; requires the ``executorch`` package.
 
 a) ExportedProgram
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -217,6 +218,64 @@ can be loaded in Python or C++ without a Torch-TensorRT runtime dependency.
 
 For dynamic shapes, C++ deployment, and a full comparison with the ExportedProgram format,
 see :ref:`aot_inductor`.
+
+
+.. _executorch_save:
+
+c) ExecuTorch (.pte)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``executorch`` output format lowers the compiled module to an ExecuTorch
+``.pte`` program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
+backend. It requires the ``executorch`` package (``pip install
+"torch_tensorrt[executorch]"``) and is Linux-only.
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+
+    model = MyModel().eval().cuda()
+    inputs = [torch.randn((1, 3, 224, 224)).cuda()]
+    trt_gm = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
+    torch_tensorrt.save(
+        trt_gm, "trt.pte", output_format="executorch",
+        retrace=False, arg_inputs=inputs,
+    )
+
+**Coalesced TensorRT + CUDA .pte**
+
+To run the ops TensorRT does not take on ExecuTorch's CUDA (AOTInductor) backend
+instead of leaving them non-delegated, pass a ``CudaPartitioner`` via
+``partitioners=``. It is appended after the TensorRT partitioner, so TensorRT
+claims what it can and the ``CudaPartitioner`` picks up the rest as a catch-all:
+
+.. code-block:: python
+
+    from executorch.backends.cuda.cuda_backend import CudaBackend
+    from executorch.backends.cuda.cuda_partitioner import CudaPartitioner
+
+    torch_tensorrt.save(
+        trt_gm, "trt.pte", output_format="executorch",
+        retrace=False, arg_inputs=inputs,
+        partitioners=[
+            CudaPartitioner(
+                [CudaBackend.generate_method_name_compile_spec("forward")]
+            )
+        ],
+    )
+
+This needs ExecuTorch's CUDA backend and a CUDA toolkit (nvcc/ptxas) at export
+time, and produces a ``.pte`` that requires a CUDA runtime at load. Any external
+CUDA weights are written as ``.ptd`` data file(s) next to the ``.pte``; the runtime
+must be pointed at those data files to load them.
+
+.. warning::
+
+    The CUDA backend names its external weight blob per-device (e.g.
+    ``aoti_cuda_blob.ptd``), not per-model, so saving two different coalesced
+    ``.pte`` into the same directory overwrites the blob and the first ``.pte``
+    will fail to load. Save each coalesced model into its own directory.
 
 
 Saving torch.compile models
