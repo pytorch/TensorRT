@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 #include <utility>
 #include "ATen/core/function_schema.h"
 #include "NvInfer.h"
@@ -17,8 +18,10 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "9";
+const std::string ABI_VERSION = "10";
 extern bool MULTI_DEVICE_SAFE_MODE;
+// AliasKind, AliasedIOSpec, and the alias_kind_(to|from)_string helpers are
+// declared in core/runtime/TRTEngine.h since runtime.h includes that header.
 
 typedef enum {
   STANDARD = 0,
@@ -41,6 +44,7 @@ typedef enum {
   REQUIRES_OUTPUT_ALLOCATOR_IDX,
   RESOURCE_ALLOCATION_STRATEGY_IDX,
   REQUIRES_NATIVE_MULTIDEVICE_IDX,
+  ALIASED_IO_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
@@ -63,6 +67,12 @@ inline constexpr std::array<const char*, SERIALIZATION_LEN> kSerializedInfoIndex
 std::string base64_encode(const std::string& in);
 std::string base64_decode(const std::string& in);
 std::string serialize_bindings(const std::vector<std::string>& bindings);
+
+// Encode/decode the aliased_io map. Records are separated by BINDING_DELIM
+// ('%') and each record is "output_name@input_name@kind" (the '@' avoids
+// collision with TRT binding names which are alphanumeric + underscore).
+std::string serialize_aliased_io(const std::unordered_map<std::string, AliasedIOSpec>& aliased_io);
+std::unordered_map<std::string, AliasedIOSpec> deserialize_aliased_io(const std::string& s);
 
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
