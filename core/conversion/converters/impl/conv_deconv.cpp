@@ -127,6 +127,12 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   if (args[1].isITensor()) {
     // Get the kernel tensor
     auto kernel = args[1].ITensor();
+    // TRT requires the convolution input and kernel to share a dtype. The kFP16
+    // builder flag used to let TRT auto-insert this cast, but that deprecated flag
+    // was removed, so reconcile the input dtype to the kernel dtype explicitly.
+    if (in->getType() != kernel->getType()) {
+      in = castITensor(ctx, in, kernel->getType(), util::node_info(n) + "_input_dtype_cast");
+    }
     auto kernel_dims = kernel->getDimensions();
 
     // Make a new Dims with only the spatial dimensions.
@@ -214,6 +220,13 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   }
 
   auto w = Weights(ctx, args[1].unwrapToTensor());
+  // TRT requires the convolution input and kernel to share a dtype. The kFP16
+  // builder flag used to let TRT auto-insert this cast, but that deprecated flag
+  // was removed, so reconcile the input dtype to the kernel dtype explicitly
+  // (e.g. fp16 weights + fp32 input).
+  if (in->getType() != w.data.type) {
+    in = castITensor(ctx, in, w.data.type, util::node_info(n) + "_input_dtype_cast");
+  }
   // TODO: Remove this when conv3d with kernel size=1 bug is fixed.
   // Github issue: https://github.com/pytorch/TensorRT/issues/1445
   bool is_kernel_size_one = true;
