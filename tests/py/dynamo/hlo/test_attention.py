@@ -66,8 +66,9 @@ _BF16_SKIP = unittest.skipIf(
 
 _FLASH_ATTN_SKIP = unittest.skipIf(
     not torch.cuda.is_available()
-    or torch.cuda.get_device_properties(torch.cuda.current_device()).major < 8,
-    "Flash attention requires Ampere (SM80) or higher",
+    or torch.cuda.get_device_properties(torch.cuda.current_device()).major < 8
+    or not torch.backends.cuda.is_flash_attention_available(),
+    "Flash attention requires Ampere (SM80) or higher, and a PyTorch build with USE_FLASH_ATTENTION=1",
 )
 
 # skip RTX on Windows
