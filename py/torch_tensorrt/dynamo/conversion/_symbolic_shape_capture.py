@@ -14,26 +14,6 @@ import torch
 logger = logging.getLogger(__name__)
 
 
-def _resolve_meta_val(node: Any) -> Any:
-    """Return ``node.meta['val']``, resolving through in-place ``copy_`` write-backs.
-
-    When a model returns a tensor mutated in place, functionalization can leave the
-    write-back ``aten.copy_(dest, src)`` as a graph output with no ``meta['val']``.
-    A ``copy_`` takes the shape/dtype of its destination, so fall back to the
-    destination's value. Returns ``None`` if no value can be resolved.
-    """
-    meta = getattr(node, "meta", None)
-    if meta is not None and "val" in meta:
-        return meta["val"]
-    if (
-        getattr(node, "op", None) == "call_function"
-        and node.target is torch.ops.aten.copy_.default
-        and node.args
-    ):
-        return _resolve_meta_val(node.args[0])
-    return None
-
-
 def extract_symbolic_shape_expressions(
     module: torch.fx.GraphModule,
 ) -> Optional[Dict[str, List[Dict[str, Any]]]]:
@@ -117,13 +97,13 @@ def extract_symbolic_shape_expressions(
     # Collect shape expressions and dtypes for each output
     output_info = []
     for out_arg in output_args:
-        out_val = _resolve_meta_val(out_arg)
-        if out_val is None:
+        if not hasattr(out_arg, "meta") or "val" not in out_arg.meta:
             logger.warning(
                 "When processing symbolic shapes for TensorRT engine, found no metadata in FX Graph"
             )
             return None
 
+        out_val = out_arg.meta["val"]
         if isinstance(out_val, torch.Tensor):
             shape_exprs = []
             for dim_size in out_val.shape:

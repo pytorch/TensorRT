@@ -22,6 +22,7 @@ from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
+
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
@@ -658,6 +659,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if converter_info.get("requires_native_multidevice", False):
             self.ctx.requires_native_multidevice = True
             _LOGGER.debug(f"{target} requires native multi-device support")
+
+        if converter_info.get("requires_aliased_plugin_io", False):
+            self.ctx.requires_aliased_plugin_io = True
+            _LOGGER.debug(f"{target} requires aliased plugin I/O")
 
         self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:

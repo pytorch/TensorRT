@@ -18,6 +18,9 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
+from torch_tensorrt.dynamo.conversion.plugins._alias_utils import (
+    mutated_tensor_indices,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -101,12 +104,7 @@ def _generate_plugin_converter(
     )
     torch_schema = torch_overload._schema
 
-    schema_declares_mutation = any(
-        arg.alias_info is not None
-        and arg.alias_info.is_write
-        and arg.type.isSubtypeOf(torch._C.TensorType.get())
-        for arg in torch_schema.arguments
-    )
+    schema_declares_mutation = bool(mutated_tensor_indices(torch_schema))
 
     use_aot_plugin = use_aot_if_available
 
@@ -167,29 +165,21 @@ def _generate_plugin_converter(
         )
         layer.name = f"[{target}]-[{name}]"
 
-        # JIT path: layer.plugin is the Python `_TemplateJITPlugin` whose
-        # `aliased_map` is populated by TRT during `add_plugin`.
-        # AOT path: layer.plugin is a C++ wrapper that does not expose the
-        # map, so fall back to the op schema's mutation declaration — the
-        # same signal `_generate_plugin` uses to emit `.aliased()`.
-        layer_plugin = getattr(layer, "plugin", None)
-        aliased_map = getattr(layer_plugin, "aliased_map", None)
-        if aliased_map and any(v != -1 for v in aliased_map.values()):
-            ctx.requires_aliased_plugin_io = True
-        elif schema_declares_mutation:
-            ctx.requires_aliased_plugin_io = True
-
         num_outputs = len(torch_schema.returns)
         if num_outputs == 1:
             return layer.get_output(0)
         return tuple(layer.get_output(i) for i in range(num_outputs))
 
-    custom_kernel_converter = dynamo_tensorrt_converter(
+    # The decorator registers the converter and returns it unchanged.
+    dynamo_tensorrt_converter(
         torch_overload,
         capability_validator=capability_validator,
         priority=priority,
         supports_dynamic_shapes=supports_dynamic_shapes,
         requires_output_allocator=requires_output_allocator,
+        # A mutating schema means the plugin declares aliased I/O
+        # (`_generate_plugin` emits `.aliased()` from the same signal).
+        requires_aliased_plugin_io=schema_declares_mutation,
     )(custom_kernel_converter)
     assert torch_overload in DYNAMO_CONVERTERS, (
         f"Generated dynamo converter for {namespace}::{op_name} did not get properly"
@@ -198,7 +188,7 @@ def _generate_plugin_converter(
     return custom_kernel_converter
 
 
-@needs_qdp_plugin
+@needs_qdp_plugin  # type: ignore[misc]
 def generate_plugin_converter(
     plugin_id: str,
     capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,

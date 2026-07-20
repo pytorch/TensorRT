@@ -29,9 +29,10 @@ from typing import (
 
 import torch
 import torch.distributed as dist
-import torch_tensorrt
 from torch._library.opaque_object import register_opaque_type
 from torch._opaque_base import OpaqueBase
+
+import torch_tensorrt
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
@@ -614,10 +615,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             for binding in self._input_binding_infos
         }
 
-        # For QDP plugins with aliased I/O, the output binding must share the
-        # input binding's buffer at runtime; otherwise the in-place mutation is
-        # lost. Resolve the alias mapping to (output_idx -> input_idx) once so
-        # the forward path can rebind without per-call name lookups.
+        # Aliased plugin outputs must share their input binding's buffer at
+        # runtime or the in-place mutation is lost; resolve the
+        # output_idx -> input_idx mapping once for the forward path.
         self.aliased_output_idx_to_input_idx: Dict[int, int] = {}
         if hasattr(self.cuda_engine, "get_aliased_input_tensor"):
             input_name_to_idx = {n: i for i, n in enumerate(self.in_binding_names)}
@@ -656,8 +656,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
         """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe."""
         has_dynamic_input = any(DYNAMIC_DIM in shape for shape in self.input_shapes)
-        return self._trt_runtime_config.is_monolithic_capturable(
-            has_dynamic_input, self.context, stream
+        return bool(
+            self._trt_runtime_config.is_monolithic_capturable(
+                has_dynamic_input, self.context, stream
+            )
         )
 
     def _enable_rtx_native_cudagraphs(self) -> None:
@@ -1211,12 +1213,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                     )
                 outputs = self.create_output_tensors()
 
-                # Rebind aliased outputs to their paired input buffer so
-                # the in-place mutation lands in the caller's tensor.
-                for (
-                    out_idx,
-                    in_idx,
-                ) in self.aliased_output_idx_to_input_idx.items():
+                # Rebind aliased outputs to their input buffer so the
+                # in-place mutation lands in the caller's tensor.
+                for out_idx, in_idx in self.aliased_output_idx_to_input_idx.items():
                     outputs[out_idx] = contiguous_inputs[in_idx]
 
             for o, output_name in enumerate(self.out_binding_names):

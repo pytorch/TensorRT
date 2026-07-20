@@ -18,14 +18,14 @@ from typing import (
     cast,
 )
 
+import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
+
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +81,7 @@ class ConverterSupport:
             this function must not modify the node or its graph
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic inputs.
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
+        requires_aliased_plugin_io: Boolean flag indicating if the converter creates plugins with aliased I/O (in-place mutation), requiring the ALIASED_PLUGIN_IO preview feature at build time.
     """
 
     converter_implementation: ConverterImplSignature
@@ -90,6 +91,7 @@ class ConverterSupport:
     supports_dynamic_shapes: bool = False
     requires_output_allocator: bool = False
     requires_native_multidevice: bool = False
+    requires_aliased_plugin_io: bool = False
 
 
 # Dictionary representing Dynamo aten-only converters
@@ -208,6 +210,7 @@ def dynamo_tensorrt_converter(
     supports_dynamic_shapes: bool = False,
     requires_output_allocator: bool = False,
     requires_native_multidevice: bool = False,
+    requires_aliased_plugin_io: bool = False,
 ) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
@@ -226,6 +229,7 @@ def dynamo_tensorrt_converter(
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic shapes.
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
         requires_native_multidevice: Boolean flag indicating if the converter creates operators which require native TensorRT multi device collectives.
+        requires_aliased_plugin_io: Boolean flag indicating if the converter creates plugins with aliased I/O (in-place mutation), requiring the ALIASED_PLUGIN_IO preview feature at build time.
     Returns:
         The converter being decorated
     """
@@ -241,6 +245,7 @@ def dynamo_tensorrt_converter(
                 supports_dynamic_shapes=supports_dynamic_shapes,
                 requires_output_allocator=requires_output_allocator,
                 requires_native_multidevice=requires_native_multidevice,
+                requires_aliased_plugin_io=requires_aliased_plugin_io,
             )
         else:
             assert callable(
@@ -252,6 +257,7 @@ def dynamo_tensorrt_converter(
                 supports_dynamic_shapes=supports_dynamic_shapes,
                 requires_output_allocator=requires_output_allocator,
                 requires_native_multidevice=requires_native_multidevice,
+                requires_aliased_plugin_io=requires_aliased_plugin_io,
             )
 
         # OpOverloadPackets are only valid if they have a single overload, or
@@ -484,6 +490,7 @@ class ConverterRegistry:
                                     "supports_dynamic_shapes": candidate.supports_dynamic_shapes,
                                     "requires_output_allocator": candidate.requires_output_allocator,
                                     "requires_native_multidevice": candidate.requires_native_multidevice,
+                                    "requires_aliased_plugin_io": candidate.requires_aliased_plugin_io,
                                 },
                             )
                         else:
@@ -501,6 +508,7 @@ class ConverterRegistry:
                                 "supports_dynamic_shapes": False,
                                 "requires_output_allocator": False,
                                 "requires_native_multidevice": False,
+                                "requires_aliased_plugin_io": False,
                             },
                         )
 

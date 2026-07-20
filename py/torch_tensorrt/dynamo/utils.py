@@ -27,6 +27,8 @@ import torch
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._sympy.numbers import int_oo
+
+from packaging import version
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -36,8 +38,6 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
-
-from packaging import version
 
 from .types import TRTDataType
 
@@ -949,17 +949,6 @@ def get_output_metadata(
 def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]:
     output_dtypes = []
     if isinstance(output, torch.fx.node.Node):
-        if (
-            "val" not in output.meta
-            and "tensor_meta" not in output.meta
-            and output.op == "call_function"
-            and output.target is torch.ops.aten.copy_.default
-            and output.args
-        ):
-            # An in-place write-back ``aten.copy_(dest, src)`` left as a graph
-            # output by functionalization carries no metadata; a copy_ takes the
-            # dtype of its destination, so resolve to that.
-            return get_output_dtypes(output.args[0], truncate_double)
         if "val" in output.meta:
             output_meta = output.meta["val"]
             if output_meta is None:

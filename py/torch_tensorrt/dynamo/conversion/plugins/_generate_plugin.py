@@ -3,7 +3,7 @@ import itertools
 import logging
 import re
 from types import FunctionType
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -15,6 +15,10 @@ from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
 
 from torch_tensorrt._features import needs_qdp_plugin
+from torch_tensorrt.dynamo.conversion.plugins._alias_utils import (
+    detect_output_aliases,
+    mutated_tensor_indices,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -110,26 +114,14 @@ def _generate_plugin(plugin_name: str) -> None:
     torch_op = getattr(getattr(torch.ops, namespace), name)
     default_schema = torch_op.default._schema
 
-    # Positional indices of tensor inputs marked as mutated in the schema
-    # (Tensor(aN!) ... -> ...) — candidates for in-place QDP outputs via
-    # `TensorDesc.aliased()`. The actual alias map (output_idx -> input_idx)
-    # is decided at fake-run time by checking output-to-input identity.
-    _tensor_arg_positions = [
-        i
-        for i, a in enumerate(default_schema.arguments)
-        if a.type.isSubtypeOf(torch._C.TensorType.get())
-    ]
-    _mutated_tensor_arg_positions = {
-        _tensor_arg_positions.index(i)
-        for i, a in enumerate(default_schema.arguments)
-        if a.type.isSubtypeOf(torch._C.TensorType.get())
-        and a.alias_info is not None
-        and a.alias_info.is_write
-    }
+    # Tensor inputs the schema marks mutated (``Tensor(a!)``) — candidates for
+    # aliased QDP outputs. The actual output->input alias map is decided at
+    # fake-run time by identity.
+    _mutated_tensor_arg_positions = mutated_tensor_indices(default_schema)
 
-    # Cached frozenset of aliased output indices, populated by the descriptor
-    # on first build-time call so the runtime impl skips the per-call probe.
-    _aliased_indices_cache: list[Any] = [None]
+    # Aliased output indices, set by the desc func at build time so the
+    # runtime impl skips the per-call probe.
+    _aliased_out_indices: Optional[frozenset[int]] = None
 
     # helper function that generates the required signature based on the torch operation
     def generate_signature(
@@ -216,6 +208,7 @@ def _generate_plugin(plugin_name: str) -> None:
     ) = generate_signature(torch_op)
 
     def _generic_plugin_desc(*args: Any, **kwargs: Any) -> Tuple[trtp.TensorDesc, ...]:
+        nonlocal _aliased_out_indices
         shape_env = ShapeEnv()
         syms_args = []
         tensor_args = [elem for elem in args if isinstance(elem, trtp.TensorDesc)]
@@ -244,17 +237,10 @@ def _generate_plugin(plugin_name: str) -> None:
 
         outputs_list = list(output) if isinstance(output, (tuple, list)) else [output]
 
-        # output_idx -> input_idx alias map: an output aliases a mutated input
-        # iff the schema marks the input as mutated AND the fake returns that
-        # tensor by identity. The schema gate prevents accidental aliasing on
-        # incidental identity returns from non-mutating ops.
-        alias_map: dict[int, int] = {}
-        for out_idx, fake_out in enumerate(outputs_list):
-            for in_idx in _mutated_tensor_arg_positions:
-                if in_idx < len(fake_args) and fake_out is fake_args[in_idx]:
-                    alias_map[out_idx] = in_idx
-                    break
-        _aliased_indices_cache[0] = frozenset(alias_map.keys())
+        alias_map = detect_output_aliases(
+            outputs_list, fake_args, _mutated_tensor_arg_positions
+        )
+        _aliased_out_indices = frozenset(alias_map)
 
         input_node_expr = list(
             itertools.chain.from_iterable(
@@ -278,13 +264,10 @@ def _generate_plugin(plugin_name: str) -> None:
         out_descs = []
         for out_idx, fake_out in enumerate(outputs_list):
             if out_idx in alias_map:
-                # Aliased output shares its buffer with a mutated input;
-                # `aliased()` carries the input's shape/dtype.
-                # Limitation: TRT preview-feature ALIASED_PLUGIN_IO_10_03
-                # inserts a defensive copy that breaks aliasing when a
-                # multi-output plugin's aliased output is consumed by
-                # another TRT layer in the same engine. Single-output
-                # plugins (the common KV-cache pattern) work end-to-end.
+                # Aliased output: shares the mutated input's buffer/shape/dtype.
+                # TRT limitation (ALIASED_PLUGIN_IO_10_03): a defensive copy
+                # breaks aliasing when a multi-output plugin's aliased output
+                # feeds another layer; single-output plugins work end-to-end.
                 out_descs.append(tensor_args[alias_map[out_idx]].aliased())
                 continue
 
@@ -354,11 +337,9 @@ def _generate_plugin(plugin_name: str) -> None:
 
         dest_tensors = [torch.as_tensor(o, device="cuda") for o in outputs]
 
-        # Skip copy_ for aliased outputs: storage is shared with the input
-        # the eager op already mutated, so copying would either no-op against
-        # itself or clobber the in-place result when the eager op returns a
-        # fresh tensor (as torch.library forces it to do).
-        aliased_outputs = _aliased_indices_cache[0]
+        # Aliased outputs share storage with the input the eager op already
+        # mutated — copying would no-op or clobber the in-place result.
+        aliased_outputs = _aliased_out_indices
         if aliased_outputs is None:
             aliased_outputs = frozenset(
                 i for i, o in enumerate(outputs) if o.get_aliased() is not None
