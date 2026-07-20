@@ -3,6 +3,7 @@ bazel-bazel-test
 bazel-bin
 bazel-genfiles
 bazel-out
+.bazelrc.user
 bazel-testlogs
 bazel-TRTorch
 bazel-trtorch-testing
