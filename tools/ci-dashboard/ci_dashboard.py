@@ -367,18 +367,31 @@ NOISE = re.compile(
     r"might have been added implicitly",
     re.I,
 )
-TESTLINE = re.compile(r"^(?P<test>[\w./-]+(?:\.[\w\[\]-]+)+)\s*$")
+# A test id is the annotation's first line: a single token that names a test —
+# a bare `test_x[param]`, a dotted `Class.test_x`, or a `file.py::Class::test_x`
+# nodeid. (The old regex required a dot, so it missed bare parametrized names.)
+TESTLINE = re.compile(r"^[\w./\[\]:-]+$")
 
 
-@lru_cache(maxsize=4096)
-def grep_test(symbol):
-    """Resolve a failing-test symbol (Class.method / module.func) to (file, line)
-    via `git grep`. Returns None if not found."""
-    leaf = re.split(r"[.:]", symbol.strip())[-1]
-    leaf = re.sub(r"\[.*$", "", leaf)
-    if not re.match(r"^[A-Za-z_]\w+$", leaf):
+def _test_name(head):
+    """Pull a test id out of an annotation's first line, or None."""
+    if not head or " " in head or not TESTLINE.match(head):
         return None
-    pat = f"def {leaf}\\b" if leaf.startswith("test") else f"class {leaf}\\b"
+    tok = head.split("::")[-1] if "::" in head else head  # nodeid → last segment
+    return tok if re.search(r"test", tok, re.I) else None
+
+
+def _annot_loc(a):
+    """Exact (repo-relative file, line) straight from the annotation — better than
+    grep, which only finds the def line. The path is prefixed (pytorch/tensorrt/…);
+    keep from `tests/` on and confirm it exists locally."""
+    m = re.search(r"(tests/.+)$", a.get("path") or "")
+    if not m or not os.path.exists(os.path.join(REPO_ROOT, m.group(1))):
+        return None
+    return (m.group(1), a.get("start_line") or 0)
+
+
+def _git_grep(pat):
     try:
         out = subprocess.run(
             ["git", "grep", "-n", "-E", pat, "--", "tests/"],
@@ -392,6 +405,22 @@ def grep_test(symbol):
     for line in out.splitlines():
         path, lineno, _ = line.split(":", 2)
         return (path, int(lineno))
+    return None
+
+
+@lru_cache(maxsize=4096)
+def grep_test(symbol):
+    """Resolve a failing-test symbol (Class.method / module.func) to (file, line)
+    via `git grep`. Tries the method, then the enclosing class — parametrized names
+    (`@parameterized.expand` → test_x_5) have no literal `def`, so the class is the
+    best anchor. Returns None if nothing matches."""
+    parts = [re.sub(r"\[.*$", "", p) for p in re.split(r"[.:]+", symbol.strip()) if p]
+    for token in reversed(parts):  # method first, then its class
+        if not re.match(r"^[A-Za-z_]\w+$", token):
+            continue
+        pat = f"def {token}\\b" if token.startswith("test") else f"class {token}\\b"
+        if hit := _git_grep(pat):
+            return hit
     return None
 
 
@@ -411,13 +440,14 @@ def get_failures(job_id, refresh=False):
         if not msg or NOISE.search(msg.splitlines()[0]):
             continue
         head = msg.splitlines()[0].strip()
-        m = TESTLINE.match(head)
-        test = m.group("test") if m else None
+        test = _test_name(head)
         dedupe = test or head
         if dedupe in seen:
             continue
         seen.add(dedupe)
-        loc = grep_test(test) if test else None
+        loc = _annot_loc(a) or (
+            grep_test(test) if test else None
+        )  # annotation line first
         failures.append(
             dict(
                 test=test,
@@ -433,6 +463,9 @@ def get_failures(job_id, refresh=False):
 
 # ── job logs (fetch + per-test extraction) ──────────────────────────────────
 _TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z ")  # GH line prefix
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")  # SGR / CSI colour codes
+_GROUP = re.compile(r"^##\[(?:group|section|command)\]")  # fold marker → keep title
+_ENDGROUP = re.compile(r"^##\[endgroup\]\s*$")  # pure noise
 _SEP = re.compile(r"^_{4,}\s+(.+?)\s+_{4,}\s*$")  # pytest FAILURES sep
 _SECT = re.compile(r"^={4,}")  # ==== section ====
 
@@ -455,7 +488,15 @@ def get_job_log(job_id, refresh=False):
 
 
 def _clean_lines(raw):
-    return [_TS.sub("", ln) for ln in raw.splitlines()]
+    """Strip the GH timestamp prefix, ANSI colour codes, and the ##[group] /
+    ##[endgroup] fold markers that otherwise leak into the <pre>."""
+    out = []
+    for ln in raw.splitlines():
+        ln = _ANSI.sub("", _TS.sub("", ln)).replace("\r", "")
+        if _ENDGROUP.match(ln):
+            continue
+        out.append(_GROUP.sub("", ln))
+    return out
 
 
 def extract_test_log(lines, test, max_lines=160):
@@ -504,14 +545,195 @@ def extract_test_log(lines, test, max_lines=160):
     return "\n".join(block).strip()
 
 
-def summary_reasons(lines, test):
-    """The concise `FAILED …/ERROR … - <reason>` lines from pytest's summary."""
-    leaf = re.split(r"[.:]", test)[-1].split("[")[0] if test else None
-    return [
-        ln
-        for ln in lines
-        if re.match(r"^(FAILED|ERROR) ", ln) and (not leaf or leaf in ln)
-    ]
+# ── anchoring: find the *real* error in a non-pytest (build/install) failure ──
+# In GH logs the first `##[error]` is almost always echoed shell text
+# (`echo "::error::…"`), so we never anchor on it. The reliable signals, in order:
+# the pytest summary, a pip/build metadata error, or a walk backward from the
+# `Process completed with exit code N` line to the nearest genuine error.
+_SUMMARY_HDR = re.compile(r"^=+\s*short test summary info\s*=+", re.I)
+_PIP_ERR = re.compile(
+    r"error: subprocess-exited-with-error|did not run successfully|^\s*╰─>"
+)
+_EXITCODE = re.compile(r"(?:Process completed with exit code|exit code:?)\s*[1-9]")
+_ECHO_NOISE = re.compile(
+    r'echo\s+["\']?::|Specified script file|^\s*(?:if|else|elif|fi|then|source|for|do|done)\b'
+)
+_REAL_ERR = re.compile(
+    r"Traceback \(most recent call last\)|\b\w*(?:Error|Exception)\b\s*:|"
+    r"^E\s{2,}\S|^\s*(?:FAILED|ERROR)\s|error: subprocess-exited-with-error|"
+    r"CMake Error|fatal error:|ninja: build stopped|Segmentation fault|OutOfMemory|Killed\b"
+)
+
+
+def find_error_window(lines, max_lines=140):
+    """Anchor a non-pytest failure on its real error instead of the blind tail.
+    Returns (title, start, end)."""
+    n = len(lines)
+    if not n:
+        return ("end of job log", 0, 0)
+    for i, ln in enumerate(lines):  # 1. pytest summary
+        if _SUMMARY_HDR.search(ln):
+            end = next(
+                (
+                    j
+                    for j in range(i + 1, n)
+                    if _SECT.match(lines[j]) and not _SUMMARY_HDR.search(lines[j])
+                ),
+                n,
+            )
+            return ("short test summary", i, min(end, i + max_lines))
+    for i, ln in enumerate(lines):  # 2. pip / build error
+        if _PIP_ERR.search(ln):
+            return ("install / build error", max(0, i - 3), min(n, i + max_lines))
+    exit_i = next(
+        (i for i in range(n - 1, -1, -1) if _EXITCODE.search(lines[i])), n - 1
+    )
+    anchor = next(
+        (
+            i
+            for i in range(exit_i, -1, -1)  # 3. walk back to real error
+            if _REAL_ERR.search(lines[i]) and not _ECHO_NOISE.search(lines[i])
+        ),
+        None,
+    )
+    if anchor is not None:
+        start = anchor
+        for j in range(
+            anchor, max(0, anchor - 80), -1
+        ):  # widen up to the traceback head
+            if "Traceback (most recent call last)" in lines[j]:
+                start = j
+                break
+        return ("error", max(0, start - 2), min(n, exit_i + 1))
+    return ("end of job log", max(0, n - 180), n)  # 4. fallback: tail
+
+
+# ── root-cause collapse: many identical failures → one line + a pointer ───────
+_EXC_RE = re.compile(r"\b([A-Z]\w*(?:Error|Exception|Warning))\b\s*:?\s*([^\n]*)")
+
+
+def _reason_key(msg):
+    """Stable, comparable essence of a failure message, for de-duplication.
+    Volatile bits (quoted names, addresses, numbers, paths) are stripped so
+    parametrized variants of one failure collapse together."""
+    m = _EXC_RE.search(msg or "")
+    if m:
+        detail = re.sub(r"['\"][^'\"]*['\"]|0x[0-9a-fA-F]+|\d+|/\S+", "", m.group(2))
+        detail = re.sub(r"\s+", " ", detail).strip()
+        return f"{m.group(1)}: {detail}"[:90].rstrip(": ")
+    head = next((l.strip() for l in (msg or "").splitlines() if l.strip()), "")
+    return re.sub(r"\d+", "", head)[:90]
+
+
+def _reason_first(msg):
+    """The single most informative line of a message, for a block subtitle."""
+    m = _EXC_RE.search(msg or "")
+    if m:
+        return m.group(0)[:300]
+    return next((l.strip() for l in (msg or "").splitlines() if l.strip()), "")[:300]
+
+
+def _group_failures(fails):
+    """Group failures by normalized reason, biggest group first (a systemic
+    break surfaces above one-offs). Returns [(reason, [failure, …]), …]."""
+    groups, order = {}, []
+    for f in fails:
+        k = _reason_key(f["message"])
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(f)
+    return sorted(((k, groups[k]) for k in order), key=lambda kv: -len(kv[1]))
+
+
+# ── severity rendering: per-line spans so the client can search / jump / colour ─
+_SEV_ERR = re.compile(
+    r"^##\[error\]|Traceback \(most recent call last\)|\b\w*(?:Error|Exception)\b\s*:|"
+    r"^E\s{2,}\S|^\s*(?:FAILED|ERROR)\s|error: subprocess-exited-with-error|"
+    r"CMake Error|fatal error:|Segmentation fault|\bAssertionError\b|exit code:?\s*[1-9]"
+)
+_SEV_WARN = re.compile(r"^##\[warning\]|\bwarning\b|\bdeprecat|\bWARN\b", re.I)
+_SEV_PASS = re.compile(r"\bPASSED\b|=+\s*\d+ passed|^\s*ok\s*$", re.I)
+
+
+def _render_logtext(text):
+    """Emit log text as one <span class=ll> per line, tagged by severity.
+    Returns (html, error_hits) where error_hits = [(line_index, short_text)]
+    for the jump-list."""
+    spans, hits = [], []
+    for i, ln in enumerate(text.split("\n")):
+        sev = ""
+        if _SEV_ERR.search(ln) and not _ECHO_NOISE.search(ln):
+            sev, _ = "err", hits.append((i, ln.strip()[:90] or "error"))
+        elif _SEV_WARN.search(ln):
+            sev = "warn"
+        elif _SEV_PASS.search(ln):
+            sev = "pass"
+        attr = f' data-sev="{sev}"' if sev else ""
+        spans.append(f'<span class="ll"{attr}>{e(ln) or "&nbsp;"}</span>')
+    return "".join(spans), hits  # .ll is display:block; no newlines between
+
+
+def _logblock(title, subtitle, excerpt, is_open=False):
+    """A collapsible log excerpt: severity-highlighted <pre> + an error jump-list."""
+    if not excerpt:
+        return (
+            f'<details class="logblock"><summary>{e(title)}</summary>{subtitle}'
+            '<div class="muted" style="padding:8px 12px 12px">No matching block '
+            "in the log — see the raw log.</div></details>"
+        )
+    body, hits = _render_logtext(excerpt)
+    jumps = ""
+    if hits:
+        chips = "".join(
+            f'<button class="jump" data-line="{i}" onclick="jumpLine(this)" '
+            f'title="{e(short)}">{e(short[:44])}</button>'
+            for i, short in hits[:8]
+        )
+        jumps = f'<div class="logjumps"><span class="lbl">jump</span>{chips}</div>'
+    op = " open" if is_open else ""
+    return (
+        f'<details class="logblock"{op}><summary>{e(title)}</summary>{subtitle}'
+        f'{jumps}<pre class="logtext">{body}</pre></details>'
+    )
+
+
+_IMPORT_FAIL = re.compile(
+    r"ModuleNotFoundError|ImportError|No module named|"
+    r"error collecting|during collection|failed to import",
+    re.I,
+)
+
+
+def _install_error_block(lines):
+    """Locate a pip/build install error in the log and render it, or return ''."""
+    pin = next((i for i, ln in enumerate(lines) if _PIP_ERR.search(ln)), None)
+    if pin is None:
+        return ""
+    body, _h = _render_logtext("\n".join(lines[max(0, pin - 3) : pin + 40]).strip())
+    return (
+        '<details class="logblock rootcause" open><summary>'
+        "likely root cause · install / build error</summary>"
+        f'<pre class="logtext">{body}</pre></details>'
+    )
+
+
+def _root_cause_banner(lines, fails, groups):
+    """When most failures share one reason, say so once and point at the cause."""
+    reason, members = groups[0]
+    n = len(members)
+    msg = (
+        f"<strong>{n} of {len(fails)}</strong> failures share one cause: "
+        f"<code>{e(reason)}</code>."
+    )
+    extra = ""
+    if _IMPORT_FAIL.search(reason):
+        msg += (
+            f" That is an <em>install / build</em> failure, not {n} test bugs — "
+            "the package never imported."
+        )
+        extra = _install_error_block(lines)
+    return f'<div class="rootbanner">{msg}</div>{extra}'
 
 
 def render_joblog(job_id, url):
@@ -529,33 +751,61 @@ def render_joblog(job_id, url):
             f"running, or GitHub expired it. {ghlink}</div>"
         )
     lines = _clean_lines(log)
+    tools = (
+        '<div class="logtools">'
+        '<input class="logfind" type="search" placeholder="search these logs…" '
+        'oninput="logSearch(this)" aria-label="search logs">'
+        '<label class="logfilt"><input type="checkbox" onchange="logFilter(this)"> matches only</label>'
+        '<span class="logcount muted"></span></div>'
+    )
     fails = get_failures(job_id).get("failures", [])
     blocks = []
-    for f in fails:
-        excerpt = extract_test_log(lines, f["test"])
-        reasons = summary_reasons(lines, f["test"])
-        title = e(f["test"] or "failure")
-        reason_html = (
-            f'<div class="logreason">{e(reasons[0][:300])}</div>' if reasons else ""
+    if fails:
+        groups = _group_failures(fails)
+        if len(fails) >= 3 and any(len(m) > 1 for _, m in groups):
+            blocks.append(_root_cause_banner(lines, fails, groups))
+        for reason, members in groups:
+            if len(members) == 1:
+                f = members[0]
+                sub = f'<div class="logreason">{e(_reason_first(f["message"]))}</div>'
+                blocks.append(
+                    _logblock(
+                        f["test"] or "failure",
+                        sub,
+                        extract_test_log(lines, f["test"]),
+                        is_open=True,
+                    )
+                )
+            else:  # collapsed: N parametrized / duplicate failures → one block
+                names = ", ".join(m["test"] or "?" for m in members[:10])
+                more = f" +{len(members) - 10} more" if len(members) > 10 else ""
+                sub = (
+                    f'<div class="logreason">{e(reason)}</div>'
+                    f'<div class="logmeta">{len(members)} tests · {e(names)}{e(more)}</div>'
+                )
+                blocks.append(
+                    _logblock(
+                        f"{len(members)}× {reason}",
+                        sub,
+                        extract_test_log(lines, members[0]["test"]),
+                        is_open=True,
+                    )
+                )
+    else:  # no annotations → anchor on the real error; surface install failures
+        title, s, en = find_error_window(lines)
+        window = "\n".join(lines[s:en]).strip()
+        import_dominated = (
+            title == "short test summary" and len(_IMPORT_FAIL.findall(window)) >= 2
         )
-        if excerpt:
+        inst = _install_error_block(lines) if import_dominated else ""
+        if inst:
+            blocks.append(inst)
             blocks.append(
-                f'<details class="logblock" open><summary>{title}</summary>'
-                f"{reason_html}<pre>{e(excerpt)}</pre></details>"
+                '<div class="rootbanner">Every test failed at <em>import</em> — this is '
+                "an <em>install / build</em> failure (above), not test bugs.</div>"
             )
-        else:
-            blocks.append(
-                f'<details class="logblock"><summary>{title}</summary>'
-                f'{reason_html}<div class="muted">No matching block in the log — '
-                f"see the raw log.</div></details>"
-            )
-    if not fails:  # build/env/setup failure: no test annotations → show the tail
-        tail = "\n".join(lines[-180:]).strip()
-        blocks.append(
-            '<details class="logblock" open><summary>end of job log</summary>'
-            f"<pre>{e(tail)}</pre></details>"
-        )
-    return head + "".join(blocks)
+        blocks.append(_logblock(title, "", window, is_open=not inst))
+    return head + tools + "".join(blocks)
 
 
 # ── status helpers ───────────────────────────────────────────────────────────
