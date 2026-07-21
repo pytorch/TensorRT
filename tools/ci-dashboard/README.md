@@ -44,11 +44,22 @@ reachable over your tailnet/LAN — the startup log prints the Tailscale + LAN U
   **source file:line it maps to** (local path + a GitHub link pinned to the run's
   commit), and a **copy-paste command to reproduce it locally** — the exact
   `python -m tests.ci run <suite>` command CI used, narrowed to the failing tests.
-- **Relevant logs, captured** — the drawer then pulls that job's log and extracts
-  just the **pytest FAILURES block per failing test** (traceback + captured
-  stdout/stderr), so you read the actual failure without scrolling a 1 MB log.
-  A **raw log ↗** link opens the full plain-text log (grep/save it); a
-  build/env failure with no test annotations falls back to the end of the log.
+- **Relevant logs, captured** — the drawer pulls that job's log (ANSI codes and
+  `##[group]` markers stripped) and shows just the part that matters:
+  - the **pytest FAILURES block per failing test** (traceback + captured output),
+    so you read the actual failure without scrolling a ~0.5 MB / ~8k-line log;
+  - **root-cause collapse** — when N failures share one reason (e.g. 5 cumsum tests
+    with `build_serialized_network returned None`, or 29 tests that all failed to
+    import), they fold into **one** `N× …` block + a banner, not N identical ones;
+  - **install/build failures surfaced** — an import storm (every test fails to
+    import) points at the actual `pip … subprocess-exited-with-error`, not the
+    misleading per-test `ModuleNotFoundError`s;
+  - **smart anchoring** for non-pytest failures — instead of the blind log tail, it
+    anchors on the real error (`short test summary`, a build error, or a backward
+    walk from `exit code N` to the traceback), skipping echoed `::error::` script noise;
+  - **search / jump / highlight** — a search box (with a *matches only* filter), an
+    error **jump-list** that scrolls to each error line, and severity-coloured lines.
+  A **raw log ↗** link still opens the full plain-text log to grep/save.
 - **Failures across platforms** — a rollup that dedupes a failing test across
   every platform it breaks on ("fails on 3 platforms → likely this code"), so a
   systemic break stands out from a one-off.
@@ -104,8 +115,9 @@ platform on open, out-of-band badge polling, the failure drawer).
 ## Limitations
 
 - Results are only as granular as the CI annotations. A **build/env/setup**
-  failure (not a test assertion) has no pytest annotation — the drawer says so
-  and links you to the raw job log.
+  failure (not a test assertion) has no pytest annotation — the drawer says so,
+  then anchors the log on the real error (and, for an import storm, points at the
+  install failure) and links you to the raw job log.
 - Expanded platform grids don't auto-refresh (only the top-level badges do). Open
   a stale platform again, or hit `↻ Refresh`, to re-pull its jobs.
 - The cross-platform rollup fans out `gh` calls for every failing test job; on a

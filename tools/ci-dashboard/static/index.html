@@ -9,7 +9,7 @@
 </head>
 <body>
   <header>
-    <h1>Torch-TensorRT <span class="dim">CI</span></h1>
+    <h1>torch-tensorrt <span class="dim">// ci</span><span class="cursor"></span></h1>
     <form class="controls" hx-get="/ui/board" hx-target="#content" hx-swap="innerHTML" hx-trigger="submit"
           hx-indicator="#load">
       <input type="text" id="branch" name="branch" value="{{BRANCH}}" spellcheck="false"
@@ -74,6 +74,31 @@
     function copyPre(btn) {
       const code = btn.parentElement.querySelector('code');
       navigator.clipboard.writeText(code.innerText).then(() => toast('copied'));
+    }
+    // ── log fishing: search / filter / jump within the drawer's log section ──
+    function logSearch(inp) {
+      const q = inp.value.trim().toLowerCase();
+      const sec = inp.closest('.logsec');
+      let n = 0, first = null;
+      sec.querySelectorAll('.logtext .ll').forEach(ll => {
+        const hit = q && ll.textContent.toLowerCase().includes(q);
+        ll.classList.toggle('match', hit);
+        if (hit) { n++; if (!first) first = ll; }
+      });
+      const c = sec.querySelector('.logcount');
+      if (c) c.textContent = q ? (n + (n === 1 ? ' match' : ' matches')) : '';
+      if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    function logFilter(cb) {
+      cb.closest('.logsec').querySelectorAll('.logtext')
+        .forEach(p => p.classList.toggle('filtered', cb.checked));
+    }
+    function jumpLine(btn) {
+      const pre = btn.closest('.logblock').querySelector('.logtext');
+      const t = pre.querySelectorAll('.ll')[+btn.dataset.line];
+      if (!t) return;
+      t.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash');
     }
     function toast(m) {
       const t = document.getElementById('toast');
