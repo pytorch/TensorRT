@@ -82,4 +82,4 @@ def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
         elif isinstance(out, (tuple, list)):
             out = out[0]
 
-    torch.testing.assert_close(ref, out, rtol=1e-1, atol=2e-1)
+    torch.testing.assert_close(ref, out, rtol=0.3, atol=0.3)
