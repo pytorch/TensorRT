@@ -64,7 +64,7 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  # Standard — the only channel on the fast lane (every PR push).
+  # Standard — runs on every non-skip lane, incl. the fast lane (every PR push).
   standard:
     needs: [decide, generate-matrix]
     if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'rtx'
@@ -84,9 +84,11 @@ jobs:
       name-prefix: "RTX - "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
+  # python-only runs on EVERY non-skip lane incl. fast: PYTHON_ONLY=1 skips Bazel,
+  # so the wheel builds cheaply and each push smoke-tests the no-C++-runtime path.
   python-only:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: python-only
@@ -95,9 +97,10 @@ jobs:
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
   # python-only against TensorRT-RTX (so backend=both runs BOTH python-only variants).
+  # Runs on any non-skip lane, but only when an RTX backend is selected.
   python-only-rtx:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: python-only

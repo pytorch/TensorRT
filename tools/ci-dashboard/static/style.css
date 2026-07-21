@@ -118,6 +118,8 @@ main { max-width: 1320px; margin: 0 auto; padding: 18px; }
 .stat.run  { color: var(--run);  border-color: var(--run-line);  background: var(--run-bg); }
 .stat.skip { color: var(--skip); border-color: var(--skip-line); background: var(--skip-bg); border-style: dashed; }
 .commit { color: var(--muted); font-size: 12px; margin-left: auto; text-transform: uppercase; letter-spacing: .04em; }
+.commit a.sha { color: var(--accent); text-decoration: none; }
+.commit a.sha:hover { text-decoration: underline; }
 .commit code { font-family: var(--mono); color: var(--accent); text-transform: none; }
 
 /* ── status lights ────────────────────────────────────────────────────────── */
@@ -243,6 +245,18 @@ h2.sec { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; colo
 .jobstate.fail { color: var(--fail); border-color: var(--fail-line); background: var(--fail-bg); }
 .jobstate.pass { color: var(--pass); border-color: var(--pass-line); background: var(--pass-bg); }
 .jobstate.skip { border-style: dashed; }
+/* infra / runner failure — a diagonal amber hatch over the fail red + amber "infra"
+   label, so a broken runner/build reads apart from a clean red test failure (and the
+   reddish base keeps it distinct from amber "running"). */
+.cell.fail.infra, .jobrow.fail.infra {
+  border-color: var(--run-line);
+  background-image: repeating-linear-gradient(45deg,
+    transparent 0, transparent 6px, var(--run-line) 6px, var(--run-line) 8px);
+}
+.cell.fail.infra .v { color: var(--run); }
+.cell.fail.infra:hover { outline: 1px solid var(--run); box-shadow: var(--glow) var(--run); }
+.jobrow.fail.infra .name { color: var(--run); }
+.jobstate.fail.infra { color: var(--run); border-color: var(--run-line); background: var(--run-bg); }
 .jobstate.cancel { color: var(--cancel); border-color: var(--cancel-line); border-style: dashed; }
 
 /* ── drawer ───────────────────────────────────────────────────────────────── */
@@ -346,6 +360,39 @@ h2.sec { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; colo
   text-transform: uppercase; letter-spacing: .04em; }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .legend .muted { text-transform: none; letter-spacing: 0; }
+.leg-infra { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none;
+  border: 1px solid var(--run-line); background: var(--fail-bg);
+  background-image: repeating-linear-gradient(45deg, transparent 0, transparent 2px, var(--run-line) 2px, var(--run-line) 3px); }
+
+/* branch search: fuzzy-autocomplete dropdown over the client-side visit history */
+.branch-wrap { position: relative; display: inline-block; }
+.branch-ac { position: absolute; top: calc(100% + 4px); left: 0; z-index: 40; width: max-content;
+  min-width: 100%; max-width: 480px; background: var(--surface); border: 1px solid var(--accent);
+  border-radius: var(--radius); overflow: hidden; }
+.ac-row { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; cursor: pointer;
+  font-size: 12px; border-bottom: 1px solid var(--border); }
+.ac-row:last-child { border-bottom: none; }
+.ac-row.sel, .ac-row:hover { background: var(--surface-2); }
+.ac-branch { font-family: var(--mono); color: var(--text); font-weight: 600; white-space: nowrap; }
+.ac-pr { font-family: var(--mono); font-size: 11px; color: var(--accent); white-space: nowrap; }
+.ac-base { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.ac-head { font-family: var(--mono); font-size: 11px; color: var(--run); white-space: nowrap; }
+.ac-title { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; min-width: 0; }
+
+/* PR banner — the open PR for the current branch, number + title + link */
+.pr-banner { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 10px 0 0;
+  padding: 8px 12px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: inset 2px 0 0 var(--accent); }
+.pr-num { font-family: var(--mono); font-weight: 700; color: var(--accent); white-space: nowrap;
+  text-decoration: none; }
+.pr-num:hover { text-decoration: underline; }
+.pr-base { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.pr-state { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  padding: 1px 6px; border-radius: var(--radius); white-space: nowrap; }
+.pr-state.merged { color: var(--cancel); background: var(--cancel-bg); border: 1px solid var(--cancel-line); }
+.pr-state.closed { color: var(--fail); background: var(--fail-bg); border: 1px solid var(--fail-line); }
+.pr-title { color: var(--text); font-size: 13px; word-break: break-word; }
 
 /* ── PR command reference (collapsible) ───────────────────────────────────── */
 .cmds { margin: 8px 0 0; font-size: 12px; }
@@ -363,3 +410,75 @@ h2.sec { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; colo
 .cmd .copy { float: none; }
 .cmd .lbl { color: var(--muted); }
 .cmd .lbl code { color: var(--text); background: var(--bg); padding: 0 4px; border-radius: var(--radius); }
+
+/* test-plan panel: what a branch's labels will actually run */
+.plan { margin: 10px 0 0; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); box-shadow: inset 2px 0 0 var(--accent); }
+.plan > summary { cursor: pointer; user-select: none; list-style: none; display: flex;
+  align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 9px 12px; font-size: 12px; }
+.plan > summary::-webkit-details-marker { display: none; }
+.plan > summary::before { content: "▸ "; color: var(--accent); }
+.plan[open] > summary::before { content: "▾ "; }
+.plan > summary .lbl { text-transform: uppercase; letter-spacing: .1em; font-weight: 700;
+  color: var(--accent); font-size: 11px; }
+.pverdict { font-family: var(--mono); color: var(--text); }
+.pverdict b { color: var(--accent); text-transform: uppercase; }
+.plan > summary .muted { margin-left: auto; }
+.plan-body { padding: 0 12px 12px; }
+.plan-labels { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+/* passive metadata tags (non-CI labels) — flat faint fill, no border, so they
+   read as info, not buttons like the CI-label / action chips */
+.plabel { display: inline-block; font-family: var(--mono); font-size: 11px; color: var(--muted);
+  background: var(--surface-2); border-radius: var(--radius); padding: 0 5px; margin: 0 2px; opacity: .8; }
+.plan-hint { color: var(--muted); }
+.plan-hint code { font-family: var(--mono); color: var(--accent); background: var(--bg);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 0 4px; }
+.plan-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.plan-table th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); font-weight: 600; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--border); }
+.plan-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.plan-table tr:last-child td { border-bottom: none; }
+.plan-table .pplat { font-weight: 600; white-space: nowrap; }
+.plan-table .pkind { color: var(--muted); white-space: nowrap; }
+.plan-table .pcnt { font-family: var(--mono); text-align: right; color: var(--text); }
+.peng { font-family: var(--mono); font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; padding: 1px 6px; border-radius: var(--radius); border: 1px solid transparent; white-space: nowrap; }
+.peng.standard { color: var(--queue); background: var(--queue-bg); border-color: var(--queue-line); }
+.peng.rtx { color: var(--accent); background: var(--fail-bg); border-color: var(--fail-line); }
+.psuites { font-family: var(--mono); font-size: 11px; color: var(--muted); word-break: break-word; }
+
+/* CI-control labels — on/off state, colour-coded by axis (lane / std / rtx) */
+.ci-labels { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+.cil-head { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700;
+  color: var(--muted); margin-right: 4px; }
+.cilabel { font-family: var(--mono); font-size: 11px; display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: var(--radius); border: 1px solid var(--border); background: transparent;
+  color: var(--muted); cursor: pointer; }
+.cilabel .cilmark { font-weight: 700; opacity: .9; }
+.cilabel.off { border-style: dashed; color: var(--muted); }
+.cilabel.off .cilmark { color: var(--muted); }
+.cilabel.on.lane { color: var(--cancel); background: var(--cancel-bg); border-color: var(--cancel-line); }
+.cilabel.on.std  { color: var(--queue);  background: var(--queue-bg);  border-color: var(--queue-line); }
+.cilabel.on.rtx  { color: var(--accent); background: var(--fail-bg);   border-color: var(--fail-line); }
+.cilabel.inert   { color: var(--run); background: var(--run-bg); border-color: var(--run-line); border-style: dashed; }
+.cilabel:not([disabled]):hover { border-color: currentColor; box-shadow: var(--glow) currentColor; }
+.cilabel[disabled] { cursor: default; opacity: .55; }
+.cilabel.arming { color: #fff; background: var(--fail); border-color: var(--fail);
+  box-shadow: var(--glow) rgba(var(--fail-glow), .6); }
+.cilabel.arming .cilmark { display: none; }
+.plan-hint-row { font-size: 12px; margin-bottom: 10px; }
+.plan-other { font-size: 11px; margin: 6px 0 2px; }
+
+/* live CI actions — post a command as a PR comment (click, then confirm) */
+.ci-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.ciact { font-family: var(--mono); font-size: 11px; padding: 3px 9px; cursor: pointer;
+  color: var(--accent); background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); white-space: nowrap; }
+.ciact::before { content: "▸ "; color: var(--muted); }
+.ciact:not([disabled]):hover { border-color: var(--accent); }
+.ciact.danger { color: var(--fail); }
+.ciact.armed { color: #fff; background: var(--fail); border-color: var(--fail);
+  box-shadow: var(--glow) rgba(var(--fail-glow), .6); }
+.ciact.armed::before { content: "⚠ "; color: #fff; }
+.ciact[disabled] { opacity: .6; cursor: default; }
+.ciact-note { font-size: 10px; margin-left: 4px; }
