@@ -56,6 +56,10 @@ try:
     from tests.ci import SUITES as _SUITES  # noqa: E402
 except Exception:  # pragma: no cover — manifest absent on pre-migration branches
     _SUITES = ()
+try:
+    from tests.ci.runner import matrix as _ci_matrix  # noqa: E402
+except Exception:  # pragma: no cover
+    _ci_matrix = None
 
 # ── Legacy tier → source mapping (fallback) ──────────────────────────────────
 # Kept only so historical, pre-migration runs (named "L2 dynamo core tests", not
@@ -272,6 +276,229 @@ def default_branch():
         return "main"
 
 
+# ── test-plan preview: what a branch's labels will actually run ───────────────
+# This mirrors, in Python, exactly what CI derives from the triggering event:
+#   1. labels → (lane, backend)              — .github/workflows/_decide.yml
+#   2. (lane, backend) → per-platform channels — the `if:` gates in the
+#      ci-linux-x86_64 / ci-windows / ci-sbsa entry workflows
+#   3. (lane, variant, platform) → suites     — `tests.ci matrix` (_test-linux.yml)
+# Keep in sync with those files if the gating changes.
+
+# The CI-control labels (the ONLY ones that change what runs) + the axis each
+# drives and a one-line effect. Order = display order. Kept in sync with _decide.yml.
+CI_LABELS = [
+    ("ci: full", "lane", "all tiers (L0–L2) on Linux + Windows"),
+    ("ci: nightly", "lane", "everything, incl. llm / kernels / distributed"),
+    ("backend: TensorRT", "std", "test the standard TensorRT engine"),
+    ("backend: TensorRT-RTX", "rtx", "test the TensorRT-RTX engine"),
+]
+_CI_LABEL_NAMES = {n for n, _, _ in CI_LABELS}
+_INERT_LABEL = "Force All Tests[L0+L1+L2]"  # replaced by ci: full / ci: nightly
+
+
+def _ci_label_chips(labels, pr):
+    """The four CI-control labels as on/off toggles — clicking (then confirming)
+    adds/removes the label on the PR live. Disabled when there's no PR to edit.
+    (Adding a CI label triggers a run, hence the confirm.)"""
+    present = set(labels)
+    num = pr["number"] if pr else None
+    out = []
+    for name, group, effect in CI_LABELS:
+        on = name in present
+        title = f'{"remove" if on else "add"} — {effect}'
+        out.append(
+            f'<button class="cilabel {group} {"on" if on else "off"}" data-pr="{num or ""}" '
+            f'data-label="{e(name)}" data-add="{"0" if on else "1"}" '
+            f'onclick="toggleLabel(this)" title="{e(title)}"{"" if num else " disabled"}>'
+            f'<span class="cilmark">{"✓" if on else "+"}</span>{e(name)}</button>'
+        )
+    return "".join(out)
+
+
+def resolve_lane_backend(labels, event="pull_request"):
+    """labels → (lane, backend), per _decide.yml. `contains()` in Actions is an
+    exact array-element match, so the two backend labels never alias."""
+    L = set(labels or [])
+    has_full, has_nightly = "ci: full" in L, "ci: nightly" in L
+    has_rtx, has_std = "backend: TensorRT-RTX" in L, "backend: TensorRT" in L
+    if event == "schedule":
+        lane = "nightly"
+    elif event == "push":  # main canary
+        lane = "full"
+    else:  # pull_request
+        lane = "nightly" if has_nightly else "full" if has_full else "fast"
+    if event != "pull_request":
+        backend = "both"
+    elif has_rtx and has_std:
+        backend = "both"
+    elif has_rtx:
+        backend = "rtx"
+    elif has_std:
+        backend = "standard"
+    elif lane == "fast":  # cheap default on a plain PR push
+        backend = "standard"
+    else:
+        backend = "both"
+    return lane, backend
+
+
+def compute_plan(lane, backend):
+    """The channels that will run for (lane, backend), each with its suite list.
+    Mirrors the entry workflows' channel `if:` gates. Returns [{platform, engine,
+    kind, suites}], suites empty for build-only channels."""
+    if _ci_matrix is None:
+        return []
+    run, fullish = lane != "skip", lane in ("full", "nightly")
+    std, rtx = backend != "rtx", backend != "standard"  # which engine channels run
+    plan = []
+
+    def add(platform, engine, kind, suite_lane, suite_platform):
+        suites = (
+            [
+                m["suite"]
+                for m in _ci_matrix(
+                    lane=suite_lane, variant=engine, platform=suite_platform
+                )
+            ]
+            if suite_platform
+            else []
+        )
+        plan.append(dict(platform=platform, engine=engine, kind=kind, suites=suites))
+
+    # Linux x86_64 (ci-linux-x86_64.yml): tests AND python-only on any non-skip lane
+    # (incl. fast — PYTHON_ONLY=1 skips Bazel, so it's a cheap per-push smoke).
+    if run and std:
+        add("Linux x86_64", "standard", "tests", lane, "linux-x86_64")
+    if run and rtx:
+        add("Linux x86_64", "rtx", "tests", lane, "linux-x86_64")
+    if run and std:
+        add("Linux x86_64", "standard", "python-only", "python-only", "linux-x86_64")
+    if run and rtx:
+        add("Linux x86_64", "rtx", "python-only", "python-only", "linux-x86_64")
+    # Windows (ci-windows.yml): full/nightly only — never on the fast lane
+    if fullish and std:
+        add("Windows", "standard", "tests", lane, "windows")
+    if fullish and rtx:
+        add("Windows", "rtx", "tests", lane, "windows")
+    if fullish and std:
+        add("Windows", "standard", "python-only", "python-only", "windows")
+    if fullish and rtx:
+        add("Windows", "rtx", "python-only", "python-only", "windows")
+    # SBSA aarch64 (ci-sbsa.yml): BUILD-ONLY (no GPU runners), full/nightly, standard
+    if fullish and std:
+        add("Linux aarch64 · SBSA", "standard", "build-only", lane, None)
+        add(
+            "Linux aarch64 · SBSA",
+            "standard",
+            "build-only · py-only",
+            "python-only",
+            None,
+        )
+    return plan
+
+
+def pr_for(branch, refresh=False):
+    """The PR whose head is `branch` — an OPEN one if there is one, else the most
+    recent of any state (so a merged/closed PR's number still shows). Fields:
+    number/title/url/labels/baseRefName/state, or None. Cached briefly so the board
+    banner + plan panel share one lookup (a `{}` sentinel caches the 'no PR' answer)."""
+    key = f"pr:{branch}"
+    if not refresh and (c := CACHE.get(key)) is not None:
+        return c or None
+    try:
+        prs = gh(
+            [
+                "pr",
+                "list",
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--json",
+                "number,title,url,labels,baseRefName,state",
+                "--limit",
+                "5",
+            ]
+        )
+        pr = next((p for p in prs if p.get("state") == "OPEN"), prs[0] if prs else None)
+    except Exception:
+        pr = None
+    CACHE.put(key, pr or {}, ttl=120)
+    return pr
+
+
+def resolve_pr_branch(num):
+    """A PR number → its head branch name, so `#4414` typed in the search box (or a
+    `?branch=%234414` URL) loads the right branch. Cached; None if no such PR."""
+    num = str(num or "").lstrip("#").strip()
+    if not re.fullmatch(r"\d+", num):
+        return None
+    key = f"prbranch:{num}"
+    if (c := CACHE.get(key)) is not None:
+        return c or None
+    try:
+        b = gh(
+            [
+                "pr",
+                "view",
+                num,
+                "--repo",
+                repo_slug(),
+                "--json",
+                "headRefName",
+                "-q",
+                ".headRefName",
+            ],
+            parse=False,
+        ).strip()
+    except Exception:
+        b = None
+    CACHE.put(key, b or "", ttl=300)
+    return b or None
+
+
+# CI-control comment commands the dashboard can POST to a PR (handled by
+# retrigger-ci.yml). (command, effect, is_destructive) — the whitelist is also the
+# server-side guard, so only these exact strings can ever be posted.
+CI_ACTIONS = [
+    ("/rerun", "re-run only the failed / cancelled jobs", False),
+    ("/rerun all", "re-run every job from scratch", False),
+    ("/cancel", "cancel stale zombie runs on old commits", False),
+    ("/cancel all", "cancel EVERY in-flight run for the PR", True),
+    ("/test full", "run the full suite (all tiers, both engines)", False),
+    ("/test full rtx", "full suite, RTX engine only", False),
+    ("/test nightly", "everything incl. llm / kernels / distributed", False),
+]
+_ALLOWED_CMDS = {c for c, _, _ in CI_ACTIONS}
+
+
+def post_pr_comment(pr, cmd):
+    """Post one whitelisted CI command as a PR comment (which triggers
+    retrigger-ci.yml). Raises on a bad PR number or non-whitelisted command —
+    the whitelist is the guard against arbitrary comments."""
+    if cmd not in _ALLOWED_CMDS:
+        raise ValueError(f"command not allowed: {cmd!r}")
+    if not re.fullmatch(r"\d+", str(pr or "")):
+        raise ValueError(f"bad PR number: {pr!r}")
+    return gh(
+        ["pr", "comment", str(pr), "--repo", repo_slug(), "--body", cmd], parse=False
+    ).strip()
+
+
+def set_pr_label(pr, label, add):
+    """Add or remove one CI-control label on a PR (adding triggers a run via the
+    `labeled` event). Whitelisted to the CI labels — the guard against editing
+    arbitrary labels. The client reloads with refresh=1 so the plan re-resolves."""
+    if label not in _CI_LABEL_NAMES:
+        raise ValueError(f"label not allowed: {label!r}")
+    if not re.fullmatch(r"\d+", str(pr or "")):
+        raise ValueError(f"bad PR number: {pr!r}")
+    flag = "--add-label" if add else "--remove-label"
+    return gh(
+        ["pr", "edit", str(pr), "--repo", repo_slug(), flag, label], parse=False
+    ).strip()
+
+
 # ── data layer ───────────────────────────────────────────────────────────────
 def get_runs(branch, limit=40, refresh=False):
     key = f"runs:{branch}:{limit}"
@@ -309,9 +536,14 @@ def _parse_job(j):
         group_parts = rest if rest else (parts[:-1] if is_matrix else parts)
     group = " / ".join(group_parts) if group_parts else raw
     gl = _norm(group)
+    last_word = gl.rsplit(" ", 1)[-1] if gl else ""
     if "build-wheel" in last or gl.startswith("build "):
         kind = "build"
-    elif re.match(r"l[012]\b", gl):
+    elif (
+        re.search(r"\bl[012]\b", gl)  # tier token (old `L2 …` names, new-format tier)
+        or " / test (" in group  # new `<channel> / test (…)` format
+        or last_word in ("test", "tests")  # descriptive `… dynamo runtime tests` groups
+    ):
         kind = "test"
     elif "matrix" in gl or "generate" in gl or group == "filter-matrix":
         kind = "setup"
@@ -1023,9 +1255,18 @@ def _summary_html(runs, oob=False):
         counts[cls] = counts.get(cls, 0) + 1
     didnt_run = counts["skip"] + counts["cancel"]
     head = runs[0] if runs else {}
-    sha = (head.get("headSha") or "")[:9]
+    full_sha = head.get("headSha") or ""
+    sha = full_sha[:9]
+    msg = head.get("displayTitle", "")
+    sha_html = (
+        f'<a class="sha" href="https://github.com/{repo_slug()}/commit/{e(full_sha)}" '
+        f'target="_blank" rel="noopener"><code>{e(sha)}</code></a>'
+        if full_sha
+        else f"<code>{e(sha)}</code>"
+    )
     commit = (
-        f'<div class="commit"><code>{e(sha)}</code> · {e(head.get("displayTitle", ""))[:80]}'
+        f'<div class="commit" data-sha="{e(sha)}" data-msg="{e(msg)}">'
+        f"{sha_html} · {e(msg)[:80]}"
         f' · {e(rel_time(head.get("createdAt")))}</div>'
     )
 
@@ -1048,6 +1289,141 @@ def _summary_html(runs, oob=False):
         f'{stat("pass", counts["pass"], "passing")}'
         f'{stat("skip", didnt_run, "didn’t run")}'
         f"{commit}</div>"
+    )
+
+
+def _plan_hint(lane, backend):
+    if lane == "fast":
+        h = (
+            "<code>fast</code> = L0 smoke + python-only on Linux x86_64. Add <code>ci: full</code> "
+            "for all tiers on Linux + Windows, or <code>ci: nightly</code> to also run "
+            "llm / kernels / distributed."
+        )
+    elif lane == "full":
+        h = (
+            "<code>full</code> runs L0–L2. Add <code>ci: nightly</code> to also run "
+            "llm / kernels / distributed."
+        )
+    else:
+        h = "<code>nightly</code> runs everything."
+    if backend == "standard":
+        h += " Add <code>backend: TensorRT-RTX</code> to also test RTX."
+    elif backend == "rtx":
+        h += " Add <code>backend: TensorRT</code> to also test standard."
+    return f'<span class="plan-hint">{h}</span>'
+
+
+def render_plan(branch, refresh=False):
+    """'What will run' panel: branch labels → lane/backend → the exact per-platform
+    channels + suites CI will execute. Cached briefly (labels change rarely)."""
+    key = f"plan:{branch}"
+    if not refresh and (c := CACHE.get(key)) is not None:
+        return c
+    try:
+        html = _render_plan(branch)
+    except Exception as ex:  # best-effort — never break the board
+        html = (
+            f'<div class="muted" style="padding:4px 0">plan unavailable: {e(ex)}</div>'
+        )
+    CACHE.put(key, html, ttl=120)
+    return html
+
+
+def _render_plan(branch):
+    pr = None
+    if branch == "main":  # the push canary — not any head=main PR
+        labels, event, src = [], "push", "push → main"
+    elif pr := pr_for(branch):
+        labels = [l.get("name", "") for l in pr.get("labels", [])]
+        event, src = "pull_request", f'PR #{pr["number"]}'
+    else:
+        labels, event, src = [], "pull_request", "no open PR"
+    lane, backend = resolve_lane_backend(labels, event)
+    plan = compute_plan(lane, backend)
+    njobs = sum(len(c["suites"]) for c in plan)
+
+    srchtml = (
+        f'<a href="{e(pr["url"])}" target="_blank" rel="noopener">{e(src)} ↗</a>'
+        if pr
+        else e(src)
+    )
+    # CI-control labels as on/off state; the rest shown muted as "other".
+    if event == "push":
+        labelblock = (
+            '<div class="plan-labels"><span class="muted">push to <code>main</code> — '
+            "runs the full lane on both engines regardless of labels.</span></div>"
+        )
+    else:
+        others = [x for x in labels if x not in _CI_LABEL_NAMES and x != _INERT_LABEL]
+        inert = (
+            f'<button class="cilabel inert" disabled title="inert — superseded by '
+            f'ci: full / ci: nightly">⚠ {e(_INERT_LABEL)}</button>'
+            if _INERT_LABEL in labels
+            else ""
+        )
+        other_html = (
+            (
+                '<div class="plan-other"><span class="muted">other:</span> '
+                + " ".join(f'<span class="plabel">{e(x)}</span>' for x in others)
+                + "</div>"
+            )
+            if others
+            else ""
+        )
+        labelblock = (
+            f'<div class="ci-labels"><span class="cil-head">CI labels</span>'
+            f"{_ci_label_chips(labels, pr)}{inert}</div>"
+            f'<div class="plan-hint-row">{_plan_hint(lane, backend)}</div>{other_html}'
+        )
+
+    # Live CI-control buttons: post a command as a PR comment (with a click-to-confirm
+    # guard so a stray click can't trigger a run). Only when there's a PR to post to.
+    actions_html = ""
+    if pr:
+        acts = "".join(
+            f'<button class="ciact{" danger" if danger else ""}" data-pr="{pr["number"]}" '
+            f'data-cmd="{e(cmd)}" onclick="postCmd(this)" title="{e(desc)} — click, then confirm">'
+            f"{e(cmd)}</button>"
+            for cmd, desc, danger in CI_ACTIONS
+        )
+        actions_html = (
+            f'<div class="ci-actions"><span class="cil-head">CI actions</span>{acts}'
+            f'<span class="ciact-note muted">click, then confirm — posts to '
+            f'PR #{pr["number"]}</span></div>'
+        )
+    labelblock += actions_html
+    rows = []
+    for c in plan:
+        if c["suites"]:
+            detail, cnt = (
+                f'<span class="psuites">{e(", ".join(c["suites"]))}</span>',
+                str(len(c["suites"])),
+            )
+        else:
+            detail, cnt = '<span class="muted">wheel build · no tests</span>', "—"
+        rows.append(
+            f'<tr><td class="pplat">{e(c["platform"])}</td>'
+            f'<td><span class="peng {e(c["engine"])}">{e(c["engine"])}</span></td>'
+            f'<td class="pkind">{e(c["kind"])}</td>'
+            f'<td class="pcnt">{cnt}</td><td class="pdet">{detail}</td></tr>'
+        )
+    table = (
+        (
+            '<table class="plan-table"><thead><tr><th>platform</th><th>engine</th>'
+            "<th>kind</th><th>#</th><th>suites</th></tr></thead>"
+            f'<tbody>{"".join(rows)}</tbody></table>'
+        )
+        if rows
+        else '<div class="muted">Manifest not available on this checkout.</div>'
+    )
+    summary = (
+        f'<summary><span class="lbl">test plan</span>'
+        f'<span class="pverdict">lane <b>{e(lane)}</b> · backend <b>{e(backend)}</b></span>'
+        f'<span class="muted">{njobs} test jobs · {srchtml}</span></summary>'
+    )
+    return (
+        f'<details class="plan" open>{summary}'
+        f'<div class="plan-body">{labelblock}{table}</div></details>'
     )
 
 
@@ -1103,7 +1479,28 @@ def render_board(branch, refresh=False):
         f'<div class="agg-loading"><span class="spinner"></span> scanning failing tests…</div></div>'
     )
     board = f'<h2 class="sec">Platforms</h2><div id="board" class="board">{"".join(cards)}</div>'
-    return summary + agg + board + poller
+    # main is the push canary, not a PR (ignore any stray head=main fork PR) — matches
+    # render_plan. pr_for still warms the cache render_plan reuses.
+    pr = pr_for(branch, refresh=refresh) if branch != "main" else None
+    banner = ""
+    if pr:
+        base = pr.get("baseRefName", "")
+        state = (pr.get("state") or "").upper()
+        state_tag = (
+            f'<span class="pr-state {state.lower()}">{e(state.lower())}</span>'
+            if state and state != "OPEN"
+            else ""
+        )
+        base_html = f'<span class="pr-base">→ {e(base)}</span>' if base else ""
+        banner = (
+            f'<div class="pr-banner" data-pr="{pr["number"]}" data-base="{e(base)}">'
+            f'<a class="pr-num" href="{e(pr["url"])}" target="_blank" '
+            f'rel="noopener">PR #{pr["number"]} ↗</a>{state_tag}{base_html}'
+            f'<span class="pr-title">{e(pr.get("title", ""))}</span></div>'
+        )
+    return (
+        banner + summary + render_plan(branch, refresh=refresh) + agg + board + poller
+    )
 
 
 def render_status(branch):
@@ -1126,6 +1523,19 @@ def render_status(branch):
 KIND_ORDER = {"test": 0, "build": 1, "setup": 2, "rollup": 3, "other": 4}
 
 
+def fail_kind(job):
+    """A FAILED test/build job → 'test' (it produced pytest failure annotations, i.e.
+    real test failures) or 'infra' (build/setup/env/OOM/runner died with no test
+    verdict). Build failures are always infra; test jobs are probed via their (cached)
+    annotations. Lets the grid show a broken runner differently from a broken test."""
+    if job.get("kind") != "test":
+        return "infra"
+    try:
+        return "test" if get_failures(str(job["id"])).get("failures") else "infra"
+    except Exception:
+        return "test"  # if we truly can't tell, don't cry wolf about infra
+
+
 def render_platform(run_id, sha, platform, refresh=False):
     try:
         jobs = get_jobs(run_id, refresh=refresh)
@@ -1133,6 +1543,20 @@ def render_platform(run_id, sha, platform, refresh=False):
         return f'<div class="muted">Could not load jobs: {e(ex)}</div>'
     if not jobs:
         return '<div class="muted">No jobs.</div>'
+
+    # Split test failures from infra/runner failures for the failing cells — one
+    # cached annotation call each, fanned out so a platform with many reds stays snappy.
+    failing = [
+        j
+        for j in jobs
+        if classify(j["status"], j["conclusion"])[0] == "fail"
+        and j["kind"] in ("test", "build")
+    ]
+    fk = {}
+    if failing:
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for j, k in zip(failing, ex.map(fail_kind, failing)):
+                fk[j["id"]] = k
 
     # group by (kind, group)
     groups = {}
@@ -1153,6 +1577,12 @@ def render_platform(run_id, sha, platform, refresh=False):
         for j in sorted(gjobs, key=lambda j: (j["python"] or "", j["cuda"] or "")):
             cls, label = classify(j["status"], j["conclusion"])
             failable = cls == "fail" and j["kind"] in ("test", "build")
+            infra = failable and fk.get(j["id"]) == "infra"
+            if infra:
+                label = "infra"
+            fcls = cls + (
+                " infra" if infra else ""
+            )  # add .infra shading when a runner (not a test) died
             if j["python"] and j["cuda"]:
                 inner = (
                     f'<span class="k"><span class="dot {cls}"></span>{e(j["python"])}·{e(j["cuda"])}</span>'
@@ -1169,11 +1599,11 @@ def render_platform(run_id, sha, platform, refresh=False):
                         url=j["url"],
                     )
                     cells.append(
-                        f'<div class="cell fail" tabindex="0" onclick="openDrawer()" '
+                        f'<div class="cell {fcls}" tabindex="0" onclick="openDrawer()" '
                         f'hx-get="/ui/failures?{q}" hx-target="#drawer-body" hx-swap="innerHTML">{inner}</div>'
                     )
                 else:
-                    cells.append(f'<div class="cell {cls}">{inner}</div>')
+                    cells.append(f'<div class="cell {fcls}">{inner}</div>')
             else:
                 name = j["raw"].split(" / ")[-1] or j["group"]
                 link = (
@@ -1195,9 +1625,9 @@ def render_platform(run_id, sha, platform, refresh=False):
                         f'hx-get="/ui/failures?{q}" hx-target="#drawer-body" hx-swap="innerHTML">details</a>'
                     )
                 rows.append(
-                    f'<div class="jobrow {cls}"><span class="dot {cls}"></span>'
+                    f'<div class="jobrow {fcls}"><span class="dot {cls}"></span>'
                     f'<span class="name">{e(name)}</span>'
-                    f'<span class="jobstate {cls}">{e(label)}</span>{link}{extra}</div>'
+                    f'<span class="jobstate {fcls}">{e(label)}</span>{link}{extra}</div>'
                 )
         body = ""
         if cells:
@@ -1413,6 +1843,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        # Never let the browser serve a stale page/fragment/asset — this is a
+        # live, rapidly-changing tool and cached HTML/CSS/JS causes "it broke
+        # again" ghosts. gh data is already cached server-side (Cache class).
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         self.end_headers()
         self.wfile.write(body)
 
@@ -1423,7 +1857,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             p = u.path
             if p in ("/", "/index.html"):
-                return self._index()
+                return self._index(q.get("branch") or default_branch())
             if p.startswith("/static/"):
                 return self._static(p[len("/static/") :])
             if p == "/ui/board":
@@ -1454,6 +1888,9 @@ class Handler(BaseHTTPRequestHandler):
                         q.get("url", ""),
                     ),
                 )
+            if p == "/api/resolve-pr":
+                b = resolve_pr_branch(q.get("pr", ""))
+                return self._send(200, {"branch": b} if b else {"error": "not found"})
             if p == "/ui/aggregate":
                 return self._send(
                     200, render_aggregate(q.get("branch") or default_branch(), refresh)
@@ -1473,10 +1910,42 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as ex:
             self._send(500, f'<div class="muted">error: {e(ex)}</div>')
 
-    def _index(self):
+    def do_POST(self):
+        u = urlparse(self.path)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            form = {
+                k: v[0] for k, v in parse_qs(self.rfile.read(length).decode()).items()
+            }
+            if u.path == "/api/pr-comment":
+                try:
+                    url = post_pr_comment(form.get("pr", ""), form.get("cmd", ""))
+                    return self._send(200, {"ok": True, "url": url})
+                except Exception as ex:  # bad cmd / gh failure → readable msg
+                    return self._send(200, {"ok": False, "error": str(ex)})
+            if u.path == "/api/pr-label":
+                try:
+                    out = set_pr_label(
+                        form.get("pr", ""),
+                        form.get("label", ""),
+                        form.get("add") == "1",
+                    )
+                    return self._send(200, {"ok": True, "out": out})
+                except Exception as ex:  # bad label / gh failure → readable msg
+                    return self._send(200, {"ok": False, "error": str(ex)})
+            return self._send(404, {"ok": False, "error": "not found"})
+        except Exception as ex:
+            return self._send(500, {"ok": False, "error": str(ex)})
+
+    def _index(self, branch):
+        """Full page bootstrapped to `branch` — so `/?branch=<x>` is a real,
+        reloadable, shareable URL (and history-restore lands on a valid page).
+        A bare `#<num>` in the URL is a PR number → resolve to its head branch."""
+        if branch and branch.startswith("#") and branch[1:].isdigit():
+            branch = resolve_pr_branch(branch) or branch
         with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
             html_s = f.read()
-        html_s = html_s.replace("{{BRANCH}}", e(default_branch())).replace(
+        html_s = html_s.replace("{{BRANCH}}", e(branch)).replace(
             "{{REPO}}", e(repo_slug())
         )
         self._send(200, html_s)
