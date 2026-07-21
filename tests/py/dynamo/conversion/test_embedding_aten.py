@@ -29,6 +29,18 @@ class TestEmbeddingConverter(DispatchTestCase):
                 weights_tensor=torch.randn((5, 10), dtype=torch.float32),
                 sparse=True,
             ),
+            param(
+                test_name="1d_indices_int64",
+                indices_tensor=torch.tensor([3, 1, 2], dtype=torch.int64),
+                weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=False,
+            ),
+            param(
+                test_name="2d_indices_int64",
+                indices_tensor=torch.tensor([[3, 1, 2], [4, 1, 3]], dtype=torch.int64),
+                weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=True,
+            ),
         ]
     )
     def test_embedding(
@@ -57,8 +69,40 @@ class TestEmbeddingConverter(DispatchTestCase):
             inputs=[indices_tensor, weights_tensor],
         )
 
+    def test_embedding_with_constant_int64_indices(self):
+        class ConstantInt64IndicesEmbedding(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "indices",
+                    torch.tensor([[0, 3, 1]], dtype=torch.int64),
+                    persistent=False,
+                )
+
+            def forward(self, weights):
+                return torch.ops.aten.embedding.default(
+                    weights,
+                    self.indices,
+                    -1,
+                    False,
+                    False,
+                )
+
+        self.run_test(
+            ConstantInt64IndicesEmbedding(),
+            inputs=[torch.randn((5, 10), dtype=torch.float32)],
+        )
+
+    @parameterized.expand(
+        [
+            param(test_name="int32_indices", indices_dtype=torch.int32),
+            param(test_name="int64_indices", indices_dtype=torch.int64),
+        ]
+    )
     def test_embedding_with_dynamic_shape_four_dimensions(
         self,
+        test_name,
+        indices_dtype,
         padding_idx=-1,
         max_norm=None,
         norm_type=2.0,
@@ -78,7 +122,7 @@ class TestEmbeddingConverter(DispatchTestCase):
         input_specs = [
             Input(
                 shape=(-1, -1, -1, -1),
-                dtype=torch.int32,
+                dtype=indices_dtype,
                 shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
             ),
             Input(
