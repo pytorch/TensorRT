@@ -8,6 +8,15 @@ Do try to fill an issue with your feature or bug before filling a PR (op support
 
 Our build system relies on `bazel` (https://bazel.build/). Though there are many ways to install `bazel`, the preferred method is to use `bazelisk` (https://github.com/bazelbuild/bazelisk) which makes it simple to set up the correct version of bazel on the fly. Additional development dependencies can be installed via the `requirements-dev.txt` file.
 
+Developers can define Bazel settings in `.bazelrc.user`, which is gitignored and loaded optionally by the repository's `.bazelrc`. For example, resource-constrained machines can limit local build parallelism:
+
+```text
+build --jobs=6
+build --local_resources=memory=HOST_RAM*.7
+```
+
+Do not commit `.bazelrc.user`; tune these values for your local machine.
+
 #### Editor / clangd setup (optional)
 
 For C++ code intelligence (go-to-definition, accurate diagnostics, completions) in any clangd-based editor — e.g. VSCode with the [clangd extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd), Cursor, Neovim, Emacs — generate a Bazel-aware compilation database:
