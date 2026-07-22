@@ -1,15 +1,47 @@
-import unittest
-
+import tensorrt as trt
 import torch
 import torch.nn as nn
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 
 from .harness import DispatchTestCase
 
 
 class TestArangeConverter(DispatchTestCase):
+    def test_static_arange_uses_linspace_fill(self):
+        logger = trt.Logger(trt.Logger.ERROR)
+        builder = trt.Builder(logger)
+        network = builder.create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        ctx = ConversionContext(network)
+
+        output = impl.arange.arange(
+            ctx,
+            torch.ops.aten.arange.start_step,
+            SourceIR.ATEN,
+            "arange",
+            start=0,
+            end=5,
+            step=1,
+        )
+
+        fill_layers = [
+            network.get_layer(index)
+            for index in range(network.num_layers)
+            if network.get_layer(index).type == trt.LayerType.FILL
+        ]
+        self.assertEqual(len(fill_layers), 1)
+        self.assertEqual(
+            fill_layers[0].name,
+            "[FILL]-[aten_ops.arange.start_step]-[arange_arange_fill]",
+        )
+        self.assertEqual(tuple(output.shape), (5,))
+
     @parameterized.expand(
         [
             (0, 5, 1),
