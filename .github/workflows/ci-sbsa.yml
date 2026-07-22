@@ -1,8 +1,10 @@
 name: CI SBSA
 
 # Per-platform entry — SBSA (linux-aarch64) is BUILD-ONLY (no aarch64 GPU test
-# runners), so this just validates the wheel builds (standard + python-only) on
-# the full/nightly lanes. No test/report jobs since nothing runs.
+# runners), so this just validates the wheel builds — standard AND TensorRT-RTX,
+# each with a python-only variant — on the full/nightly lanes. No test/report jobs
+# since nothing runs. (TensorRT-RTX ships an aarch64/SBSA build as of 1.5, so the
+# RTX channels build @tensorrt_rtx_sbsa via USE_TRT_RTX=1.)
 
 on:
   pull_request:
@@ -50,7 +52,7 @@ jobs:
       contains(fromJSON('["ci: full", "ci: nightly", "backend: TensorRT", "backend: TensorRT-RTX"]'), github.event.label.name)
     uses: ./.github/workflows/_decide.yml
 
-  # Generate the aarch64 build matrix once (shared by both build channels).
+  # Generate the aarch64 build matrix once (shared by all build channels).
   generate-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
@@ -84,8 +86,36 @@ jobs:
       name-prefix: "Python-only SBSA "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
+  # RTX channels — run when an RTX backend is selected (backend != 'standard').
+  # TensorRT-RTX 1.5 ships an aarch64 (SBSA) build, so USE_TRT_RTX=1 resolves
+  # @tensorrt_rtx_sbsa. Build-only, same as the standard SBSA channels.
+  build-rtx:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      architecture: aarch64
+      use-rtx: true
+      run-tests: false
+      name-prefix: "RTX SBSA "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  python-only-rtx:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: python-only
+      python-only: true
+      architecture: aarch64
+      use-rtx: true
+      run-tests: false
+      name-prefix: "RTX Python-only SBSA "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
   gate:
-    needs: [decide, build, python-only]
+    needs: [decide, build, python-only, build-rtx, python-only-rtx]
     if: always()
     runs-on: ubuntu-latest
     steps:

@@ -384,12 +384,22 @@ def compute_plan(lane, backend):
         add("Windows", "standard", "python-only", "python-only", "windows")
     if fullish and rtx:
         add("Windows", "rtx", "python-only", "python-only", "windows")
-    # SBSA aarch64 (ci-sbsa.yml): BUILD-ONLY (no GPU runners), full/nightly, standard
+    # SBSA aarch64 (ci-sbsa.yml): BUILD-ONLY (no GPU runners), full/nightly.
+    # Standard AND RTX (TensorRT-RTX 1.5 ships an aarch64 build), each w/ python-only.
     if fullish and std:
         add("Linux aarch64 · SBSA", "standard", "build-only", lane, None)
         add(
             "Linux aarch64 · SBSA",
             "standard",
+            "build-only · py-only",
+            "python-only",
+            None,
+        )
+    if fullish and rtx:
+        add("Linux aarch64 · SBSA", "rtx", "build-only", lane, None)
+        add(
+            "Linux aarch64 · SBSA",
+            "rtx",
             "build-only · py-only",
             "python-only",
             None,
