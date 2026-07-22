@@ -79,27 +79,22 @@ if(TARGET extension_cuda)
             "${_extension_cuda_type}. Static copies break caller-stream sharing."
         )
     endif()
-elseif(DEFINED EXECUTORCH_EXTENSION_CUDA_LIBRARY AND EXISTS "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}")
+elseif(DEFINED EXECUTORCH_EXTENSION_CUDA_LIBRARY)
     # Use a prebuilt shared library, e.g. the one shipped in libtorchtrt.tar.gz.
-    if(WIN32)
-        if(NOT EXECUTORCH_EXTENSION_CUDA_LIBRARY MATCHES "\\.lib$")
-            message(FATAL_ERROR
-                "EXECUTORCH_EXTENSION_CUDA_LIBRARY must name the extension_cuda "
-                "shared-library import .lib on Windows."
-            )
-        endif()
-        if(NOT DEFINED EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY OR
-           NOT EXISTS "${EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY}" OR
-           NOT EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY MATCHES "\\.dll$")
-            message(FATAL_ERROR
-                "Set EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY to the matching "
-                "extension_cuda .dll so the override cannot resolve to a static .lib."
-            )
-        endif()
-        add_library(extension_cuda SHARED IMPORTED)
-        set_target_properties(extension_cuda PROPERTIES
-            IMPORTED_IMPLIB "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}"
-            IMPORTED_LOCATION "${EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY}"
+    # A caller-supplied override is authoritative: never silently fall back to a
+    # different source-built library when its path is invalid.
+    if(NOT EXISTS "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}")
+        message(FATAL_ERROR
+            "EXECUTORCH_EXTENSION_CUDA_LIBRARY does not exist: "
+            "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}"
+        )
+    elseif(WIN32)
+        # A .lib suffix alone cannot distinguish an import library from a static
+        # archive, so accepting this override could duplicate caller-stream TLS.
+        message(FATAL_ERROR
+            "Prebuilt EXECUTORCH_EXTENSION_CUDA_LIBRARY overrides are not supported "
+            "on Windows. Provide ExecuTorch's shared extension_cuda target or build "
+            "the shared library from an ExecuTorch source checkout."
         )
     elseif(NOT EXECUTORCH_EXTENSION_CUDA_LIBRARY MATCHES "\\.(so(\\.[0-9]+)*|dylib)$")
         message(FATAL_ERROR
@@ -131,8 +126,7 @@ else()
         "Torch-TensorRT's ExecuTorch backend requires ExecuTorch's shared "
         "extension_cuda library. Add ExecuTorch first with EXECUTORCH_BUILD_CUDA=ON, "
         "or set EXECUTORCH_EXTENSION_CUDA_LIBRARY to a prebuilt libextension_cuda "
-        "(and EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY to the matching .dll on "
-        "Windows), or set EXECUTORCH_SOURCE_DIR/EXECUTORCH_ROOT to an ExecuTorch "
+        "on Linux/macOS, or set EXECUTORCH_SOURCE_DIR/EXECUTORCH_ROOT to an ExecuTorch "
         "checkout containing extension/cuda/caller_stream.cpp. Do not link a static "
         "copy: all delegates must share one caller-stream TLS."
     )
