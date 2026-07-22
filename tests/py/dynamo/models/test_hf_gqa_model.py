@@ -4,6 +4,7 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt
+from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
 
 if importlib.util.find_spec("transformers"):
     import transformers
@@ -21,6 +22,15 @@ if importlib.util.find_spec("transformers"):
     "transformers is required to run this test",
 )
 def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
+    if (
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
+        and not is_tensorrt_rtx_version_supported("1.6")
+    ):
+        pytest.skip(
+            "TensorRT-RTX >= 1.6 is required because it fixed some accuracy issues for FP16"
+        )
+        return
+
     from transformers import AutoModelForCausalLM
 
     model_name = "Qwen/Qwen2.5-0.5B-Instruct"
