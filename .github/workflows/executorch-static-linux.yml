@@ -98,10 +98,16 @@ jobs:
         # the libnvinfer that Bazel materialized for the build (under the external
         # repo tree) and pass LD_LIBRARY_PATH + the GPU env through to the
         # unsandboxed (standalone) test process.
-        tensorrt_lib_dir="$(find "$(bazel info output_base)/external" -name 'libnvinfer.so*' -printf '%h\n' 2>/dev/null | sort -u | head -n1)"
-        if [[ -n "${tensorrt_lib_dir}" ]]; then
-          export LD_LIBRARY_PATH="${tensorrt_lib_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+        tensorrt_lib_dir="$(
+          find -L "$(bazel info output_base)/external" \
+            \( -path '*/+*tensorrt/lib/libnvinfer.so*' -o -path '*/tensorrt/lib/libnvinfer.so*' \) \
+            -printf '%h\n' -quit 2>/dev/null || true
+        )"
+        if [[ -z "${tensorrt_lib_dir}" ]]; then
+          echo "Could not locate Bazel's libnvinfer runtime directory" >&2
+          exit 1
         fi
+        export LD_LIBRARY_PATH="${tensorrt_lib_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
         bazel test //tests/cpp/executorch:executorch_backend_tests \
           --compilation_mode opt --config=linux --test_output=errors \
           --test_strategy=standalone \
