@@ -40,6 +40,22 @@ def check_cross_compile_trt_win_lib() -> bool:
     return False
 
 
+def is_tensorrt_rtx_version_supported(min_version: str) -> bool:
+    """
+    Check if the installed TensorRT-RTX version supports the specified minimum version.
+    Args:
+        min_version (str): Minimum required TensorRT-RTX version
+    Returns:
+        bool: True if TensorRT-RTX version is >= min_version, False otherwise
+    """
+    if trt._package_name != "tensorrt_rtx":
+        return True
+
+    from packaging.version import Version
+
+    return bool(Version(trt.__version__) >= Version(min_version))
+
+
 def is_tensorrt_version_supported(min_version: str) -> bool:
     """
     Check if the installed TensorRT version supports the specified minimum version.
