@@ -174,5 +174,6 @@ filegroup(
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
+        "include/torch_tensorrt/executorch/TensorRTCallerStream.h",
     ],
 )

@@ -289,6 +289,7 @@ require_tar_entry() {
 }
 
 require_tar_entry "torch_tensorrt/src/torch_tensorrt/executorch/CMakeLists.txt"
+require_tar_entry "torch_tensorrt/include/torch_tensorrt/executorch/TensorRTCallerStream.h"
 require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt"
 require_tar_entry "torch_tensorrt/lib/libextension_cuda.so"
 require_tar_entry "torch_tensorrt/BUILD"
