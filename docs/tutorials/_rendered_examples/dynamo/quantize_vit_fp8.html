@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=1d0a1177"></script>
+    <script src="../../../_static/documentation_options.js?v=1a3c8148"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -535,7 +535,7 @@ document.write(`
 <p>Requirements:</p>
 <ul class="simple">
 <li><p>NVIDIA GPU with FP8 support (Hopper or newer)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">nvidia-modelopt&gt;=0.45.0</span></code> that supports the Hugging Face quantization recipes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nvidia-modelopt</span></code> that supports the Hugging Face quantization recipes</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">transformers</span></code> to load the ViT model</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">torch-tensorrt&gt;=2.13.0</span></code> which converts attention to TRT IAttention Layer</p></li>
 </ul>
@@ -710,21 +710,22 @@ calibration_dataloader = [
         for batch in calibration_dataloader:
             model(batch.cuda())
 
-    recipe = load_recipe(&quot;huggingface/vit/ptq/fp8&quot;)
-    quant_cfg = recipe.quantize.model_dump()
-    # You can also define your own quant_cfg to specify which layers to quantize, like this:
-    # quant_cfg = {
-    #     &quot;quant_cfg&quot;: {
-    #         &quot;*&quot;: {&quot;enable&quot;: False},
-    #         &quot;*weight_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-    #         &quot;*input_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-    #         &quot;*output_quantizer&quot;: {&quot;enable&quot;: False},
-    #         &quot;*[qkv]_bmm_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-    #         &quot;*softmax_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-    #         &quot;*bmm2_output_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-    #     },
-    #     &quot;algorithm&quot;: &quot;max&quot;,
-    # }
+    # Define quant_cfg to specify which layers to quantize.
+    quant_cfg = {
+        &quot;quant_cfg&quot;: {
+            &quot;*&quot;: {&quot;enable&quot;: False},
+            &quot;*weight_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+            &quot;*input_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+            &quot;*output_quantizer&quot;: {&quot;enable&quot;: False},
+            &quot;*[qkv]_bmm_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+            &quot;*softmax_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+            &quot;*bmm2_output_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+        },
+        &quot;algorithm&quot;: &quot;max&quot;,
+    }
+    # You can use the following recipe if you have nvidia-modelopt &gt;= 0.46.0
+    # recipe = load_recipe(&quot;huggingface/vit/ptq/fp8&quot;)
+    # quant_cfg = recipe.quantize.model_dump()
 
     mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
     return model
