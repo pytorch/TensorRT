@@ -92,6 +92,16 @@ jobs:
 
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
+        # Run the ExecuTorch backend C++ unit tests (incl. the caller-stream
+        # test), which are otherwise only built, never executed. Use the local
+        # test strategy and pass the GPU env through so the always-linked backend
+        # registration and any CUDA/TensorRT DSO loads behave like the build/
+        # reference-runner steps on this GPU runner (sandboxed tests can hide the
+        # driver, which would fail process startup even though the test uses only
+        # fake stream handles and needs no device).
+        bazel test //tests/cpp/executorch:executorch_backend_tests \
+          --compilation_mode opt --config=linux --test_output=errors \
+          --test_strategy=local --test_env=CUDA_VISIBLE_DEVICES
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"

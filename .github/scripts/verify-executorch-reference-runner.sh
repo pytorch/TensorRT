@@ -318,21 +318,103 @@ cmake --build "${verify_root}/build-executorch-reference-runner" \
 
 runner_log="${verify_root}/my_runner.log"
 runner_path="${verify_root}/build-executorch-reference-runner/example_executorch_runner"
-if command -v ldd >/dev/null 2>&1 &&
-  ldd "${runner_path}" |
+
+# Symbol/linkage inspection tools are mandatory on this Linux gate: silently
+# skipping them would let a broken single-TLS layout pass unnoticed.
+for _tool in ldd readelf nm; do
+  if ! command -v "${_tool}" >/dev/null 2>&1; then
+    echo "Required tool '${_tool}' not found; cannot verify caller-stream linkage" >&2
+    exit 1
+  fi
+done
+
+# The runner must not pull in libtorch: this native path is libtorch-free.
+if ldd "${runner_path}" |
     grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
   echo "example_executorch_runner links PyTorch/libtorch shared libraries" >&2
   exit 1
 fi
-if command -v ldd >/dev/null 2>&1 &&
-  ! ldd "${runner_path}" | grep -q "libextension_cuda.so"; then
-  echo "example_executorch_runner does not link libextension_cuda.so" >&2
+
+# The runner must declare a real DT_NEEDED dependency on libextension_cuda.so
+# (an ldd filename match alone would also accept a "=> not found" line).
+if ! readelf -d "${runner_path}" |
+    grep -E "\(NEEDED\).*libextension_cuda\.so" >&2; then
+  echo "example_executorch_runner has no DT_NEEDED entry for libextension_cuda.so" >&2
   exit 1
 fi
-if command -v nm >/dev/null 2>&1 &&
-  nm --defined-only "${runner_path}" |
+
+# ...and that dependency must actually resolve at load time.
+if ldd "${runner_path}" | grep -E "libextension_cuda\.so.*=>.*not found" >&2; then
+  echo "example_executorch_runner cannot resolve libextension_cuda.so at runtime" >&2
+  exit 1
+fi
+
+# The caller-stream symbols must be resolved from the shared library, never
+# defined inside the runner. A private definition here means a second, static
+# copy of the thread-local -> the cross-backend handshake is silently broken.
+if nm --defined-only "${runner_path}" 2>/dev/null |
     grep -E "getCallerStream|CallerStreamGuard" >&2; then
   echo "example_executorch_runner contains a private caller-stream definition" >&2
+  exit 1
+fi
+
+# The runner must instead carry an UNDEFINED reference to the caller-stream
+# accessor, proving it consults the shared library's thread-local.
+if ! nm --undefined-only "${runner_path}" 2>/dev/null |
+    grep -q "getCallerStream"; then
+  echo "example_executorch_runner does not import getCallerStream from libextension_cuda.so" >&2
+  exit 1
+fi
+
+# Validate the .so the runner ACTUALLY loads (resolved via ldd), not just a
+# packaged copy. The runner is CMake-built and may link the CMake-built
+# extension_cuda; whichever .so the loader binds to must export the accessor and
+# must be the sole definer the runner sees.
+loaded_extension_cuda="$(
+  ldd "${runner_path}" 2>/dev/null |
+    sed -n 's/.*libextension_cuda\.so[^ ]* => \([^ ]*\).*/\1/p' |
+    head -n1
+)"
+if [[ -z "${loaded_extension_cuda}" || ! -f "${loaded_extension_cuda}" ]]; then
+  echo "Could not resolve the libextension_cuda.so the runner loads" >&2
+  exit 1
+fi
+if ! nm --defined-only --dynamic "${loaded_extension_cuda}" 2>/dev/null |
+    grep -q "getCallerStream"; then
+  echo "Loaded ${loaded_extension_cuda} does not export getCallerStream" >&2
+  exit 1
+fi
+
+# Packaging integrity (independent of the CMake runner): the Bazel-packaged .so
+# must exist and export the accessor, and no other packaged ELF may define the
+# caller-stream symbols -- a second definition would reintroduce a duplicate
+# thread-local in the shipped artifact.
+packaged_extension_cuda="${TORCH_TENSORRT_ROOT}/lib/libextension_cuda.so"
+if [[ ! -f "${packaged_extension_cuda}" ]]; then
+  echo "Packaged libextension_cuda.so missing at ${packaged_extension_cuda}" >&2
+  exit 1
+fi
+if ! nm --defined-only --dynamic "${packaged_extension_cuda}" 2>/dev/null |
+    grep -q "getCallerStream"; then
+  echo "Packaged libextension_cuda.so does not export getCallerStream" >&2
+  exit 1
+fi
+
+# No other packaged ELF may define the caller-stream symbols: a second
+# definition would reintroduce a duplicate thread-local.
+extra_defs="$(
+  find "${TORCH_TENSORRT_ROOT}/lib" -maxdepth 1 -type f -name '*.so*' \
+    ! -name 'libextension_cuda.so' -print0 2>/dev/null |
+    while IFS= read -r -d '' _so; do
+      if nm --defined-only --dynamic "${_so}" 2>/dev/null |
+          grep -qE "getCallerStream|CallerStreamGuard"; then
+        echo "${_so}"
+      fi
+    done
+)"
+if [[ -n "${extra_defs}" ]]; then
+  echo "Unexpected caller-stream definitions outside libextension_cuda.so:" >&2
+  echo "${extra_defs}" >&2
   exit 1
 fi
 

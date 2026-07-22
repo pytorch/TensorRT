@@ -34,4 +34,31 @@ TEST(CallerStreamTest, ExplicitNullStreamRemainsSelected) {
   EXPECT_EQ(torch_tensorrt::executorch_backend::getTensorRTExecutionStream(), nullptr);
 }
 
+TEST(CallerStreamTest, NestedGuardsRestoreOuterSelection) {
+  namespace cuda = executorch::extension::cuda;
+  using torch_tensorrt::executorch_backend::getTensorRTExecutionStream;
+
+  const cudaStream_t outer = fake_stream(0);
+  const cudaStream_t inner = fake_stream(1);
+
+  EXPECT_EQ(getTensorRTExecutionStream(), cudaStreamPerThread);
+  {
+    cuda::CallerStreamGuard outer_guard(outer);
+    EXPECT_EQ(getTensorRTExecutionStream(), outer);
+    {
+      cuda::CallerStreamGuard inner_guard(inner);
+      EXPECT_EQ(getTensorRTExecutionStream(), inner);
+      {
+        // An explicit null nested inside a non-null guard must be honored, then
+        // restore the enclosing selection on scope exit.
+        cuda::CallerStreamGuard null_guard(nullptr);
+        EXPECT_EQ(getTensorRTExecutionStream(), nullptr);
+      }
+      EXPECT_EQ(getTensorRTExecutionStream(), inner);
+    }
+    EXPECT_EQ(getTensorRTExecutionStream(), outer);
+  }
+  EXPECT_EQ(getTensorRTExecutionStream(), cudaStreamPerThread);
+}
+
 } // namespace

@@ -50,10 +50,39 @@ executorch::extension::cuda::CallerStreamGuard guard(stream);
 module.forward(inputs);
 ```
 
-The old class is intentionally not kept as a compatibility alias: retaining a
-second public caller-stream primitive makes it possible for different delegates
-to observe different thread-local state. The caller owns the stream and must
-keep it alive for the guard's lifetime.
+The old class is intentionally not kept as a deprecated alias: the goal is one
+backend-neutral primitive and one shared TLS definition, so all CUDA-capable
+delegates read the same caller-stream selection. (A deprecated `using` alias to
+`executorch::extension::cuda::CallerStreamGuard` would have shared that same TLS,
+so this removal is an API-simplification choice, not a correctness requirement.)
+This is a source-breaking C++ change; downstream callers must switch to the new
+type.
+
+### Caller-stream contract for the TensorRT backend
+
+The upstream `CallerStreamGuard` documents the generic contract (per-thread,
+nested scoping; green-context confinement rides the stream; the caller owns the
+stream for the guard's lifetime; the caller manages host-data lifetime for async
+work). The TensorRT backend adds these requirements, which previously lived on
+the removed `CudaStreamGuard`:
+
+- The selected stream must be on the TensorRT engine's device.
+- Calls using one delegate handle must not overlap, and must not overlap with
+  its destruction; the backend serializes `execute()` calls with an internal
+  mutex, but destruction is not mutex-guarded.
+- With a guard active and when no host staging is required (all inputs and
+  outputs are directly bindable — device, managed, or unified memory),
+  `execute()` may return with the TensorRT enqueue still in flight on the
+  stream (no end-of-execute sync). The backend orders the next `execute()` and
+  the handle's destruction after that work via an internal completion event, but
+  that event only protects backend-owned state. The caller must therefore keep
+  all directly bound input/output storage alive and unmodified until the work is
+  complete, order any cross-stream producers/consumers with their own events,
+  and synchronize the stream before reading outputs on the host.
+- With no guard active, the backend falls back to `cudaStreamPerThread`. That
+  fallback is invalid while a CUDA green context is current — scope a
+  `CallerStreamGuard` with a green-context stream in that case. An explicit null
+  stream is not a substitute for a green-context stream.
 
 ## Standalone Backend Archive
 

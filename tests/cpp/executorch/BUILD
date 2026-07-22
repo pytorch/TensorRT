@@ -16,6 +16,7 @@ cc_test(
     srcs = ["test_caller_stream.cpp"],
     deps = [
         "//cpp:tensorrt_executorch_backend",
+        "@executorch//:executorch_core",
         "@executorch//:extension_cuda",
         "@googletest//:gtest_main",
     ],
