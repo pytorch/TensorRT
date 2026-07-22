@@ -52,12 +52,12 @@ def arange(
     dtype: Optional[torch.dtype] = None,
 ) -> TRTTensor:
     """
-    Creates a sequence of values (arange) either dynamically or statically,
-    then outputs a TensorRT tensor.
+    Creates a sequence of values (arange) with a TensorRT Fill layer.
 
-    If any of (start, end, step) is a TRT tensor, it sets up a dynamic arange
-    using a Fill layer. Otherwise, the sequence is computed at build time and
-    frozen into a TensorRT constant tensor.
+    If any of (start, end, step) is a TRT tensor, the Fill output length is
+    computed dynamically. Otherwise, torch is used only to determine the static
+    output shape and dtype. Keeping static ranges as Fill layers preserves their
+    sequence provenance for downstream TensorRT graph-pattern recognition.
     """
     # If any argument is a TRT tensor, use dynamic arange with a Fill layer
     if any(isinstance(x, TRTTensor) for x in (start, end, step)):
@@ -111,11 +111,25 @@ def arange(
         return fill_layer.get_output(0)
 
     else:
-        # All arguments are static, so evaluate the sequence eagerly and freeze it
-        # into the engine as a constant. Letting torch pick the dtype preserves
-        # PyTorch's promotion rules (float result if any argument is a float).
+        # Keep a static arange as LINSPACE rather than materializing its values in
+        # a Constant. TensorRT uses this producer provenance when recognizing
+        # compact causal attention masks. Letting torch calculate the shape and
+        # dtype preserves the promotion behavior added upstream.
         with unset_fake_temporarily():
             values = torch.arange(start, end, step, dtype=dtype)
         if values.dtype == torch.int64:
             values = values.to(torch.int32)
-        return get_trt_tensor(ctx, values, f"{name}_arange_const")
+        value_dtype = _enums.dtype._from(values.dtype).to(trt.DataType)
+        start_tensor = get_trt_tensor(
+            ctx, start, name + "_start", dtype=value_dtype, min_rank=0
+        )
+        step_tensor = get_trt_tensor(
+            ctx, step, name + "_step", dtype=value_dtype, min_rank=1
+        )
+        fill_layer = ctx.net.add_fill(
+            tuple(values.shape), trt.FillOperation.LINSPACE, value_dtype
+        )
+        fill_layer.set_input(1, start_tensor)
+        fill_layer.set_input(2, step_tensor)
+        set_layer_name(fill_layer, target, f"{name}_arange_fill", source_ir)
+        return fill_layer.get_output(0)
