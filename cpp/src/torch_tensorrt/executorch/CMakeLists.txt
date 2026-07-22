@@ -23,6 +23,7 @@ find_package(Threads REQUIRED)
 set(_torchtrt_executorch_sources
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/TensorRTCallerStream.cpp"
 )
 
 add_library(executorch_trt_backend STATIC ${_torchtrt_executorch_sources})
@@ -50,8 +51,10 @@ target_compile_definitions(executorch_trt_backend
         C10_USING_CUSTOM_GENERATED_MACROS
 )
 
+set(_torchtrt_executorch_source_root "")
 foreach(_executorch_root_candidate IN ITEMS "${EXECUTORCH_SOURCE_DIR}" "${EXECUTORCH_ROOT}")
     if(_executorch_root_candidate AND EXISTS "${_executorch_root_candidate}/runtime/core/portable_type/c10")
+        set(_torchtrt_executorch_source_root "${_executorch_root_candidate}")
         get_filename_component(_executorch_include_parent "${_executorch_root_candidate}" DIRECTORY)
         target_include_directories(executorch_trt_backend
             PUBLIC
@@ -61,10 +64,40 @@ foreach(_executorch_root_candidate IN ITEMS "${EXECUTORCH_SOURCE_DIR}" "${EXECUT
     endif()
 endforeach()
 
+set(_torchtrt_owns_extension_cuda FALSE)
+if(NOT TARGET extension_cuda)
+    if(NOT _torchtrt_executorch_source_root OR
+       NOT EXISTS "${_torchtrt_executorch_source_root}/extension/cuda/caller_stream.cpp")
+        message(FATAL_ERROR
+            "Torch-TensorRT's ExecuTorch backend requires an ExecuTorch source "
+            "checkout containing extension/cuda (ExecuTorch 1.4 or a commit "
+            "including pytorch/executorch#20158 and #20498)."
+        )
+    endif()
+    add_library(extension_cuda SHARED
+        "${_torchtrt_executorch_source_root}/extension/cuda/caller_stream.cpp"
+    )
+    set(_torchtrt_owns_extension_cuda TRUE)
+    target_compile_definitions(
+        extension_cuda PRIVATE EXECUTORCH_EXTENSION_CUDA_BUILDING
+    )
+    target_include_directories(extension_cuda PUBLIC "${_executorch_include_parent}")
+    target_link_libraries(extension_cuda PUBLIC CUDA::cudart)
+endif()
+
+get_target_property(_extension_cuda_type extension_cuda TYPE)
+if(NOT _extension_cuda_type STREQUAL "SHARED_LIBRARY")
+    message(FATAL_ERROR
+        "ExecuTorch's extension_cuda target must be shared; got "
+        "${_extension_cuda_type}. Static copies break caller-stream sharing."
+    )
+endif()
+
 set(_torchtrt_executorch_link_libraries
     CUDA::cudart
     TensorRT::nvinfer
     Threads::Threads
+    extension_cuda
 )
 
 if(TARGET executorch_core)
@@ -117,3 +150,10 @@ install(
     TARGETS executorch_trt_backend
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
 )
+if(_torchtrt_owns_extension_cuda)
+    install(
+        TARGETS extension_cuda
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+endif()

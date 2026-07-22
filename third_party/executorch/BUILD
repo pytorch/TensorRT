@@ -40,12 +40,29 @@ cmake(
 )
 
 cc_library(
+    name = "extension_cuda",
+    srcs = ["executorch/extension/cuda/caller_stream.cpp"],
+    hdrs = [
+        "executorch/extension/cuda/caller_stream.h",
+        "executorch/extension/cuda/export.h",
+    ],
+    local_defines = [
+        "C10_USING_CUSTOM_GENERATED_MACROS",
+        "EXECUTORCH_EXTENSION_CUDA_BUILDING",
+    ],
+    include_prefix = "executorch",
+    strip_include_prefix = "executorch",
+    linkstatic = False,
+    deps = ["@cuda//:cudart"],
+)
+
+cc_library(
     name = "executorch_headers",
     hdrs = glob(
         [
-            "runtime/**/*.h",
-            "runtime/backend/**/*.h",
-            "extension/**/*.h",
+            "executorch/runtime/**/*.h",
+            "executorch/runtime/backend/**/*.h",
+            "executorch/extension/**/*.h",
         ],
         allow_empty = True,
     ),
@@ -53,8 +70,9 @@ cc_library(
         "C10_USING_CUSTOM_GENERATED_MACROS",
     ],
     include_prefix = "executorch",
+    strip_include_prefix = "executorch",
     includes = [
-        "runtime/core/portable_type/c10",
+        "executorch/runtime/core/portable_type/c10",
     ],
 )
 
@@ -70,7 +88,7 @@ cc_library(
     name = "executorch_file_data_loader",
     # buildifier: disable=constant-glob
     srcs = glob(
-        ["extension/data_loader/file_data_loader.cpp"],
+        ["executorch/extension/data_loader/file_data_loader.cpp"],
         allow_empty = True,
     ),
     deps = [

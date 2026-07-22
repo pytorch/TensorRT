@@ -290,6 +290,7 @@ require_tar_entry() {
 
 require_tar_entry "torch_tensorrt/src/torch_tensorrt/executorch/CMakeLists.txt"
 require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt"
+require_tar_entry "torch_tensorrt/lib/libextension_cuda.so"
 require_tar_entry "torch_tensorrt/BUILD"
 
 export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
@@ -321,6 +322,17 @@ if command -v ldd >/dev/null 2>&1 &&
   ldd "${runner_path}" |
     grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
   echo "example_executorch_runner links PyTorch/libtorch shared libraries" >&2
+  exit 1
+fi
+if command -v ldd >/dev/null 2>&1 &&
+  ! ldd "${runner_path}" | grep -q "libextension_cuda.so"; then
+  echo "example_executorch_runner does not link libextension_cuda.so" >&2
+  exit 1
+fi
+if command -v nm >/dev/null 2>&1 &&
+  nm --defined-only "${runner_path}" |
+    grep -E "getCallerStream|CallerStreamGuard" >&2; then
+  echo "example_executorch_runner contains a private caller-stream definition" >&2
   exit 1
 fi
 

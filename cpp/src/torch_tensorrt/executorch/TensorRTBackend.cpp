@@ -8,6 +8,7 @@
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 #include "torch_tensorrt/executorch/TensorRTBindingNames.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
+#include "torch_tensorrt/executorch/TensorRTCallerStream.h"
 
 #include <cstdint>
 #include <cstring>
@@ -20,6 +21,7 @@
 #include <NvInfer.h>
 #include <cuda_runtime.h>
 
+#include <executorch/extension/cuda/caller_stream.h>
 #include <executorch/runtime/backend/interface.h>
 #include <executorch/runtime/core/exec_aten/util/tensor_util.h>
 #include <executorch/runtime/platform/log.h>
@@ -47,21 +49,6 @@ using ::executorch::runtime::Span;
       return ERROR_CODE;                                   \
     }                                                      \
   } while (false)
-
-namespace {
-thread_local cudaStream_t g_user_stream = nullptr;
-thread_local bool g_user_stream_set = false;
-} // namespace
-
-CudaStreamGuard::CudaStreamGuard(cudaStream_t stream) : prev_stream_(g_user_stream), prev_set_(g_user_stream_set) {
-  g_user_stream = stream;
-  g_user_stream_set = true;
-}
-
-CudaStreamGuard::~CudaStreamGuard() {
-  g_user_stream = prev_stream_;
-  g_user_stream_set = prev_set_;
-}
 
 void TRTLogger::log(Severity severity, const char* msg) noexcept {
   if (severity <= Severity::kERROR) {
@@ -379,7 +366,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return Error::InvalidProgram;
     }
   }
-  cudaStream_t stream = g_user_stream_set ? g_user_stream : cudaStreamPerThread;
+  const bool caller_stream_set = ::executorch::extension::cuda::getCallerStream().has_value();
+  cudaStream_t stream = getTensorRTExecutionStream();
   bool output_staged_to_host = false;
   bool input_staged_from_host = false;
 
@@ -572,7 +560,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     ET_LOG(
         Error,
         "TensorRTBackend::execute: enqueueV3 failed. If a CUDA green context is "
-        "current, scope a CudaStreamGuard with a green-context stream: "
+        "current, scope an executorch::extension::cuda::CallerStreamGuard "
+        "with a green-context stream: "
         "cudaStreamPerThread is invalid while a green context is current.");
     return Error::InvalidState;
   }
@@ -587,7 +576,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
   // copies live in the must_sync branch: an output staged to host always sets
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
-  const bool must_sync = output_staged_to_host || input_staged_from_host || !g_user_stream_set;
+  const bool must_sync = output_staged_to_host || input_staged_from_host || !caller_stream_set;
   if (must_sync) {
     for (auto& output : outputs_needing_copy) {
       exec_aten::Tensor et_out = args[num_inputs + output.first]->toTensor();

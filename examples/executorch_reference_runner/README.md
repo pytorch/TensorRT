@@ -34,16 +34,18 @@ torch_tensorrt/bin/example_executorch_runner
 ```
 
 ```bash
-# Get the ExecuTorch source code. Set EXECUTORCH_REF to a branch or tag;
-# leave it unset for the latest main.
-EXECUTORCH_REF="${EXECUTORCH_REF:-main}"
-case "${EXECUTORCH_REF}" in
-  latest|latest-main|latest_main|"latest main")
-    EXECUTORCH_REF="main"
-    ;;
-esac
-git clone --depth 1 --branch "${EXECUTORCH_REF}" --recurse-submodules --shallow-submodules \
+# Get a compatible ExecuTorch source checkout. This temporary main-branch pin
+# includes the shared extension_cuda caller-stream API and caller-stream-aware
+# CUDA boundary copies. Replace it with the first ExecuTorch 1.4 release tag
+# containing pytorch/executorch#20158 and #20498.
+EXECUTORCH_REF="${EXECUTORCH_REF:-8965e512b6e01f728bb2267fbbe0e92653e31a3b}"
+git clone --filter=blob:none --no-checkout \
   https://github.com/pytorch/executorch.git executorch
+pushd executorch
+git fetch --depth 1 origin "${EXECUTORCH_REF}"
+git checkout FETCH_HEAD
+git submodule update --init --recursive --depth 1
+popd
 
 # download the libtorchtrt.tar.gz
 tar xvf libtorchtrt.tar.gz
@@ -64,16 +66,22 @@ cmake -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner" \
 cmake --build build-executorch-reference-runner --target example_executorch_runner -j
 ```
 
+This packaged reference-runner flow currently targets Linux x86_64 and SBSA,
+matching the native backend's Bazel compatibility constraints. Windows and
+JetPack packaging are outside this flow.
+
 Expected artifact:
 
 ```text
 build-executorch-reference-runner/example_executorch_runner
 ```
 
-The build also creates the executorch core and tensorrt backend archive as a dependency:
+The build also creates the ExecuTorch core, the shared caller-stream extension,
+and the TensorRT backend archive as dependencies:
 
 ```text
 build-executorch-reference-runner/executorch/libexecutorch_core.a
+build-executorch-reference-runner/torch_tensorrt_executorch/extension_cuda/libextension_cuda.so
 build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 ```
 
@@ -100,6 +108,10 @@ method.get_outputs(...)
 ```
 
 Loading the method initializes the TensorRT ExecuTorch backend for any
-Torch-TensorRT delegate subgraphs embedded in the `.pte`. The Python
+Torch-TensorRT delegate subgraphs embedded in the `.pte`. Applications can
+scope `executorch::extension::cuda::CallerStreamGuard` around execution to run
+TensorRT and CUDA/AOTI delegates on one caller-owned stream, including a CUDA
+green-context stream. Device-resident work may remain asynchronous; synchronize
+the stream before consuming results on the host. The Python
 `torch_tensorrt` package is needed when exporting the `.pte`; it is not needed
 by this native runner at inference time.

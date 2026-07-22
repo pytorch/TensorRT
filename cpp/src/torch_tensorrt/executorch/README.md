@@ -10,7 +10,11 @@ user_runner_project/
   torch_tensorrt/
 ```
 
-The normal integration path is to add both ExecuTorch and this package from
+This backend requires ExecuTorch 1.4 or a source commit containing
+`pytorch/executorch#20158` and `pytorch/executorch#20498`. Its CMake target
+builds ExecuTorch's minimal shared `extension_cuda` caller-stream library from
+that source checkout when the target is not already available. The normal
+integration path is to add both ExecuTorch and this package from
 your runner CMake. Linking `torchtrt::executorch_backend` makes the backend
 archive a dependency of your runner target, so you do not need a separate
 backend build step.
@@ -31,6 +35,25 @@ target_link_libraries(
 
 The backend archive is available as the `executorch_trt_backend` CMake target
 and is written to `${CMAKE_BINARY_DIR}/lib/libexecutorch_trt_backend.a`.
+`libextension_cuda` remains a shared runtime dependency so every CUDA-capable
+delegate in the process observes the same caller-stream TLS instance.
+
+## Caller Stream API Migration
+
+`torch_tensorrt::executorch_backend::CudaStreamGuard` has been removed. Use
+ExecuTorch's backend-neutral guard instead:
+
+```cpp
+#include <executorch/extension/cuda/caller_stream.h>
+
+executorch::extension::cuda::CallerStreamGuard guard(stream);
+module.forward(inputs);
+```
+
+The old class is intentionally not kept as a compatibility alias: retaining a
+second public caller-stream primitive makes it possible for different delegates
+to observe different thread-local state. The caller owns the stream and must
+keep it alive for the guard's lifetime.
 
 ## Standalone Backend Archive
 
@@ -62,5 +85,6 @@ cmake -S torch_tensorrt/src/torch_tensorrt/executorch -B build-torchtrt-executor
   -DEXECUTORCH_ROOT="${EXECUTORCH_ROOT}" \
   -DTensorRT_ROOT="${TensorRT_ROOT}"
 
-cmake --build build-torchtrt-executorch --target executorch_trt_backend -j
+cmake --build build-torchtrt-executorch \
+  --target executorch_trt_backend extension_cuda -j
 ```

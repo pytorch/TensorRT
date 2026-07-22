@@ -157,6 +157,7 @@ pkg_files(
     srcs = [
         ":executorch_core_archive",
         ":executorch_trt_backend_archive",
+        "@executorch//:extension_cuda",
     ],
     prefix = "lib/",
     visibility = ["//visibility:public"],

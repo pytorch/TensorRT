@@ -5,8 +5,19 @@ package(default_visibility = ["//visibility:public"])
 test_suite(
     name = "executorch_backend_tests",
     tests = [
+        ":test_caller_stream",
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
+    ],
+)
+
+cc_test(
+    name = "test_caller_stream",
+    srcs = ["test_caller_stream.cpp"],
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "@executorch//:extension_cuda",
+        "@googletest//:gtest_main",
     ],
 )
 
