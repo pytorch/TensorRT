@@ -5,7 +5,6 @@ from torch.fx import GraphModule, Node
 
 from .pass_utils import clean_up_graph_after_modifications
 
-
 _INT64_MAX = 2**63 - 1
 _SYM_MIN = getattr(torch, "sym_min", None)
 
