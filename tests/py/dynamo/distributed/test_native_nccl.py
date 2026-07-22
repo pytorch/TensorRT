@@ -1763,6 +1763,85 @@ def _multirank_distributed_mode_tp_model(
     _check_close(pt_out, trt_out, f"TP MLP distributed_context rank={rank}")
 
 
+def _multirank_compute_collective_single_engine(
+    rank: int, world_size: int, device: torch.device
+) -> None:
+    """Keep a native all-reduce beside compute in one TRT engine.
+
+    Regression test for pytorch/TensorRT#4381.  Pointwise and shuffle layers
+    around the collective encourage Myelin to absorb it into a ForeignNode;
+    the converter's precision boundary must leave the DistCollective layer
+    standalone without introducing a graph break or a second TRT engine.
+    """
+    import torch_tensorrt
+    from torch_tensorrt.distributed._distributed import distributed_context
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+    group = dist.group.WORLD
+
+    hidden = 64
+    batch = 2
+    sequence = 8
+
+    class ComputeCollective(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fc_in = nn.Linear(hidden, hidden)
+            self.fc_out = nn.Linear(hidden, hidden)
+            self.gain = nn.Parameter(torch.randn(hidden))
+            self.bias = nn.Parameter(torch.randn(hidden))
+
+        def forward(self, x: torch.Tensor, residual: torch.Tensor) -> torch.Tensor:
+            x = self.fc_in(x)
+            x = (x * self.gain + self.bias + residual).unsqueeze(0)
+            x = x.reshape(batch * sequence, hidden)
+            dist.all_reduce(x)
+            x = x.reshape(batch, sequence, hidden)
+            return self.fc_out(x * self.gain - self.bias + residual)
+
+    torch.manual_seed(42)
+    model = ComputeCollective().to(device=device, dtype=torch.bfloat16).eval()
+    torch.manual_seed(1234 + rank)
+    inp = torch.randn(
+        batch, sequence, hidden, device=device, dtype=torch.bfloat16
+    )
+    residual = torch.randn_like(inp)
+
+    with torch.no_grad():
+        eager_out = model(inp, residual)
+        exported = torch.export.export(model, (inp, residual), strict=False)
+        with distributed_context(group):
+            trt_model = torch_tensorrt.dynamo.compile(
+                exported,
+                inputs=[inp, residual],
+                min_block_size=1,
+                use_distributed_mode_trace=True,
+                use_python_runtime=False,
+            )
+
+            # Compilation must not hide the collective in a PyTorch fallback.
+            trt_engines = [
+                name
+                for name, _ in trt_model.named_modules()
+                if "_run_on_acc" in name
+            ]
+            assert len(trt_engines) == 1, (
+                f"expected one TRT engine, found {trt_engines}"
+            )
+            graph = str(trt_model.graph) if hasattr(trt_model, "graph") else ""
+            for token in ("all_reduce", "_c10d_functional", "wait_tensor"):
+                assert token not in graph, f"collective escaped TRT engine: {graph}"
+
+            trt_out = trt_model(inp, residual)
+
+    torch.testing.assert_close(trt_out, eager_out, atol=2e-2, rtol=2e-2)
+    print(
+        f"[Rank {rank}] PASS compute+collective single-engine regression",
+        flush=True,
+    )
+
+
 def _multirank_distributed_mode_subgroup(
     rank: int, world_size: int, device: torch.device
 ) -> None:
@@ -2107,6 +2186,16 @@ class TestMultirankNccl(MultiProcessTestCase):
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
+    def test_compute_collective_single_engine(self) -> None:
+        """Compute and a native collective compile and run in one TRT engine."""
+        device = self._init_dist()
+        _multirank_compute_collective_single_engine(
+            self.rank, self.world_size, device
+        )
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
     def test_distributed_mode_subgroup(self) -> None:
         """C++ runtime with a non-default TP subgroup routes NCCL correctly."""
         device = self._init_dist()
@@ -2159,6 +2248,7 @@ def run_multirank_tests() -> None:
             _multirank_gather_correctness(i, r, ws, dev) for i in range(ws)
         ],
         _multirank_distributed_mode_tp_model,
+        _multirank_compute_collective_single_engine,
         _multirank_distributed_mode_subgroup,
         _multirank_cpp_runtime_bind_nccl,
         _multirank_distributed_mode_context_switch,
