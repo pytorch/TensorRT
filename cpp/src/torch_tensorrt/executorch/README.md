@@ -11,13 +11,15 @@ user_runner_project/
 ```
 
 This backend requires ExecuTorch 1.4 or a source commit containing
-`pytorch/executorch#20158` and `pytorch/executorch#20498`. Its CMake target
-builds ExecuTorch's minimal shared `extension_cuda` caller-stream library from
-that source checkout when the target is not already available. The normal
-integration path is to add both ExecuTorch and this package from
-your runner CMake. Linking `torchtrt::executorch_backend` makes the backend
-archive a dependency of your runner target, so you do not need a separate
-backend build step.
+`pytorch/executorch#20158` and `pytorch/executorch#20498`. The normal integration
+path is to add both ExecuTorch (with `EXECUTORCH_BUILD_CUDA=ON`) and this package
+from your runner CMake, so this backend links ExecuTorch's shared `extension_cuda`
+target directly. If that target is not available, set
+`EXECUTORCH_EXTENSION_CUDA_LIBRARY` to a prebuilt `libextension_cuda`, or the CMake
+target builds the minimal shared `extension_cuda` caller-stream library from the
+ExecuTorch source checkout as a fallback. Linking `torchtrt::executorch_backend`
+makes the backend archive a dependency of your runner target, so you do not need a
+separate backend build step.
 
 ```cmake
 add_subdirectory("executorch")

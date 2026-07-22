@@ -64,32 +64,77 @@ foreach(_executorch_root_candidate IN ITEMS "${EXECUTORCH_SOURCE_DIR}" "${EXECUT
     endif()
 endforeach()
 
+# Select ExecuTorch's shared extension_cuda so every CUDA-capable delegate shares
+# one caller-stream thread-local. Exactly one shared library is allowed in the
+# process; each branch rejects a static copy, which would duplicate the TLS and
+# silently break the caller-stream handshake. Precedence: an ExecuTorch-provided
+# target, then an explicit prebuilt shared library, then a source build.
 set(_torchtrt_owns_extension_cuda FALSE)
-if(NOT TARGET extension_cuda)
-    if(NOT _torchtrt_executorch_source_root OR
-       NOT EXISTS "${_torchtrt_executorch_source_root}/extension/cuda/caller_stream.cpp")
+if(TARGET extension_cuda)
+    # Provided by ExecuTorch, e.g. add_subdirectory() with EXECUTORCH_BUILD_CUDA=ON.
+    get_target_property(_extension_cuda_type extension_cuda TYPE)
+    if(NOT _extension_cuda_type STREQUAL "SHARED_LIBRARY")
         message(FATAL_ERROR
-            "Torch-TensorRT's ExecuTorch backend requires an ExecuTorch source "
-            "checkout containing extension/cuda (ExecuTorch 1.4 or a commit "
-            "including pytorch/executorch#20158 and #20498)."
+            "ExecuTorch's extension_cuda target must be shared; got "
+            "${_extension_cuda_type}. Static copies break caller-stream sharing."
         )
     endif()
+elseif(DEFINED EXECUTORCH_EXTENSION_CUDA_LIBRARY AND EXISTS "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}")
+    # Use a prebuilt shared library, e.g. the one shipped in libtorchtrt.tar.gz.
+    if(WIN32)
+        if(NOT EXECUTORCH_EXTENSION_CUDA_LIBRARY MATCHES "\\.lib$")
+            message(FATAL_ERROR
+                "EXECUTORCH_EXTENSION_CUDA_LIBRARY must name the extension_cuda "
+                "shared-library import .lib on Windows."
+            )
+        endif()
+        if(NOT DEFINED EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY OR
+           NOT EXISTS "${EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY}" OR
+           NOT EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY MATCHES "\\.dll$")
+            message(FATAL_ERROR
+                "Set EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY to the matching "
+                "extension_cuda .dll so the override cannot resolve to a static .lib."
+            )
+        endif()
+        add_library(extension_cuda SHARED IMPORTED)
+        set_target_properties(extension_cuda PROPERTIES
+            IMPORTED_IMPLIB "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}"
+            IMPORTED_LOCATION "${EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY}"
+        )
+    elseif(NOT EXECUTORCH_EXTENSION_CUDA_LIBRARY MATCHES "\\.(so(\\.[0-9]+)*|dylib)$")
+        message(FATAL_ERROR
+            "EXECUTORCH_EXTENSION_CUDA_LIBRARY must name a shared .so or .dylib; "
+            "static archives would duplicate caller-stream TLS."
+        )
+    else()
+        add_library(extension_cuda SHARED IMPORTED)
+        set_target_properties(extension_cuda PROPERTIES
+            IMPORTED_LOCATION "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}"
+        )
+    endif()
+elseif(_torchtrt_executorch_source_root AND
+       EXISTS "${_torchtrt_executorch_source_root}/extension/cuda/caller_stream.cpp")
+    # Build the single shared library from an ExecuTorch source checkout.
     add_library(extension_cuda SHARED
         "${_torchtrt_executorch_source_root}/extension/cuda/caller_stream.cpp"
     )
     set(_torchtrt_owns_extension_cuda TRUE)
-    target_compile_definitions(
-        extension_cuda PRIVATE EXECUTORCH_EXTENSION_CUDA_BUILDING
+    target_compile_definitions(extension_cuda
+        PRIVATE
+            C10_USING_CUSTOM_GENERATED_MACROS
+            EXECUTORCH_EXTENSION_CUDA_BUILDING
     )
     target_include_directories(extension_cuda PUBLIC "${_executorch_include_parent}")
     target_link_libraries(extension_cuda PUBLIC CUDA::cudart)
-endif()
-
-get_target_property(_extension_cuda_type extension_cuda TYPE)
-if(NOT _extension_cuda_type STREQUAL "SHARED_LIBRARY")
+else()
     message(FATAL_ERROR
-        "ExecuTorch's extension_cuda target must be shared; got "
-        "${_extension_cuda_type}. Static copies break caller-stream sharing."
+        "Torch-TensorRT's ExecuTorch backend requires ExecuTorch's shared "
+        "extension_cuda library. Add ExecuTorch first with EXECUTORCH_BUILD_CUDA=ON, "
+        "or set EXECUTORCH_EXTENSION_CUDA_LIBRARY to a prebuilt libextension_cuda "
+        "(and EXECUTORCH_EXTENSION_CUDA_RUNTIME_LIBRARY to the matching .dll on "
+        "Windows), or set EXECUTORCH_SOURCE_DIR/EXECUTORCH_ROOT to an ExecuTorch "
+        "checkout containing extension/cuda/caller_stream.cpp. Do not link a static "
+        "copy: all delegates must share one caller-stream TLS."
     )
 endif()
 
@@ -153,6 +198,7 @@ install(
 if(_torchtrt_owns_extension_cuda)
     install(
         TARGETS extension_cuda
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     )
