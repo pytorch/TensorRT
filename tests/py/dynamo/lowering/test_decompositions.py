@@ -1956,6 +1956,60 @@ class TestLowering(TestCase):
             )
             self.assertEqual(lowered.module()(*inputs).dtype, torch.float16)
 
+    def test_lowering_scaled_dot_product_attention_bool_mask_bias(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value, attn_mask):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query, key, value, attn_mask
+                )
+
+        inputs = (
+            torch.randn(1, 2, 8, 16, dtype=torch.bfloat16, device="cuda"),
+            torch.randn(1, 2, 8, 16, dtype=torch.bfloat16, device="cuda"),
+            torch.randn(1, 2, 8, 16, dtype=torch.bfloat16, device="cuda"),
+            torch.ones(1, 1, 8, 8, dtype=torch.bool, device="cuda").tril(),
+        )
+        exported_program = torch.export.export(TestModule(), inputs)
+        lowered = exported_program.run_decompositions(
+            get_decompositions(decompose_attention=True)
+        )
+
+        full_nodes = [
+            node
+            for node in lowered.graph.nodes
+            if node.op == "call_function" and node.target == torch.ops.aten.full.default
+        ]
+        self.assertEqual(len(full_nodes), 2)
+        self.assertTrue(all(node.args[0] == [] for node in full_nodes))
+        self.assertEqual(
+            {node.args[1] for node in full_nodes},
+            {0.0, torch.finfo(torch.bfloat16).min},
+        )
+        self.assertTrue(
+            all(node.meta["val"].dtype == torch.bfloat16 for node in full_nodes)
+        )
+
+        where_nodes = [
+            node
+            for node in lowered.graph.nodes
+            if node.op == "call_function" and node.target == torch.ops.aten.where.self
+        ]
+        self.assertEqual(len(where_nodes), 1)
+        self.assertEqual(where_nodes[0].meta["val"].dtype, torch.bfloat16)
+        self.assertFalse(
+            any(
+                node.op == "call_function"
+                and node.target == torch.ops.aten.logical_not.default
+                for node in lowered.graph.nodes
+            )
+        )
+        torch.testing.assert_close(
+            lowered.module()(*inputs),
+            exported_program.module()(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+        )
+
     @parameterized.expand(
         [
             (True, False, None, False),
