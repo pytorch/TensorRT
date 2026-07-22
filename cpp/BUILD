@@ -111,9 +111,11 @@ cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
+        "src/torch_tensorrt/executorch/TensorRTCallerStream.cpp",
     ],
     hdrs = [
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
+        "include/torch_tensorrt/executorch/TensorRTCallerStream.h",
     ],
     # Build the TensorRT backend as a static library. The final application
     # links this target together with the ExecuTorch runtime it was compiled
@@ -130,11 +132,13 @@ cc_library(
     ] + select({
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
             "@cuda//:cudart",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
             "@cuda//:cudart",
             "@tensorrt_sbsa//:nvinfer",
         ],
@@ -150,6 +154,7 @@ filegroup(
         "src/torch_tensorrt/executorch/README.md",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
+        "src/torch_tensorrt/executorch/TensorRTCallerStream.cpp",
     ],
 )
 
@@ -169,5 +174,6 @@ filegroup(
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
+        "include/torch_tensorrt/executorch/TensorRTCallerStream.h",
     ],
 )

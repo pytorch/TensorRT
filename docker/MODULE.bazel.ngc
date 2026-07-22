@@ -71,12 +71,12 @@ new_local_repository(
     build_file = "third_party/libtorch/BUILD"
 )
 
-# Pinned to the ExecuTorch release/1.3 branch head.
+# Pinned after ExecuTorch caller-stream PRs #20158 and #20498.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # latest commit in release/1.3 branch
-    commit = "6118688a095fd9697224f5cad72ce42db641c9cd",
+    # ExecuTorch main commit after the shared extension_cuda API and caller-stream copies.
+    commit = "8965e512b6e01f728bb2267fbbe0e92653e31a3b",
     recursive_init_submodules = True,
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",

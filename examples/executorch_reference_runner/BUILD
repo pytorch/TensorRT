@@ -14,9 +14,11 @@ filegroup(
 cc_binary(
     name = "example_executorch_runner",
     srcs = ["main.cpp"],
+    linkopts = ["-Wl,-rpath,$$ORIGIN/../lib"],
     deps = [
         "//cpp:tensorrt_executorch_backend",
         "@executorch//:executorch_core",
         "@executorch//:executorch_file_data_loader",
+        "@executorch//:extension_cuda",
     ],
 )
