@@ -93,13 +93,19 @@ jobs:
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
         # Run the ExecuTorch backend C++ unit tests (incl. the caller-stream
-        # test), which are otherwise only built, never executed. Use the
-        # standalone (unsandboxed) test strategy and pass the GPU env through so
-        # the always-linked backend registration and any CUDA/TensorRT DSO loads
-        # behave like the build/reference-runner steps on this GPU runner.
+        # test), which are otherwise only built, never executed. These tests link
+        # TensorRT, so their runtime needs libnvinfer on LD_LIBRARY_PATH. Locate
+        # the libnvinfer that Bazel materialized for the build (under the external
+        # repo tree) and pass LD_LIBRARY_PATH + the GPU env through to the
+        # unsandboxed (standalone) test process.
+        tensorrt_lib_dir="$(find "$(bazel info output_base)/external" -name 'libnvinfer.so*' -printf '%h\n' 2>/dev/null | sort -u | head -n1)"
+        if [[ -n "${tensorrt_lib_dir}" ]]; then
+          export LD_LIBRARY_PATH="${tensorrt_lib_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+        fi
         bazel test //tests/cpp/executorch:executorch_backend_tests \
           --compilation_mode opt --config=linux --test_output=errors \
-          --test_strategy=standalone --test_env=CUDA_VISIBLE_DEVICES
+          --test_strategy=standalone \
+          --test_env=LD_LIBRARY_PATH --test_env=CUDA_VISIBLE_DEVICES
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
