@@ -68,6 +68,60 @@ def _normalize_attention_mask_rank(
     return mask
 
 
+def _restore_static_query_heads(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    query: TRTTensor,
+) -> TRTTensor:
+    """Restore a static query-head count when dynamic reshapes obscure it as -1.
+
+    IAttention requires a static head count (dim 1). Models like Llama/Qwen often
+    reshape Q to ``[B, -1, S, D]``, so TRT sees ``query.shape[1] == -1``. Without
+    recovering the concrete head count from FX metadata, ``add_attention_v2``
+    produces an output with ``nbDims == -1``, and the next op (e.g. permute)
+    fails with ``ValueError: __len__() should return >= 0``.
+    """
+    if ctx.current_node is None or len(query.shape) != 4 or query.shape[1] != -1:
+        return query
+
+    query_node = ctx.current_node.args[0]
+    query_meta = (
+        query_node.meta.get("val") if isinstance(query_node, torch.fx.Node) else None
+    )
+    num_query_heads = (
+        query_meta.shape[1]
+        if query_meta is not None and len(query_meta.shape) == 4
+        else None
+    )
+    if not isinstance(num_query_heads, int):
+        return query
+
+    query_shape = [
+        (
+            num_query_heads
+            if i == 1
+            else (
+                impl.shape.shape(
+                    ctx, target, source_ir, f"{name}_query_dim_{i}", query, i
+                )
+                if dim == -1
+                else dim
+            )
+        )
+        for i, dim in enumerate(query.shape)
+    ]
+    return impl.shuffle.reshape(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_restore_query_heads",
+        query,
+        query_shape,
+    )
+
+
 def tril(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -227,6 +281,8 @@ def scaled_dot_product_attention(
     if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
         scale = 1.0 / math.sqrt(query.shape[-1])
 
+    query = _restore_static_query_heads(ctx, target, source_ir, name, query)
+
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
         q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_q_dim", query, -1)
@@ -340,44 +396,7 @@ def scaled_dot_product_efficient_attention(
     if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
         scale = 1.0 / math.sqrt(query.shape[-1])
 
-    # Dynamic reshapes in models like Qwen can obscure a statically known query-head count as -1.
-    # IAttention requires a static head count, so recover it from FX metadata while keeping the
-    # batch and sequence dimensions as runtime shape tensors.
-    if ctx.current_node is not None and len(query.shape) == 4 and query.shape[1] == -1:
-        query_node = ctx.current_node.args[0]
-        query_meta = (
-            query_node.meta.get("val")
-            if isinstance(query_node, torch.fx.Node)
-            else None
-        )
-        num_query_heads = (
-            query_meta.shape[1]
-            if query_meta is not None and len(query_meta.shape) == 4
-            else None
-        )
-        if isinstance(num_query_heads, int):
-            query_shape = [
-                (
-                    num_query_heads
-                    if i == 1
-                    else (
-                        impl.shape.shape(
-                            ctx, target, source_ir, f"{name}_query_dim_{i}", query, i
-                        )
-                        if dim == -1
-                        else dim
-                    )
-                )
-                for i, dim in enumerate(query.shape)
-            ]
-            query = impl.shuffle.reshape(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_restore_query_heads",
-                query,
-                query_shape,
-            )
+    query = _restore_static_query_heads(ctx, target, source_ir, name, query)
 
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
