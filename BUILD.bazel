@@ -152,30 +152,12 @@ alias(
     actual = ":executorch_trt_backend_archive",
 )
 
-pkg_files(
-    name = "executorch_lib_pkg_files",
-    srcs = [
-        ":executorch_core_archive",
-        ":executorch_trt_backend_archive",
-        "@executorch//:extension_cuda",
-    ],
-    prefix = "lib/",
-    visibility = ["//visibility:public"],
-)
-
-pkg_tar(
-    name = "executorch_lib",
-    srcs = [":executorch_lib_pkg_files"],
-    mode = "0644",
-    package_dir = "",
-)
-
 # Ship only the shared caller-stream library. The packaged reference runner
 # builds the ExecuTorch core and TensorRT backend from source (its CMake uses
-# add_subdirectory), so the prebuilt .a archives in :executorch_lib are not
-# consumed by that flow -- but libextension_cuda.so must ship so the runner has
-# a single shared caller-stream TLS at runtime. Package the .so target directly
-# so the tarball never contains a static caller-stream archive.
+# add_subdirectory), so prebuilt .a archives are not consumed by that flow -- but
+# libextension_cuda.so must ship so the runner has a single shared caller-stream
+# TLS at runtime. Package the .so target directly so the tarball never contains a
+# static caller-stream archive.
 pkg_files(
     name = "executorch_extension_cuda_pkg_files",
     srcs = ["@executorch//:libextension_cuda.so"],

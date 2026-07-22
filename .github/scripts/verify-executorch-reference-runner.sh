@@ -360,8 +360,10 @@ if nm --defined-only "${runner_path}" 2>/dev/null |
 fi
 
 # The runner must instead carry an UNDEFINED reference to the caller-stream
-# accessor, proving it consults the shared library's thread-local.
-if ! nm --undefined-only "${runner_path}" 2>/dev/null |
+# accessor, proving it consults the shared library's thread-local. Use `nm -D`
+# (dynamic symbols): a runner's imports live in .dynsym, and the static .symtab
+# that plain `nm` reads is stripped from release binaries.
+if ! nm -D --undefined-only "${runner_path}" 2>/dev/null |
     grep -q "getCallerStream"; then
   echo "example_executorch_runner does not import getCallerStream from libextension_cuda.so" >&2
   exit 1
