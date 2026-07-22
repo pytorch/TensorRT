@@ -1983,7 +1983,7 @@ class TestLowering(TestCase):
         self.assertTrue(all(node.args[0] == [] for node in full_nodes))
         self.assertEqual(
             {node.args[1] for node in full_nodes},
-            {0.0, torch.finfo(torch.bfloat16).min},
+            {0.0, float("-inf")},
         )
         self.assertTrue(
             all(node.meta["val"].dtype == torch.bfloat16 for node in full_nodes)
@@ -1996,13 +1996,14 @@ class TestLowering(TestCase):
         ]
         self.assertEqual(len(where_nodes), 1)
         self.assertEqual(where_nodes[0].meta["val"].dtype, torch.bfloat16)
-        self.assertFalse(
-            any(
-                node.op == "call_function"
-                and node.target == torch.ops.aten.logical_not.default
-                for node in lowered.graph.nodes
-            )
-        )
+        logical_not_nodes = [
+            node
+            for node in lowered.graph.nodes
+            if node.op == "call_function"
+            and node.target == torch.ops.aten.logical_not.default
+        ]
+        self.assertEqual(len(logical_not_nodes), 1)
+        self.assertIs(where_nodes[0].args[0], logical_not_nodes[0])
         torch.testing.assert_close(
             lowered.module()(*inputs),
             exported_program.module()(*inputs),
