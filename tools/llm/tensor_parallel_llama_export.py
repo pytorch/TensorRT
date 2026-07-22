@@ -15,15 +15,13 @@ distributed compilation path.
 
 Usage
 -----
-# Export mode — export + compile + save engines (run on each node):
-  torchtrtrun --nproc_per_node=1 --nnodes=2 --node_rank=0 \\
-      --rdzv_endpoint=<node0-ip>:29500 \\
-      tools/llm/tensor_parallel_llama_export.py --mode export --save_dir /tmp/llama_tp_engines
+# Export mode — export + compile + save engines (single node, 2 GPUs):
+  torchtrtrun --nproc_per_node=2 \\
+      tools/llm/tensor_parallel_llama_export.py --mode export --save_dir tools/llm/outputs/llama_tp_engines
 
 # Load mode — load saved engines + inference (no model download needed):
-  torchtrtrun --nproc_per_node=1 --nnodes=2 --node_rank=0 \\
-      --rdzv_endpoint=<node0-ip>:29500 \\
-      tools/llm/tensor_parallel_llama_export.py --mode load --save_dir /tmp/llama_tp_engines
+  torchtrtrun --nproc_per_node=2 \\
+      tools/llm/tensor_parallel_llama_export.py --mode load --save_dir tools/llm/outputs/llama_tp_engines
 """
 
 import argparse
