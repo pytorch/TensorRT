@@ -1,8 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import json
+import tempfile
 import unittest
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from parameterized import parameterized
@@ -17,6 +20,7 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
 )
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import post_lowering
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
@@ -2016,6 +2020,213 @@ class TestLowering(TestCase):
                 all(node.meta["val"].dtype == expected_matmul_dtype for node in matmuls)
             )
             self.assertEqual(lowered.module()(*inputs).dtype, torch.float16)
+
+    def test_lowering_scaled_dot_product_attention_bool_mask_bias(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value, attn_mask):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query, key, value, attn_mask
+                )
+
+        inputs = (
+            torch.randn(1, 2, 8, 16, dtype=torch.bfloat16, device="cuda"),
+            torch.randn(1, 2, 8, 16, dtype=torch.bfloat16, device="cuda"),
+            torch.randn(1, 2, 8, 16, dtype=torch.bfloat16, device="cuda"),
+            torch.ones(1, 1, 8, 8, dtype=torch.bool, device="cuda").tril(),
+        )
+        exported_program = torch.export.export(TestModule(), inputs)
+        lowered = exported_program.run_decompositions(
+            get_decompositions(decompose_attention=True)
+        )
+
+        full_nodes = [
+            node
+            for node in lowered.graph.nodes
+            if node.op == "call_function" and node.target == torch.ops.aten.full.default
+        ]
+        self.assertEqual(len(full_nodes), 2)
+        self.assertTrue(all(node.args[0] == [] for node in full_nodes))
+        self.assertEqual(
+            {node.args[1] for node in full_nodes},
+            {0.0, float("-inf")},
+        )
+        self.assertTrue(
+            all(node.meta["val"].dtype == torch.bfloat16 for node in full_nodes)
+        )
+
+        where_nodes = [
+            node
+            for node in lowered.graph.nodes
+            if node.op == "call_function" and node.target == torch.ops.aten.where.self
+        ]
+        self.assertEqual(len(where_nodes), 1)
+        self.assertEqual(where_nodes[0].meta["val"].dtype, torch.bfloat16)
+        logical_not_nodes = [
+            node
+            for node in lowered.graph.nodes
+            if node.op == "call_function"
+            and node.target == torch.ops.aten.logical_not.default
+        ]
+        self.assertEqual(len(logical_not_nodes), 1)
+        self.assertIs(where_nodes[0].args[0], logical_not_nodes[0])
+        torch.testing.assert_close(
+            lowered.module()(*inputs),
+            exported_program.module()(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+        )
+
+    @parameterized.expand(
+        [(32, 32, "broadcast"), (16, 32, "flat"), (32, 16, "broadcast")]
+    )
+    def test_lowering_scaled_dot_product_attention_shared_bool_mask(
+        self, query_length, key_length, mask_layout
+    ):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value, padding_mask):
+                row = torch.arange(query.shape[-2], device=query.device)[:, None]
+                col = torch.arange(key.shape[-2], device=key.device)[None, :]
+                mask = (row >= col) & padding_mask
+                first = torch.nn.functional.scaled_dot_product_attention(
+                    query, key, value, mask
+                )
+                return torch.nn.functional.scaled_dot_product_attention(
+                    first, key, value, mask
+                )
+
+        torch.manual_seed(0)
+        inputs = [
+            torch.randn(2, 2, query_length, 64, dtype=torch.float16, device="cuda"),
+            torch.randn(2, 2, key_length, 64, dtype=torch.float16, device="cuda"),
+            torch.randn(2, 2, key_length, 64, dtype=torch.float16, device="cuda"),
+        ]
+        padding = torch.ones(key_length, dtype=torch.bool, device="cuda")
+        padding[1::3] = False  # Keep the first key visible in every causal row.
+        if mask_layout == "broadcast":
+            padding = padding.view(1, 1, 1, -1).repeat(2, 1, 1, 1)
+            padding[1, :, :, 2::3] = False
+        inputs.append(padding)
+        query_dim = torch.export.Dim("query_length", min=2, max=64)
+        key_dim = torch.export.Dim("key_length", min=2, max=64)
+        dynamic_shapes = (
+            {2: query_dim},
+            {2: key_dim},
+            {2: key_dim},
+            {padding.ndim - 1: key_dim},
+        )
+        model = TestModule().eval()
+        exported = torch.export.export(
+            model, tuple(inputs), dynamic_shapes=dynamic_shapes
+        )
+        lowered = exported.run_decompositions(
+            get_decompositions(decompose_attention=True)
+        )
+        gm = post_lowering(lowered.module(), CompilationSettings())
+        # Dynamic lengths exercise Fill without depending on the separate
+        # static attention-mask constant-fold exclusion rule.
+        self.assertEqual(
+            sum(
+                getattr(node.target, "overloadpacket", None) is torch.ops.aten.arange
+                for node in gm.graph.nodes
+            ),
+            2,
+        )
+        where_nodes = [
+            node for node in gm.graph.nodes if node.target == torch.ops.aten.where.self
+        ]
+        self.assertEqual(len(where_nodes), 2)
+        self.assertIs(where_nodes[0].args[0].args[0], where_nodes[1].args[0].args[0])
+
+        specs = []
+        for tensor, dimensions in zip(inputs, dynamic_shapes):
+            minimum, maximum = list(tensor.shape), list(tensor.shape)
+            for dimension in dimensions:
+                minimum[dimension], maximum[dimension] = 2, 64
+            specs.append(
+                torch_tensorrt.Input(
+                    min_shape=tuple(minimum),
+                    opt_shape=tuple(tensor.shape),
+                    max_shape=tuple(maximum),
+                    dtype=tensor.dtype,
+                )
+            )
+        with tempfile.TemporaryDirectory() as directory:
+            with torch_tensorrt.dynamo.Debugger(
+                log_level="warning", logging_dir=directory
+            ):
+                compiled = torch_tensorrt.dynamo.compile(
+                    exported,
+                    inputs=specs,
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    decompose_attention=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+        with torch.inference_mode():
+            torch.testing.assert_close(
+                compiled(*inputs), model(*inputs), rtol=RTOL, atol=ATOL
+            )
+            # Reuse the engine at different lengths and with different padding.
+            runtime_inputs = [
+                inputs[0][:, :, :8].contiguous(),
+                inputs[1][:, :, :12].contiguous(),
+                inputs[2][:, :, :12].contiguous(),
+                padding[..., :12].clone(),
+            ]
+            runtime_inputs[-1][..., 1:] = ~runtime_inputs[-1][..., 1:]
+            torch.testing.assert_close(
+                compiled(*runtime_inputs), model(*runtime_inputs), rtol=RTOL, atol=ATOL
+            )
+
+        # The detailed Myelin mask representation is specific to standard TRT
+        # 11.5+ on GPUs with fused-attention support. Numerical checks run above
+        # for every supported backend regardless of its selected tactics.
+        if (
+            not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
+            and tuple(int(part) for part in trt.__version__.split(".")[:2]) >= (11, 5)
+            and torch.cuda.get_device_capability()[0] >= 8
+        ):
+            engines = [
+                module
+                for module in compiled.modules()
+                if isinstance(module, TorchTensorRTModule)
+            ]
+            self.assertEqual(len(engines), 1)
+            runtime = trt.Runtime(trt.Logger(trt.Logger.WARNING))
+            engine = runtime.deserialize_cuda_engine(
+                bytes(engines[0].serialized_engine)
+            )
+            context = engine.create_execution_context()
+            for name, tensor in zip(engines[0].input_binding_names, inputs):
+                self.assertTrue(context.set_input_shape(name, tuple(tensor.shape)))
+            self.assertEqual(context.infer_shapes(), [])
+            inspector = engine.create_engine_inspector()
+            inspector.execution_context = context
+            layers = json.loads(
+                inspector.get_engine_information(trt.LayerInformationFormat.JSON)
+            )["Layers"]
+            masks = {engines[0].input_binding_names[-1]}
+            attention_masks = []
+            for layer in layers:
+                mask_inputs = [
+                    tensor
+                    for tensor in layer.get("Inputs", [])
+                    if tensor["Name"] in masks
+                ]
+                if "_gemm_mha_v2" in layer.get("Name", "").lower():
+                    self.assertEqual(len(mask_inputs), 1)
+                    attention_masks.append(mask_inputs[0])
+                elif mask_inputs:
+                    masks.update(tensor["Name"] for tensor in layer.get("Outputs", []))
+            self.assertEqual(len(attention_masks), 2)
+            for mask in attention_masks:
+                self.assertEqual(mask["Datatype"], "Bool")
+                # Internal Myelin dimensions may stay symbolic in the inspector.
+                # The query dimension must be 1, not a dense L-by-S mask.
+                self.assertEqual(mask["Dimensions"][-2], 1)
+                self.assertIn(mask["Dimensions"][-1], (-1, key_length))
+            self.assertEqual(attention_masks[0]["Name"], attention_masks[1]["Name"])
 
     @parameterized.expand(
         [
