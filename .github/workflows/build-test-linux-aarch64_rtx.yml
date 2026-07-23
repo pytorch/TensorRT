@@ -1,4 +1,9 @@
-name: RTX - Python-only build and test Linux x86_64 wheels
+name: RTX - Build Linux aarch64 wheels
+
+# Basic RTX support for aarch64 (SBSA): mirrors build-test-linux-aarch64.yml but
+# selects TensorRT-RTX (use-rtx: true). BUILD-ONLY — there are no aarch64 GPU test
+# runners, so this just validates the RTX aarch64 wheel builds. The full
+# manifest-based wiring lives in the CI redesign (test-dx) on top of this.
 
 on:
   pull_request:
@@ -13,6 +18,7 @@ on:
       - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
 
+# Read-only by default (CodeQL); the build job overrides with id-token: write.
 permissions:
   contents: read
 
@@ -21,7 +27,7 @@ jobs:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
-      os: linux
+      os: linux-aarch64
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       with-rocm: false
@@ -30,7 +36,7 @@ jobs:
   filter-matrix:
     needs: [generate-matrix]
     outputs:
-      matrix: ${{ steps.generate.outputs.matrix }}
+      matrix: ${{ steps.filter.outputs.matrix }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v6
@@ -39,8 +45,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: pytorch/tensorrt
-      - name: Generate matrix
-        id: generate
+      - name: Filter matrix
+        id: filter
+        env:
+          LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains( github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
         run: |
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
@@ -59,11 +67,11 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             pre-script: packaging/pre_build_script.sh
-            env-var-script: packaging/env_vars_python_only.txt
+            env-var-script: packaging/env_vars.txt
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
-            display-name: RTX - Python-only build Linux x86_64 torch-tensorrt-rtx whl package
+            display-name: RTX - Build SBSA torch-tensorrt whl package
     name: ${{ matrix.display-name }}
     uses: ./.github/workflows/build_linux.yml
     with:
@@ -78,41 +86,10 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
-      architecture: "x86_64"
+      architecture: "aarch64"
       use-rtx: true
       pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
 
-  dynamo-runtime-tests:
-    name: ${{ matrix.display-name }}
-    needs: [filter-matrix, build]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref_name, 'release/') || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-rc')) || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-            display-name: RTX - Python-only dynamo runtime tests
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: rtx-python-only-dynamo-runtime-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      use-rtx: true
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/runtime
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/python_only_dynamo_runtime_tests_results.xml .
-        popd
-
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-rtx-python-only-${{ github.event_name == 'workflow_dispatch' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true

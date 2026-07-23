@@ -642,6 +642,15 @@ if not (PY_ONLY or NO_TS):
         .split("/BUILD.bazel")[0]
     )
 
+    tensorrt_rtx_sbsa_external_dir = (
+        lambda: subprocess.check_output(
+            [BAZEL_EXE, "query", "@tensorrt_rtx_sbsa//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
     tensorrt_jetpack_external_dir = (
         lambda: subprocess.check_output(
             [BAZEL_EXE, "query", "@tensorrt_l4t//:nvinfer", "--output", "location"]
@@ -652,7 +661,10 @@ if not (PY_ONLY or NO_TS):
     )
 
     if IS_SBSA:
-        tensorrt_linux_external_dir = tensorrt_sbsa_external_dir
+        if USE_TRT_RTX:
+            tensorrt_linux_external_dir = tensorrt_rtx_sbsa_external_dir
+        else:
+            tensorrt_linux_external_dir = tensorrt_sbsa_external_dir
     elif IS_JETPACK:
         tensorrt_linux_external_dir = tensorrt_jetpack_external_dir
     else:
@@ -834,10 +846,17 @@ def get_sbsa_requirements(base_requirements):
     if IS_DLFW_CI:
         return requirements
     else:
+        requirements = requirements + [
+            "torch>=2.14.0.dev,<2.15.0",
+        ]
+        if USE_TRT_RTX:
+            # TensorRT-RTX ships an aarch64 (SBSA) wheel; mirror get_x86_64_requirements.
+            return requirements + [
+                "tensorrt_rtx>=1.5.0.114,<1.6.0.0",
+            ]
         # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
         # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
         return requirements + [
-            "torch>=2.14.0.dev,<2.15.0",
             "tensorrt>=11.0.0,<11.1.0",
         ]
 
