@@ -22,6 +22,11 @@ VERSION_COMPATIBLE = False
 OPTIMIZATION_LEVEL = None
 SPARSE_WEIGHTS = False
 TRUNCATE_DOUBLE = False
+# When True, use PyTorch's upstream complex decomposition (pytorch/pytorch#169832)
+# via complex_decomposition_adapter instead of the legacy hand-rolled
+# complex_graph_detection pass.  Default False until the new path is validated
+# against the complex/RoPE test suites (issue #4390).
+USE_COMPLEX_DECOMPOSITION = False
 USE_FAST_PARTITIONER = True
 ENABLE_EXPERIMENTAL_DECOMPOSITIONS = False
 REQUIRE_FULL_COMPILATION = False

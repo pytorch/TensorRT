@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 )
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
+from .complex_decomposition_adapter import complex_decomposition_adapter
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
@@ -34,6 +35,19 @@ pre_lowering_pass_list = [
     rule_based_autocast,
 ]
 
+
+def complex_lowering_pass(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> torch.fx.GraphModule:
+    """Select the complex-numerics lowering by settings flag (issue #4390).
+
+    ``use_complex_decomposition`` routes to PyTorch's upstream decomposition;
+    otherwise the legacy hand-rolled rewriter runs.
+    """
+    if getattr(settings, "use_complex_decomposition", False):
+        return complex_decomposition_adapter(gm, settings)
+    return complex_graph_detection(gm, settings)
+
 post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
@@ -43,7 +57,7 @@ post_lowering_pass_list = [
     replace_max_pool_with_indices,
     remove_assert_nodes,
     remove_num_users_is_0_nodes,
-    complex_graph_detection,
+    complex_lowering_pass,
     force_causal_efficient_attention,
     eliminate_sym_min_int64_max,
     normalize_negative_slice_stop,
