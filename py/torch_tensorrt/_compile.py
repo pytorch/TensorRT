@@ -4,6 +4,7 @@ import collections.abc
 import importlib
 import inspect
 import logging
+import os
 import platform
 import warnings
 from enum import Enum
@@ -749,6 +750,13 @@ def save(
                 ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``
                 and is forwarded to ``to_executorch(config=...)`` to customize
                 ExecuTorch lowering (e.g. memory planning or device placement).
+                ``partitioners=`` appends caller partitioners after the TensorRT
+                partitioner, so ops TensorRT does not take can be routed to another
+                delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +
+                CUDA ``.pte``. See :ref:`the ExecuTorch save guide
+                <executorch_save>` for the ``CudaPartitioner`` recipe, its
+                export-time requirements (CUDA backend + nvcc), and the external
+                ``.ptd`` weight caveats.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -1327,6 +1335,29 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
     return exp_program
 
 
+def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None:
+    """Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.
+
+    The CUDA (AOTInductor) backend emits its weights as external named data
+    (``save_data_externally``), which ExecuTorch serializes only via
+    ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not
+    persist it. So a partition that carries external weights (e.g. a
+    ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not
+    load. This writes the ``.ptd`` data file(s) into the ``.pte``'s directory when
+    the program has any; the runtime must then be given those data file(s) (e.g.
+    via the ExecuTorch ``Module`` data-files argument) to load the weights.
+    """
+    # Direct attribute access (no getattr default) so a future rename fails loud.
+    if executorch_program._tensor_data:
+        out_dir = os.path.dirname(os.path.abspath(file_path))
+        executorch_program.write_tensor_data_to_file(out_dir)
+        logger.info(
+            "Wrote external delegate weights (.ptd) to %s; point the runtime's "
+            "data-files at this directory to load them.",
+            out_dir,
+        )
+
+
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an ExportedProgram (with TensorRT execute_engine nodes) as an ExecuTorch .pte file.
 
@@ -1395,6 +1426,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     executorch_program = edge_program.to_executorch(config=kwargs.get("backend_config"))
     with open(file_path, "wb") as f:
         executorch_program.write_to_file(f)
+    _write_external_tensor_data(executorch_program, file_path)
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:
