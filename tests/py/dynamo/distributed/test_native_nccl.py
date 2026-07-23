@@ -803,6 +803,36 @@ def _node_targets(gm: torch.fx.GraphModule) -> list:
     return [n.target for n in gm.graph.nodes if n.op == "call_function"]
 
 
+def has_native_trt_collectives() -> bool:
+    """Check if the native TRT collectives (the ones with dynamic-shape support) are available."""
+    try:
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(ENABLED_FEATURES.native_trt_collectives)
+    except Exception:
+        return False
+
+
+def _symbolic_fake_tensor(shape: tuple[int, ...] = (4, 8), dynamic_dim: int = 0) -> Any:
+    """Return a FakeTensor with a symbolic SymInt at ``dynamic_dim`` (via a tiny export)."""
+    from torch.export import Dim
+
+    class _Identity(nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x + 1
+
+    dyn = Dim("s", min=1, max=1 << 20)
+    ep = torch.export.export(
+        _Identity(),
+        (torch.randn(*shape),),
+        dynamic_shapes={"x": {dynamic_dim: dyn}},
+    )
+    for node in ep.graph.nodes:
+        if node.op == "placeholder" and "val" in node.meta:
+            return node.meta["val"]
+    raise RuntimeError("no symbolic placeholder produced by export")
+
+
 class TestFuseDistributedOps(unittest.TestCase):
     """Unit tests for the fuse_distributed_ops lowering pass.
 
@@ -1274,6 +1304,78 @@ class TestNcclOpsSingleRank(unittest.TestCase):
             [torch.randn(1, dim)],
         )
 
+    def _run_dynamic(
+        self,
+        model: nn.Module,
+        opt_inputs: list[torch.Tensor],
+        check_inputs: list[list[torch.Tensor]],
+        dyn_dim: int = 0,
+        dyn_min: int = 1,
+        dyn_max: int = 16,
+    ) -> None:
+        """Mark a dim dynamic (min/max), compile at the opt shape, verify at other shapes."""
+        import torch_tensorrt  # noqa: F401
+
+        model = model.cuda().eval()
+        opt_cuda = [t.cuda() for t in opt_inputs]
+        for t in opt_cuda:
+            torch._dynamo.mark_dynamic(t, dyn_dim, min=dyn_min, max=dyn_max)
+
+        with torch.no_grad():
+            trt_model = torch.compile(
+                model,
+                backend="torch_tensorrt",
+                options={
+                    "use_python_runtime": True,
+                    "min_block_size": 1,
+                    "use_distributed_mode_trace": True,
+                },
+            )
+            # Warm-compile at the opt shape.
+            trt_model(*opt_cuda)
+
+            for check in check_inputs:
+                check_cuda = [t.cuda() for t in check]
+                ref = model(*check_cuda)
+                out = trt_model(*check_cuda)
+                torch.testing.assert_close(ref, out, atol=1e-4, rtol=1e-4)
+
+    def test_all_reduce_single_rank_dynamic(self) -> None:
+        """all_reduce compiles with a dynamic seq dim and is correct at other shapes."""
+        dim = 8
+        self._run_dynamic(
+            _AllReduceModel(dim, self.group_name),
+            opt_inputs=[torch.randn(4, dim)],
+            check_inputs=[[torch.randn(2, dim)], [torch.randn(8, dim)]],
+        )
+
+    def test_all_gather_single_rank_dynamic(self) -> None:
+        """all_gather compiles with a dynamic seq dim and is correct at other shapes."""
+        dim = 8
+        self._run_dynamic(
+            _AllGatherModel(dim, self.world_size, self.group_name),
+            opt_inputs=[torch.randn(4, dim)],
+            check_inputs=[[torch.randn(2, dim)], [torch.randn(8, dim)]],
+        )
+
+    def test_reduce_scatter_single_rank_dynamic(self) -> None:
+        """reduce_scatter compiles with a dynamic seq dim and is correct at other shapes."""
+        dim = 8
+        self._run_dynamic(
+            _ReduceScatterModel(dim, self.world_size, self.group_name),
+            opt_inputs=[torch.randn(4, dim)],
+            check_inputs=[[torch.randn(2, dim)], [torch.randn(8, dim)]],
+        )
+
+    def test_all_to_all_single_rank_dynamic(self) -> None:
+        """all_to_all compiles with a dynamic seq dim and is correct at other shapes."""
+        dim = 8
+        self._run_dynamic(
+            _AllToAllModel(dim, self.world_size, self.group_name),
+            opt_inputs=[torch.randn(4, dim)],
+            check_inputs=[[torch.randn(2, dim)], [torch.randn(8, dim)]],
+        )
+
     def test_distributed_mode_with_single_rank_subgroup(self) -> None:
         """distributed_context() selects the subgroup as NCCL communicator source."""
         import torch_tensorrt
@@ -1321,6 +1423,87 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         self.assertEqual(inner_name, subgroup.group_name)
         # After exit, world group name (may be "" for WORLD constant)
         self.assertIsNotNone(outer_name)  # not None — dist is still init'd
+
+
+@unittest.skipIf(
+    not has_native_trt_collectives(),
+    "Skipped: native TRT collective converters not available.",
+)
+class TestNcclDynamicShapeConverterSupport(unittest.TestCase):
+    """Guards supports_dynamic_shapes=True on the fused NCCL converters.
+
+    With a dynamic input and default settings, the node is convertible only if
+    its converter opts in; reverting the flag would make it fall back. Needs no
+    process group or GPU — only inspects the converter-registry support decision.
+    """
+
+    def _assert_dynamic_supported(
+        self, collective_op, args_without_input, fused_target
+    ):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.conversion import DYNAMO_CONVERTERS as CONVERTERS
+        from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+            node_has_dynamic_shapes,
+        )
+        from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+            fuse_distributed_ops,
+        )
+
+        gm = _build_graph(collective_op, args_without_input)
+        # Make the input dynamic so the fused node is seen as dynamic.
+        sym = _symbolic_fake_tensor()
+        for node in gm.graph.nodes:
+            if node.op == "placeholder":
+                node.meta["val"] = sym
+
+        gm = fuse_distributed_ops(gm, CompilationSettings())
+        fused = next(n for n in gm.graph.nodes if n.target == fused_target)
+
+        # Precondition: the node really is dynamic, else the flag is untested.
+        self.assertTrue(node_has_dynamic_shapes(fused))
+
+        original = CONVERTERS.compilation_settings
+        try:
+            # Default settings => support hinges on the converter's flag.
+            CONVERTERS.set_compilation_settings(CompilationSettings())
+            self.assertIn(fused, CONVERTERS)
+            _, _, meta = CONVERTERS[fused]
+            self.assertTrue(meta["supports_dynamic_shapes"])
+        finally:
+            CONVERTERS.compilation_settings = original
+
+    def test_all_reduce_supports_dynamic(self) -> None:
+        from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+            tensorrt_fused_nccl_all_reduce_op,
+        )
+
+        self._assert_dynamic_supported(
+            torch.ops._c10d_functional.all_reduce.default,
+            ("sum", "test_group"),
+            tensorrt_fused_nccl_all_reduce_op,
+        )
+
+    def test_all_gather_supports_dynamic(self) -> None:
+        from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+            tensorrt_fused_nccl_all_gather_op,
+        )
+
+        self._assert_dynamic_supported(
+            torch.ops._c10d_functional.all_gather_into_tensor.default,
+            (2, "test_group"),
+            tensorrt_fused_nccl_all_gather_op,
+        )
+
+    def test_reduce_scatter_supports_dynamic(self) -> None:
+        from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+            tensorrt_fused_nccl_reduce_scatter_op,
+        )
+
+        self._assert_dynamic_supported(
+            torch.ops._c10d_functional.reduce_scatter_tensor.default,
+            ("sum", 2, "test_group"),
+            tensorrt_fused_nccl_reduce_scatter_op,
+        )
 
 
 # ============================================================================
