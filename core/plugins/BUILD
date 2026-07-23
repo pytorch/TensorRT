@@ -23,6 +23,17 @@ config_setting(
 )
 
 config_setting(
+    name = "rtx_sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
     name = "rtx_win",
     constraint_values = [
         "@platforms//os:windows",
@@ -69,6 +80,7 @@ cc_library(
         ],
         ":rtx_win": [],
         ":rtx_x86_64": [],
+        ":rtx_sbsa": [],
         "//conditions:default": [
             "impl/interpolate_plugin.cpp",
             "impl/normalize_plugin.cpp",
@@ -84,6 +96,7 @@ cc_library(
         ],
         ":rtx_win": [],
         ":rtx_x86_64": [],
+        ":rtx_sbsa": [],
         "//conditions:default": [
             "impl/interpolate_plugin.h",
             "impl/normalize_plugin.h",
@@ -115,6 +128,7 @@ cc_library(
         ],
         ":rtx_win": [],
         ":rtx_x86_64": [],
+        ":rtx_sbsa": [],
         ":sbsa": [
             "@tensorrt_sbsa//:nvinfer",
             "@tensorrt_sbsa//:nvinferplugin",
