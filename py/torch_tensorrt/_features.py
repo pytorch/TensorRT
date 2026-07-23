@@ -27,6 +27,7 @@ FeatureSet = namedtuple(
         "tensorrt_rtx",
         "trtllm_for_nccl",
         "native_trt_collectives",
+        "complex_decomposition",
     ],
 )
 
@@ -49,6 +50,11 @@ _TENSORRT_RTX = getattr(tensorrt, "_package_name", "") == "tensorrt_rtx"
 _TS_FE_AVAIL = os.path.isfile(linked_file_full_path)
 _TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_path)
 _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
+# PyTorch's upstream complex-tensor decomposition (pytorch/pytorch#169832) ships
+# in torch>=2.14.dev; gates the complex_decomposition_adapter lowering pass.
+_COMPLEX_DECOMP_AVAIL = version.parse(sanitized_torch_version()) >= version.parse(
+    "2.14.dev"
+)
 _FX_FE_AVAIL = False if _TENSORRT_RTX else True
 _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
@@ -87,6 +93,7 @@ ENABLED_FEATURES = FeatureSet(
     _TENSORRT_RTX,
     _TRTLLM_AVAIL,
     _NATIVE_TRT_COLLECTIVES_AVAIL,
+    _COMPLEX_DECOMP_AVAIL,
 )
 
 T = TypeVar("T")
@@ -94,8 +101,17 @@ T = TypeVar("T")
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
-    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n - Native TRT Collectives: {enabled(_NATIVE_TRT_COLLECTIVES_AVAIL)}\n"  # type: ignore[no-untyped-call]
+    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n - Native TRT Collectives: {enabled(_NATIVE_TRT_COLLECTIVES_AVAIL)}\n - Complex Decomposition: {enabled(_COMPLEX_DECOMP_AVAIL)}\n"  # type: ignore[no-untyped-call]
     return out_str
+
+
+def has_complex_decomposition() -> bool:
+    """Check if PyTorch's upstream complex-tensor decomposition is available.
+
+    Returns:
+        bool: True if torch>=2.14.dev (ships decompose_complex_in_graph, PR #169832)
+    """
+    return bool(ENABLED_FEATURES.complex_decomposition)
 
 
 # Inline helper functions for checking feature availability
