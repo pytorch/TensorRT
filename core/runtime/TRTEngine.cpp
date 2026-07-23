@@ -579,12 +579,23 @@ bool TRTEngine::bind_nccl_comm() {
     // auto-resolve when there is exactly one — if there are several (TP+DP,
     // Megatron 4-D parallelism, etc.) we cannot know which group this engine
     // belongs to and the caller must pin it explicitly.
+    // PyTorch >= 2.13 throws c10::Error (instead of returning nullptr) when
+    // the requested group name doesn't exist. try_resolve normalises this to a
+    // nullptr return so the scan loop stays exception-free.
+    auto try_resolve = [](const std::string& name) -> c10::intrusive_ptr<c10d::ProcessGroup> {
+      try {
+        return c10d::resolve_process_group(name);
+      } catch (const c10::Error&) {
+        return nullptr;
+      }
+    };
     std::vector<std::string> nccl_groups;
     for (int i = 0; i < 20; ++i) {
-      auto candidate = std::to_string(i);
-      auto probe = c10d::resolve_process_group(candidate);
-      if (probe != nullptr && probe->getBackendType() == c10d::ProcessGroup::BackendType::NCCL) {
-        nccl_groups.push_back(candidate);
+      auto pg = try_resolve(std::to_string(i));
+      if (!pg)
+        break;
+      if (pg->getBackendType() == c10d::ProcessGroup::BackendType::NCCL) {
+        nccl_groups.push_back(std::to_string(i));
       }
     }
 

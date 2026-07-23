@@ -435,10 +435,24 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Optional
         or expr.xreplace(var_to_val_map)
     )
     assert var_range, var_val
-    min_val, max_val = (
-        int(var_range.lower),
-        int(var_range.upper) if var_range.upper != int_oo else None,
-    )
+
+    # ``var_to_range`` returns ``int_oo`` for unbounded; ``bound_sympy`` (used
+    # for composite exprs like ``s0+s1``) returns ``sympy.oo`` instead. They
+    # are distinct objects -- check both, else ``int(sympy.oo)`` raises.
+    def _bound_to_int_or_none(value: Any) -> Optional[int]:
+        if value is int_oo or value is -int_oo:
+            return None
+        if value == sympy.oo or value == -sympy.oo:
+            return None
+        try:
+            return int(value)
+        except (TypeError, OverflowError, AttributeError):
+            return None
+
+    min_val_opt = _bound_to_int_or_none(var_range.lower)
+    max_val = _bound_to_int_or_none(var_range.upper)
+    # Unbounded lower shouldn't happen for tensor dims; fall back to 1.
+    min_val = min_val_opt if min_val_opt is not None else 1
 
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
