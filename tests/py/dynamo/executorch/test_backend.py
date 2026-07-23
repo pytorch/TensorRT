@@ -1,3 +1,5 @@
+import ast
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -7,6 +9,7 @@ executorch = pytest.importorskip("executorch.exir")
 import torch  # noqa: E402
 from torch.export.graph_signature import InputKind  # noqa: E402
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
+    ALIASED_IO_IDX,
     DEVICE_IDX,
     ENGINE_IDX,
     INPUT_BINDING_NAMES_IDX,
@@ -107,6 +110,32 @@ def _make_multi_engine_program(engine_info):
 
 def _engine_tensor(payload: bytes) -> torch.Tensor:
     return torch.frombuffer(bytearray(payload), dtype=torch.uint8)
+
+
+@pytest.mark.unit
+def test_no_op_placeholder_schema_matches_serialized_engine_layout():
+    meta_ops_path = (
+        Path(__file__).parents[4]
+        / "py/torch_tensorrt/dynamo/runtime/meta_ops/register_meta_ops.py"
+    )
+    module = ast.parse(meta_ops_path.read_text())
+    signatures = {
+        node.name: [arg.arg for arg in node.args.args]
+        for node in module.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name
+        in {
+            "no_op_placeholder_for_execute_engine",
+            "fake_no_op_placeholder_for_execute_engine",
+        }
+    }
+
+    expected_arg_count = SERIALIZATION_LEN + 1
+    for args in signatures.values():
+        assert len(args) == expected_arg_count
+        assert args[ALIASED_IO_IDX + 1] == "serialized_aliased_io"
+    assert len(signatures) == 2
+    assert len({tuple(args) for args in signatures.values()}) == 1
 
 
 @pytest.mark.unit
