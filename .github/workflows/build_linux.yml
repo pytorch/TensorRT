@@ -254,6 +254,20 @@ jobs:
           cache-key: ${{ inputs.cache-key }}
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.pre-script }}
+      # Persist bazel's action cache across runs so the C++/CUDA compile — the
+      # serial long pole — reuses unchanged action outputs instead of rebuilding
+      # from scratch. Lives under RUNNER_TEMP (the "Clean workspace" step wipes
+      # GITHUB_WORKSPACE). setup.py picks up BAZEL_DISK_CACHE (exported below).
+      # Key is COARSE (toolchain/deps, not the commit) so most PRs restore a warm
+      # cache; the restore-keys prefix makes even a dep bump an incremental build.
+      - name: Cache the bazel C++/CUDA build
+        if: ${{ inputs.architecture != 'aarch64' }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/trt-bazel-disk-cache
+          key: trt-bazel-${{ inputs.architecture }}-${{ matrix.desired_cuda }}-rtx${{ inputs.use-rtx }}-${{ hashFiles('**/MODULE.bazel', '**/WORKSPACE', '**/.bazelrc', '**/dev_dep_versions.yml') }}
+          restore-keys: |
+            trt-bazel-${{ inputs.architecture }}-${{ matrix.desired_cuda }}-rtx${{ inputs.use-rtx }}-
       - name: Build the wheel (python-build-package)
         if: ${{ inputs.build-platform == 'python-build-package' }}
         working-directory: ${{ inputs.repository }}
@@ -272,6 +286,8 @@ jobs:
         run: |
           set -x
           source "${BUILD_ENV_FILE}"
+          # Reuse the cached bazel action outputs (see "Cache the bazel..." step).
+          export BAZEL_DISK_CACHE="${RUNNER_TEMP}/trt-bazel-disk-cache"
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
           ${CONDA_RUN} python setup.py clean
           echo "Successfully ran `python setup.py clean`"
@@ -413,5 +429,10 @@ jobs:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.is-release-wheel}}-${{inputs.is-release-tarball}}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'no-tag' }}-${{ inputs.use-rtx }}
+  # env-var-script distinguishes the python-only build (env_vars_python_only.txt)
+  # from the standard build (env_vars.txt). Without it, the standard and
+  # python-only channels of the SAME run share this group and cancel-in-progress
+  # kills one of them — which is why "run everything" never completed. (Local
+  # addition to the test-infra-synced key; keep on re-sync.)
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.is-release-wheel}}-${{inputs.is-release-tarball}}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'no-tag' }}-${{ inputs.use-rtx }}-${{ inputs.env-var-script }}
   cancel-in-progress: true

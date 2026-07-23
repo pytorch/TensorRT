@@ -1,0 +1,141 @@
+name: CI Windows
+
+# Per-platform entry — runs the Windows channels (standard, RTX, python-only) as
+# one small independent run. Windows is heavier, so it runs on the full/nightly
+# lanes only (never the fast PR-push lane).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "Which lane to run"
+        type: choice
+        options: [fast, full, nightly]
+        default: full
+      backend:
+        description: "Which backend(s) to test"
+        type: choice
+        options: [standard, rtx, both]
+        default: both
+
+concurrency:
+  # Only NON-CI label events (component:*, cla signed, …) get their own per-label
+  # group, so auto-label churn never cancels the running pipeline. CI-control labels
+  # (ci:full / ci:nightly / backend:*) and real pushes share the PR group so they
+  # SUPERSEDE cleanly — exactly ONE pipeline per commit. Coexisting runs would
+  # otherwise collide inside build_linux.yml's own concurrency and cancel a
+  # half-built wheel (that is what cancelled the SBSA aarch64 build).
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  decide:
+    # A label event only warrants running the pipeline when the label controls CI;
+    # auto-labels (component:*, cla signed) must not spawn work — and would each
+    # start a full run once ci:full is present. Non-label events always proceed.
+    if: >-
+      github.event.action != 'labeled' ||
+      contains(fromJSON('["ci: full", "ci: nightly", "backend: TensorRT", "backend: TensorRT-RTX"]'), github.event.label.name)
+    uses: ./.github/workflows/_decide.yml
+
+  # Generate the windows build matrix once (shared across channels;
+  # generate_binary_build_matrix's cancel-in-progress concurrency would otherwise
+  # make per-channel calls cancel each other).
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: windows
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  standard:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/_test-windows.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      use-rtx: false
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  rtx:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    uses: ./.github/workflows/_test-windows.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      use-rtx: true
+      name-prefix: "RTX - "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  python-only:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/_test-windows.yml
+    with:
+      lane: python-only
+      name-prefix: "Python-only "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  # python-only against TensorRT-RTX (so backend=both runs BOTH python-only variants).
+  python-only-rtx:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    uses: ./.github/workflows/_test-windows.yml
+    with:
+      lane: python-only
+      use-rtx: true
+      name-prefix: "Python-only RTX "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  gate:
+    needs: [decide, standard, rtx, python-only, python-only-rtx]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate
+        run: |
+          set -euo pipefail
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
+            echo "::error::a Windows channel failed — see the channel jobs above"
+            exit 1
+          fi
+          echo "Windows gate OK (cancelled/skipped channels ignored)."
+
+  report:
+    needs: [standard, rtx, python-only, python-only-rtx]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: junit-*
+          path: all-results
+          merge-multiple: true
+      - name: Consolidated report
+        run: |
+          set -uo pipefail
+          mkdir -p all-results
+          if [ -z "$(find all-results -name '*.xml' 2>/dev/null)" ]; then
+            echo "No JUnit results uploaded." >> "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          python tests/py/utils/junit_summary.py all-results --agent >> "$GITHUB_STEP_SUMMARY" || true
+          python tests/py/utils/junit_summary.py all-results || true

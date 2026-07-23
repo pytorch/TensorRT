@@ -1,0 +1,129 @@
+name: CI SBSA
+
+# Per-platform entry — SBSA (linux-aarch64) is BUILD-ONLY (no aarch64 GPU test
+# runners), so this just validates the wheel builds — standard AND TensorRT-RTX,
+# each with a python-only variant — on the full/nightly lanes. No test/report jobs
+# since nothing runs. (TensorRT-RTX ships an aarch64/SBSA build as of 1.5, so the
+# RTX channels build @tensorrt_rtx_sbsa via USE_TRT_RTX=1.)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "Which lane to run"
+        type: choice
+        options: [fast, full, nightly]
+        default: full
+      backend:
+        description: "Which backend(s) to test"
+        type: choice
+        options: [standard, rtx, both]
+        default: both
+
+concurrency:
+  # Only NON-CI label events (component:*, cla signed, …) get their own per-label
+  # group, so auto-label churn never cancels the running pipeline. CI-control labels
+  # (ci:full / ci:nightly / backend:*) and real pushes share the PR group so they
+  # SUPERSEDE cleanly — exactly ONE pipeline per commit. Coexisting runs would
+  # otherwise collide inside build_linux.yml's own concurrency and cancel a
+  # half-built wheel (that is what cancelled the SBSA aarch64 build).
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  decide:
+    # A label event only warrants running the pipeline when the label controls CI;
+    # auto-labels (component:*, cla signed) must not spawn work — and would each
+    # start a full run once ci:full is present. Non-label events always proceed.
+    if: >-
+      github.event.action != 'labeled' ||
+      contains(fromJSON('["ci: full", "ci: nightly", "backend: TensorRT", "backend: TensorRT-RTX"]'), github.event.label.name)
+    uses: ./.github/workflows/_decide.yml
+
+  # Generate the aarch64 build matrix once (shared by all build channels).
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: linux-aarch64
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  build:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      architecture: aarch64
+      run-tests: false
+      name-prefix: "SBSA "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  python-only:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: python-only
+      python-only: true
+      architecture: aarch64
+      run-tests: false
+      name-prefix: "Python-only SBSA "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  # RTX channels — run when an RTX backend is selected (backend != 'standard').
+  # TensorRT-RTX 1.5 ships an aarch64 (SBSA) build, so USE_TRT_RTX=1 resolves
+  # @tensorrt_rtx_sbsa. Build-only, same as the standard SBSA channels.
+  build-rtx:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: ${{ needs.decide.outputs.lane }}
+      architecture: aarch64
+      use-rtx: true
+      run-tests: false
+      name-prefix: "RTX SBSA "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  python-only-rtx:
+    needs: [decide, generate-matrix]
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    uses: ./.github/workflows/_test-linux.yml
+    with:
+      lane: python-only
+      python-only: true
+      architecture: aarch64
+      use-rtx: true
+      run-tests: false
+      name-prefix: "RTX Python-only SBSA "
+      raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  gate:
+    needs: [decide, build, python-only, build-rtx, python-only-rtx]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate
+        run: |
+          set -euo pipefail
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
+            echo "::error::an SBSA build failed — see the build jobs above"
+            exit 1
+          fi
+          echo "SBSA gate OK (cancelled/skipped channels ignored)."

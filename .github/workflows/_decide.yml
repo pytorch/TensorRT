@@ -1,0 +1,72 @@
+name: _decide
+
+# Resolve the lane + backend from the triggering event. Shared by the
+# per-platform entry workflows (ci-linux-x86_64 / ci-windows / ci-sbsa) so the
+# rules live in exactly one place. `github.*` here refers to the caller's event.
+#
+#   lane:    fast (PR push) | full (approval / `ci: full` / main push) |
+#            nightly (schedule) | skip (non-approval review)
+#   backend: standard | rtx | both  — from the `backend: TensorRT[-RTX]` labels
+#            (or the workflow_dispatch `backend` input)
+
+on:
+  workflow_call:
+    outputs:
+      lane:
+        description: "fast | full | nightly | skip"
+        value: ${{ jobs.decide.outputs.lane }}
+      backend:
+        description: "standard | rtx | both"
+        value: ${{ jobs.decide.outputs.backend }}
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      lane: ${{ steps.pick.outputs.lane }}
+      backend: ${{ steps.pick.outputs.backend }}
+    steps:
+      - id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          # Lane labels (consolidated): `ci: full` runs all tiers (L0+L1+L2);
+          # `ci: nightly` also adds the nightly-only suites. Neither → fast (L0
+          # smoke) on PR pushes. (The old `Force All Tests[L0+L1+L2]` label is gone.)
+          HAS_FULL_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'ci: full') }}"
+          HAS_NIGHTLY_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'ci: nightly') }}"
+          # Backend labels narrow the engine; on a full/nightly run their absence
+          # means BOTH. Exact match: 'backend: TensorRT' != 'backend: TensorRT-RTX'.
+          HAS_RTX_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'backend: TensorRT-RTX') }}"
+          HAS_STD_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'backend: TensorRT') }}"
+          DISPATCH_LANE: ${{ github.event.inputs.lane }}
+          DISPATCH_BACKEND: ${{ github.event.inputs.backend }}
+        run: |
+          set -euo pipefail
+          case "$EVENT" in
+            schedule)           lane=nightly ;;
+            workflow_dispatch)  lane="${DISPATCH_LANE:-full}" ;;
+            push)               lane=full ;;                  # main canary
+            pull_request_review)
+              [ "$REVIEW_STATE" = "approved" ] && lane=full || lane=skip ;;
+            pull_request)
+              if   [ "$HAS_NIGHTLY_LABEL" = "true" ]; then lane=nightly
+              elif [ "$HAS_FULL_LABEL" = "true" ]; then lane=full
+              else lane=fast; fi ;;
+            *)                  lane=fast ;;
+          esac
+          echo "lane=$lane" >> "$GITHUB_OUTPUT"
+          # Backend: explicit labels win; otherwise a fast PR push stays
+          # standard-only (cheap), while full/nightly default to BOTH engines.
+          case "$EVENT" in
+            workflow_dispatch) backend="${DISPATCH_BACKEND:-both}" ;;
+            pull_request)
+              if   [ "$HAS_RTX_LABEL" = "true" ] && [ "$HAS_STD_LABEL" = "true" ]; then backend=both
+              elif [ "$HAS_RTX_LABEL" = "true" ]; then backend=rtx
+              elif [ "$HAS_STD_LABEL" = "true" ]; then backend=standard
+              elif [ "$lane" = "fast" ]; then backend=standard
+              else backend=both; fi ;;
+            *)                  backend=both ;;   # push / approval / schedule
+          esac
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "Resolved lane='$lane' backend='$backend' (event=$EVENT)."
