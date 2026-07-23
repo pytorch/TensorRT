@@ -68,6 +68,7 @@ jobs:
       build-matrix: ${{ needs.select-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       fail-on-empty: false
+      upload-artifact: torch-tensorrt-executorch-delegate
       script: |
         set -euo pipefail
         BAZELISK_VERSION="1.26.0"
@@ -96,5 +97,15 @@ jobs:
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         # this is to verify the end user's workflow
-        python -m pip install pyyaml "executorch>=1.3.1"
-        .github/scripts/verify-executorch-reference-runner.sh
+        python -m pip install pyyaml executorch
+
+        # export the model to a .pte file
+        python examples/torchtrt_executorch_example/export_static_shape.py --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
+        # verify the c++ reference runner can run the model
+        .github/scripts/verify-executorch-reference-runner.sh "${RUNNER_TEMP}/torchtrt-python.pte"
+
+        # Build the no-compile-for-users Python runtime/delegate wheel.
+        python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-delegate
+        python -m pip install --no-deps --force-reinstall dist/torch_tensorrt_executorch_delegate-*.whl
+        python -c 'from torch_tensorrt_executorch_delegate import runtime; assert runtime().backend_registry.is_available("TensorRTBackend")'
+        python examples/executorch_reference_runner/load_model.py --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1

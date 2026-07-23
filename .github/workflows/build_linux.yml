@@ -90,6 +90,11 @@ on:
         required: false
         default: "python -m build --wheel"
         type: string
+      build-executorch-delegate:
+        description: Build and publish the matching ExecuTorch delegate wheel
+        required: false
+        default: false
+        type: boolean
       pip-install-torch-extra-args:
         # NOTE: Why does this exist?
         # Well setuptools / python packaging doesn't actually allow you to specify dependencies
@@ -152,6 +157,7 @@ jobs:
       ARCH: ${{ inputs.architecture }}
       BUILD_TARGET: ${{ inputs.build-target }}
       USE_TRT_RTX: ${{ inputs.use-rtx }}
+      BUILD_EXECUTORCH_DELEGATE: ${{ inputs.build-executorch-delegate }}
     name: build-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.architecture }}-${{ inputs.use-rtx }}-${{ inputs.is-jetpack }}
     runs-on: ${{ matrix.validation_runner }}
     environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
@@ -313,6 +319,19 @@ jobs:
               ${CONDA_RUN} python setup.py bdist_wheel ${param}
             fi
           fi
+      - name: Build the ExecuTorch delegate wheel
+        if: ${{ inputs.build-executorch-delegate && inputs.use-rtx == false && inputs.is-jetpack == false && inputs.is-release-tarball == false }}
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          ${CONDA_RUN} python -m pip install pyyaml executorch
+          executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
+          export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
+          export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
+          ${CONDA_RUN} python -m pip wheel --no-build-isolation --no-deps \
+            --wheel-dir dist py/torch-tensorrt-executorch-delegate
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
         env:
@@ -346,16 +365,31 @@ jobs:
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
-          echo "$WHEEL_NAME"
+          mapfile -t WHEEL_PATHS < <(find "${{ inputs.repository }}/dist" -maxdepth 1 -name "*.whl" -print | sort)
+          if [[ ${#WHEEL_PATHS[@]} -eq 0 ]]; then
+            echo "No wheels found in ${{ inputs.repository }}/dist" >&2
+            exit 1
+          fi
+          printf "Wheel: %s\n" "${WHEEL_PATHS[@]}"
+          MAIN_WHEEL=""
+          for wheel_path in "${WHEEL_PATHS[@]}"; do
+            if [[ $(basename "${wheel_path}") == torch_tensorrt-[0-9]*.whl ]]; then
+              MAIN_WHEEL="${wheel_path}"
+              break
+            fi
+          done
+          if [[ -z "${MAIN_WHEEL}" ]]; then
+            echo "Could not identify the torch_tensorrt wheel" >&2
+            exit 1
+          fi
           if [[ ${{ inputs.architecture }} == "aarch64" ]]; then
             echo "Skipping smoke test for aarch64, since it is not an actual gpu runner"
           else
-            ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME" --use-deprecated=legacy-resolver --extra-index-url https://download.pytorch.org/${CHANNEL}/${CU_VERSION}
+            ${CONDA_RUN} pip install "${WHEEL_PATHS[@]}" --use-deprecated=legacy-resolver --extra-index-url https://download.pytorch.org/${CHANNEL}/${CU_VERSION}
             # Checking that we have a pinned version of torch in our dependency tree
             (
               pushd "${RUNNER_TEMP}"
-              unzip -o "${GITHUB_WORKSPACE}/${{ inputs.repository }}/dist/$WHEEL_NAME"
+              unzip -o "${MAIN_WHEEL}"
               # Ensure that pytorch version is pinned, should output file where it was found
               grep "Requires-Dist: torch (==.*)" -r .
             )
@@ -373,6 +407,9 @@ jobs:
             else
               echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} found"
               ${CONDA_RUN} python "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT}"
+            fi
+            if [[ "${BUILD_EXECUTORCH_DELEGATE}" == "true" ]]; then
+              ${CONDA_RUN} python -c 'from torch_tensorrt_executorch_delegate import runtime; assert runtime().backend_registry.is_available("TensorRTBackend")'
             fi
           fi
 

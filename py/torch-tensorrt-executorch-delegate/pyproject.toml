@@ -1,0 +1,9 @@
+[build-system]
+requires = [
+    "setuptools>=68",
+    "wheel>=0.40",
+    # Intentionally supplied by the active Torch-TensorRT build environment.
+    # Builds must use --no-build-isolation; see README.md.
+    "torch",
+]
+build-backend = "setuptools.build_meta"
