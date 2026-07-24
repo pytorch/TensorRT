@@ -40,7 +40,7 @@ def quantize(
     source_ir: Optional[SourceIR],
     name: str,
     input_tensor: TRTTensor,
-    amax: Union[np.ndarray, torch.Tensor],
+    amax: Union[np.ndarray, torch.Tensor, TRTTensor],
     num_bits: int,
     exponent_bits: int,
 ) -> TRTTensor:
@@ -78,25 +78,27 @@ def quantize(
             max_bound = 448
 
         axis = None
-        # int8 weight quantization is per-channel quantization(it can have one or multiple amax values)
-        if dtype == trt.DataType.INT8 and amax.numel() > 1:
-            # if the amax has more than one element, calculate the axis, otherwise axis value will be ignored
-            amax_init_shape = amax.shape
-            amax = amax.squeeze().data
-            assert (
-                len(amax.shape) == 1
-            ), f"TensorRT does not support multi-axis quantization. {name=} {amax_init_shape=} {amax.shape=} "
-            axis = list(amax_init_shape).index(list(amax.shape)[0])
-            assert (
-                axis == 0
-            ), f"{name=} {amax=} is per-channel quantization, expected axis to be 0, but got {axis=}"
-        else:
-            # int8 activation and fp8 weight/activation quantization is per-tensor quantization, it can only have single amax value
-            assert (
-                amax.numel() == 1
-            ), f"{name=} is per-tensor quantization, expected amax is a singular value, but got {amax.shape=}"
-
+        # Dynamic amax (TRT ITensor) is always treated as per-tensor; numel()/shape
+        # checks only apply to constant torch/numpy amax values.
         if not isinstance(amax, trt.ITensor):
+            # int8 weight quantization is per-channel quantization(it can have one or multiple amax values)
+            if dtype == trt.DataType.INT8 and amax.numel() > 1:
+                # if the amax has more than one element, calculate the axis, otherwise axis value will be ignored
+                amax_init_shape = amax.shape
+                amax = amax.squeeze().data
+                assert (
+                    len(amax.shape) == 1
+                ), f"TensorRT does not support multi-axis quantization. {name=} {amax_init_shape=} {amax.shape=} "
+                axis = list(amax_init_shape).index(list(amax.shape)[0])
+                assert (
+                    axis == 0
+                ), f"{name=} {amax=} is per-channel quantization, expected axis to be 0, but got {axis=}"
+            else:
+                # int8 activation and fp8 weight/activation quantization is per-tensor quantization, it can only have single amax value
+                assert (
+                    amax.numel() == 1
+                ), f"{name=} is per-tensor quantization, expected amax is a singular value, but got {amax.shape=}"
+
             amax = to_torch(amax, None)
             scale = torch.divide(amax, max_bound)
             scale = get_trt_tensor(ctx, scale, name + "_scale", dtype=torch.float32)

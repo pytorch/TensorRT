@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 import logging
+from contextlib import nullcontext
 from inspect import signature
 from typing import Any, Optional, Tuple, Union
 
@@ -79,13 +81,22 @@ def trace(
     dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
     dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs, dim_registry)
     dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry))
-    exp_program = export(
-        mod,
-        tuple(torch_arg_inputs),
-        kwargs=torch_kwarg_inputs,
-        dynamic_shapes=dynamic_shapes,
-        strict=kwargs.get("strict", False),
-    )
+
+    export_context = nullcontext()
+    if importlib.util.find_spec("modelopt") is not None:
+        from modelopt.torch.quantization.utils import export_torch_mode, is_quantized
+
+        if is_quantized(mod):
+            export_context = export_torch_mode()
+
+    with export_context:
+        exp_program = export(
+            mod,
+            tuple(torch_arg_inputs),
+            kwargs=torch_kwarg_inputs,
+            dynamic_shapes=dynamic_shapes,
+            strict=kwargs.get("strict", False),
+        )
 
     return exp_program
 
