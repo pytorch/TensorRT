@@ -183,7 +183,42 @@ class Input(object):
                         "if you try to run inference with empty tensor inputs."
                     )
 
+                # Namedtuple shape API: field names encode per-axis dimension names.
+                # Convert to shared_dims so _tracer.py needs no changes — axes with the
+                # same name across inputs become one shared torch.export.Dim.
+                if hasattr(kwargs["min_shape"], "_fields"):
+                    fields = kwargs["min_shape"]._fields
+                    if not (
+                        hasattr(kwargs["opt_shape"], "_fields")
+                        and hasattr(kwargs["max_shape"], "_fields")
+                    ):
+                        raise TypeError(
+                            "If min_shape is a namedtuple, opt_shape and max_shape must also be namedtuples"
+                        )
+                    if not (
+                        kwargs["opt_shape"]._fields == fields
+                        and kwargs["max_shape"]._fields == fields
+                    ):
+                        raise ValueError(
+                            "min_shape, opt_shape, max_shape namedtuples must have identical field names"
+                        )
+                    # Only tag dynamic axes (min != max); static axes need no shared Dim.
+                    self.shared_dims = {
+                        i: name
+                        for i, name in enumerate(fields)
+                        if self.shape["min_shape"][i] != self.shape["max_shape"][i]
+                    }
+
                 if "shared_dims" in kwargs and kwargs["shared_dims"]:
+                    if hasattr(kwargs["min_shape"], "_fields"):
+                        # Not allowed:
+                        #   S = namedtuple('S', ['b', 'c'])
+                        #   Input(min_shape=S(1,2), opt_shape=S(4,2), max_shape=S(8,2),
+                        #         shared_dims={0: "b"})   # ← redundant and ambiguous
+                        raise ValueError(
+                            "Cannot specify both a namedtuple min_shape and shared_dims; "
+                            "use one or the other to name dynamic axes."
+                        )
                     self.shared_dims = Input._parse_shared_dims(
                         kwargs["shared_dims"], self.shape
                     )
