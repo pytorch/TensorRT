@@ -8,6 +8,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
     build-docs:
         runs-on: linux.g5.4xlarge.nvidia.gpu
