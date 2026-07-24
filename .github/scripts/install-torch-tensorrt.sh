@@ -16,7 +16,7 @@ python -m pip install --upgrade "pip>=25.1" "tomli>=1.1.0; python_version < '3.1
 python -m pip install \
     --pre \
     --extra-index-url https://pypi.nvidia.com \
-    --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+    --extra-index-url https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION} \
     --group test \
     --group test-ext \
     --group quantization
