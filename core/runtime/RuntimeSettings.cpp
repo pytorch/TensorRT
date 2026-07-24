@@ -1,5 +1,6 @@
 #include "core/runtime/RuntimeSettings.h"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <iterator>
@@ -124,9 +125,13 @@ at::Tensor RuntimeCacheHandle::serialize() const {
 #ifdef TRT_MAJOR_RTX
   std::lock_guard<std::mutex> lock(state_mu_);
   if (!trt_handle_) {
-    LOG_WARNING(
-        "RuntimeCacheHandle::serialize() called before the IRuntimeCache was materialized; returning empty bytes.");
-    return empty();
+    if (std::empty(pending_warm_bytes_)) {
+      return empty();
+    }
+    auto tensor = at::empty({static_cast<int64_t>(pending_warm_bytes_.size())}, opts);
+    std::copy(
+        std::cbegin(pending_warm_bytes_), std::cend(pending_warm_bytes_), static_cast<uint8_t*>(tensor.data_ptr()));
+    return tensor;
   }
   auto host_mem = make_trt(trt_handle_->serialize());
   TORCHTRT_CHECK(host_mem, "IRuntimeCache::serialize() returned null host memory; cannot serialize cache bytes.");
