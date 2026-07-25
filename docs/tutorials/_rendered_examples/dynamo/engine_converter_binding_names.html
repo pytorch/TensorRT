@@ -1,0 +1,1020 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Naming Engine Bindings with convert_exported_program_to_serialized_trt_engine &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/nbsphinx-code-cells.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=71a86b84"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/dynamo/engine_converter_binding_names';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Distributed Inference" href="../../deployment/distributed_inference.html" />
+    <link rel="prev" title="Cross runtime compilation for windows example" href="cross_runtime_compilation_for_windows.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../huggingface/index.html">HuggingFace Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../huggingface/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_compile_stable_diffusion.html">Example: Compiling Stable Diffusion with torch.compile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_export_flux_dev.html">Example: Compiling FLUX.1-dev with the dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mutable_torchtrt_module_example.html">Example: Mutable Torch TensorRT Module</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../extensibility/index.html">Extensibility</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/converters/index.html">Converters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/converter_registry.html">Converter Registry Internals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/impl_subpackage.html">The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library</a></li>
+<li class="toctree-l3"><a class="reference internal" href="auto_generate_converters.html">Example: Auto-generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="converter_overloading.html">Example: Overloading Converters with Custom Converters</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/subgraph_builder.html">SubgraphBuilder — Cursor-Based FX Node Insertion</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/plugins/plugins.html">Plugin System</a></li>
+<li class="toctree-l3"><a class="reference internal" href="auto_generate_plugins.html">Example: Auto-generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="custom_kernel_plugins.html">Example: Using Custom Kernels within TensorRT Engines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="aot_plugin.html">Automatically Generate a TensorRT AOT Plugin</a></li>
+
+
+
+
+
+
+<li class="toctree-l3"><a class="reference internal" href="nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../resource_memory/index.html">Resource &amp; Memory Management</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/resource_management.html">Resource Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/engine_cache.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="engine_caching_example.html">Example: Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="engine_caching_bert_example.html">Example: Engine Caching (BERT)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="weight_streaming_example.html">Example: Weight Streaming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dynamic_memory_allocation.html">Example: Dynamic Memory Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="low_cpu_memory_compilation.html">Example: Low CPU Memory Compilation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../compilation_analysis/index.html">Compilation &amp; Graph Analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/trace.html">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/dryrun.html">Dryrun Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hierarchical_partitioner_example.html">Example: Hierarchical Partitioner</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../weight_refit/index.html">Weight Refitting &amp; LoRA</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../weight_refit/refit.html">Refitting TensorRT Engines with Updated Weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="refit_engine_example.html">Example: Refitting Programs with New Weights</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../runtime_opt/index.html">Runtime Optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/multi_optimization_profiles.html">Multiple Optimization Profiles (Prefill / Decode)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi_optimization_profiles.html">Example: Multiple optimization profiles (prefill/decode)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python vs C++ runtime</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../deployment/index.html">Deployment</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Example: Naming engine I/O bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/distributed_inference.html">Distributed Inference</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../complex_numerics/index.html">Complex Numerics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../complex_numerics/complex_tensors.html">Complex Tensor Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torch_export_3d_rope.html">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../distributed_inference/index.html">Example: Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/test_multinode_nccl.html">Usage</a></li>
+
+
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/tensor_parallel_simple_example_mn.html">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../distributed_inference/test_multinode_export_save_load.html">Usage</a></li>
+
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../advanced_usage.html" class="nav-link">Advanced Usage</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="../../deployment/index.html" class="nav-link">Deployment</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Naming...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="Naming-Engine-Bindings-with-convert_exported_program_to_serialized_trt_engine">
+<h1>Naming Engine Bindings with <code class="docutils literal notranslate"><span class="pre">convert_exported_program_to_serialized_trt_engine</span></code><a class="headerlink" href="#Naming-Engine-Bindings-with-convert_exported_program_to_serialized_trt_engine" title="Link to this heading">#</a></h1>
+<p>When you use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine</span></code> to produce a raw serialized TensorRT engine, the engine’s binding names are determined by Torch-TensorRT’s default policy:</p>
+<ul class="simple">
+<li><p><strong>Inputs</strong> get the FX placeholder names from the exported program (typically the names of your <code class="docutils literal notranslate"><span class="pre">forward()</span></code> arguments).</p></li>
+<li><p><strong>Outputs</strong> get auto-generated names <code class="docutils literal notranslate"><span class="pre">output0</span></code>, <code class="docutils literal notranslate"><span class="pre">output1</span></code>, etc.</p></li>
+</ul>
+<p>Many production runtimes (Triton Inference Server, custom C++ harnesses, ONNX-style integrations) bind tensors by name rather than position, and the auto-generated names often don’t line up with what the rest of the serving stack expects. The engine converter exposes three keyword arguments that let you supply binding names shaped like your model’s inputs and return value:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">arg_input_binding_names</span></code> — pytree of strings matching <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kwarg_input_binding_names</span></code> — pytree of strings matching <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">output_binding_names</span></code> — pytree of strings matching the model’s return</p></li>
+</ul>
+<p>The shape of each kwarg directly mirrors how you already pass the values themselves: <code class="docutils literal notranslate"><span class="pre">arg_input_binding_names</span></code> lines up with <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code>, <code class="docutils literal notranslate"><span class="pre">kwarg_input_binding_names</span></code> lines up with <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code>.</p>
+<section id="A-note-on-%22the-return-shape%22">
+<h2>A note on “the return shape”<a class="headerlink" href="#A-note-on-%22the-return-shape%22" title="Link to this heading">#</a></h2>
+<p>A Python function always returns exactly one value. <code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">a,</span> <span class="pre">b</span></code> is a single tuple-shaped return value; <code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">{&quot;x&quot;:</span> <span class="pre">a,</span> <span class="pre">&quot;y&quot;:</span> <span class="pre">b}</span></code> is a single dict-shaped return value. Whatever that value is, the exported program captures it as a pytree. Its <em>leaves</em> — the individual tensors at the bottom of the structure — become engine bindings, and you supply names in the same pytree shape. Inputs work the same way: <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code> is itself a pytree (a tuple of positional values, each of which can be a
+tensor or a nested collection of tensors); <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code> is a dict-shaped pytree.</p>
+</section>
+<section id="How-it-works">
+<h2>How it works<a class="headerlink" href="#How-it-works" title="Link to this heading">#</a></h2>
+<p>The exported program already carries pytree specs (<code class="docutils literal notranslate"><span class="pre">args_spec</span></code> for <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code>, <code class="docutils literal notranslate"><span class="pre">kwargs_spec</span></code> for <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code>, <code class="docutils literal notranslate"><span class="pre">out_spec</span></code> for the return value) that fully describe the structure of inputs and outputs. When you provide binding names as a pytree of strings, Torch-TensorRT runs <code class="docutils literal notranslate"><span class="pre">pytree.tree_flatten</span></code> and compares the resulting <code class="docutils literal notranslate"><span class="pre">TreeSpec</span></code> against the exported program’s spec. When they match, the flat list of names maps 1:1 to FX’s flattened placeholder / output order — no runtime
+queue, no in-band validation, just an up-front structural check.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
+import torch_tensorrt
+from torch_tensorrt.dynamo._compiler import BindingNameMismatchError
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import tensorrt as trt
+
+DEVICE = torch.device(&quot;cuda&quot;, 0)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Helpers">
+<h2>Helpers<a class="headerlink" href="#Helpers" title="Link to this heading">#</a></h2>
+<p>A pair of small helpers: one reads binding names off a deserialized engine, the other actually runs the engine via the native TRT Python API. The “execute via native TRT” path is what production deployments use — the whole point of this API is that the binding names you supply are the names you’ll bind by at execution time, not just metadata in the engine file.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def deserialize(engine_bytes: bytes) -&gt; trt.ICudaEngine:
+    runtime = trt.Runtime(trt.Logger(trt.Logger.WARNING))
+    return runtime.deserialize_cuda_engine(engine_bytes)
+
+
+def binding_names(engine: trt.ICudaEngine, mode: trt.TensorIOMode) -&gt; list[str]:
+    return [
+        engine.get_tensor_name(i)
+        for i in range(engine.num_io_tensors)
+        if engine.get_tensor_mode(engine.get_tensor_name(i)) == mode
+    ]
+
+
+_TRT_TO_TORCH_DTYPE = {
+    trt.DataType.FLOAT: torch.float32,
+    trt.DataType.HALF: torch.float16,
+    trt.DataType.INT32: torch.int32,
+    trt.DataType.INT64: torch.int64,
+    trt.DataType.BOOL: torch.bool,
+    trt.DataType.BF16: torch.bfloat16,
+}
+
+
+def run_engine(engine: trt.ICudaEngine, named_inputs: dict) -&gt; dict:
+    &quot;&quot;&quot;Execute an engine via the native TRT Python API.
+
+    ``named_inputs`` is a {binding_name: contiguous CUDA tensor} dict.
+    Returns {binding_name: output tensor}.  Demonstrates that the
+    user-supplied binding names are what production C++/Python TRT
+    runtime code will bind by.
+    &quot;&quot;&quot;
+    context = engine.create_execution_context()
+    for name, tensor in named_inputs.items():
+        context.set_input_shape(name, tuple(tensor.shape))
+        context.set_tensor_address(name, tensor.data_ptr())
+
+    outputs = {}
+    for i in range(engine.num_io_tensors):
+        name = engine.get_tensor_name(i)
+        if engine.get_tensor_mode(name) != trt.TensorIOMode.OUTPUT:
+            continue
+        shape = tuple(context.get_tensor_shape(name))
+        dtype = _TRT_TO_TORCH_DTYPE[engine.get_tensor_dtype(name)]
+        out = torch.empty(shape, dtype=dtype, device=DEVICE)
+        context.set_tensor_address(name, out.data_ptr())
+        outputs[name] = out
+
+    stream = torch.cuda.Stream(device=DEVICE)
+    with torch.cuda.stream(stream):
+        context.execute_async_v3(stream.cuda_stream)
+    stream.synchronize()
+    return outputs
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Case-1-—-positional-args,-tuple-shaped-return">
+<h2>Case 1 — positional args, tuple-shaped return<a class="headerlink" href="#Case-1-—-positional-args,-tuple-shaped-return" title="Link to this heading">#</a></h2>
+<p>Start with the most common shape: <code class="docutils literal notranslate"><span class="pre">forward(x)</span></code> returning a 2-tuple. <code class="docutils literal notranslate"><span class="pre">arg_input_binding_names</span></code> mirrors <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code> (a 1-tuple here); <code class="docutils literal notranslate"><span class="pre">output_binding_names</span></code> mirrors the return tuple.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>class TwoHeads(torch.nn.Module):
+    def forward(self, x: torch.Tensor):
+        return torch.relu(x), torch.tanh(x)
+
+
+two_heads = TwoHeads().eval().cuda().half()
+x = torch.randn(2, 3, device=DEVICE, dtype=torch.float16)
+exported = torch.export.export(two_heads, (x,))
+
+engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+    exported,
+    arg_inputs=(x,),
+    arg_input_binding_names=(&quot;input_image&quot;,),
+    output_binding_names=(&quot;relu_out&quot;, &quot;tanh_out&quot;),
+    require_full_compilation=True,
+    min_block_size=1,
+    use_python_runtime=False,
+    immutable_weights=True,
+)
+engine = deserialize(engine_bytes)
+print(&quot;Case 1 inputs:&quot;, binding_names(engine, trt.TensorIOMode.INPUT))
+print(&quot;Case 1 outputs:&quot;, binding_names(engine, trt.TensorIOMode.OUTPUT))
+# Case 1 inputs: [&#39;input_image&#39;]
+# Case 1 outputs: [&#39;relu_out&#39;, &#39;tanh_out&#39;]
+
+# Run the engine through the native TRT API using the names we requested.
+trt_outs = run_engine(engine, {&quot;input_image&quot;: x.contiguous()})
+with torch.no_grad():
+    ref_relu, ref_tanh = two_heads(x)
+torch.testing.assert_close(trt_outs[&quot;relu_out&quot;], ref_relu, rtol=1e-2, atol=1e-2)
+torch.testing.assert_close(trt_outs[&quot;tanh_out&quot;], ref_tanh, rtol=1e-2, atol=1e-2)
+print(&quot;Case 1 native TRT run matches PyTorch.&quot;)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Case-2-—-keyword-only-inputs">
+<h2>Case 2 — keyword-only inputs<a class="headerlink" href="#Case-2-—-keyword-only-inputs" title="Link to this heading">#</a></h2>
+<p>When the model takes keyword arguments, you pass <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code> and match its shape with <code class="docutils literal notranslate"><span class="pre">kwarg_input_binding_names</span></code>. Note we leave <code class="docutils literal notranslate"><span class="pre">arg_input_binding_names</span></code> unset because <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code> is empty.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>class KwargOnly(torch.nn.Module):
+    def forward(self, image: torch.Tensor, positions: torch.Tensor):
+        return image + positions
+
+
+kwarg_only = KwargOnly().eval().cuda().half()
+image = torch.randn(2, 3, device=DEVICE, dtype=torch.float16)
+positions = torch.randn(2, 3, device=DEVICE, dtype=torch.float16)
+kw_exported = torch.export.export(
+    kwarg_only,
+    args=(),
+    kwargs={&quot;image&quot;: image, &quot;positions&quot;: positions},
+)
+
+engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+    kw_exported,
+    arg_inputs=(),
+    kwarg_inputs={&quot;image&quot;: image, &quot;positions&quot;: positions},
+    kwarg_input_binding_names={&quot;image&quot;: &quot;rgb_in&quot;, &quot;positions&quot;: &quot;pos_in&quot;},
+    output_binding_names=&quot;combined&quot;,
+    require_full_compilation=True,
+    min_block_size=1,
+    use_python_runtime=False,
+    immutable_weights=True,
+)
+engine = deserialize(engine_bytes)
+print(&quot;Case 2 inputs:&quot;, sorted(binding_names(engine, trt.TensorIOMode.INPUT)))
+print(&quot;Case 2 outputs:&quot;, binding_names(engine, trt.TensorIOMode.OUTPUT))
+# Case 2 inputs: [&#39;pos_in&#39;, &#39;rgb_in&#39;]
+# Case 2 outputs: [&#39;combined&#39;]
+
+trt_outs = run_engine(
+    engine,
+    {&quot;rgb_in&quot;: image.contiguous(), &quot;pos_in&quot;: positions.contiguous()},
+)
+with torch.no_grad():
+    ref = kwarg_only(image=image, positions=positions)
+torch.testing.assert_close(trt_outs[&quot;combined&quot;], ref, rtol=1e-2, atol=1e-2)
+print(&quot;Case 2 native TRT run matches PyTorch.&quot;)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Case-3-—-nested-collections-as-inputs-and-outputs">
+<h2>Case 3 — nested collections as inputs and outputs<a class="headerlink" href="#Case-3-—-nested-collections-as-inputs-and-outputs" title="Link to this heading">#</a></h2>
+<p>Inputs and outputs can be arbitrary nested collections of tensors — tuples of dicts of tensors, lists of tuples, anything <code class="docutils literal notranslate"><span class="pre">pytree</span></code> can flatten. The binding-name kwargs follow the same nesting. Here the model takes a tuple of two cameras (each a dict of two tensors) and returns a dict of feature stacks.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>class CameraTower(torch.nn.Module):
+    def forward(self, cameras: tuple, bias: torch.Tensor):
+        feats = []
+        for cam in cameras:
+            feats.append(cam[&quot;rgb&quot;] + cam[&quot;depth&quot;] + bias)
+        return {&quot;primary&quot;: feats[0], &quot;secondary&quot;: feats[1]}
+
+
+def _cam():
+    return {
+        &quot;rgb&quot;: torch.randn(2, 3, device=DEVICE, dtype=torch.float16),
+        &quot;depth&quot;: torch.randn(2, 3, device=DEVICE, dtype=torch.float16),
+    }
+
+
+camera_tower = CameraTower().eval().cuda().half()
+cameras = (_cam(), _cam())
+bias = torch.randn(2, 3, device=DEVICE, dtype=torch.float16)
+nested_exported = torch.export.export(camera_tower, args=(cameras, bias))
+
+engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+    nested_exported,
+    arg_inputs=(cameras, bias),
+    arg_input_binding_names=(
+        (
+            {&quot;rgb&quot;: &quot;cam0_rgb&quot;, &quot;depth&quot;: &quot;cam0_depth&quot;},
+            {&quot;rgb&quot;: &quot;cam1_rgb&quot;, &quot;depth&quot;: &quot;cam1_depth&quot;},
+        ),
+        &quot;global_bias&quot;,
+    ),
+    output_binding_names={&quot;primary&quot;: &quot;p_feats&quot;, &quot;secondary&quot;: &quot;s_feats&quot;},
+    require_full_compilation=True,
+    min_block_size=1,
+    use_python_runtime=False,
+    immutable_weights=True,
+)
+engine = deserialize(engine_bytes)
+print(&quot;Case 3 inputs:&quot;, sorted(binding_names(engine, trt.TensorIOMode.INPUT)))
+print(&quot;Case 3 outputs:&quot;, sorted(binding_names(engine, trt.TensorIOMode.OUTPUT)))
+# Case 3 inputs: [&#39;cam0_depth&#39;, &#39;cam0_rgb&#39;, &#39;cam1_depth&#39;, &#39;cam1_rgb&#39;, &#39;global_bias&#39;]
+# Case 3 outputs: [&#39;p_feats&#39;, &#39;s_feats&#39;]
+
+trt_outs = run_engine(
+    engine,
+    {
+        &quot;cam0_rgb&quot;: cameras[0][&quot;rgb&quot;].contiguous(),
+        &quot;cam0_depth&quot;: cameras[0][&quot;depth&quot;].contiguous(),
+        &quot;cam1_rgb&quot;: cameras[1][&quot;rgb&quot;].contiguous(),
+        &quot;cam1_depth&quot;: cameras[1][&quot;depth&quot;].contiguous(),
+        &quot;global_bias&quot;: bias.contiguous(),
+    },
+)
+with torch.no_grad():
+    ref = camera_tower(cameras, bias)
+torch.testing.assert_close(trt_outs[&quot;p_feats&quot;], ref[&quot;primary&quot;], rtol=1e-2, atol=1e-2)
+torch.testing.assert_close(trt_outs[&quot;s_feats&quot;], ref[&quot;secondary&quot;], rtol=1e-2, atol=1e-2)
+print(&quot;Case 3 native TRT run matches PyTorch.&quot;)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Case-4-—-structural-validation">
+<h2>Case 4 — structural validation<a class="headerlink" href="#Case-4-—-structural-validation" title="Link to this heading">#</a></h2>
+<p>If the shape of any of the binding-name kwargs doesn’t match the exported program’s spec, the converter raises <code class="docutils literal notranslate"><span class="pre">BindingNameMismatchError</span></code> before any TensorRT network construction. The error message shows the expected structure plus a leaf-position listing — you can read the correct shape off the error and re-run.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>try:
+    torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+        exported,
+        arg_inputs=(x,),
+        output_binding_names=(&quot;only_one&quot;,),  # wrong arity for the 2-tuple return
+        require_full_compilation=True,
+        min_block_size=1,
+        use_python_runtime=False,
+        immutable_weights=True,
+    )
+except BindingNameMismatchError as err:
+    print(&quot;Caught BindingNameMismatchError as expected.&quot;)
+    print(str(err).splitlines()[0])
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Notes">
+<h2>Notes<a class="headerlink" href="#Notes" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>The binding-name kwargs are <em>parallel</em> to the input kwargs they refer to: <code class="docutils literal notranslate"><span class="pre">arg_input_binding_names</span></code> matches <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code>, <code class="docutils literal notranslate"><span class="pre">kwarg_input_binding_names</span></code> matches <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code>. Skip either one if the corresponding input slot is empty.</p></li>
+<li><p>Duplicate names within any individual list, or across inputs and outputs, are rejected at the API boundary — TensorRT requires binding names to be globally unique.</p></li>
+<li><p>This API is <strong>only</strong> available on <code class="docutils literal notranslate"><span class="pre">convert_exported_program_to_serialized_trt_engine</span></code>. <code class="docutils literal notranslate"><span class="pre">compile()</span></code> and <code class="docutils literal notranslate"><span class="pre">dynamo.compile()</span></code> produce <code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> artifacts whose runtime depends on the default naming policy, so they intentionally don’t expose this knob.</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="cross_runtime_compilation_for_windows.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Cross runtime compilation for windows example</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../../deployment/distributed_inference.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Distributed Inference</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#A-note-on-%22the-return-shape%22">A note on “the return shape”</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#How-it-works">How it works</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Helpers">Helpers</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Case-1-—-positional-args,-tuple-shaped-return">Case 1 — positional args, tuple-shaped return</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Case-2-—-keyword-only-inputs">Case 2 — keyword-only inputs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Case-3-—-nested-collections-as-inputs-and-outputs">Case 3 — nested collections as inputs and outputs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Case-4-—-structural-validation">Case 4 — structural validation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Notes">Notes</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/dynamo/engine_converter_binding_names.ipynb">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../_sources/tutorials/_rendered_examples/dynamo/engine_converter_binding_names.ipynb.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

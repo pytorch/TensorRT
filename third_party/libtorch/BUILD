@@ -33,9 +33,6 @@ cc_library(
     }) + glob(
         [
             "lib/libtorch_nvshmem.so*",
-            "nvidia/cusparselt/lib/libcusparseLt.so*",
-            "nvidia/cudnn/lib/libcudnn*.so*",
-            "nvidia/nvshmem/lib/libnvshmem_host.so*",
         ],
         allow_empty = True,
     ),
