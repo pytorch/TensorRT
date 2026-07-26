@@ -182,12 +182,12 @@ new_local_repository(
     build_file = "third_party/libtorch/BUILD"
 )
 
-# Pinned to the ExecuTorch release/1.3 branch head.
+# Pinned to the ExecuTorch release/1.4 branch head.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # latest commit in release/1.3 branch
-    commit = "6118688a095fd9697224f5cad72ce42db641c9cd",
+    # latest commit in release/1.4 branch
+    commit = "cd380e7aefd18c171271cc228d3a155455095219",
     recursive_init_submodules = True,
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
