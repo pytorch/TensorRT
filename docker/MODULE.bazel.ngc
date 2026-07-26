@@ -71,12 +71,13 @@ new_local_repository(
     build_file = "third_party/libtorch/BUILD"
 )
 
-# Pinned to the ExecuTorch release/1.3 branch head.
+# Keep this pin synchronized with the ExecuTorch release installed in
+# py/torch-tensorrt-executorch-runtime/README.md.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # latest commit in release/1.3 branch
-    commit = "6118688a095fd9697224f5cad72ce42db641c9cd",
+    # executorch==1.4.1
+    commit = "e4d02f41f7909e8ed5bf4a14ffc520d733453d9f",
     recursive_init_submodules = True,
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
