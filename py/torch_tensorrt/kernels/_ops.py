@@ -1,18 +1,21 @@
 """Public entry points for ``torch_tensorrt.kernels``.
 
-Two functions, two paths into the same registration funnel:
+Three functions, three paths into the same registration funnel:
 
 * :func:`cuda_kernel_op` — declarative entry for CUDA C++ source. Reads
   a :class:`KernelSpec` and derives meta / eager / aot / schema, with
   override keyword arguments for cases outside the DSL.
 * :func:`ptx_op` — escape hatch for pre-compiled PTX bytes (Triton output,
   cached NVRTC artifact). User supplies meta / eager / aot directly.
+* :func:`triton_op` — declarative entry for a ``@triton.jit`` kernel. Compiles
+  the kernel to PTX for you and derives the AOT launch, so callers don't
+  hand-write the ``@trtp.aot_impl`` compile boilerplate.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
@@ -181,3 +184,138 @@ def ptx_op(
         schema=schema,
         precompiled_ptx=ptx,
     )
+
+
+def triton_op(
+    op_name: str,
+    kernel: Any,
+    signature: Dict[str, str],
+    constexprs: Dict[str, Any],
+    grid: Callable[..., Any],
+    meta_fn: Callable[..., Any],
+    *,
+    extra_args_fn: Optional[Callable[..., Any]] = None,
+    aot_fn: Optional[Callable[..., Any]] = None,
+    eager_fn: Optional[Callable[..., Any]] = None,
+    supports_dynamic_shapes: bool = True,
+    requires_output_allocator: bool = False,
+    priority: ConverterPriority = ConverterPriority.STANDARD,
+    capability_validator: Optional[Callable[..., Any]] = None,
+    schema: Optional[str] = None,
+) -> None:
+    """Register a ``@triton.jit`` kernel as a TensorRT AOT QDP plugin.
+
+    This is the Triton analogue of :func:`cuda_kernel_op`: it compiles the
+    Triton kernel to PTX once (via ``triton.compile``) and wires it through the
+    same registration funnel as ``ptx_op`` — registering the PyTorch custom op,
+    the TRT plugin descriptor, the AOT impl (embedding the PTX), and the
+    Torch-TensorRT converter. It removes the hand-written ``@trtp.aot_impl``
+    compile boilerplate shown in ``examples/dynamo/aot_plugin.py``.
+
+    Calling convention — the Triton kernel's *runtime* parameters (everything
+    except ``tl.constexpr`` args) must be declared in this order::
+
+        (input_ptrs..., extra_scalars..., output_ptrs...)
+
+    and ``signature`` must list those same parameters in the same order. This
+    matches the order TensorRT passes tensor pointers and AOT extra args, so no
+    PTX rewriting is needed.
+
+    Args:
+        op_name: qualified op name ``"ns::name"``. After registration
+            ``torch.ops.ns.name`` exists and is lowered to the QDP plugin
+            during ``torch_tensorrt.compile``.
+        kernel: the ``@triton.jit`` kernel function.
+        signature: Triton signature for the non-constexpr parameters, in
+            declaration order, e.g.
+            ``{"x_ptr": "*fp32", "n_elements": "i32", "y_ptr": "*fp32"}``.
+        constexprs: ``tl.constexpr`` values baked into the PTX,
+            e.g. ``{"BLOCK_SIZE": 256}``.
+        grid: ``callable(inputs, outputs) -> int | tuple`` returning the launch
+            grid, where ``inputs`` / ``outputs`` are ``trtp.TensorDesc`` objects
+            (use ``.shape_expr`` for symbolic dims). Up to three dims are used
+            for ``grid_x`` / ``grid_y`` / ``grid_z``.
+        meta_fn: the fake / meta kernel used for shape+dtype inference. The
+            PyTorch schema is inferred from its type hints unless ``schema`` is
+            passed.
+        extra_args_fn: optional ``callable(inputs, outputs) -> list`` returning
+            the runtime scalar kernel args as ``trtp.SymInt32`` (matching the
+            ``extra_scalars`` in the calling convention). Omit if the kernel
+            has no scalar args.
+        aot_fn: optional full override of the derived AOT launch function
+            (``callable(inputs, outputs, tactic) -> (KernelLaunchParams,
+            extra_args)``). When given, ``grid`` / ``extra_args_fn`` are unused.
+        eager_fn: optional CUDA eager implementation registered on the torch
+            op. Omit if the op is only used through ``torch_tensorrt.compile``.
+
+    .. note::
+        This initial implementation compiles a single PTX for the given
+        ``signature`` (fixed input dtypes) and ``constexprs`` (single config) —
+        the inputs at runtime must match the compiled dtypes. Multi-config
+        autotuning and dtype specialization are follow-up work.
+    """
+    if not ENABLED_FEATURES.qdp_plugin:
+        raise RuntimeError(
+            "TensorRT QDP plugins are not available. "
+            "Requires TensorRT >= 10.7.0 (and not 10.14.x)."
+        )
+
+    import tensorrt.plugin as trtp
+
+    from torch_tensorrt.kernels._register import register_qdp_plugin
+    from torch_tensorrt.kernels._triton import compile_triton_to_ptx
+    from torch_tensorrt.kernels._triton_spec import TritonSpec
+
+    ptx, kernel_name, num_warps, shared_mem = compile_triton_to_ptx(
+        kernel, signature, constexprs
+    )
+
+    if aot_fn is not None:
+        final_aot = aot_fn
+    else:
+
+        def final_aot(inputs: Any, outputs: Any, tactic: int) -> Any:
+            dims = grid(inputs, outputs)
+            if not isinstance(dims, (tuple, list)):
+                dims = (dims,)
+
+            launch_params = trtp.KernelLaunchParams()
+            launch_params.grid_x = dims[0]
+            if len(dims) > 1:
+                launch_params.grid_y = dims[1]
+            if len(dims) > 2:
+                launch_params.grid_z = dims[2]
+            # Triton reports occupancy in warps; TRT wants threads-per-block.
+            launch_params.block_x = num_warps * 32
+            launch_params.shared_mem = shared_mem
+
+            if extra_args_fn is not None:
+                values = list(extra_args_fn(inputs, outputs))
+                extra_args = trtp.SymIntExprs(len(values))
+                for idx, value in enumerate(values):
+                    extra_args[idx] = value
+            else:
+                extra_args = trtp.SymIntExprs(0)
+            return launch_params, extra_args
+
+    spec = TritonSpec(
+        kernel_name=kernel_name,
+        aot_fn=final_aot,
+        eager_fn=eager_fn,
+        signature=dict(signature),
+        constexprs=dict(constexprs),
+    )
+    register_qdp_plugin(
+        op_name=op_name,
+        spec=spec,
+        meta_fn=meta_fn,
+        supports_dynamic_shapes=supports_dynamic_shapes,
+        requires_output_allocator=requires_output_allocator,
+        priority=priority,
+        capability_validator=capability_validator,
+        register_torch_op=True,
+        schema=schema,
+        precompiled_ptx=ptx,
+        use_aot_if_available=True,
+    )
+    _LOGGER.info("triton_op '%s' registered (kernel: %s)", op_name, kernel_name)

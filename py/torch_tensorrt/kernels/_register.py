@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Union, get_type_hints
 
 import torch
 
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.plugins import custom_op
 from torch_tensorrt.kernels._cuda_python_spec import CudaPythonSpec
+from torch_tensorrt.kernels._triton_spec import TritonSpec
+
+# Any kernel spec that carries a compiled entry name + AOT launch function and is
+# registered from precompiled PTX. Both the NVRTC/CUDA-C++ spec and the Triton
+# spec satisfy this; source-compilation fields are only read for CudaPythonSpec
+# when no precompiled PTX is supplied.
+AOTPluginSpec = Union[CudaPythonSpec, TritonSpec]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -142,7 +149,7 @@ def _register_pytorch_op(
     _LOGGER.debug("Registered PyTorch op %s  schema: %s%s", op_name, name, schema_str)
 
 
-def _register_aot_impl(op_name: str, ptx: bytes, spec: CudaPythonSpec) -> None:
+def _register_aot_impl(op_name: str, ptx: bytes, spec: "AOTPluginSpec") -> None:
     """Dynamically build a correctly-typed aot_impl and register it with trtp."""
     from typing import Tuple, Union  # noqa: F401 – used in annotations dict
 
@@ -218,9 +225,9 @@ def _aot_impl({sig}):
     _LOGGER.debug("Registered AOT impl for %s", op_name)
 
 
-def register_cuda_python_plugin(
+def register_qdp_plugin(
     op_name: str,
-    spec: CudaPythonSpec,
+    spec: "AOTPluginSpec",
     meta_fn: Optional[Callable[..., Any]],
     supports_dynamic_shapes: bool = False,
     requires_output_allocator: bool = False,
@@ -231,28 +238,37 @@ def register_cuda_python_plugin(
     precompiled_ptx: Optional[bytes] = None,
     use_aot_if_available: bool = True,
 ) -> None:
-    """Register a NVRTC-compiled CUDA kernel as a TensorRT QDP plugin end-to-end.
+    """Register a kernel (CUDA-C++ or Triton, compiled to PTX) as a TRT QDP plugin.
 
-    Steps performed:
-    1. Compile kernel source to PTX via NVRTC (skipped if ``precompiled_ptx`` is passed).
+    Backend-agnostic: ``spec`` may be a :class:`CudaPythonSpec` (NVRTC source or
+    pre-compiled PTX) or a :class:`TritonSpec` (Triton-compiled PTX). Steps:
+
+    1. Compile kernel source to PTX via NVRTC (skipped if ``precompiled_ptx`` is
+       passed — always the case for Triton).
     2. Optionally register the PyTorch custom op (define + fake impl).
     3. Register the TRT plugin descriptor + JIT impl via generate_plugin().
     4. Register the AOT impl with the compiled PTX.
     5. Register the Torch-TensorRT converter via generate_plugin_converter().
 
-    ``precompiled_ptx`` lets higher-level entry points (e.g. ``cuda_kernel_op``)
-    avoid a redundant second NVRTC pass when they already compiled the source
-    to build an eager kernel handle.
+    ``precompiled_ptx`` lets higher-level entry points (e.g. ``cuda_kernel_op``,
+    ``triton_op``) supply already-compiled PTX and skip the NVRTC pass; only
+    ``CudaPythonSpec`` source-compilation fields are read when it is ``None``.
     """
     if spec.aot_fn is None:
         raise ValueError(
-            f"CudaPythonSpec.aot_fn must be set before registering plugin '{op_name}'. "
-            "Pass aot_fn= to cuda_python() or assign spec.aot_fn directly."
+            f"spec.aot_fn must be set before registering plugin '{op_name}'. "
+            "Pass aot_fn= to the entry point or assign spec.aot_fn directly."
         )
 
     if precompiled_ptx is not None:
         ptx = precompiled_ptx
     else:
+        # Only CudaPythonSpec carries kernel source; TritonSpec always supplies
+        # precompiled PTX, so this branch is never reached for it.
+        assert isinstance(spec, CudaPythonSpec), (
+            "source compilation requires a CudaPythonSpec; "
+            "TritonSpec must supply precompiled_ptx"
+        )
         from torch_tensorrt.kernels._nvrtc import compile_to_ptx
 
         ptx, _device, _kernel = compile_to_ptx(
@@ -285,4 +301,8 @@ def register_cuda_python_plugin(
         _aot_register=lambda: _register_aot_impl(op_name, ptx, spec),
     )
 
-    _LOGGER.info("cuda-python QDP plugin '%s' registered successfully", op_name)
+    _LOGGER.info("QDP plugin '%s' registered successfully", op_name)
+
+
+# Back-compat alias: ``cuda_kernel_op`` / ``ptx_op`` call this name.
+register_cuda_python_plugin = register_qdp_plugin

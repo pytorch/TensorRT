@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+
 import torch_tensorrt
 
 skip_no_cuda = pytest.mark.skipif(
@@ -13,6 +14,18 @@ skip_no_qdp = pytest.mark.skipif(
     not torch_tensorrt.ENABLED_FEATURES.qdp_plugin,
     reason="TensorRT QDP plugin not available",
 )
+
+
+def _has_triton() -> bool:
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec("triton") is not None
+    except (ImportError, ModuleNotFoundError, ValueError):
+        return False
+
+
+skip_no_triton = pytest.mark.skipif(not _has_triton(), reason="triton not installed")
 
 
 def _has_cuda_core() -> bool:
