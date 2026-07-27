@@ -468,6 +468,11 @@ extend-ignore-identifiers-re = [
     "^([A-z]|[a-z])*nd*",
     "activ*([A-z]|[a-z]|[0-9])*,",
 ]
+# Honor spellchecker:disable-line and spellchecker:off/:on regions.
+extend-ignore-re = [
+    "(?Rm)^.*(#|//)\\s*spellchecker:disable-line$",
+    "(?s)(#|//)\\s*spellchecker:off.*?(#|//)\\s*spellchecker:on",
+]
 
 [tool.typos.default.extend-words]
 arange = "arange"
