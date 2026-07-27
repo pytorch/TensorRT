@@ -185,8 +185,7 @@ else:
 
 EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
 EXECUTORCH_DELEGATE_REQUIREMENT = (
-    f"torch-tensorrt-executorch-delegate=={__version__}; "
-    "platform_system == 'Linux'"
+    f"torch-tensorrt-executorch-delegate=={__version__}; " "platform_system == 'Linux'"
 )
 EXTRAS_REQUIRE = {
     "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_DELEGATE_REQUIREMENT],
