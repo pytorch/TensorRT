@@ -24,7 +24,7 @@ def activate() -> ModuleType:
     if existing is not None or _WRAPPER_NAME in sys.modules:
         raise DelegateCompatibilityError(
             "ExecuTorch's stock runtime was imported first. Call "
-            "torch_tensorrt.executorch.load(...) before importing "
+            'torch_tensorrt.load(..., format="executorch") before importing '
             "executorch.runtime."
         )
     missing = object()
@@ -48,7 +48,7 @@ def activate() -> ModuleType:
     return native
 
 
-def runtime():
+def get_runtime():
     """Return the activated ExecuTorch Runtime singleton."""
     activate()
     from executorch.runtime import Runtime
@@ -59,4 +59,4 @@ def runtime():
     return value
 
 
-__all__ = ["BACKEND_NAME", "DelegateCompatibilityError", "activate", "runtime"]
+__all__ = ["BACKEND_NAME", "DelegateCompatibilityError", "activate", "get_runtime"]

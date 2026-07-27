@@ -26,6 +26,9 @@ python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir dist py/torch-tensorrt-executorch-delegate
 ```
 
+The ExecuTorch source commit pinned in `MODULE.bazel` is the revision recorded
+by the `executorch==1.3.1` wheel.
+
 The static ExecuTorch and delegate archives are intermediate build inputs;
 users receive the final native Python module and do not compile anything.
 
@@ -37,8 +40,8 @@ pip install "torch-tensorrt[executorch]"
 
 ```python
 import torch
-from torch_tensorrt.executorch.runtime import load
+import torch_tensorrt
 
-program = load("model.pte")
+program = torch_tensorrt.load("model.pte", format="executorch")
 outputs = program.forward(torch.ones((2, 3, 4, 4)))
 ```

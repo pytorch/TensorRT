@@ -54,15 +54,56 @@ def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
 
 
 @pytest.mark.unit
+def test_load_executorch_error_when_delegate_missing(monkeypatch):
+    from torch_tensorrt import _compile
+
+    monkeypatch.setattr(_compile, "_has_executorch_delegate", lambda: False)
+
+    with pytest.raises(ImportError, match=r"torch-tensorrt\[executorch\]"):
+        _compile.load("model.pte", format="executorch")
+
+
+@pytest.mark.unit
+def test_load_executorch_dispatches_to_delegate(monkeypatch):
+    from torch_tensorrt import _compile
+
+    delegate = types.ModuleType("torch_tensorrt_executorch_delegate")
+    delegate.__path__ = []
+    runtime = types.ModuleType("torch_tensorrt_executorch_delegate.runtime")
+    sentinel = object()
+    runtime.load = lambda path: (sentinel, path)
+    monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
+    monkeypatch.setitem(sys.modules, runtime.__name__, runtime)
+    monkeypatch.setattr(_compile, "_has_executorch_delegate", lambda: True)
+
+    assert _compile.load("model.pte", format="executorch") == (
+        sentinel,
+        "model.pte",
+    )
+
+
+@pytest.mark.unit
 def test_public_api_symbols_present():
     module = importlib.import_module("torch_tensorrt.executorch")
     assert "get_edge_compile_config" in module.__all__
     assert "TensorRTPartitioner" in module.__all__
     assert "TensorRTBackend" in module.__all__
+    assert "Program" not in module.__all__
+    assert "load" not in module.__all__
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SETUP_PY = _REPO_ROOT / "setup.py"
+
+
+@pytest.mark.unit
+def test_runtime_implementation_is_owned_by_delegate_package():
+    assert not (_REPO_ROOT / "py/torch_tensorrt/executorch/runtime.py").exists()
+    assert (
+        _REPO_ROOT
+        / "py/torch-tensorrt-executorch-delegate"
+        / "torch_tensorrt_executorch_delegate/runtime.py"
+    ).is_file()
 
 
 def _setup_tree():
@@ -101,11 +142,14 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        assert any(
-            isinstance(requirement, ast.Name)
-            and requirement.id == "EXECUTORCH_REQUIREMENT"
-            for requirement in requirements.elts
-        )
+        for requirement_name in (
+            "EXECUTORCH_REQUIREMENT",
+            "EXECUTORCH_DELEGATE_REQUIREMENT",
+        ):
+            assert any(
+                isinstance(requirement, ast.Name) and requirement.id == requirement_name
+                for requirement in requirements.elts
+            )
 
     setup_call = next(
         node
@@ -134,19 +178,20 @@ def test_executorch_is_not_base_install_requirement():
     ):
         function = _function_def(tree, function_name)
         assert not any(
-            isinstance(node, ast.Name) and node.id == "EXECUTORCH_REQUIREMENT"
+            isinstance(node, ast.Name)
+            and node.id
+            in {
+                "EXECUTORCH_REQUIREMENT",
+                "EXECUTORCH_DELEGATE_REQUIREMENT",
+            }
             for node in ast.walk(function)
         )
 
 
 @pytest.mark.unit
-def test_executorch_headers_are_not_dlfw_gated():
-    tree = _setup_tree()
-    header_package_data = _assignment_value(tree, "executorch_header_package_data")
-    assert isinstance(header_package_data, ast.List)
-    assert not any(
-        isinstance(node, ast.Name) and node.id == "IS_DLFW_CI"
-        for node in ast.walk(header_package_data)
+def test_main_wheel_does_not_package_executorch_delegate_headers():
+    assert "include/torch_tensorrt/executorch/*.h" not in _SETUP_PY.read_text(
+        encoding="utf-8"
     )
 
 

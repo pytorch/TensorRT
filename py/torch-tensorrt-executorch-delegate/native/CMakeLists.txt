@@ -49,18 +49,22 @@ if(NOT TARGET portable_lib)
   message(FATAL_ERROR "ExecuTorch did not define portable_lib")
 endif()
 
-# ExecuTorch portable c10 delegates selected headers to torch/headeronly. The
-# pybind bridge must resolve those delegated headers from the exact PyTorch
-# wheel it links, not ExecuTorch's vendored snapshot.
+# The pybind bridge includes both ATen and portable ExecuTorch headers. Keep the
+# ATen/c10/torch header set internally consistent by resolving all of it from
+# the exact PyTorch wheel that supplies the linked libraries.
 if(NOT EXISTS "${TORCH_PRIMARY_INCLUDE_DIR}/torch/headeronly")
   message(FATAL_ERROR
     "torch/headeronly not found under TORCH_PRIMARY_INCLUDE_DIR=${TORCH_PRIMARY_INCLUDE_DIR}")
 endif()
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/torch_header_shim/torch")
-file(CREATE_LINK
-  "${TORCH_PRIMARY_INCLUDE_DIR}/torch/headeronly"
-  "${CMAKE_BINARY_DIR}/torch_header_shim/torch/headeronly"
-  SYMBOLIC COPY_ON_ERROR)
+file(COPY "${TORCH_PRIMARY_INCLUDE_DIR}/c10/"
+  DESTINATION "${CMAKE_BINARY_DIR}/torch_header_shim/c10")
+file(COPY "${TORCH_PRIMARY_INCLUDE_DIR}/torch/headeronly/"
+  DESTINATION "${CMAKE_BINARY_DIR}/torch_header_shim/torch/headeronly")
+if(NOT EXISTS "${CMAKE_BINARY_DIR}/torch_header_shim/c10/util/complex.h" OR
+   NOT EXISTS "${CMAKE_BINARY_DIR}/torch_header_shim/torch/headeronly/macros/Macros.h")
+  message(FATAL_ERROR "Failed to stage the PyTorch header shim")
+endif()
 target_include_directories(util BEFORE PRIVATE "${CMAKE_BINARY_DIR}/torch_header_shim")
 target_include_directories(portable_lib BEFORE PRIVATE "${CMAKE_BINARY_DIR}/torch_header_shim")
 

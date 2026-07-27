@@ -89,6 +89,15 @@ def _has_executorch_exir() -> bool:
         return False
 
 
+def _has_executorch_delegate() -> bool:
+    try:
+        return (
+            importlib.util.find_spec("torch_tensorrt_executorch_delegate") is not None
+        )
+    except ModuleNotFoundError:
+        return False
+
+
 def _non_fx_input_interface(
     inputs: Sequence[Input | torch.Tensor],
 ) -> TypeGuard[List[Input | torch.Tensor]]:
@@ -587,16 +596,23 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
 
 
 def load(
-    file_path: str = "", extra_files: Optional[dict[str, Any]] = None, **kwargs: Any
+    file_path: str = "",
+    extra_files: Optional[dict[str, Any]] = None,
+    *,
+    format: Optional[str] = None,
+    **kwargs: Any,
 ) -> Any:
     """
-    Load either a Torchscript model or ExportedProgram.
+    Load a TorchScript, ExportedProgram, or ExecuTorch program.
 
-    Loads a TorchScript or ExportedProgram file from disk. File type will be detect the type using try, except.
+    By default, detects TorchScript and ExportedProgram files. Set
+    ``format="executorch"`` explicitly for an ExecuTorch ``.pte`` file.
 
     Arguments:
         file_path (str): Path to file on the disk
         extra_files (dict[str, Any]): Extra files to load with the model
+        format (Optional[str]): Set to ``"executorch"`` to load a ``.pte`` file
+            using the separately installed ExecuTorch delegate package.
 
     Example:
     # Load with extra files.
@@ -605,8 +621,26 @@ def load(
         print(extra_files["foo.txt"])
 
     Raises:
-        ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file
+        ImportError: If ExecuTorch format is requested without the delegate package
+        ValueError: If the format is unsupported or the file is not a TorchScript or ExportedProgram file
     """
+    if format == "executorch":
+        if not _has_executorch_delegate():
+            raise ImportError(
+                "Loading an ExecuTorch program requires the prebuilt "
+                "Torch-TensorRT ExecuTorch delegate. Install it with: "
+                'pip install "torch-tensorrt[executorch]"'
+            )
+        from torch_tensorrt_executorch_delegate.runtime import (
+            load as load_executorch,
+        )
+
+        return load_executorch(file_path)
+    if format is not None:
+        raise ValueError(
+            f"Unsupported format {format!r}; expected None or 'executorch'"
+        )
+
     # Ensure Python TRT engine ops are registered so torch.export.load can
     # resolve tensorrt::execute_engine when the C++ runtime is absent.
     if not ENABLED_FEATURES.torch_tensorrt_runtime:

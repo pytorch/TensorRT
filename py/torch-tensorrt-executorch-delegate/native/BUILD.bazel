@@ -8,6 +8,8 @@ filegroup(
         ["**"],
         exclude = ["BUILD.bazel"],
     ) + [
+        "//core/runtime:include_files",
+        "//cpp:executorch_api_headers",
         "//cpp:executorch_backend_source_files",
         "//:torchtrt_cmake_modules",
         "@executorch//:executorch_sources",
@@ -32,6 +34,7 @@ cmake(
     ],
     deps = [
         "@cuda//:cudart",
+        "@libtorch//:torch",
         "@tensorrt//:nvinfer",
     ],
     lib_source = ":delegate_sources",

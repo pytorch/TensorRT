@@ -186,7 +186,7 @@ else:
 EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
 EXECUTORCH_DELEGATE_REQUIREMENT = (
     f"torch-tensorrt-executorch-delegate=={__version__}; "
-    "platform_system == 'Linux' and platform_machine == 'x86_64'"
+    "platform_system == 'Linux'"
 )
 EXTRAS_REQUIRE = {
     "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_DELEGATE_REQUIREMENT],
@@ -616,7 +616,6 @@ if _FX_FE_AVAIL:
     )
 
 package_data = {}
-executorch_header_package_data = ["include/torch_tensorrt/executorch/*.h"]
 
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (
@@ -783,7 +782,6 @@ if not (PY_ONLY or NO_TS):
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
-                *executorch_header_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/conversion/*.h",
                 "include/torch_tensorrt/core/conversion/conversionctx/*.h",
@@ -813,7 +811,6 @@ elif NO_TS:
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
-                *executorch_header_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/runtime/*.h",
                 "lib/*",

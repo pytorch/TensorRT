@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-RUNTIME_PATH = Path(__file__).parents[4] / "py/torch_tensorrt/executorch/runtime.py"
+RUNTIME_PATH = (
+    Path(__file__).parents[4]
+    / "py/torch-tensorrt-executorch-delegate/torch_tensorrt_executorch_delegate/runtime.py"
+)
 DELEGATE_PATH = (
     Path(__file__).parents[4]
     / "py/torch-tensorrt-executorch-delegate/torch_tensorrt_executorch_delegate/__init__.py"
@@ -53,7 +56,7 @@ class FakeRuntime:
 def test_load_and_forward(monkeypatch, tmp_path):
     delegate = types.ModuleType("torch_tensorrt_executorch_delegate")
     fake_runtime = FakeRuntime()
-    delegate.runtime = lambda: fake_runtime
+    delegate.get_runtime = lambda: fake_runtime
     monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
     model = tmp_path / "model.pte"
     model.write_bytes(b"pte")
@@ -66,7 +69,7 @@ def test_load_and_forward(monkeypatch, tmp_path):
 
 def test_unknown_method(monkeypatch, tmp_path):
     delegate = types.ModuleType("torch_tensorrt_executorch_delegate")
-    delegate.runtime = FakeRuntime
+    delegate.get_runtime = FakeRuntime
     monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
     model = tmp_path / "model.pte"
     model.write_bytes(b"pte")
@@ -123,7 +126,7 @@ def test_activate_rejects_preloaded_stock_wrapper(monkeypatch):
 
     with pytest.raises(
         delegate.DelegateCompatibilityError,
-        match=r"Call torch_tensorrt\.executorch\.load",
+        match=r"torch_tensorrt\.load",
     ):
         delegate.activate()
 

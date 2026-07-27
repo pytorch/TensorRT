@@ -6,15 +6,15 @@ from pathlib import Path
 from typing import Any, Sequence, Union
 
 
-def _runtime():
+def _get_runtime():
     try:
-        from torch_tensorrt_executorch_delegate import runtime
+        from torch_tensorrt_executorch_delegate import get_runtime
     except ImportError as error:
         raise ImportError(
             "ExecuTorch Python inference requires the prebuilt delegate. "
             'Install it with: pip install "torch-tensorrt[executorch]"'
         ) from error
-    return runtime()
+    return get_runtime()
 
 
 class Program:
@@ -55,7 +55,7 @@ def load(path: Union[str, Path]) -> Program:
     if not model_path.is_file():
         raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
     data = model_path.read_bytes()
-    return Program(_runtime().load_program(data), data)
+    return Program(_get_runtime().load_program(data), data)
 
 
 __all__ = ["Program", "load"]

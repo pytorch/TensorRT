@@ -47,13 +47,14 @@ class BazelBuild(build_ext):
         if bazel is None:
             raise RuntimeError("Could not find bazelisk or bazel in PATH")
 
+        compilation_mode = "dbg" if self.debug else "opt"
         command = [
             bazel,
             "build",
             BAZEL_TARGET,
             "--config=linux",
             "--config=python",
-            f"--compilation_mode={'dbg' if self.debug else 'opt'}",
+            f"--compilation_mode={compilation_mode}",
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",
         ]
         dist_dir = REPO_ROOT / "third_party/dist_dir/x86_64-linux-gnu"
@@ -67,7 +68,15 @@ class BazelBuild(build_ext):
 
         bazel_bin = pathlib.Path(
             subprocess.check_output(
-                [bazel, "info", "bazel-bin"], cwd=REPO_ROOT, env=env, text=True
+                [
+                    bazel,
+                    "info",
+                    "bazel-bin",
+                    f"--compilation_mode={compilation_mode}",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                text=True,
             ).strip()
         )
         library_stem = (
@@ -80,6 +89,7 @@ class BazelBuild(build_ext):
         )
         if not built.is_file():
             raise RuntimeError(f"Bazel did not produce {built}")
+        output.unlink(missing_ok=True)
         shutil.copy2(built, output)
 
 
@@ -98,6 +108,7 @@ setup(
     install_requires=[
         f"torch=={torch.__version__}",
         f"executorch=={executorch_version}",
+        f"torch-tensorrt=={torchtrt_version()}",
     ],
     zip_safe=False,
 )

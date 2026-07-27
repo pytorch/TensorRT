@@ -53,6 +53,14 @@ config_setting(
     },
 )
 
+filegroup(
+    name = "torchtrt_cmake_modules",
+    srcs = [
+        "cmake/Modules/FindTensorRT.cmake",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 pkg_tar(
     name = "include_core",
     package_dir = "include/torch_tensorrt",

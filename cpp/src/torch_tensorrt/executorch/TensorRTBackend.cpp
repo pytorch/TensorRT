@@ -57,7 +57,7 @@ extern const Error kRegistrationResult;
 Error check_registration() {
   if (kRegistrationResult != Error::Ok) {
     ET_LOG(
-        Error, "TensorRTBackend registration failed: %s", ::executorch::runtime::error_to_string(kRegistrationResult));
+        Error, "TensorRTBackend registration failed: %s", ::executorch::runtime::to_string(kRegistrationResult));
   }
   return kRegistrationResult;
 }
