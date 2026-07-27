@@ -6,16 +6,19 @@ import importlib.metadata
 import os
 import pathlib
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 
 import torch
-from torch.utils.cpp_extension import include_paths
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
+BAZEL_TARGET = "//py/torch-tensorrt-executorch-delegate/native:delegate_native"
+
 
 def torchtrt_version() -> str:
     if value := os.getenv("TORCH_TENSORRT_EXECUTORCH_DELEGATE_VERSION"):
@@ -27,66 +30,57 @@ def torchtrt_version() -> str:
     return (REPO_ROOT / "version.txt").read_text().strip()
 
 
-class CMakeExtension(Extension):
+class BazelExtension(Extension):
     def __init__(self, name: str) -> None:
         super().__init__(name, sources=[])
 
 
-class CMakeBuild(build_ext):
+class BazelBuild(build_ext):
     def build_extension(self, ext: Extension) -> None:
         if sys.platform != "linux":
             raise RuntimeError("The ExecuTorch TensorRT delegate supports Linux only")
-        executorch_source = os.getenv("EXECUTORCH_SOURCE_DIR")
-        if not executorch_source:
-            raise RuntimeError(
-                "Set EXECUTORCH_SOURCE_DIR to the pinned ExecuTorch source tree"
-            )
 
         output = pathlib.Path(self.get_ext_fullpath(ext.name)).resolve()
-        if output.exists():
-            return
-        build_dir = pathlib.Path(self.build_temp) / "executorch_delegate_native"
         output.parent.mkdir(parents=True, exist_ok=True)
-        build_dir.mkdir(parents=True, exist_ok=True)
-        configure = [
-            "cmake",
-            "-S",
-            str(HERE / "native"),
-            "-B",
-            str(build_dir),
-            f"-DEXECUTORCH_SOURCE_DIR={pathlib.Path(executorch_source).resolve()}",
-            f"-DTORCH_TENSORRT_SOURCE_DIR={REPO_ROOT}",
-            f"-DPYTHON_EXECUTABLE={sys.executable}",
-            f"-DTORCH_PRIMARY_INCLUDE_DIR={include_paths()[0]}",
-            f"-DDELEGATE_LIBRARY_OUTPUT_DIRECTORY={output.parent}",
-            f"-DCMAKE_BUILD_TYPE={'Debug' if self.debug else 'Release'}",
+
+        bazel = shutil.which("bazelisk") or shutil.which("bazel")
+        if bazel is None:
+            raise RuntimeError("Could not find bazelisk or bazel in PATH")
+
+        command = [
+            bazel,
+            "build",
+            BAZEL_TARGET,
+            "--config=linux",
+            "--config=python",
+            f"--compilation_mode={'dbg' if self.debug else 'opt'}",
+            f"--action_env=PYTHON_BIN_PATH={sys.executable}",
         ]
-        if value := os.getenv("TensorRT_ROOT"):
-            configure.append(f"-DTensorRT_ROOT={value}")
-        configure.extend(os.getenv("CMAKE_ARGS", "").split())
-        subprocess.run(configure, check=True)
-        subprocess.run(
-            [
-                "cmake",
-                "--build",
-                str(build_dir),
-                "--target",
-                "torch_tensorrt_executorch_portable_lib",
-                "--parallel",
-                str(self.parallel or os.cpu_count() or 1),
-            ],
-            check=True,
+        dist_dir = REPO_ROOT / "third_party/dist_dir/x86_64-linux-gnu"
+        if dist_dir.is_dir():
+            command.append(f"--distdir={dist_dir}")
+        command.extend(shlex.split(os.getenv("BAZEL_ARGS", "")))
+
+        env = os.environ.copy()
+        env.setdefault("TORCH_PATH", str(pathlib.Path(torch.__file__).resolve().parent))
+        subprocess.run(command, cwd=REPO_ROOT, env=env, check=True)
+
+        bazel_bin = pathlib.Path(
+            subprocess.check_output(
+                [bazel, "info", "bazel-bin"], cwd=REPO_ROOT, env=env, text=True
+            ).strip()
         )
         library_stem = (
             "_portable_lib" if ext.name.endswith("._portable_lib") else "data_loader"
         )
-        built = next(output.parent.glob(f"{library_stem}*.so"), None)
-        if built is None:
-            raise RuntimeError(
-                f"CMake did not produce {library_stem} in {output.parent}"
-            )
-        if built != output:
-            built.replace(output)
+        built = (
+            bazel_bin
+            / "py/torch-tensorrt-executorch-delegate/native/delegate_native/lib"
+            / f"{library_stem}.so"
+        )
+        if not built.is_file():
+            raise RuntimeError(f"Bazel did not produce {built}")
+        shutil.copy2(built, output)
 
 
 executorch_version = importlib.metadata.version("executorch")
@@ -96,10 +90,10 @@ setup(
     description="Torch-TensorRT delegate for the ExecuTorch Python runtime",
     packages=find_packages(),
     ext_modules=[
-        CMakeExtension("torch_tensorrt_executorch_delegate._portable_lib"),
-        CMakeExtension("torch_tensorrt_executorch_delegate.data_loader"),
+        BazelExtension("torch_tensorrt_executorch_delegate._portable_lib"),
+        BazelExtension("torch_tensorrt_executorch_delegate.data_loader"),
     ],
-    cmdclass={"build_ext": CMakeBuild},
+    cmdclass={"build_ext": BazelBuild},
     python_requires=">=3.10",
     install_requires=[
         f"torch=={torch.__version__}",

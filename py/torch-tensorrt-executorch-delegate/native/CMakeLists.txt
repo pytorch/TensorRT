@@ -1,8 +1,15 @@
 cmake_minimum_required(VERSION 3.24)
 project(torch_tensorrt_executorch_delegate LANGUAGES CXX)
 
-if(NOT EXECUTORCH_SOURCE_DIR OR NOT TORCH_TENSORRT_SOURCE_DIR)
-  message(FATAL_ERROR "EXECUTORCH_SOURCE_DIR and TORCH_TENSORRT_SOURCE_DIR are required")
+if(NOT EXECUTORCH_SOURCE_DIR AND EXECUTORCH_CMAKE_FILE)
+  get_filename_component(EXECUTORCH_SOURCE_DIR "${EXECUTORCH_CMAKE_FILE}" DIRECTORY)
+endif()
+if(NOT TORCH_PRIMARY_INCLUDE_DIR AND TORCH_HEADER_MARKER)
+  get_filename_component(TORCH_PRIMARY_INCLUDE_DIR "${TORCH_HEADER_MARKER}/../../../.." ABSOLUTE)
+endif()
+if(NOT EXECUTORCH_SOURCE_DIR OR NOT TORCH_TENSORRT_SOURCE_DIR OR NOT TORCH_PRIMARY_INCLUDE_DIR)
+  message(FATAL_ERROR
+    "EXECUTORCH_SOURCE_DIR, TORCH_TENSORRT_SOURCE_DIR, and TORCH_PRIMARY_INCLUDE_DIR are required")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${TORCH_TENSORRT_SOURCE_DIR}/cmake/Modules")
@@ -45,6 +52,10 @@ endif()
 # ExecuTorch portable c10 delegates selected headers to torch/headeronly. The
 # pybind bridge must resolve those delegated headers from the exact PyTorch
 # wheel it links, not ExecuTorch's vendored snapshot.
+if(NOT EXISTS "${TORCH_PRIMARY_INCLUDE_DIR}/torch/headeronly")
+  message(FATAL_ERROR
+    "torch/headeronly not found under TORCH_PRIMARY_INCLUDE_DIR=${TORCH_PRIMARY_INCLUDE_DIR}")
+endif()
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/torch_header_shim/torch")
 file(CREATE_LINK
   "${TORCH_PRIMARY_INCLUDE_DIR}/torch/headeronly"
@@ -60,9 +71,10 @@ target_link_libraries(portable_lib PRIVATE
   extension_threadpool
   CUDA::cudart TensorRT::nvinfer Threads::Threads)
 set_target_properties(portable_lib PROPERTIES
-  LIBRARY_OUTPUT_DIRECTORY "${DELEGATE_LIBRARY_OUTPUT_DIRECTORY}"
-  OUTPUT_NAME "_portable_lib")
-set_target_properties(data_loader PROPERTIES
-  LIBRARY_OUTPUT_DIRECTORY "${DELEGATE_LIBRARY_OUTPUT_DIRECTORY}")
+  OUTPUT_NAME "_portable_lib"
+  SUFFIX ".so")
+set_target_properties(data_loader PROPERTIES SUFFIX ".so")
+
+install(TARGETS portable_lib data_loader LIBRARY DESTINATION lib)
 
 add_custom_target(torch_tensorrt_executorch_portable_lib DEPENDS portable_lib data_loader)
