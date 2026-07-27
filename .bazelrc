@@ -47,3 +47,6 @@ build:use_precompiled_torchtrt --define=torchtrt_src=prebuilt
 
 test:ci_testing --define=torchtrt_src=prebuilt --cxxopt="-DDISABLE_TEST_IN_CI" --action_env "NVIDIA_TF32_OVERRIDE=0"
 test:use_precompiled_torchtrt --define=torchtrt_src=prebuilt
+
+# Load optional per-developer overrides, such as local resource limits.
+try-import %workspace%/.bazelrc.user

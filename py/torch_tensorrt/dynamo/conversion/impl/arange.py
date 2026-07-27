@@ -35,6 +35,15 @@ def arange(
     if any(isinstance(x, TRTTensor) for x in (start, end, step)):
         # Convert start, end, step into TRT tensors with appropriate rank
         start_rank_0 = get_trt_tensor(ctx, start, name + "_start_rank_0", min_rank=0)
+        # LINSPACE's start input requires rank 0; if the upstream ITensor came in
+        # as rank-1 (e.g. a SymInt materialized by a sym_size op), reshape it.
+        if isinstance(start_rank_0, TRTTensor) and len(start_rank_0.shape) > 0:
+            squeeze_layer = ctx.net.add_shuffle(start_rank_0)
+            squeeze_layer.reshape_dims = trt.Dims()
+            set_layer_name(
+                squeeze_layer, target, name + "_start_rank_0_squeeze", source_ir
+            )
+            start_rank_0 = squeeze_layer.get_output(0)
         start_rank_1 = get_trt_tensor(ctx, start, name + "_start_rank_1", min_rank=1)
         end = get_trt_tensor(ctx, end, name + "_end", min_rank=1)
         step = get_trt_tensor(ctx, step, name + "_step", min_rank=1)

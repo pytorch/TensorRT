@@ -30,7 +30,12 @@ cc_library(
             "lib/libtorch_cuda.so",
             "lib/libtorch_global_deps.so",
         ],
-    }),
+    }) + glob(
+        [
+            "lib/libtorch_nvshmem.so*",
+        ],
+        allow_empty = True,
+    ),
     hdrs = glob(
         [
             "include/torch/**/*.h",

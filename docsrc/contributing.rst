@@ -28,3 +28,4 @@ understanding the system architecture, and managing resources.
    contributors/dynamic_memory_allocation
    contributors/autocast
    contributors/export_serialization
+   contributors/inplace_operations

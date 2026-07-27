@@ -634,6 +634,10 @@ class TestEngineCache(TestCase):
 
     # @unittest.skip("benchmark on small models")
     @unittest.skipIf(
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        "TensorRT-RTX compiles without build-time autotuning, so engine caching does not speed up compilation",
+    )
+    @unittest.skipIf(
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
     )

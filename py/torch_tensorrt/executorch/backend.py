@@ -58,6 +58,17 @@ def _get_engine_nodes_from_edge_program(edge_program: ExportedProgram) -> List[A
     return _get_engine_nodes_in(edge_program.graph_module.graph.nodes)
 
 
+def _get_single_engine_node(edge_program: ExportedProgram) -> Any:
+    """Return the partition's one TRT engine node, or raise if not exactly one."""
+    engine_nodes = _get_engine_nodes_from_edge_program(edge_program)
+    if len(engine_nodes) != 1:
+        raise RuntimeError(
+            "TensorRT ExecuTorch backend expects exactly 1 engine node per "
+            f"partition, found {len(engine_nodes)}."
+        )
+    return engine_nodes[0]
+
+
 def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[Any]:
     """Extract engine info (list of strings/bytes) from the partition's TRT node.
 
@@ -71,13 +82,9 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
     Uses schema name comparison (not object identity) so it works for both
     OpOverload and EdgeOpOverload targets.
     """
-    engine_nodes = _get_engine_nodes_from_edge_program(edge_program)
-    if len(engine_nodes) != 1:
-        raise RuntimeError(
-            "TensorRT ExecuTorch backend expects exactly 1 engine node per "
-            f"partition, found {len(engine_nodes)}."
-        )
-    return _get_engine_info_for_node(edge_program, engine_nodes[0])
+    return _get_engine_info_for_node(
+        edge_program, _get_single_engine_node(edge_program)
+    )
 
 
 def _get_engine_info_for_node(
@@ -198,6 +205,52 @@ def _parse_device_id(value: Any) -> int:
         return 0
 
 
+def _reorder_input_names_for_executorch(
+    edge_program: ExportedProgram, engine_node: Any, input_names: List[str]
+) -> List[str]:
+    """Reorder TRT binding names into executorch_call_delegate argument order.
+
+    The runtime binds positionally (``execute()`` arg ``i`` -> input_binding_names
+    ``[i]``), but ExecuTorch fusion may permute the delegate placeholders relative
+    to the TRT-submodule order that produced ``input_binding_names``. The names
+    can't be matched (TRT names are semantic, lowered placeholders are generic
+    ``arg_N``), so recover the permutation by node identity: the engine node's
+    first arg lists its input nodes in binding order, so sort the names by each
+    node's slot among the graph placeholders (its runtime delegate-arg position).
+
+    Only inputs need this. Outputs are also bound positionally by the runtime,
+    but they are ``getitem(engine_node, idx)`` nodes whose index order equals the
+    engine output-binding order. ExecuTorch lowering can reorder delegate outputs
+    (``arrange_graph_outputs`` moves buffer-mutation outputs ahead of user
+    outputs), but a TensorRT delegate partition is a functional inference engine
+    with no mutation outputs, so that pass is a no-op here and the output order is
+    preserved. If a TRT partition ever produced mutation outputs, outputs would
+    need the same node-identity reordering as inputs.
+    """
+    input_nodes = list(engine_node.args[0])
+    if len(input_nodes) != len(input_names):
+        raise ValueError(
+            "TensorRT ExecuTorch backend: engine has "
+            f"{len(input_names)} input binding names but {len(input_nodes)} "
+            "engine input nodes; cannot establish a reliable binding order."
+        )
+    slot = {
+        node: i
+        for i, node in enumerate(
+            n for n in edge_program.graph_module.graph.nodes if n.op == "placeholder"
+        )
+    }
+    missing = [n for n in input_nodes if n not in slot]
+    if missing:
+        raise ValueError(
+            "TensorRT ExecuTorch backend: engine inputs "
+            f"{[n.name for n in missing]} are not delegate runtime placeholders; "
+            "cannot determine their argument position."
+        )
+    order = sorted(range(len(input_nodes)), key=lambda i: slot[input_nodes[i]])
+    return [input_names[i] for i in order]
+
+
 def _get_str(engine_info: List[Any], index: int, default: str = "") -> str:
     if index < 0 or index >= len(engine_info):
         return default
@@ -223,7 +276,8 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         edge_program: ExportedProgram,
         compile_specs: List[CompileSpec],
     ) -> PreprocessResult:
-        engine_info = _get_engine_info_from_edge_program(edge_program)
+        engine_node = _get_single_engine_node(edge_program)
+        engine_info = _get_engine_info_for_node(edge_program, engine_node)
         engine_info = list(engine_info)
         _validate_engine_info(engine_info)
         serialized_engine = engine_info[ENGINE_IDX]
@@ -240,8 +294,10 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             )
         elif not isinstance(serialized_engine, (bytes, bytearray)):
             engine_info[ENGINE_IDX] = bytes(serialized_engine)
-        input_names = _split_binding_names(
-            _get_str(engine_info, INPUT_BINDING_NAMES_IDX)
+        input_names = _reorder_input_names_for_executorch(
+            edge_program,
+            engine_node,
+            _split_binding_names(_get_str(engine_info, INPUT_BINDING_NAMES_IDX)),
         )
         output_names = _split_binding_names(
             _get_str(engine_info, OUTPUT_BINDING_NAMES_IDX)

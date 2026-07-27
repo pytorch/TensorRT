@@ -38,6 +38,7 @@ from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ABI_TARGET_IDX,
+    ALIASED_IO_IDX,
     DEVICE_IDX,
     ENGINE_IDX,
     HW_COMPATIBLE_IDX,
@@ -73,6 +74,10 @@ class _InputBindingInfo(NamedTuple):
     name: str
     expected_type: torch.dtype
     is_shape_tensor: bool
+    # True when this input is the alias source of some output binding. Precomputed
+    # so the per-call input-setup loop avoids an aliased_input_binding_names lookup
+    # on every input, every execution.
+    is_aliased_input: bool
 
 
 def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
@@ -138,6 +143,7 @@ class TorchTRTRuntimeStates:
         new_cudagraphs: bool,
         new_pre_allocated_output: bool,
         shape_changed: bool,
+        has_aliased_io: bool,
     ) -> Tuple[bool, bool, bool]:
         need_cudagraphs_record = False
         can_use_pre_allocated_outputs = False
@@ -148,10 +154,14 @@ class TorchTRTRuntimeStates:
         ):
             need_cudagraphs_record = True
 
+        # Engines with aliased I/O are excluded: aliased outputs reuse the caller's
+        # input storage, which can differ between calls, so a cached pre-allocated
+        # output would point at stale storage.
         if (
             self.old_pre_allocated_outputs
             and new_pre_allocated_output
             and (not shape_changed)
+            and (not has_aliased_io)
         ):
             can_use_pre_allocated_outputs = True
 
@@ -243,6 +253,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
+        self._bound_inputs_by_name: Dict[str, torch.Tensor] = {}
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self._owned_pool_stream: Optional[torch.cuda.Stream] = None
@@ -370,6 +381,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.pre_allocated_outputs = []
         self._input_buffers = []
         self._output_buffers = []
+        self._bound_inputs_by_name = {}
         self._caller_stream = None
         self._engine_stream = None
         self._owned_pool_stream = None
@@ -452,6 +464,22 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # Internal alias used by the NCCL setup paths (matches the original
         # _PythonTorchTensorRTModule attribute name).
         self._has_nccl_ops: bool = self.requires_native_multidevice
+
+        # aliased_io maps an output binding name to (input_binding_name, kind).
+        # Aliased outputs share storage with their source input so the engine
+        # writes through to the user's tensor in place (mirrors the C++ runtime).
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            deserialize_aliased_io,
+        )
+
+        self.aliased_io: Dict[str, Tuple[str, str]] = deserialize_aliased_io(
+            str(self.serialized_info[ALIASED_IO_IDX])
+        )
+        # Input binding names that are the alias source of some output, so the
+        # per-call input-setup loop can test membership in O(1).
+        self.aliased_input_binding_names = {
+            in_name for (in_name, _kind) in self.aliased_io.values()
+        }
 
         metadata = self.decode_metadata(self.serialized_metadata)
         self.settings = metadata.get("settings", CompilationSettings())
@@ -583,6 +611,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             self.in_binding_names = input_names
             self.out_binding_names = output_names
 
+        # Reconcile the deserialized aliased_io map against the engine's own
+        # get_aliased_input_tensor (the TRT API is the source of truth for
+        # KV-cache aliasing). Must run before _input_binding_infos is built,
+        # since that consumes aliased_input_binding_names. Mirrors the C++
+        # TRTEngine constructor.
+        self._reconcile_aliased_io()
+
         self._input_buffers = [None] * len(self.in_binding_names)
         self._output_buffers = [None] * len(self.out_binding_names)
         self.input_dtypes = [
@@ -594,6 +629,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 input_name,
                 self.input_dtypes[idx],
                 self.cuda_engine.is_shape_inference_io(input_name),
+                input_name in self.aliased_input_binding_names,
             )
             for idx, input_name in enumerate(self.in_binding_names)
         ]
@@ -617,6 +653,58 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if self.requires_output_allocator:
             self.create_output_allocator()
 
+    def _reconcile_aliased_io(self) -> None:
+        """Reconcile the deserialized ``aliased_io`` map against the engine.
+
+        Mirrors the C++ ``TRTEngine`` constructor: TRT exposes aliasing via
+        ``ICudaEngine.get_aliased_input_tensor``, which is the source of truth
+        for KV-cache-style aliasing (TRT-enforced via ``IKVCacheUpdateLayer``)
+        and may report aliases the serialized map lacks (e.g. for engines built
+        outside Torch-TensorRT). ``kind="user"`` aliases are declared by
+        Torch-TensorRT and preserved as-is since TRT does not know about them.
+        Also enforces that aliased outputs are incompatible with the dynamic
+        output allocator, and recomputes ``aliased_input_binding_names``.
+        """
+        for out_name in self.out_binding_names:
+            # TRT returns None / empty string for non-aliased outputs.
+            aliased_in = self.cuda_engine.get_aliased_input_tensor(out_name)
+            if not aliased_in:
+                continue
+            existing = self.aliased_io.get(out_name)
+            if existing is None:
+                self.aliased_io[out_name] = (aliased_in, "kv_cache_update")
+                logger.debug(
+                    f"aliased_io reconciliation: discovered {out_name} -> "
+                    f"{aliased_in} (kv_cache_update)"
+                )
+            elif existing[1] == "user":
+                # A "user"-declared alias is declared by Torch-TensorRT, not TRT.
+                # TRT does not track user-declared aliases, so its view is not
+                # authoritative here; keep the build-time value as-is.
+                pass
+            elif existing[0] != aliased_in:
+                logger.warning(
+                    f"aliased_io: build-time map disagrees with engine for output "
+                    f"{out_name} (build: {existing[0]}, engine: {aliased_in}); "
+                    "using engine value."
+                )
+                self.aliased_io[out_name] = (aliased_in, "kv_cache_update")
+
+        # Recompute the alias-source input set and validate every aliased output
+        # against the output allocator. The loop above is engine-driven and only
+        # visits kv_cache_update outputs; user-declared aliases are never reported
+        # by TRT, so iterating the merged map here is what covers them too.
+        # Aliasing binds an output to an input's static storage, which is
+        # incompatible with the dynamic-allocation output-allocator path.
+        self.aliased_input_binding_names = set()
+        for out_name, (in_name, _kind) in self.aliased_io.items():
+            if self.requires_output_allocator:
+                raise RuntimeError(
+                    f"Aliased output {out_name} is incompatible with dynamic output "
+                    "allocator. Aliasing requires fixed output shape."
+                )
+            self.aliased_input_binding_names.add(in_name)
+
     # --- TensorRT-RTX runtime-config delegation ---
 
     def update_runtime_settings(self, new_settings: RuntimeSettings) -> None:
@@ -639,8 +727,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
         """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe."""
         has_dynamic_input = any(DYNAMIC_DIM in shape for shape in self.input_shapes)
-        return self._trt_runtime_config.is_monolithic_capturable(
-            has_dynamic_input, self.context, stream
+        return bool(
+            self._trt_runtime_config.is_monolithic_capturable(
+                has_dynamic_input, self.context, stream
+            )
         )
 
     def _enable_rtx_native_cudagraphs(self) -> None:
@@ -993,14 +1083,36 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             )
 
     def create_output_tensors(self) -> List[torch.Tensor]:
-        return [
-            torch.empty(
-                size=self.output_shapes[idx],
-                dtype=self.output_dtypes[idx],
-                device=torch.cuda.current_device(),
-            )
-            for idx, _ in enumerate(self.out_binding_names)
-        ]
+        outputs: List[torch.Tensor] = []
+        for idx, output_name in enumerate(self.out_binding_names):
+            alias = self.aliased_io.get(output_name)
+            if alias is not None:
+                # Aliased output shares storage with its source input: reuse the
+                # bound input tensor instead of allocating so the engine writes
+                # through to the user's storage.
+                input_name = alias[0]
+                aliased_input = self._bound_inputs_by_name.get(input_name)
+                assert aliased_input is not None, (
+                    f"Aliased output {output_name} references input {input_name} "
+                    "which was not bound during this call."
+                )
+                # Aliasing binds the output to the input's storage, so the shapes
+                # must match; a mismatch would corrupt memory. Mirrors the C++
+                # runtime's shape check.
+                assert tuple(aliased_input.shape) == tuple(self.output_shapes[idx]), (
+                    f"Aliased output {output_name} shape {tuple(self.output_shapes[idx])} "
+                    f"does not match source input {input_name} shape {tuple(aliased_input.shape)}"
+                )
+                outputs.append(aliased_input)
+            else:
+                outputs.append(
+                    torch.empty(
+                        size=self.output_shapes[idx],
+                        dtype=self.output_dtypes[idx],
+                        device=torch.cuda.current_device(),
+                    )
+                )
+        return outputs
 
     def setup_input_tensors(
         self,
@@ -1008,6 +1120,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         cudagraphs_enabled: bool,
         need_cudagraphs_record: bool,
     ) -> None:
+        # Bound input tensors keyed by binding name, consumed by
+        # create_output_tensors / the output-binding loop to alias outputs to
+        # their source-input storage.
+        self._bound_inputs_by_name = {}
         for i, binding in enumerate(self._input_binding_infos):
             input_name = binding.name
 
@@ -1015,7 +1131,11 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 contiguous_inputs[i].dtype == binding.expected_type
             ), f"Dtype mismatch for input {input_name}. Expect {binding.expected_type}, got {contiguous_inputs[i].dtype}."
 
-            if need_cudagraphs_record:
+            # Aliased inputs are bound directly to the user's tensor so the engine
+            # writes through to the user's storage; cloning into a persistent
+            # cudagraph staging buffer would break the aliasing (and the user is
+            # already required to pass stable input addresses under cudagraphs).
+            if need_cudagraphs_record and not binding.is_aliased_input:
                 self._input_buffers[i] = contiguous_inputs[i].clone()
 
             if binding.is_shape_tensor:
@@ -1035,15 +1155,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                         )
                     tensor_to_bind = self._empty_tensor_placeholder
 
-                if cudagraphs_enabled:
+                if cudagraphs_enabled and not binding.is_aliased_input:
                     self._input_buffers[i].copy_(contiguous_inputs[i])
-                    self.context.set_tensor_address(
-                        input_name, self._input_buffers[i].data_ptr()
-                    )
-                else:
-                    self.context.set_tensor_address(
-                        input_name, tensor_to_bind.data_ptr()
-                    )
+                    tensor_to_bind = self._input_buffers[i]
+
+                self.context.set_tensor_address(input_name, tensor_to_bind.data_ptr())
+                self._bound_inputs_by_name[input_name] = tensor_to_bind
 
     def _profile_section(self, label: str) -> ContextManager[None]:
         if self._profile_execution:
@@ -1150,6 +1267,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             and self._auto_select_profiles
         ):
             self._auto_select_profile(contiguous_inputs)
+        if self.use_pre_allocated_outputs and self.aliased_io:
+            logger.warning(
+                "pre_allocated_outputs is enabled but this engine has aliased I/O; "
+                "pre-allocation is disabled for aliased engines (aliased outputs reuse "
+                "the caller's input storage, so there is nothing to pre-allocate). "
+                "Outputs are allocated fresh each call."
+            )
         (
             need_cudagraphs_record,
             can_use_pre_allocated_outputs,
@@ -1158,6 +1282,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             effective_cudagraphs,
             self.use_pre_allocated_outputs,
             shape_changed,
+            bool(self.aliased_io),
         )
 
         if need_cudagraphs_reset:
@@ -1195,6 +1320,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 outputs = self.create_output_tensors()
 
             for o, output_name in enumerate(self.out_binding_names):
+                # Aliased outputs share storage with a source input: outputs[o] is
+                # already that input tensor (see create_output_tensors), so bind
+                # directly to it and bypass the cudagraph persistent-output-buffer
+                # path (no separate buffer to sync; staging would defeat aliasing).
+                if output_name in self.aliased_io:
+                    self.context.set_tensor_address(output_name, outputs[o].data_ptr())
+                    continue
                 if need_cudagraphs_record:
                     self._output_buffers[o] = outputs[o].clone()
                 if effective_cudagraphs:
@@ -1234,16 +1366,27 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             if caller_on_default:
                 caller_stream.wait_stream(engine_stream)
 
-        if self.use_pre_allocated_outputs and (
-            self.output_tensors_are_unowned
-            or not self.pre_allocated_outputs
-            or shape_changed
+        # Aliased-I/O engines are excluded from pre-allocation entirely: aliased
+        # outputs reuse the user's input storage, which may change between calls,
+        # so a cached pre-allocated output would point at stale storage.
+        if (
+            self.use_pre_allocated_outputs
+            and not self.aliased_io
+            and (
+                self.output_tensors_are_unowned
+                or not self.pre_allocated_outputs
+                or shape_changed
+            )
         ):
             self.pre_allocated_outputs = self.create_output_tensors()
 
         if effective_cudagraphs:
-            for idx, output in enumerate(outputs):
-                output.copy_(self._output_buffers[idx])
+            for idx, output_name in enumerate(self.out_binding_names):
+                # Aliased outputs were written in place through the user's storage
+                # (no staging buffer), so there is nothing to copy back.
+                if output_name in self.aliased_io:
+                    continue
+                outputs[idx].copy_(self._output_buffers[idx])
 
         if len(outputs) == 1:
             return outputs[0]
@@ -1384,7 +1527,18 @@ if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
         input_tensors: List[torch.Tensor], engine: TRTEngine
     ) -> List[torch.Tensor]:
         outputs = engine.execute(input_tensors)
-        return [outputs] if isinstance(outputs, torch.Tensor) else list(outputs)
+        output_tensors = (
+            [outputs] if isinstance(outputs, torch.Tensor) else list(outputs)
+        )
+        input_storages = {tensor.untyped_storage()._cdata for tensor in input_tensors}
+        return [
+            (
+                output.clone()
+                if output.untyped_storage()._cdata in input_storages
+                else output
+            )
+            for output in output_tensors
+        ]
 
     @execute_engine.register_fake  # type: ignore[misc]
     def execute_engine_fake(

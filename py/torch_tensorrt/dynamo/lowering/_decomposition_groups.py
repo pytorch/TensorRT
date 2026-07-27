@@ -59,8 +59,11 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.im2col,
     aten.index_add,
     aten.index_add_,
-    aten.index_copy,
-    aten.index_copy_,
+    # aten.index_copy / aten.index_copy_ are intentionally NOT decomposed —
+    # they are handled by two converters: a KV-cache fast path that emits
+    # IKVCacheUpdateLayer with aliased I/O when the input is a 4-D static
+    # cache and a fallback that emits the standard scatter sequence.
+    # See py/torch_tensorrt/dynamo/conversion/impl/index_copy.py.
     aten.index_fill,
     aten.index_fill_,
     aten.isneginf,

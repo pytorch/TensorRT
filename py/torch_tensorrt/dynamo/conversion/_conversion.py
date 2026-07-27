@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence
+from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
-import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -26,6 +25,8 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +37,12 @@ class SerializedInterpreterResult(NamedTuple):
     requires_output_allocator: bool
     symbolic_shape_expressions: Dict[str, List[Dict[str, Any]]]
     requires_native_multidevice: bool
+    # Map of engine output binding name -> (input binding name, kind_str). The
+    # kind_str distinguishes "kv_cache_update" (TRT-enforced via
+    # IKVCacheUpdateLayer; reported by ICudaEngine.get_aliased_input_tensor)
+    # from "user" (Torch-TensorRT-declared; runtime must enforce shape match
+    # and bind the same device pointer).
+    aliased_io: Dict[str, Tuple[str, str]] = {}
 
 
 def infer_module_output_dtypes(
@@ -197,6 +204,9 @@ def interpret_module_to_result(
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
+    *,
+    input_binding_names: Optional[Sequence[str]] = None,
+    output_binding_names: Optional[Sequence[str]] = None,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
@@ -270,6 +280,8 @@ def interpret_module_to_result(
         output_dtypes=output_dtypes,
         compilation_settings=settings,
         engine_cache=engine_cache,
+        input_binding_names=input_binding_names,
+        output_binding_names=output_binding_names,
     )
 
     interpreter_result = interpreter.run()
@@ -316,6 +328,7 @@ def interpret_module_to_result(
         requires_output_allocator=interpreter_result.requires_output_allocator,
         requires_native_multidevice=interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=symbolic_shape_expressions,
+        aliased_io=interpreter_result.aliased_io,
     )
 
     return serialized_interpreter_result
@@ -372,4 +385,5 @@ def convert_module(
         requires_output_allocator=serialized_interpreter_result.requires_output_allocator,
         requires_native_multidevice=serialized_interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
+        aliased_io=serialized_interpreter_result.aliased_io,
     )

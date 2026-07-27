@@ -15,7 +15,6 @@ from typing import (
 )
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -53,6 +52,8 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
+
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
@@ -70,6 +71,19 @@ class TRTInterpreterResult(NamedTuple):
     output_names: List[str]
     requires_output_allocator: bool
     requires_native_multidevice: bool
+    # Per-output aliasing info. Map of engine output binding name -> tuple of
+    # (input binding name, alias-kind string). The kind is "kv_cache_update"
+    # for TRT-enforced aliasing (IKVCacheUpdateLayer) or "user" for
+    # Torch-TensorRT-declared aliasing. The runtime uses this to bind aliased
+    # outputs to their input device pointers and skip fresh allocation.
+    #
+    # By convention the interpreter appends side-effect aliased outputs
+    # (added to satisfy layers like IKVCacheUpdateLayer that require their
+    # output to be a network output) to the END of ``output_names``. The
+    # runtime derives the user-output count by walking that list backwards
+    # — see ``user_output_count`` in the runtime module — and hides the
+    # side-effect outputs from the caller's return tuple.
+    aliased_io: dict[str, tuple[str, str]] = {}
 
 
 @cls_supports_debugger
@@ -82,6 +96,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         compilation_settings: CompilationSettings = CompilationSettings(),
         engine_cache: Optional[BaseEngineCache] = None,
         *,
+        input_binding_names: Optional[Sequence[str]] = None,
+        output_binding_names: Optional[Sequence[str]] = None,
         _debugger_config: Optional[DebuggerConfig] = None,
     ):
         super().__init__(module)
@@ -147,6 +163,22 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._cur_node: Optional[torch.fx.Node] = None
         self._input_names: List[str] = []
         self._output_names: List[str] = []
+        # Per-output binding aliasing: output_name -> (input_binding_name, kind_str).
+        # `kind_str` is "kv_cache_update" or "user". Populated by aliased
+        # converters and reconciled with engine.get_aliased_input_tensor.
+        self._aliased_io: Dict[str, Tuple[str, str]] = {}
+
+        # User-supplied binding-name overrides (engine-converter API only).
+        # The caller has already validated these against the exported
+        # program's in_spec / out_spec, so the lists are guaranteed to have
+        # one entry per placeholder / output in FX's flattened order.  The
+        # interpreter just indexes into them positionally.
+        self._user_input_binding_names: Optional[List[str]] = (
+            list(input_binding_names) if input_binding_names is not None else None
+        )
+        self._user_output_binding_names: Optional[List[str]] = (
+            list(output_binding_names) if output_binding_names is not None else None
+        )
         self._itensor_to_tensor_meta: Dict[trt.tensorrt.ITensor, TensorMetadata] = (
             dict()
         )
@@ -475,12 +507,28 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config, self.compilation_settings.timing_cache_path
         )
 
+        # Reconcile against the engine: TRT exposes aliasing via
+        # get_aliased_input_tensor on ICudaEngine. The engine API is the
+        # source of truth for KV-cache-style aliasing; our build-time records
+        # are a fast cache. User-declared aliasing (kind="user") is preserved
+        # as-is since TRT doesn't know about it. TRT returns None / empty
+        # string for non-aliased outputs; any raised exception is a real
+        # error in the engine and propagates.
+        engine_aliased_io: Dict[str, Tuple[str, str]] = dict(self._aliased_io)
+        for out_name in self._output_names:
+            aliased_in = cuda_engine.get_aliased_input_tensor(out_name)
+            if aliased_in:
+                # Engine-reported aliasing is always KV-cache-update origin
+                # (the only TRT-enforced aliasing API in 10.x).
+                engine_aliased_io[out_name] = (aliased_in, "kv_cache_update")
+
         return TRTInterpreterResult(
             cuda_engine,
             self._input_names,
             self._output_names,
             self.ctx.requires_output_allocator,
             self.ctx.requires_native_multidevice,
+            engine_aliased_io,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -537,8 +585,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         return result
 
     def placeholder(self, target: str, args: Any, kwargs: Any) -> trt.ITensor:
-        self._input_names.append(target)
-        current_input = self.input_specs[self.input_specs_iter]
+        # Determine the binding name.  Default policy is the FX target name;
+        # the engine-converter API may override via input_binding_names,
+        # already validated by the caller to have one entry per placeholder
+        # in FX flattening order.
+        idx = self.input_specs_iter
+        if self._user_input_binding_names is not None:
+            binding_name = self._user_input_binding_names[idx]
+        else:
+            binding_name = target
+
+        self._input_names.append(binding_name)
+        current_input = self.input_specs[idx]
         self.input_specs_iter += 1
         # Set optimization profile for dynamic input shape
         shape = None
@@ -559,9 +617,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 if current_input.is_shape_tensor:
                     # For shape_tensors, min/opt/max_shapes correspond to actual
                     # values of the shapes provided during runtime.
-                    opt_profile.set_shape_input(target, min_shape, opt_shape, max_shape)
+                    opt_profile.set_shape_input(
+                        binding_name, min_shape, opt_shape, max_shape
+                    )
                 else:
-                    opt_profile.set_shape(target, min_shape, opt_shape, max_shape)
+                    opt_profile.set_shape(binding_name, min_shape, opt_shape, max_shape)
 
             # The INetwork input shape uses the union envelope to mark which
             # dims are dynamic (-1). A dim is static only if it is identical
@@ -598,11 +658,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         trt_input_dtype = current_input.dtype.to(trt.DataType, use_default=True)
         _LOGGER.debug(
-            f"Adding input to in-progress INetwork: {target} [shape={shape}, dtype={trt_input_dtype}]"
+            f"Adding input to in-progress INetwork: {binding_name} "
+            f"[shape={shape}, dtype={trt_input_dtype}]"
         )
 
         return self.ctx.net.add_input(
-            name=target,
+            name=binding_name,
             shape=tuple(shape),
             dtype=trt_input_dtype,
         )
@@ -699,6 +760,28 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         else:
             outputs = (args[0],)
 
+        # Aliased outputs (e.g. IKVCacheUpdateLayer) must be marked as network
+        # outputs even if the user's source did not return them. We APPEND
+        # them after the user outputs — the runtime derives the user/
+        # side-effect boundary by walking output_names backward and treating
+        # the contiguous in-aliased_io suffix as side-effects.
+        user_output_ids = {id(o) for o in outputs if isinstance(o, trt.ITensor)}
+        for entry in self.ctx.aliased_outputs:
+            aliased_tensor = entry.output_tensor
+            if id(aliased_tensor) not in user_output_ids:
+                outputs = outputs + (aliased_tensor,)
+                # Extend output_dtypes so the dtype-mismatch check passes and
+                # no cast is inserted (a cast would break engine-level aliasing).
+                if self.output_dtypes is not None:
+                    aliased_dtype = dtype._from(aliased_tensor.dtype)
+                    self.output_dtypes = list(self.output_dtypes) + [aliased_dtype]
+        # Map ITensor identity -> (input_binding_name, kind_str), used after
+        # rename below to populate self._aliased_io keyed by final binding name.
+        aliased_info_by_id = {
+            id(e.output_tensor): (e.input_binding_name, e.kind.value)
+            for e in self.ctx.aliased_outputs
+        }
+
         for output_idx in range(len(outputs)):
             output = outputs[output_idx]
 
@@ -724,7 +807,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 continue
             marked_outputs_ids.append(id(output))
 
-            name = f"output{i}"
+            # Default policy is "output{i}"; engine-converter API may override
+            # via output_binding_names, already validated by the caller to
+            # have one entry per output node in FX flattening order.
+            if self._user_output_binding_names is not None:
+                name = self._user_output_binding_names[i]
+            else:
+                name = f"output{i}"
 
             if self.output_dtypes is not None:
                 output_dtype = self.output_dtypes[i]
@@ -748,7 +837,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             else:
                 output_dtype = dtype.unknown
 
-            if output_dtype is not dtype.unknown:
+            # Capture identity before any cast — we use it to find aliasing.
+            original_id = id(output)
+            # If this output was emitted by an aliased layer (e.g.
+            # IKVCacheUpdateLayer), it shares storage with its source input.
+            alias_info = aliased_info_by_id.get(original_id)
+
+            # Skip the dtype cast for aliased outputs: a cast inserts a new
+            # layer whose output no longer shares storage with the source
+            # input, which would break engine-level aliasing. Aliased outputs
+            # already carry the correct dtype (they alias the input's buffer),
+            # so no cast is needed.
+            if alias_info is None and output_dtype is not dtype.unknown:
                 output = self._cast_output_dtype(
                     output,
                     output_dtype.to(trt.DataType, use_default=True),
@@ -760,6 +860,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.net.mark_output(output)
 
             self._output_names.append(name)
+
+            # Carry the alias to the final binding name so the runtime can bind
+            # the output to its source input's storage.
+            if alias_info is not None:
+                aliased_input, kind_str = alias_info
+                self._aliased_io[name] = (aliased_input, kind_str)
+                _LOGGER.debug(
+                    "Output %s aliased to input %s (kind=%s)",
+                    name,
+                    aliased_input,
+                    kind_str,
+                )
+
             _LOGGER.debug(
                 f"Marking output {name} [shape={output.shape}, dtype={output.dtype}]"
             )

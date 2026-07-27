@@ -8,7 +8,9 @@ from torch.testing._internal.common_cuda import (
     PLATFORM_SUPPORTS_FLASH_ATTENTION,
 )
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import post_lowering
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
@@ -627,10 +629,10 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.slice_scatter(x, src, dim, start, end, step)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.scatter.src,
-        }
+        # slice_scatter is no longer decomposed — the converter handles it
+        # directly (emits IKVCacheUpdateLayer when KV-eligible, scatter
+        # otherwise). select_scatter is still decomposed via slice_scatter.
+        expected_ops = {torch.ops.aten.slice_scatter.default}
         unexpected_ops = {torch.ops.aten.select_scatter}
 
         inputs = [torch.zeros(8, 8).cuda(), torch.ones(8, 2).cuda(), 1, 6, None, 1]
@@ -689,11 +691,9 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.slice_scatter.default(x, src, dim, start, end, step)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.scatter.src,
-        }
-        unexpected_ops = {torch.ops.aten.slice_scatter}
+        # slice_scatter is no longer decomposed — survives to the converter.
+        expected_ops = {torch.ops.aten.slice_scatter.default}
+        unexpected_ops: set = set()
 
         inputs = [torch.zeros(8, 8).cuda(), torch.ones(2, 8).cuda(), 0, 2, 6, 2]
 
@@ -752,11 +752,9 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.slice_scatter.default(x, src, dim, start, end, step)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.scatter.src,
-        }
-        unexpected_ops = {torch.ops.aten.slice_scatter}
+        # slice_scatter is no longer decomposed — survives to the converter.
+        expected_ops = {torch.ops.aten.slice_scatter.default}
+        unexpected_ops: set = set()
 
         inputs = [
             torch.zeros(8, 8, 8).cuda(),
@@ -866,25 +864,19 @@ class TestLowering(TestCase):
         )
         fx_graph = exported_program.module()
 
-        expected_ops = {torch.ops.aten.scatter.src}
-        unexpected_ops = {torch.ops.aten.slice_scatter.default}
-        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
-            fx_graph,
-            list(example_inputs),
-            expected_ops=expected_ops,
-            unexpected_ops=unexpected_ops,
-            min_block_size=1,
+        lowered_graph = post_lowering(fx_graph, CompilationSettings())
+        lowered_ops = {
+            node.target
+            for node in lowered_graph.graph.nodes
+            if node.op == "call_function"
+        }
+        self.assertNotIn(
+            torch.ops.aten.slice_scatter.default,
+            lowered_ops,
         )
-
-        self.assertEqual(
-            len(unexpected_ops_seen),
-            0,
-            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
-        )
-        self.assertEqual(
-            len(expected_ops_unseen),
-            0,
-            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        self.assertIn(
+            torch.ops.aten.scatter.src,
+            lowered_ops,
         )
 
         torch._dynamo.reset()
@@ -926,25 +918,19 @@ class TestLowering(TestCase):
         )
         fx_graph = exported_program.module()
 
-        expected_ops = {torch.ops.aten.scatter.src}
-        unexpected_ops = {torch.ops.aten.slice_scatter.default}
-        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
-            fx_graph,
-            list(example_inputs),
-            expected_ops=expected_ops,
-            unexpected_ops=unexpected_ops,
-            min_block_size=1,
+        lowered_graph = post_lowering(fx_graph, CompilationSettings())
+        lowered_ops = {
+            node.target
+            for node in lowered_graph.graph.nodes
+            if node.op == "call_function"
+        }
+        self.assertNotIn(
+            torch.ops.aten.slice_scatter.default,
+            lowered_ops,
         )
-
-        self.assertEqual(
-            len(unexpected_ops_seen),
-            0,
-            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
-        )
-        self.assertEqual(
-            len(expected_ops_unseen),
-            0,
-            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        self.assertIn(
+            torch.ops.aten.scatter.src,
+            lowered_ops,
         )
 
         torch._dynamo.reset()
@@ -971,12 +957,14 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.select_scatter.default(x, src, dim, index)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
-        unexpected_ops = {
-            torch.ops.aten.select_scatter.default,
+        # select_scatter is still decomposed (to slice_scatter via the
+        # Torch-TRT decomposition); slice_scatter is no longer decomposed
+        # further and survives to the converter.
+        expected_ops = {
             torch.ops.aten.slice_scatter.default,
+            torch.ops.aten.unsqueeze.default,
         }
+        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
         inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 0, 0]
 
@@ -1034,12 +1022,14 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.select_scatter.default(x, src, dim, index)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
-        unexpected_ops = {
-            torch.ops.aten.select_scatter.default,
+        # select_scatter is still decomposed (to slice_scatter via the
+        # Torch-TRT decomposition); slice_scatter is no longer decomposed
+        # further and survives to the converter.
+        expected_ops = {
             torch.ops.aten.slice_scatter.default,
+            torch.ops.aten.unsqueeze.default,
         }
+        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
         inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 1, 0]
 
@@ -1097,12 +1087,14 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.select_scatter.default(x, src, dim, index)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
-        unexpected_ops = {
-            torch.ops.aten.select_scatter.default,
+        # select_scatter is still decomposed (to slice_scatter via the
+        # Torch-TRT decomposition); slice_scatter is no longer decomposed
+        # further and survives to the converter.
+        expected_ops = {
             torch.ops.aten.slice_scatter.default,
+            torch.ops.aten.unsqueeze.default,
         }
+        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
         inputs = [torch.zeros(2, 3, 4).cuda(), torch.ones(2, 4).cuda(), 1, 0]
 

@@ -1,0 +1,140 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# In-place aliased I/O: caller-owned tensors\n\nThis example shows the simplest in-place pattern: the caller owns a buffer\n(e.g. a KV cache), passes it into the compiled module on every call, and\nthe TensorRT engine mutates it in place. No fresh allocation per call, no\npost-engine copy.\n\nMechanically:\n\n* The model writes into a slice of one of its inputs:\n  ``cache[:, :, t:t+1, :] = update``.\n* The converter recognizes the ``slice_scatter`` pattern and emits a\n  ``IKVCacheUpdateLayer`` whose output is aliased to the cache input.\n* The C++ runtime binds the aliased output to the input's ``data_ptr``,\n  skipping ``at::empty``. The engine writes through that pointer directly\n  into the caller's tensor storage.\n* The user-facing return tuple contains only the model's explicit outputs\n  \u2014 the aliased \"mutation output\" is invisible to the caller.\n\nConstraints (from the TensorRT operator):\n\n* Cache shape must be 4-D ``[batch, heads, max_seq, head_dim]`` and fully\n  static.\n* Write dimension must be ``2`` (the sequence axis).\n* ``write_start + update_len <= max_seq``.\n\nIf the constraints aren't met the converter silently falls back to a\nregular scatter and aliasing isn't established (correctness is still\npreserved, but no in-place benefit).\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Imports\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import torch\nimport torch_tensorrt\nfrom torch.export import export"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Model\nA trivial \"step\" that writes one timestep into the cache and returns a\nsummary statistic. The interesting line is ``cache[:, :, 3:4, :] = update``\n\u2014 that single slice-write is what triggers the KV-cache fast path.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "class KVStep(torch.nn.Module):\n    def forward(self, cache, update):\n        cache[:, :, 3:4, :] = update\n        return cache.sum()"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Compile\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "B, H, S_MAX, D = 1, 4, 16, 8\ncache_proto = torch.zeros(B, H, S_MAX, D, device=\"cuda\")\nupdate_proto = torch.ones(B, H, 1, D, device=\"cuda\")\n\nep = export(KVStep().cuda(), (cache_proto.clone(), update_proto.clone()))\ncompiled = torch_tensorrt.compile(\n    ep,\n    ir=\"dynamo\",\n    inputs=[cache_proto.clone(), update_proto.clone()],\n    enabled_precisions={torch.float32},\n    min_block_size=1,\n    use_python_runtime=False,  # aliased I/O requires the C++ runtime\n)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Verify aliasing was established\nEach compiled engine carries an ``aliased_io`` map of output binding\nname -> ``(input_binding_name, kind)``. ``kind`` is \"kv_cache_update\"\nwhen TensorRT itself enforces the alias (via ``IKVCacheUpdateLayer``).\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "for _, mod in compiled.named_modules():\n    if hasattr(mod, \"aliased_io\") and mod.aliased_io:\n        for out, (inp, kind) in mod.aliased_io.items():\n            print(f\"  {out}  <-aliased->  {inp}  (kind={kind})\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Run: cache mutates in place\nThe caller owns ``cache``. After ``compiled(cache, update)`` returns,\n``cache`` has been mutated; ``id(cache)`` and ``cache.data_ptr()`` are\nthe same as before the call. The return value is just the model's\nexplicit output (the sum).\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "cache = torch.zeros(B, H, S_MAX, D, device=\"cuda\")\nupdate = torch.ones(B, H, 1, D, device=\"cuda\") * 7.0\ncache_id_before = id(cache)\ncache_ptr_before = cache.data_ptr()\n\nreturned = compiled(cache, update)\n\nprint(f\"\\nreturned: {returned.item()}  (expected {7.0 * H * D})\")\nprint(f\"cache.sum(): {cache.sum().item()}  (expected {7.0 * H * D})\")\nprint(f\"id preserved: {id(cache) == cache_id_before}\")\nprint(f\"data_ptr preserved: {cache.data_ptr() == cache_ptr_before}\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Streaming: repeated calls accumulate state\nBecause the caller's cache tensor identity is preserved and the engine\nwrites in place, each call sees the result of the previous one.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "cache = torch.zeros(B, H, S_MAX, D, device=\"cuda\")\nfor step, scale in enumerate([1.0, 5.0, 0.0]):\n    compiled(cache, torch.ones(B, H, 1, D, device=\"cuda\") * scale)\n    print(f\"step {step}: cache.sum() = {cache.sum().item()}\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.15"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
