@@ -138,7 +138,7 @@ def test_activate_cleans_up_data_loader_when_native_import_fails(monkeypatch):
     def fake_import(name):
         if name == data_loader.__name__:
             return data_loader
-        assert delegate._DATA_LOADER_NAME not in sys.modules
+        assert sys.modules[delegate._DATA_LOADER_NAME] is data_loader
         raise ImportError("native module failed to load")
 
     monkeypatch.setattr(

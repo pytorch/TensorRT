@@ -31,6 +31,10 @@ def activate() -> ModuleType:
     previous_data_loader = sys.modules.get(_DATA_LOADER_NAME, missing)
     try:
         data_loader = importlib.import_module(__name__ + ".data_loader")
+        # _portable_lib imports this canonical name while its module initializer
+        # runs. Install our binding first so Python does not load ExecuTorch's
+        # stock data_loader and register PyDataLoader a second time.
+        sys.modules[_DATA_LOADER_NAME] = data_loader
         native = importlib.import_module(__name__ + "._portable_lib")
     except ImportError as error:
         if previous_data_loader is missing:
@@ -42,7 +46,6 @@ def activate() -> ModuleType:
             "Install torch, executorch, torch-tensorrt, and the delegate from "
             "the same release matrix."
         ) from error
-    sys.modules[_DATA_LOADER_NAME] = data_loader
     sys.modules[_NATIVE_NAME] = native
     sys.modules.pop(_WRAPPER_NAME, None)
     return native

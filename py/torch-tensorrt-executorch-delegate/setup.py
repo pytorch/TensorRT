@@ -10,6 +10,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import uuid
 
 import torch
 from setuptools import Extension, find_packages, setup
@@ -18,6 +19,7 @@ from setuptools.command.build_ext import build_ext
 HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-delegate/native:delegate_native"
+BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
 
 
 def torchtrt_version() -> str:
@@ -56,6 +58,7 @@ class BazelBuild(build_ext):
             "--config=python",
             f"--compilation_mode={compilation_mode}",
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",
+            f"--action_env=TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE={BUILD_NONCE}",
         ]
         dist_dir = REPO_ROOT / "third_party/dist_dir/x86_64-linux-gnu"
         if dist_dir.is_dir():
