@@ -19,6 +19,15 @@ config_setting(
     flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
 )
 
+config_setting(
+    name = "rtx_sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
+)
+
 cc_library(
     name = "nvinfer_headers",
     hdrs = select({
@@ -33,6 +42,16 @@ cc_library(
             # ],
         ),
         ":rtx_x86_64": glob(
+            [
+                "include/NvInfer*.h",
+            ],
+            allow_empty = True,
+            # exclude = [
+            #     "include/NvInferPlugin.h",
+            #     "include/NvInferPluginUtils.h",
+            # ],
+        ),
+        ":rtx_sbsa": glob(
             [
                 "include/NvInfer*.h",
             ],
@@ -60,6 +79,7 @@ cc_import(
     shared_library = select({
         ":rtx_win": "bin/tensorrt_rtx_1_5.dll",
         ":rtx_x86_64": "lib/libtensorrt_rtx.so",
+        ":rtx_sbsa": "lib/libtensorrt_rtx.so",
     }),
     visibility = ["//visibility:private"],
 )

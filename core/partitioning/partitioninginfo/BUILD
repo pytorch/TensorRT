@@ -22,6 +22,17 @@ config_setting(
 )
 
 config_setting(
+    name = "rtx_sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
     name = "rtx_win",
     constraint_values = [
         "@platforms//os:windows",
@@ -75,6 +86,7 @@ cc_library(
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],
         ":rtx_win": ["@tensorrt_rtx_win//:nvinfer"],
         ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
+        ":rtx_sbsa": ["@tensorrt_rtx_sbsa//:nvinfer"],
         ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
         ":windows": ["@tensorrt_win//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],

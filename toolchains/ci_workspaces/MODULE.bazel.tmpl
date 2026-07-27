@@ -112,6 +112,16 @@ http_archive(
 )
 
 http_archive(
+    name = "tensorrt_rtx_sbsa",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.5.0.114",
+    type = "tar.zst",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Linux-aarch64-cuda-${CU_UPPERBOUND}-Release-external.tar.zst",
+    ],
+)
+
+http_archive(
     name = "tensorrt_sbsa",
     build_file = "@//third_party/tensorrt/archive:BUILD",
     strip_prefix = "TensorRT-11.0.0.114",
