@@ -2,16 +2,24 @@ load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "aarch64_linux",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
 filegroup(
     name = "delegate_sources",
     srcs = glob(
         ["**"],
         exclude = ["BUILD.bazel"],
     ) + [
+        "//:torchtrt_cmake_modules",
         "//core/runtime:include_files",
         "//cpp:executorch_api_headers",
         "//cpp:executorch_backend_source_files",
-        "//:torchtrt_cmake_modules",
         "@executorch//:executorch_sources",
     ],
 )
@@ -32,15 +40,17 @@ cmake(
         "@executorch//:executorch/CMakeLists.txt",
         "@libtorch//:include/torch/headeronly/util/TypeTraits.h",
     ],
-    deps = [
-        "@cuda//:cudart",
-        "@libtorch//:torch",
-        "@tensorrt//:nvinfer",
-    ],
     lib_source = ":delegate_sources",
     out_include_dir = "",
     out_shared_libs = [
         "_portable_lib.so",
         "data_loader.so",
     ],
+    deps = [
+        "@cuda//:cudart",
+        "@libtorch//:torch",
+    ] + select({
+        ":aarch64_linux": ["@tensorrt_sbsa//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }),
 )

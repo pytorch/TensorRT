@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.metadata
 import os
 import pathlib
+import platform
 import re
 import shlex
 import shutil
@@ -60,7 +61,12 @@ class BazelBuild(build_ext):
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",
             f"--action_env=TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE={BUILD_NONCE}",
         ]
-        dist_dir = REPO_ROOT / "third_party/dist_dir/x86_64-linux-gnu"
+        dist_dir_arch = (
+            "aarch64-linux-gnu"
+            if platform.machine() in {"aarch64", "arm64"}
+            else "x86_64-linux-gnu"
+        )
+        dist_dir = REPO_ROOT / "third_party/dist_dir" / dist_dir_arch
         if dist_dir.is_dir():
             command.append(f"--distdir={dist_dir}")
         command.extend(shlex.split(os.getenv("BAZEL_ARGS", "")))
