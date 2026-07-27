@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=71a86b84"></script>
+    <script src="../_static/documentation_options.js?v=ab61fdf7"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -753,7 +753,13 @@ warning. Pass <code class="docutils literal notranslate"><span class="pre">compi
 <span class="pre">b&quot;cuda:&lt;i&gt;&quot;)]</span></code> to override the default target device (<code class="docutils literal notranslate"><span class="pre">cuda:0</span></code>).
 <code class="docutils literal notranslate"><span class="pre">backend_config=</span></code> takes an <code class="docutils literal notranslate"><span class="pre">Optional[ExecutorchBackendConfig]</span></code>
 and is forwarded to <code class="docutils literal notranslate"><span class="pre">to_executorch(config=...)</span></code> to customize
-ExecuTorch lowering (e.g. memory planning or device placement).</p></li>
+ExecuTorch lowering (e.g. memory planning or device placement).
+<code class="docutils literal notranslate"><span class="pre">partitioners=</span></code> appends caller partitioners after the TensorRT
+partitioner, so ops TensorRT does not take can be routed to another
+delegate – e.g. a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> for a coalesced TensorRT +
+CUDA <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. See <a class="reference internal" href="../user_guide/runtime_performance/saving_models.html#executorch-save"><span class="std std-ref">the ExecuTorch save guide</span></a> for the <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> recipe, its
+export-time requirements (CUDA backend + nvcc), and the external
+<code class="docutils literal notranslate"><span class="pre">.ptd</span></code> weight caveats.</p></li>
 </ul>
 </dd>
 </dl>
