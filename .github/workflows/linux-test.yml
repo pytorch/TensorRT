@@ -53,6 +53,10 @@ on:
         description: 'Name to give artifacts uploaded from ${RUNNER_ARTIFACT_DIR}'
         default: ''
         type: string
+      additional-artifact:
+        description: "Optional additional artifact to install alongside the core wheel"
+        default: ""
+        type: string
       use-rtx:
         description: "Whether to use TensorRT-RTX"
         default: false
@@ -146,6 +150,12 @@ jobs:
       #   with:
       #     repository: ${{ inputs.repository  }}
       #     script: .github/scripts/install-torch-tensorrt.sh
+      - name: Download additional artifacts
+        if: ${{ inputs.additional-artifact != '' }}
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ inputs.additional-artifact }}
+          path: /opt/torch-tensorrt-builds/
       - name: Pack script
         continue-on-error: ${{ inputs.continue-on-error }}
         working-directory: ${{ inputs.repository }}
