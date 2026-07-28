@@ -1,0 +1,2186 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="width=device-width,initial-scale=1" name="viewport"/>
+  <meta content="ie=edge" http-equiv="x-ua-compatible"/>
+  <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
+  <meta content="Copied to clipboard" name="lang:clipboard.copied"/>
+  <meta content="en" name="lang:search.language"/>
+  <meta content="True" name="lang:search.pipeline.stopwords"/>
+  <meta content="True" name="lang:search.pipeline.trimmer"/>
+  <meta content="No matching documents" name="lang:search.result.none"/>
+  <meta content="1 matching document" name="lang:search.result.one"/>
+  <meta content="# matching documents" name="lang:search.result.other"/>
+  <meta content="[\s\-]+" name="lang:search.tokenizer"/>
+  <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500,700|Roboto:300,400,400i,700&amp;display=fallback" rel="stylesheet"/>
+  <style>
+   body,
+      input {
+        font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif
+      }
+
+      code,
+      kbd,
+      pre {
+        font-family: "Roboto Mono", "Courier New", Courier, monospace
+      }
+  </style>
+  <link href="../_static/stylesheets/application.css" rel="stylesheet"/>
+  <link href="../_static/stylesheets/application-palette.css" rel="stylesheet"/>
+  <link href="../_static/stylesheets/application-fixes.css" rel="stylesheet"/>
+  <link href="../_static/fonts/material-icons.css" rel="stylesheet"/>
+  <meta content="84bd00" name="theme-color"/>
+  <script src="../_static/javascripts/modernizr.js">
+  </script>
+  <title>
+   torch_tensorrt.ts — Torch-TensorRT v1.0.0 documentation
+  </title>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
+  </script>
+  <script src="../_static/jquery.js">
+  </script>
+  <script src="../_static/underscore.js">
+  </script>
+  <script src="../_static/doctools.js">
+  </script>
+  <script src="../_static/language_data.js">
+  </script>
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
+  </script>
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
+  </script>
+  <link href="../genindex.html" rel="index" title="Index"/>
+  <link href="../search.html" rel="search" title="Search"/>
+  <link href="../_cpp_api/torch_tensort_cpp.html" rel="next" title="Torch-TensorRT C++ API"/>
+  <link href="ptq.html" rel="prev" title="torch_tensorrt.ptq"/>
+ </head>
+ <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
+  <svg class="md-svg">
+   <defs data-children-count="0">
+    <svg height="448" id="__github" viewbox="0 0 416 448" width="416" xmlns="http://www.w3.org/2000/svg">
+     <path d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z" fill="currentColor">
+     </path>
+    </svg>
+   </defs>
+  </svg>
+  <input class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+  <input class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+  <label class="md-overlay" data-md-component="overlay" for="__drawer">
+  </label>
+  <a class="md-skip" href="#py_api/ts" tabindex="1">
+   Skip to content
+  </a>
+  <header class="md-header" data-md-component="header">
+   <nav class="md-header-nav md-grid">
+    <div class="md-flex navheader">
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT v1.0.0 documentation">
+       <i class="md-icon">
+        
+       </i>
+      </a>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer">
+      </label>
+     </div>
+     <div class="md-flex__cell md-flex__cell--stretch">
+      <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+       <span class="md-header-nav__topic">
+        Torch-TensorRT
+       </span>
+       <span class="md-header-nav__topic">
+        torch_tensorrt.ts
+       </span>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <label class="md-icon md-icon--search md-header-nav__button" for="__search">
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+       <label class="md-search__overlay" for="__search">
+       </label>
+       <div class="md-search__inner" role="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
+         <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
+         <label class="md-icon md-search__icon" for="__search">
+         </label>
+         <button class="md-icon md-search__icon" data-md-component="reset" tabindex="-1" type="reset">
+          
+         </button>
+        </form>
+        <div class="md-search__output">
+         <div class="md-search__scrollwrap" data-md-scrollfix="">
+          <div class="md-search-result" data-md-component="result">
+           <div class="md-search-result__meta">
+            Type to start searching
+           </div>
+           <ol class="md-search-result__list">
+           </ol>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <div class="md-header-nav__source">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
+        <div class="md-source__icon">
+         <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+          <use height="24" width="24" xlink:href="#__github">
+          </use>
+         </svg>
+        </div>
+        <div class="md-source__repository">
+         Torch-TensorRT
+        </div>
+       </a>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink dropdown">
+      <button class="dropdownbutton">
+       Versions
+      </button>
+      <div class="dropdown-content md-hero">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
+        master
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v1.0.0/" title="v1.0.0">
+        v1.0.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
+        v0.4.1
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
+        v0.4.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
+        v0.2.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
+        v0.1.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
+        v0.0.3
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
+        v0.0.2
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
+        v0.0.1
+       </a>
+      </div>
+     </div>
+    </div>
+   </nav>
+  </header>
+  <div class="md-container">
+   <nav class="md-tabs" data-md-component="tabs">
+    <div class="md-tabs__inner md-grid">
+     <ul class="md-tabs__list">
+      <li class="md-tabs__item">
+       <a class="md-tabs__link" href="../index.html">
+        Torch-TensorRT v1.0.0 documentation
+       </a>
+      </li>
+      <li class="md-tabs__item">
+       <a class="md-tabs__link" href="torch_tensorrt.html">
+        torch_tensorrt
+       </a>
+      </li>
+     </ul>
+    </div>
+   </nav>
+   <main class="md-main">
+    <div class="md-main__inner md-grid" data-md-component="container">
+     <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--primary" data-md-level="0">
+         <label class="md-nav__title md-nav__title--site" for="__drawer">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT v1.0.0 documentation">
+           <i class="md-icon">
+            
+           </i>
+          </a>
+          <a href="../index.html" title="Torch-TensorRT v1.0.0 documentation">
+           Torch-TensorRT
+          </a>
+         </label>
+         <div class="md-nav__source">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
+           <div class="md-source__icon">
+            <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+             <use height="24" width="24" xlink:href="#__github">
+             </use>
+            </svg>
+           </div>
+           <div class="md-source__repository">
+            Torch-TensorRT
+           </div>
+          </a>
+         </div>
+         <ul class="md-nav__list">
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Getting Started
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/installation.html">
+            Installation
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/ptq.html">
+            Post Training Quantization (PTQ)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/torchtrtc.html">
+            torchtrtc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
+            Using Torch-TensorRT Directly From PyTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/runtime.html">
+            Deploying Torch-TensorRT Programs
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/using_dla.html">
+            DLA
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
+            Torch-TensorRT Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
+            Object Detection with Torch-TensorRT (SSD)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Python API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="torch_tensorrt.html">
+            torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
+           <label class="md-nav__link md-nav__link--active" for="__toc">
+            torch_tensorrt.ts
+           </label>
+           <a class="md-nav__link md-nav__link--active" href="#">
+            torch_tensorrt.ts
+           </a>
+           <nav class="md-nav md-nav--secondary">
+            <label class="md-nav__title" for="__toc">
+             Contents
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix="">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#py-api-ts--page-root">
+               torch_tensorrt.ts
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#functions">
+                  Functions
+                 </a>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__extra_link" href="../_sources/py_api/ts.rst.txt">
+               Show Source
+              </a>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Contributor Documentation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/system_overview.html">
+            System Overview
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/writing_converters.html">
+            Writing Converters
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/useful_links.html">
+            Useful Links for Torch-TensorRT Development
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--secondary">
+         <label class="md-nav__title" for="__toc">
+          Contents
+         </label>
+         <ul class="md-nav__list" data-md-scrollfix="">
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="#py-api-ts--page-root">
+            torch_tensorrt.ts
+           </a>
+           <nav class="md-nav">
+            <ul class="md-nav__list">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#functions">
+               Functions
+              </a>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__extra_link" href="../_sources/py_api/ts.rst.txt">
+            Show Source
+           </a>
+          </li>
+          <li class="md-nav__item" id="searchbox">
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-content">
+      <article class="md-content__inner md-typeset" role="main">
+       <span id="torch-tensorrt-ts-py">
+       </span>
+       <h1 id="py-api-ts--page-root">
+        torch_tensorrt.ts
+        <a class="headerlink" href="#py-api-ts--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <span class="target" id="module-torch_tensorrt.ts">
+       </span>
+       <h2 id="functions">
+        Functions
+        <a class="headerlink" href="#functions" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <dl class="py function">
+        <dt id="torch_tensorrt.ts.compile">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.ts.
+         </code>
+         <code class="sig-name descname">
+          compile
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          module: torch.jit._script.ScriptModule
+         </em>
+         ,
+         <em class="sig-param">
+          inputs=[]
+         </em>
+         ,
+         <em class="sig-param">
+          device=&lt;torch_tensorrt._Device.Device object&gt;
+         </em>
+         ,
+         <em class="sig-param">
+          disable_tf32=False
+         </em>
+         ,
+         <em class="sig-param">
+          sparse_weights=False
+         </em>
+         ,
+         <em class="sig-param">
+          enabled_precisions={}
+         </em>
+         ,
+         <em class="sig-param">
+          refit=False
+         </em>
+         ,
+         <em class="sig-param">
+          debug=False
+         </em>
+         ,
+         <em class="sig-param">
+          strict_types=False
+         </em>
+         ,
+         <em class="sig-param">
+          capability=&lt;EngineCapability.default: 0&gt;
+         </em>
+         ,
+         <em class="sig-param">
+          num_min_timing_iters=2
+         </em>
+         ,
+         <em class="sig-param">
+          num_avg_timing_iters=1
+         </em>
+         ,
+         <em class="sig-param">
+          workspace_size=0
+         </em>
+         ,
+         <em class="sig-param">
+          max_batch_size=0
+         </em>
+         ,
+         <em class="sig-param">
+          calibrator=None
+         </em>
+         ,
+         <em class="sig-param">
+          truncate_long_and_double=False
+         </em>
+         ,
+         <em class="sig-param">
+          require_full_compilation=False
+         </em>
+         ,
+         <em class="sig-param">
+          min_block_size=3
+         </em>
+         ,
+         <em class="sig-param">
+          torch_executed_ops=[]
+         </em>
+         ,
+         <em class="sig-param">
+          torch_executed_modules=[]
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         → torch.jit._script.ScriptModule
+         <a class="headerlink" href="#torch_tensorrt.ts.compile" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Compile a TorchScript module for NVIDIA GPUs using TensorRT
+         </p>
+         <p>
+          Takes a existing TorchScript module and a set of settings to configure the compiler
+and will convert methods to JIT Graphs which call equivalent TensorRT engines
+         </p>
+         <p>
+          Converts specifically the forward method of a TorchScript Module
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             module
+            </strong>
+            (
+            <em>
+             torch.jit.ScriptModule
+            </em>
+            ) – Source module, a result of tracing or scripting a PyTorch
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              torch.nn.Module
+             </span>
+            </code>
+           </p>
+          </dd>
+          <dt class="field-even">
+           Keyword Arguments
+          </dt>
+          <dd class="field-even">
+           <ul class="simple">
+            <li>
+             <p>
+              <strong>
+               inputs
+              </strong>
+              (
+              <em>
+               List
+              </em>
+              <em>
+               [
+              </em>
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Input" title="torch_tensorrt.Input">
+               <em>
+                torch_tensorrt.Input
+               </em>
+              </a>
+              <em>
+               ,
+              </em>
+              <em>
+               torch.Tensor
+              </em>
+              <em>
+               )
+              </em>
+              <em>
+               ]
+              </em>
+              ) –
+             </p>
+             <p>
+              <strong>
+               Required
+              </strong>
+              List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+to select device type.
+             </p>
+             <div class="highlight-cpp notranslate">
+              <div class="highlight">
+               <pre><span></span>input=[
+    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+    torch_tensorrt.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    ), # Dynamic input shape for input #2
+    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+]
+</pre>
+              </div>
+             </div>
+            </li>
+            <li>
+             <p>
+              <strong>
+               device
+              </strong>
+              (
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt.Device">
+               <em>
+                torch_tensorrt.Device
+               </em>
+              </a>
+              <em>
+               ,
+              </em>
+              <em>
+               torch.device
+              </em>
+              <em>
+               ,
+              </em>
+              <em>
+               dict
+              </em>
+              <em>
+               )
+              </em>
+              ) –
+             </p>
+             <p>
+              Target device for TensorRT engines to run on
+             </p>
+             <div class="highlight-cpp notranslate">
+              <div class="highlight">
+               <pre><span></span><span class="n">device</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Device</span><span class="p">(</span><span class="s">"dla:1"</span><span class="p">,</span> <span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="n">True</span><span class="p">)</span>
+</pre>
+              </div>
+             </div>
+            </li>
+            <li>
+             <p>
+              <strong>
+               disable_tf32
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               sparse_weights
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable sparsity for convolution and fully connected layers.
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               enabled_precision
+              </strong>
+              (
+              <em>
+               Set
+              </em>
+              <em>
+               (
+              </em>
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <em>
+               torch.dtype
+              </em>
+              <em>
+               ,
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.dtype" title="torch_tensorrt.dtype">
+               <em>
+                torch_tensorrt.dtype
+               </em>
+              </a>
+              <em>
+               )
+              </em>
+              <em>
+               )
+              </em>
+              ) – The set of datatypes that TensorRT can use when selecting kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               refit
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable refitting
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               debug
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable debuggable engine
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               strict_types
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               capability
+              </strong>
+              (
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability">
+               <em>
+                torch_tensorrt.EngineCapability
+               </em>
+              </a>
+              ) – Restrict kernel selection to safe gpu kernels or safe dla kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               num_min_timing_iters
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Number of minimization timing iterations used to select kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               num_avg_timing_iters
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Number of averaging timing iterations used to select kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               workspace_size
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Maximum size of workspace given to TensorRT
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               max_batch_size
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               truncate_long_and_double
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Truncate weights provided in int64 or double (float64) to int32 and float32
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               calibrator
+              </strong>
+              (
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <em>
+               torch_tensorrt._C.IInt8Calibrator
+              </em>
+              <em>
+               ,
+              </em>
+              <em>
+               tensorrt.IInt8Calibrator
+              </em>
+              <em>
+               )
+              </em>
+              ) – Calibrator object which will provide data to the PTQ system for INT8 Calibration
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               require_full_compilation
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               min_block_size
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               torch_executed_ops
+              </strong>
+              (
+              <em>
+               List
+              </em>
+              <em>
+               [
+              </em>
+              <em>
+               str
+              </em>
+              <em>
+               ]
+              </em>
+              ) – List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but
+              <code class="docutils literal notranslate">
+               <span class="pre">
+                require_full_compilation
+               </span>
+              </code>
+              is True
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               torch_executed_modules
+              </strong>
+              (
+              <em>
+               List
+              </em>
+              <em>
+               [
+              </em>
+              <em>
+               str
+              </em>
+              <em>
+               ]
+              </em>
+              ) – List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but
+              <code class="docutils literal notranslate">
+               <span class="pre">
+                require_full_compilation
+               </span>
+              </code>
+              is True
+             </p>
+            </li>
+           </ul>
+          </dd>
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            Compiled TorchScript Module, when run it will execute via TensorRT
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
+            torch.jit.ScriptModule
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.ts.convert_method_to_trt_engine">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.ts.
+         </code>
+         <code class="sig-name descname">
+          convert_method_to_trt_engine
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          module: torch.jit._script.ScriptModule
+         </em>
+         ,
+         <em class="sig-param">
+          method_name: str
+         </em>
+         ,
+         <em class="sig-param">
+          inputs=[]
+         </em>
+         ,
+         <em class="sig-param">
+          device=&lt;torch_tensorrt._Device.Device object&gt;
+         </em>
+         ,
+         <em class="sig-param">
+          disable_tf32=False
+         </em>
+         ,
+         <em class="sig-param">
+          sparse_weights=False
+         </em>
+         ,
+         <em class="sig-param">
+          enabled_precisions={}
+         </em>
+         ,
+         <em class="sig-param">
+          refit=False
+         </em>
+         ,
+         <em class="sig-param">
+          debug=False
+         </em>
+         ,
+         <em class="sig-param">
+          strict_types=False
+         </em>
+         ,
+         <em class="sig-param">
+          capability=&lt;EngineCapability.default: 0&gt;
+         </em>
+         ,
+         <em class="sig-param">
+          num_min_timing_iters=2
+         </em>
+         ,
+         <em class="sig-param">
+          num_avg_timing_iters=1
+         </em>
+         ,
+         <em class="sig-param">
+          workspace_size=0
+         </em>
+         ,
+         <em class="sig-param">
+          max_batch_size=0
+         </em>
+         ,
+         <em class="sig-param">
+          truncate_long_and_double=False
+         </em>
+         ,
+         <em class="sig-param">
+          calibrator=None
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         → str
+         <a class="headerlink" href="#torch_tensorrt.ts.convert_method_to_trt_engine" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Convert a TorchScript module method to a serialized TensorRT engine
+         </p>
+         <p>
+          Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <ul class="simple">
+            <li>
+             <p>
+              <strong>
+               module
+              </strong>
+              (
+              <em>
+               torch.jit.ScriptModule
+              </em>
+              ) – Source module, a result of tracing or scripting a PyTorch
+              <code class="docutils literal notranslate">
+               <span class="pre">
+                torch.nn.Module
+               </span>
+              </code>
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               method_name
+              </strong>
+              (
+              <em>
+               str
+              </em>
+              ) – Name of method to convert
+             </p>
+            </li>
+           </ul>
+          </dd>
+          <dt class="field-even">
+           Keyword Arguments
+          </dt>
+          <dd class="field-even">
+           <ul class="simple">
+            <li>
+             <p>
+              <strong>
+               inputs
+              </strong>
+              (
+              <em>
+               List
+              </em>
+              <em>
+               [
+              </em>
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Input" title="torch_tensorrt.Input">
+               <em>
+                torch_tensorrt.Input
+               </em>
+              </a>
+              <em>
+               ,
+              </em>
+              <em>
+               torch.Tensor
+              </em>
+              <em>
+               )
+              </em>
+              <em>
+               ]
+              </em>
+              ) –
+             </p>
+             <p>
+              <strong>
+               Required
+              </strong>
+              List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+to select device type.
+             </p>
+             <div class="highlight-cpp notranslate">
+              <div class="highlight">
+               <pre><span></span>input=[
+    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+    torch_tensorrt.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    ), # Dynamic input shape for input #2
+    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+]
+</pre>
+              </div>
+             </div>
+            </li>
+            <li>
+             <p>
+              <strong>
+               device
+              </strong>
+              (
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt.Device">
+               <em>
+                torch_tensorrt.Device
+               </em>
+              </a>
+              <em>
+               ,
+              </em>
+              <em>
+               torch.device
+              </em>
+              <em>
+               ,
+              </em>
+              <em>
+               dict
+              </em>
+              <em>
+               )
+              </em>
+              ) –
+             </p>
+             <p>
+              Target device for TensorRT engines to run on
+             </p>
+             <div class="highlight-cpp notranslate">
+              <div class="highlight">
+               <pre><span></span><span class="n">device</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Device</span><span class="p">(</span><span class="s">"dla:1"</span><span class="p">,</span> <span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="n">True</span><span class="p">)</span>
+</pre>
+              </div>
+             </div>
+            </li>
+            <li>
+             <p>
+              <strong>
+               disable_tf32
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               sparse_weights
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable sparsity for convolution and fully connected layers.
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               enabled_precision
+              </strong>
+              (
+              <em>
+               Set
+              </em>
+              <em>
+               (
+              </em>
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <em>
+               torch.dtype
+              </em>
+              <em>
+               ,
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.dtype" title="torch_tensorrt.dtype">
+               <em>
+                torch_tensorrt.dtype
+               </em>
+              </a>
+              <em>
+               )
+              </em>
+              <em>
+               )
+              </em>
+              ) – The set of datatypes that TensorRT can use when selecting kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               refit
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable refitting
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               debug
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable debuggable engine
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               strict_types
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               capability
+              </strong>
+              (
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability">
+               <em>
+                torch_tensorrt.EngineCapability
+               </em>
+              </a>
+              ) – Restrict kernel selection to safe gpu kernels or safe dla kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               num_min_timing_iters
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Number of minimization timing iterations used to select kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               num_avg_timing_iters
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Number of averaging timing iterations used to select kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               workspace_size
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Maximum size of workspace given to TensorRT
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               max_batch_size
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               truncate_long_and_double
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Truncate weights provided in int64 or double (float64) to int32 and float32
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               calibrator
+              </strong>
+              (
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <em>
+               torch_tensorrt._C.IInt8Calibrator
+              </em>
+              <em>
+               ,
+              </em>
+              <em>
+               tensorrt.IInt8Calibrator
+              </em>
+              <em>
+               )
+              </em>
+              ) – Calibrator object which will provide data to the PTQ system for INT8 Calibration
+             </p>
+            </li>
+           </ul>
+          </dd>
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
+            bytes
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.ts.check_method_op_support">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.ts.
+         </code>
+         <code class="sig-name descname">
+          check_method_op_support
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           module
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           torch.jit._script.ScriptModule
+          </span>
+         </em>
+         ,
+         <em class="sig-param">
+          <span class="n">
+           method_name
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           str
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         → bool
+         <a class="headerlink" href="#torch_tensorrt.ts.check_method_op_support" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Checks to see if a method is fully supported by torch_tensorrt
+         </p>
+         <p>
+          Checks if a method of a TorchScript module can be compiled by torch_tensorrt, if not, a list of operators
+that are not supported are printed out and the function returns false, else true.
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <ul class="simple">
+            <li>
+             <p>
+              <strong>
+               module
+              </strong>
+              (
+              <em>
+               torch.jit.ScriptModule
+              </em>
+              ) – Source module, a result of tracing or scripting a PyTorch
+              <code class="docutils literal notranslate">
+               <span class="pre">
+                torch.nn.Module
+               </span>
+              </code>
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               method_name
+              </strong>
+              (
+              <em>
+               str
+              </em>
+              ) – Name of method to check
+             </p>
+            </li>
+           </ul>
+          </dd>
+          <dt class="field-even">
+           Returns
+          </dt>
+          <dd class="field-even">
+           <p>
+            True if supported Method
+           </p>
+          </dd>
+          <dt class="field-odd">
+           Return type
+          </dt>
+          <dd class="field-odd">
+           <p>
+            bool
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.ts.embed_engine_in_new_module">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.ts.
+         </code>
+         <code class="sig-name descname">
+          embed_engine_in_new_module
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          serialized_engine: bytes
+         </em>
+         ,
+         <em class="sig-param">
+          device=&lt;torch_tensorrt._Device.Device object&gt;
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         → torch.jit._script.ScriptModule
+         <a class="headerlink" href="#torch_tensorrt.ts.embed_engine_in_new_module" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
+         </p>
+         <p>
+          Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.
+Registers the forward method to execute the TensorRT engine with the function signature:
+         </p>
+         <blockquote>
+          <div>
+           <p>
+            forward(Tensor[]) -&gt; Tensor[]
+           </p>
+          </div>
+         </blockquote>
+         <p>
+          Module can be save with engine embedded with torch.jit.save and moved / loaded according to torch_tensorrt portability rules
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             serialized_engine
+            </strong>
+            (
+            <em>
+             bytes
+            </em>
+            ) – Serialized TensorRT engine from either torch_tensorrt or TensorRT APIs
+           </p>
+          </dd>
+          <dt class="field-even">
+           Keyword Arguments
+          </dt>
+          <dd class="field-even">
+           <p>
+            <strong>
+             device
+            </strong>
+            (
+            <em>
+             Union
+            </em>
+            <em>
+             (
+            </em>
+            <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt.Device">
+             <em>
+              torch_tensorrt.Device
+             </em>
+            </a>
+            <em>
+             ,
+            </em>
+            <em>
+             torch.device
+            </em>
+            <em>
+             ,
+            </em>
+            <em>
+             dict
+            </em>
+            <em>
+             )
+            </em>
+            ) – Target device to run engine on. Must be compatible with engine provided. Default: Current active device
+           </p>
+          </dd>
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            New TorchScript module with engine embedded
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
+            torch.jit.ScriptModule
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.ts.TensorRTCompileSpec">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.ts.
+         </code>
+         <code class="sig-name descname">
+          TensorRTCompileSpec
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          inputs=[]
+         </em>
+         ,
+         <em class="sig-param">
+          device=&lt;torch_tensorrt._Device.Device object&gt;
+         </em>
+         ,
+         <em class="sig-param">
+          disable_tf32=False
+         </em>
+         ,
+         <em class="sig-param">
+          sparse_weights=False
+         </em>
+         ,
+         <em class="sig-param">
+          enabled_precisions={}
+         </em>
+         ,
+         <em class="sig-param">
+          refit=False
+         </em>
+         ,
+         <em class="sig-param">
+          debug=False
+         </em>
+         ,
+         <em class="sig-param">
+          strict_types=False
+         </em>
+         ,
+         <em class="sig-param">
+          capability=&lt;EngineCapability.default: 0&gt;
+         </em>
+         ,
+         <em class="sig-param">
+          num_min_timing_iters=2
+         </em>
+         ,
+         <em class="sig-param">
+          num_avg_timing_iters=1
+         </em>
+         ,
+         <em class="sig-param">
+          workspace_size=0
+         </em>
+         ,
+         <em class="sig-param">
+          max_batch_size=0
+         </em>
+         ,
+         <em class="sig-param">
+          truncate_long_and_double=False
+         </em>
+         ,
+         <em class="sig-param">
+          calibrator=None
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         → &lt;torch._C.ScriptClass object at 0x7f79a6ccc928&gt;
+         <a class="headerlink" href="#torch_tensorrt.ts.TensorRTCompileSpec" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Keyword Arguments
+          </dt>
+          <dd class="field-odd">
+           <ul class="simple">
+            <li>
+             <p>
+              <strong>
+               inputs
+              </strong>
+              (
+              <em>
+               List
+              </em>
+              <em>
+               [
+              </em>
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Input" title="torch_tensorrt.Input">
+               <em>
+                torch_tensorrt.Input
+               </em>
+              </a>
+              <em>
+               ,
+              </em>
+              <em>
+               torch.Tensor
+              </em>
+              <em>
+               )
+              </em>
+              <em>
+               ]
+              </em>
+              ) –
+             </p>
+             <p>
+              <strong>
+               Required
+              </strong>
+              List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+to select device type.
+             </p>
+             <div class="highlight-cpp notranslate">
+              <div class="highlight">
+               <pre><span></span>input=[
+    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+    torch_tensorrt.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    ), # Dynamic input shape for input #2
+    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+]
+</pre>
+              </div>
+             </div>
+            </li>
+            <li>
+             <p>
+              <strong>
+               device
+              </strong>
+              (
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt.Device">
+               <em>
+                torch_tensorrt.Device
+               </em>
+              </a>
+              <em>
+               ,
+              </em>
+              <em>
+               torch.device
+              </em>
+              <em>
+               ,
+              </em>
+              <em>
+               dict
+              </em>
+              <em>
+               )
+              </em>
+              ) –
+             </p>
+             <p>
+              Target device for TensorRT engines to run on
+             </p>
+             <div class="highlight-cpp notranslate">
+              <div class="highlight">
+               <pre><span></span><span class="n">device</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Device</span><span class="p">(</span><span class="s">"dla:1"</span><span class="p">,</span> <span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="n">True</span><span class="p">)</span>
+</pre>
+              </div>
+             </div>
+            </li>
+            <li>
+             <p>
+              <strong>
+               disable_tf32
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               sparse_weights
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable sparsity for convolution and fully connected layers.
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               enabled_precision
+              </strong>
+              (
+              <em>
+               Set
+              </em>
+              <em>
+               (
+              </em>
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <em>
+               torch.dtype
+              </em>
+              <em>
+               ,
+              </em>
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.dtype" title="torch_tensorrt.dtype">
+               <em>
+                torch_tensorrt.dtype
+               </em>
+              </a>
+              <em>
+               )
+              </em>
+              <em>
+               )
+              </em>
+              ) – The set of datatypes that TensorRT can use when selecting kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               refit
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable refitting
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               debug
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Enable debuggable engine
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               strict_types
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               capability
+              </strong>
+              (
+              <a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.EngineCapability" title="torch_tensorrt.EngineCapability">
+               <em>
+                torch_tensorrt.EngineCapability
+               </em>
+              </a>
+              ) – Restrict kernel selection to safe gpu kernels or safe dla kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               num_min_timing_iters
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Number of minimization timing iterations used to select kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               num_avg_timing_iters
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Number of averaging timing iterations used to select kernels
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               workspace_size
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Maximum size of workspace given to TensorRT
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               max_batch_size
+              </strong>
+              (
+              <em>
+               int
+              </em>
+              ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               truncate_long_and_double
+              </strong>
+              (
+              <em>
+               bool
+              </em>
+              ) – Truncate weights provided in int64 or double (float64) to int32 and float32
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               calibrator
+              </strong>
+              – Calibrator object which will provide data to the PTQ system for INT8 Calibration
+             </p>
+            </li>
+           </ul>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+      </article>
+     </div>
+    </div>
+   </main>
+  </div>
+  <footer class="md-footer">
+   <div class="md-footer-nav">
+    <nav class="md-footer-nav__inner md-grid">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="ptq.html" rel="prev" title="torch_tensorrt.ptq">
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
+       </i>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Previous
+        </span>
+        torch_tensorrt.ptq
+       </span>
+      </div>
+     </a>
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../_cpp_api/torch_tensort_cpp.html" rel="next" title="Torch-TensorRT C++ API">
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Next
+        </span>
+        Torch-TensorRT C++ API
+       </span>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
+       </i>
+      </div>
+     </a>
+    </nav>
+   </div>
+   <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+     <div class="md-footer-copyright">
+      <div class="md-footer-copyright__highlight">
+       © Copyright 2021, NVIDIA Corporation.
+      </div>
+      Created using
+      <a href="http://www.sphinx-doc.org/">
+       Sphinx
+      </a>
+      3.1.2.
+             and
+      <a href="https://github.com/bashtage/sphinx-material/">
+       Material for
+              Sphinx
+      </a>
+     </div>
+    </div>
+   </div>
+  </footer>
+  <script src="../_static/javascripts/application.js">
+  </script>
+  <script>
+   app.initialize({version: "1.0.4", url: {base: ".."}})
+  </script>
+ </body>
+</html>

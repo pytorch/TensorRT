@@ -1,0 +1,2 @@
+# Compatibility stub for tooling that still expects this file to exist.
+# Shared test dependencies live in pyproject.toml dependency groups.

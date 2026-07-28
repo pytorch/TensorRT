@@ -1,0 +1,8 @@
+/* sphinx-design styles for cards/tabs
+*/
+
+.sphx-glr-thumbcontainer {
+    padding: 50%;
+    display: flex;
+    align-content: center;
+}

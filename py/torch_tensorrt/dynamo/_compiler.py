@@ -1,0 +1,2165 @@
+from __future__ import annotations
+
+import collections.abc
+import logging
+import os
+import platform
+import warnings
+
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
+
+import sympy
+import torch
+from torch.export import ExportedProgram
+from torch.export.graph_signature import InputKind
+from torch.fx.node import Target
+from torch.utils._sympy.numbers import int_oo
+from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import EngineCapability, dtype
+from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
+from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo import _defaults, partitioning
+from torch_tensorrt.dynamo._DryRunTracker import (
+    DryRunTracker,
+    PerSubgraphData,
+    dryrun_stats_display,
+    parse_non_trt_nodes,
+)
+from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
+from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
+from torch_tensorrt.dynamo.conversion import (
+    CompilationSettings,
+    UnsupportedOperatorException,
+    convert_module,
+    interpret_module_to_result,
+    repair_double_inputs,
+)
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_CONVERTERS as CONVERTERS,
+)
+from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
+from torch_tensorrt.dynamo.debug._supports_debugger import fn_supports_debugger
+from torch_tensorrt.dynamo.lowering import (
+    get_decompositions,
+    post_lowering,
+    pre_export_lowering,
+)
+from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+    inline_lifted_buffers_into_gm,
+    lift_mutated_buffers,
+)
+from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
+    resource_partition,
+)
+from torch_tensorrt.dynamo.utils import (
+    deallocate_module,
+    get_cpu_memory_usage,
+    get_flat_args_with_check,
+    get_output_metadata,
+    parse_graph_io,
+    prepare_inputs,
+    to_torch_device,
+    to_torch_tensorrt_device,
+    validate_optimization_profiles,
+)
+
+logger = logging.getLogger(__name__)
+
+
+@needs_cross_compile  # type: ignore[misc]
+def cross_compile_for_windows(
+    exported_program: ExportedProgram,
+    inputs: Optional[Sequence[Sequence[Any]]] = None,
+    *,
+    arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
+    device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
+    disable_tf32: bool = _defaults.DISABLE_TF32,
+    assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
+    engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
+    num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
+    workspace_size: int = _defaults.WORKSPACE_SIZE,
+    dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
+    dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
+    dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
+    truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
+    min_block_size: int = _defaults.MIN_BLOCK_SIZE,
+    torch_executed_ops: Optional[Collection[Target]] = None,
+    torch_executed_modules: Optional[List[str]] = None,
+    pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
+    version_compatible: bool = _defaults.VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
+    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
+    use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    dryrun: bool = _defaults.DRYRUN,
+    hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
+    cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
+    reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
+    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
+    custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
+    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
+    immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
+    enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
+    tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
+    l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
+    use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
+    cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
+    **kwargs: Any,
+) -> torch.fx.GraphModule:
+    """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
+
+    Takes an exported program and a set of settings to configure the compiler
+    and it will convert methods to AOT graphs which call equivalent TensorRT engines
+
+    Arguments:
+        exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
+        inputs (Tuple[Any, ...]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type.
+
+                .. code-block:: py
+
+                    inputs=[
+                        torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        torch_tensorrt.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ), # Dynamic input shape for input #2
+                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                    ]
+
+    Keyword Arguments:
+        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
+        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+
+        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
+        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
+        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
+        workspace_size (int): Maximum size of workspace given to TensorRT
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        truncate_double (bool): Truncate weights provided in double (float64) to float32
+        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
+        torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
+        max_aux_stream (Optional[int]): Maximum streams in the engine
+        version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
+        optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
+        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
+        use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
+        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+        cache_built_engines (bool): Whether to save the compiled TRT engines to storage
+        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
+        engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
+        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
+        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
+        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
+        enable_weight_streaming (bool): Enable weight streaming.
+        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
+        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
+        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
+        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
+        **kwargs: Any,
+    Returns:
+        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
+
+    """
+    if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
+        raise RuntimeError(
+            f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
+        )
+
+    if kwargs.get("debug", False):
+        warnings.warn(
+            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if "truncate_long_and_double" in kwargs.keys():
+        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
+            raise ValueError(
+                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
+            )
+        else:
+            truncate_double = kwargs["truncate_long_and_double"]
+            warnings.warn(
+                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+    if use_python_runtime:
+        warnings.warn(
+            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
+            "runtimes have been merged; the runtime is now selected automatically based "
+            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
+            "be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["refit"]
+
+    if "make_refittable" in kwargs.keys():
+        warnings.warn(
+            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["make_refittable"]
+
+    if refit_identical_engine_weights:
+        if immutable_weights:
+            raise ValueError(
+                "`immutable_weights` must be False when `refit_identical_engine_weights` is True."
+            )
+
+    engine_capability = EngineCapability._from(engine_capability)
+
+    if torch_executed_modules is not None and torch_executed_modules:
+        logger.warning(
+            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
+            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
+        )
+
+    if use_fp32_acc:
+        logger.debug(
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
+        )
+
+    # Aliasing inputs to arg_inputs for better understanding
+    if arg_inputs is None and kwarg_inputs is None and inputs is None:
+        raise AssertionError(
+            "'arg_inputs', 'kwarg_inputs' and 'inputs' should not all be None."
+        )
+
+    elif arg_inputs is not None and inputs is not None:
+        raise AssertionError(
+            "'arg_inputs' and 'inputs' should not be used at the same time."
+        )
+
+    arg_inputs = inputs or arg_inputs
+
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
+
+    if not isinstance(arg_inputs, collections.abc.Sequence):
+        arg_inputs = [arg_inputs]  # type: ignore
+
+    # Prepare torch_trt inputs
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    device = to_torch_tensorrt_device(device)
+
+    compilation_options = {
+        "device": device,
+        "assume_dynamic_shape_support": assume_dynamic_shape_support,
+        "workspace_size": workspace_size,
+        "min_block_size": min_block_size,
+        "torch_executed_ops": (
+            torch_executed_ops if torch_executed_ops is not None else set()
+        ),
+        "pass_through_build_failures": pass_through_build_failures,
+        "max_aux_streams": max_aux_streams,
+        "version_compatible": version_compatible,
+        "optimization_level": optimization_level,
+        "truncate_double": truncate_double,
+        "use_fast_partitioner": use_fast_partitioner,
+        "num_avg_timing_iters": num_avg_timing_iters,
+        "enable_experimental_decompositions": enable_experimental_decompositions,
+        "require_full_compilation": require_full_compilation,
+        "disable_tf32": disable_tf32,
+        "sparse_weights": sparse_weights,
+        "engine_capability": engine_capability,
+        "dla_sram_size": dla_sram_size,
+        "dla_local_dram_size": dla_local_dram_size,
+        "dla_global_dram_size": dla_global_dram_size,
+        "dryrun": dryrun,
+        "hardware_compatible": hardware_compatible,
+        "timing_cache_path": timing_cache_path,
+        "lazy_engine_init": lazy_engine_init,
+        "cache_built_engines": cache_built_engines,
+        "reuse_cached_engines": reuse_cached_engines,
+        "refit_identical_engine_weights": refit_identical_engine_weights,
+        "strip_engine_weights": strip_engine_weights,
+        "immutable_weights": immutable_weights,
+        "enable_cross_compile_for_windows": True,
+        "enable_weight_streaming": enable_weight_streaming,
+        "tiling_optimization_level": tiling_optimization_level,
+        "l2_limit_for_tiling": l2_limit_for_tiling,
+        "use_distributed_mode_trace": use_distributed_mode_trace,
+        "enable_resource_partitioning": enable_resource_partitioning,
+        "cpu_memory_budget": cpu_memory_budget,
+        "dynamically_allocate_resources": dynamically_allocate_resources,
+        "decompose_attention": decompose_attention,
+        "attn_bias_is_causal": attn_bias_is_causal,
+        "fallback_data_dependent_ops": fallback_data_dependent_ops,
+    }
+
+    # disable the following settings is not supported for cross compilation for windows feature
+    unsupported_settings = (
+        "lazy_engine_init",
+        "cache_built_engines",
+        "reuse_cached_engines",
+    )
+    # disable these settings if anything is turned on
+    for key, value in compilation_options.items():
+        if key in unsupported_settings and value:
+            compilation_options[key] = False
+            logger.warning(
+                f"arg: {key} is not supported for cross compilation for windows feature, hence it is disabled."
+            )
+
+    settings = CompilationSettings(**compilation_options)
+    logger.info("Compilation Settings: %s\n", settings)
+    exported_program = pre_export_lowering(exported_program, settings)
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(
+            enable_experimental_decompositions,
+            decompose_attention,
+            use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
+        )
+    )
+
+    gm = exported_program.module()
+    logger.debug("Input graph: " + str(gm.graph))
+
+    # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
+    # module parameters to still be on GPU, so we must not deallocate before this call.
+    gm = post_lowering(gm, settings)
+    logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
+    logger.debug("Lowered Input graph: " + str(gm.graph))
+
+    # Move the weights in the state_dict to CPU
+    if offload_module_to_cpu:
+        deallocate_module(gm)
+        logger.info(
+            "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
+        )
+        logger.debug(f"CPU memory usage after CPU offload: {get_cpu_memory_usage()} MB")
+    else:
+        remaining_memory, total_memory = torch.cuda.mem_get_info()
+        if remaining_memory < total_memory // 2:
+            logger.warning(
+                "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
+            )
+    trt_gm = compile_module(
+        gm,
+        trt_arg_inputs,
+        trt_kwarg_inputs,
+        settings,
+        graph_signature=exported_program.graph_signature,
+    )
+    return trt_gm
+
+
+def compile(
+    exported_program: ExportedProgram,
+    inputs: Optional[Sequence[Sequence[Any]]] = None,
+    *,
+    arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
+    device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
+    disable_tf32: bool = _defaults.DISABLE_TF32,
+    assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
+    engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
+    num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
+    workspace_size: int = _defaults.WORKSPACE_SIZE,
+    dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
+    dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
+    dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
+    truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
+    min_block_size: int = _defaults.MIN_BLOCK_SIZE,
+    torch_executed_ops: Optional[Collection[Target]] = None,
+    torch_executed_modules: Optional[List[str]] = None,
+    pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
+    version_compatible: bool = _defaults.VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
+    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
+    use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    dryrun: bool = _defaults.DRYRUN,
+    hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
+    cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
+    reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
+    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
+    custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
+    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
+    immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
+    enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
+    tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
+    l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
+    use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    enable_autocast: bool = _defaults.ENABLE_AUTOCAST,
+    autocast_low_precision_type: Optional[
+        Union[torch.dtype, dtype]
+    ] = _defaults.AUTOCAST_LOW_PRECISION_TYPE,
+    autocast_excluded_nodes: Collection[str] = _defaults.AUTOCAST_EXCLUDED_NODES,
+    autocast_excluded_ops: Collection[Target] = _defaults.AUTOCAST_EXCLUDED_OPS,
+    autocast_max_output_threshold: float = _defaults.AUTOCAST_MAX_OUTPUT_THRESHOLD,
+    autocast_max_depth_of_reduction: Optional[
+        int
+    ] = _defaults.AUTOCAST_MAX_DEPTH_OF_REDUCTION,
+    autocast_calibration_dataloader: Optional[
+        torch.utils.data.DataLoader
+    ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
+    cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
+    dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
+    **kwargs: Any,
+) -> torch.fx.GraphModule:
+    """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
+
+    Takes a existing TorchScript module and a set of settings to configure the compiler
+    and will convert methods to JIT Graphs which call equivalent TensorRT engines
+
+    Converts specifically the forward method of a TorchScript Module
+
+    Arguments:
+        exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
+        inputs (Optional[Sequence[Sequence[Any]]]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type.
+
+                .. code-block:: py
+
+                    inputs=[
+                        torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        torch_tensorrt.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ), # Dynamic input shape for input #2
+                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                    ]
+
+    Keyword Arguments:
+        arg_inputs (Optional[Sequence[Sequence[Any]]]): Same as inputs. Alias for better understanding with kwarg_inputs.
+        kwarg_inputs (Optional[dict[Any, Any]]): kwarg inputs to the module forward function.
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+
+        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
+        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
+        engine_capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
+        workspace_size (int): Maximum size of workspace given to TensorRT
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        truncate_double (bool): Truncate weights provided in double (float64) to float32
+        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
+        torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (Optional[List[str]]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
+        max_aux_streams (Optional[int]): Maximum streams in the engine
+        version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
+        optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
+        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
+        use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
+        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+        cache_built_engines (bool): Whether to save the compiled TRT engines to storage
+        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        engine_cache_dir (str): Directory to store the cached TRT engines
+        engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
+        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
+        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
+        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
+        enable_weight_streaming (bool): Enable weight streaming.
+        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
+        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
+        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        enable_autocast (bool): Whether to enable autocast.
+        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
+        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
+        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
+        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
+        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
+        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
+        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
+        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
+        **kwargs: Any,
+    Returns:
+        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
+    """
+
+    if kwargs.get("debug", False):
+        warnings.warn(
+            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if "truncate_long_and_double" in kwargs.keys():
+        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
+            raise ValueError(
+                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
+            )
+        else:
+            truncate_double = kwargs["truncate_long_and_double"]
+            warnings.warn(
+                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+    if use_python_runtime:
+        warnings.warn(
+            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
+            "runtimes have been merged; the runtime is now selected automatically based "
+            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
+            "be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["refit"]
+
+    if "make_refittable" in kwargs.keys():
+        warnings.warn(
+            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["make_refittable"]
+
+    if refit_identical_engine_weights:
+        if immutable_weights:
+            raise ValueError(
+                "`immutable_weights` must be False when `refit_identical_engine_weights` is True."
+            )
+
+    if (
+        "enable_cross_compile_for_windows" in kwargs.keys()
+        and kwargs["enable_cross_compile_for_windows"]
+    ):
+        raise ValueError(
+            "Please use torch_tensorrt.dynamo.cross_compile_for_windows() if you want to cross compile the module in Linux for inferencing in Windows."
+        )
+
+    engine_capability = EngineCapability._from(engine_capability)
+
+    if torch_executed_modules is not None and torch_executed_modules:
+        logger.warning(
+            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
+            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
+        )
+
+    if autocast_low_precision_type is not None:
+        if not isinstance(autocast_low_precision_type, (torch.dtype, dtype)):
+            raise ValueError(
+                f"autocast_low_precision_type must be a torch.dtype or torch_tensorrt._enums.dtype, got {type(autocast_low_precision_type)}"
+            )
+        if autocast_low_precision_type not in {
+            torch.float16,
+            torch.bfloat16,
+        } and autocast_low_precision_type not in {dtype.f16, dtype.bf16}:
+            raise ValueError(
+                f"autocast_low_precision_type must be one of torch.float16, torch.bfloat16, dtype.f16, dtype.bf16, got {autocast_low_precision_type}"
+            )
+
+    if use_fp32_acc:
+        logger.debug(
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
+        )
+
+    # Aliasing inputs to arg_inputs for better understanding
+    if arg_inputs is None and kwarg_inputs is None and inputs is None:
+        raise AssertionError(
+            "'arg_inputs', 'kwarg_inputs' and 'inputs' should not all be None."
+        )
+
+    elif arg_inputs is not None and inputs is not None:
+        raise AssertionError(
+            "'arg_inputs' and 'inputs' should not be used at the same time."
+        )
+
+    arg_inputs = inputs or arg_inputs
+
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
+
+    if not isinstance(arg_inputs, collections.abc.Sequence):
+        arg_inputs = [arg_inputs]  # type: ignore
+
+    # Prepare torch_trt inputs
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    device = to_torch_tensorrt_device(device)
+
+    engine_cache = None
+    if cache_built_engines or reuse_cached_engines:
+        engine_cache = (
+            custom_engine_cache
+            if custom_engine_cache is not None
+            else DiskEngineCache(engine_cache_dir, engine_cache_size)
+        )
+
+    compilation_options = {
+        "device": device,
+        "assume_dynamic_shape_support": assume_dynamic_shape_support,
+        "workspace_size": workspace_size,
+        "min_block_size": min_block_size,
+        "torch_executed_ops": (
+            torch_executed_ops if torch_executed_ops is not None else set()
+        ),
+        "pass_through_build_failures": pass_through_build_failures,
+        "max_aux_streams": max_aux_streams,
+        "version_compatible": version_compatible,
+        "optimization_level": optimization_level,
+        "truncate_double": truncate_double,
+        "use_fast_partitioner": use_fast_partitioner,
+        "num_avg_timing_iters": num_avg_timing_iters,
+        "enable_experimental_decompositions": enable_experimental_decompositions,
+        "require_full_compilation": require_full_compilation,
+        "disable_tf32": disable_tf32,
+        "sparse_weights": sparse_weights,
+        "engine_capability": engine_capability,
+        "dla_sram_size": dla_sram_size,
+        "dla_local_dram_size": dla_local_dram_size,
+        "dla_global_dram_size": dla_global_dram_size,
+        "dryrun": dryrun,
+        "hardware_compatible": hardware_compatible,
+        "timing_cache_path": timing_cache_path,
+        "lazy_engine_init": lazy_engine_init,
+        "cache_built_engines": cache_built_engines,
+        "reuse_cached_engines": reuse_cached_engines,
+        "use_fp32_acc": use_fp32_acc,
+        "refit_identical_engine_weights": refit_identical_engine_weights,
+        "strip_engine_weights": strip_engine_weights,
+        "immutable_weights": immutable_weights,
+        "enable_cross_compile_for_windows": False,
+        "enable_weight_streaming": enable_weight_streaming,
+        "tiling_optimization_level": tiling_optimization_level,
+        "l2_limit_for_tiling": l2_limit_for_tiling,
+        "offload_module_to_cpu": offload_module_to_cpu,
+        "use_distributed_mode_trace": use_distributed_mode_trace,
+        "enable_autocast": enable_autocast,
+        "autocast_low_precision_type": autocast_low_precision_type,
+        "autocast_excluded_nodes": autocast_excluded_nodes,
+        "autocast_excluded_ops": autocast_excluded_ops,
+        "autocast_max_output_threshold": autocast_max_output_threshold,
+        "autocast_max_depth_of_reduction": autocast_max_depth_of_reduction,
+        "autocast_calibration_dataloader": autocast_calibration_dataloader,
+        "enable_resource_partitioning": enable_resource_partitioning,
+        "cpu_memory_budget": cpu_memory_budget,
+        "dynamically_allocate_resources": dynamically_allocate_resources,
+        "decompose_attention": decompose_attention,
+        "attn_bias_is_causal": attn_bias_is_causal,
+        "fallback_data_dependent_ops": fallback_data_dependent_ops,
+    }
+    logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
+    settings = CompilationSettings(**compilation_options)
+
+    logger.info("Compilation Settings: %s\n", settings)
+    exported_program = pre_export_lowering(exported_program, settings)
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(
+            enable_experimental_decompositions,
+            decompose_attention,
+            use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
+        )
+    )
+
+    gm = exported_program.module()
+    # Move the weights in the state_dict to CPU
+    logger.debug("Input graph: " + str(gm.graph))
+
+    # Lift mutated buffers from get_attr to placeholders BEFORE post_lowering's
+    # constant_fold runs, so the engine sees them as input bindings (a
+    # prerequisite for IKVCacheUpdateLayer / aliased I/O to fire on a
+    # module-held cache). Returns a fresh GraphModule whose forward signature
+    # reflects the new placeholders.
+    gm, lifted_buffers = lift_mutated_buffers(gm)
+    if lifted_buffers:
+        # Append each lifted buffer as an engine input AFTER the user inputs.
+        # Buffer tensors live on the gm's state; prepare an Input spec for
+        # each so engine building knows their shape/dtype/device.
+        buffer_tensors = [t for _, _, t in lifted_buffers]
+        buffer_inputs = prepare_inputs(buffer_tensors)
+        trt_arg_inputs = list(trt_arg_inputs) + list(buffer_inputs)
+        logger.info(
+            "Lifted %d mutable buffer(s) into engine inputs: %s",
+            len(lifted_buffers),
+            [b for _, b, _ in lifted_buffers],
+        )
+
+    # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
+    # module parameters to still be on GPU, so we must not deallocate before this call.
+    gm = post_lowering(gm, settings)
+    logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
+    logger.debug("Lowered Input graph: " + str(gm.graph))
+
+    # Move the weights in the state_dict to CPU
+    if offload_module_to_cpu:
+        deallocate_module(gm)
+        logger.info(
+            "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
+        )
+        logger.debug(f"CPU memory usage after CPU offload: {get_cpu_memory_usage()} MB")
+    else:
+        remaining_memory, total_memory = torch.cuda.mem_get_info()
+        if remaining_memory < total_memory // 2:
+            logger.warning(
+                "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
+            )
+    trt_gm = compile_module(
+        gm,
+        trt_arg_inputs,
+        trt_kwarg_inputs,
+        settings,
+        engine_cache,
+        graph_signature=exported_program.graph_signature,
+    )
+    if lifted_buffers:
+        # Inline buffers into the compiled gm as get_attr nodes + registered
+        # buffers. The resulting gm's forward takes only user inputs; buffers
+        # are read from module state on each call and threaded into the
+        # engine via get_attr nodes in the fx graph. This shape is naturally
+        # serializable by torch_tensorrt.save / torch.export (no external
+        # Python wrapper that would be lost on a round-trip).
+        trt_gm = inline_lifted_buffers_into_gm(trt_gm, lifted_buffers)
+    return trt_gm
+
+
+def _insert_complex_io_adapters(
+    partitioned_module: torch.fx.GraphModule,
+    gm: torch.fx.GraphModule,
+    settings: CompilationSettings,
+) -> None:
+    """Insert view_as_real / view_as_complex boundary nodes for complex I/O.
+
+    complex_graph_detection rewrites complex subgraphs to real arithmetic before
+    partitioning, but when a model has complex inputs or outputs the outer wrapper
+    graph still needs adapters at the TRT block boundary:
+
+      Inputs:  insert view_as_real (+ optional cast for complex128+truncate_double)
+               after each placeholder that was unpacked by the rewriter.
+      Outputs: insert view_as_complex before the output node for each originally-complex
+               output that comes from a TRT block.
+
+    Leverages metadata that was captured when the complex rewriter pass was run
+    """
+    complex_input_names = gm.meta.get("complex_input_names", [])
+    complex_input_dtypes = gm.meta.get("complex_input_dtypes", {})
+    complex_output_indices = gm.meta.get("complex_output_indices", [])
+
+    if not complex_input_names and not complex_output_indices:
+        return
+
+    graph_modified = False
+
+    # --- Input boundary: view_as_real for complex inputs ---
+    # complex_graph_detection renames complex placeholder 'foo' to 'foo_unpacked_complex'
+    # with float dtype. The outer graph still has 'foo_unpacked_complex' as a placeholder,
+    # but the caller passes the original complex tensor. Insert view_as_real after
+    # each such placeholder so the graph unpacks it transparently.
+    reshaped_names = {f"{n}_unpacked_complex" for n in complex_input_names}
+    for node in list(partitioned_module.graph.nodes):
+        if node.op != "placeholder" or node.name not in reshaped_names:
+            continue
+        with partitioned_module.graph.inserting_after(node):
+            real_node = partitioned_module.graph.call_function(
+                torch.ops.aten.view_as_real.default, args=(node,)
+            )
+        # For complex128 with truncate_double, the rewriter produced float32
+        # TRT engine inputs but view_as_real gives float64 — add an explicit cast.
+        orig_name = node.name[: -len("_unpacked_complex")]
+        orig_dtype = complex_input_dtypes.get(orig_name, None)
+
+        if orig_dtype == torch.complex128 and settings.truncate_double:
+            logger.info(
+                f"Input '{orig_name}' is complex128 with truncate_double=True: unpacked "
+                f"float64 components will be cast to float32."
+            )
+            with partitioned_module.graph.inserting_after(real_node):
+                cast_node = partitioned_module.graph.call_function(
+                    torch.ops.aten.to.dtype,
+                    args=(real_node, torch.float32),
+                )
+            node.replace_all_uses_with(cast_node)
+            cast_node.args = (real_node, torch.float32)
+            real_node.args = (node,)
+            logger.info(
+                f"Inserted view_as_real + cast-to-float32 for complex128 input placeholder '{node.name}' (truncate_double=True)"
+            )
+        else:
+            node.replace_all_uses_with(real_node)
+            # fix the self-reference created by replace_all_uses_with
+            real_node.args = (node,)
+            logger.info(
+                f"Inserted view_as_real for complex input placeholder '{node.name}'"
+            )
+        graph_modified = True
+
+    # --- Output boundary: view_as_complex for complex outputs from TRT blocks ---
+    if complex_output_indices:
+        output_node = list(partitioned_module.graph.nodes)[-1]
+        outputs = list(output_node.args[0])
+        for idx in complex_output_indices:
+            if idx >= len(outputs):
+                continue
+            src = outputs[idx]
+            if not isinstance(src, torch.fx.Node):
+                continue
+            if src.op == "call_module" and (
+                "_run_on_acc" in str(src.target) or "_run_on_gpu" in str(src.target)
+            ):
+                with partitioned_module.graph.inserting_before(output_node):
+                    complex_node = partitioned_module.graph.call_function(
+                        torch.ops.aten.view_as_complex.default, args=(src,)
+                    )
+                logger.info(
+                    f"Inserted view_as_complex for complex output index {idx} "
+                    f"from TRT block '{src.target}'"
+                )
+                outputs[idx] = complex_node
+                graph_modified = True
+        output_node.args = (tuple(outputs),)
+
+    if graph_modified:
+        partitioned_module.graph.lint()
+        partitioned_module.recompile()
+
+
+def _build_user_symbol_bounds(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: dict[Any, Any],
+    graph_signature: torch.export.graph_signature.ExportGraphSignature,
+) -> Dict[sympy.Symbol, Tuple[int, int]]:
+    """Map ``sympy.Symbol -> (min, max)`` from dynamic ``Input``s, used to
+    fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
+
+    Validates against finite exporter bounds: ``user_max > exp_max`` and
+    ``user_min < exp_min`` raise (TRT would reject those shapes at runtime);
+    a strict subset narrows the engine profile to the user's bounds (info
+    log only); the ``user_min=1, exp_min=2`` case warns -- it's PyTorch's
+    0/1 specialization artifact, not a user error.
+    """
+    # ep.module() strips lifted params/buffers from the graph, so all_placeholders
+    # only contains USER_INPUT nodes, but graph_signature.input_specs still lists
+    # all specs (PARAMETER, BUFFER, USER_INPUT). A positional zip misaligns.
+    # Use name-based lookup keyed on graph_signature USER_INPUT names instead.
+    placeholder_by_name = {n.name: n for n in gm.graph.nodes if n.op == "placeholder"}
+    user_input_names = [
+        spec.arg.name
+        for spec in graph_signature.input_specs
+        if spec.kind == InputKind.USER_INPUT and hasattr(spec.arg, "name")
+    ]
+    placeholders = [
+        placeholder_by_name[name]
+        for name in user_input_names
+        if name in placeholder_by_name
+    ]
+
+    # Use _in_spec.flatten_up_to to preserve export-time kwarg ordering.
+    # Fall back to name-based kwarg lookup when the arg/kwarg split differs
+    # from export time (which would cause flatten_up_to to raise an arity error).
+    in_spec = getattr(gm, "_in_spec", None)
+    try:
+        if in_spec is None:
+            raise AttributeError("_in_spec not found on graph module")
+        flat_inputs = in_spec.flatten_up_to(
+            (tuple(sample_arg_inputs), sample_kwarg_inputs)
+        )
+    except (ValueError, AttributeError):
+        flat_inputs = list(sample_arg_inputs)
+        if isinstance(sample_kwarg_inputs, dict):
+            for name in user_input_names[len(sample_arg_inputs) :]:
+                if name in sample_kwarg_inputs:
+                    flat_inputs.append(sample_kwarg_inputs[name])
+
+    user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
+
+    for node, inp in zip(placeholders, flat_inputs):
+        if not (isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC):
+            continue
+        fake_val = node.meta.get("val")
+        if not isinstance(fake_val, torch.Tensor):
+            continue
+
+        min_shape = inp.shape["min_shape"]
+        max_shape = inp.shape["max_shape"]
+
+        if len(fake_val.size()) != len(min_shape):
+            raise ValueError(
+                f"Input '{node.target}' has {len(fake_val.size())} dimensions in "
+                f"the exported program, but the provided Input specifies "
+                f"{len(min_shape)} dimensions. Ensure Input.min_shape, "
+                f"Input.opt_shape, and Input.max_shape each have "
+                f"{len(fake_val.size())} entries."
+            )
+
+        for d, dim in enumerate(fake_val.size()):
+            if not isinstance(dim, torch.SymInt):
+                if min_shape[d] != dim or max_shape[d] != dim:
+                    raise ValueError(
+                        f"Input '{node.target}' dim {d} is static (size={int(dim)}) "
+                        f"in the exported program, but the provided Input has "
+                        f"min_shape[{d}]={min_shape[d]}, max_shape[{d}]={max_shape[d]}. "
+                        f"Static dimensions must be fixed."
+                    )
+                continue
+            expr = dim.node.expr
+            # Composite exprs (e.g. ``2*s0``) are recomputed by
+            # ``ShapeEnv.bound_sympy``; overriding them directly would lie.
+            if not isinstance(expr, sympy.Symbol):
+                logger.debug(
+                    "Input '%s' dim %d is a composite symbolic expression (%s) "
+                    "bounded by another dynamic dimension; its range will be "
+                    "derived from constituent symbols via bound_sympy.",
+                    node.target,
+                    d,
+                    expr,
+                )
+                continue
+            if expr in user_symbol_bounds:
+                continue
+            user_min = int(min_shape[d])
+            user_max = int(max_shape[d])
+            user_symbol_bounds[expr] = (user_min, user_max)
+            logger.debug(
+                "Recorded user-supplied bounds for %s: [%d, %d]",
+                expr,
+                user_min,
+                user_max,
+            )
+
+            # The exported program may already bound this symbol to a finite
+            # range (e.g. Dim("batch", min=10, max=20)). The compiled TRT
+            # engine's optimization profile follows that range; any shape
+            # outside it is rejected by TensorRT at runtime
+            # (IExecutionContext::setInputShape "satisfyProfile" check).
+            # Validate the user's Input range against it here -- at compile
+            # time -- before they hit that opaque runtime error on a shape
+            # they explicitly declared in Input.min_shape / Input.max_shape.
+            shape_env = getattr(dim.node, "shape_env", None)
+            if shape_env is None:
+                continue
+            exp_range = shape_env.var_to_range.get(expr)
+            if exp_range is None:
+                continue
+            exp_lower = exp_range.lower
+            exp_upper = exp_range.upper
+            exp_max_unbounded = exp_upper is int_oo or exp_upper == sympy.oo
+            if exp_max_unbounded:
+                # Dim.DYNAMIC: user fills the gap (intended use).
+                continue
+            try:
+                exp_min = int(exp_lower)
+                exp_max = int(exp_upper)
+            except (TypeError, ValueError):
+                continue
+            if user_min == exp_min and user_max == exp_max:
+                continue
+
+            mismatch = (
+                f"Dynamic dimension '{expr}': "
+                f"Input range [{user_min}, {user_max}] vs "
+                f"exported program range [{exp_min}, {exp_max}]."
+            )
+
+            if user_max > exp_max:
+                raise ValueError(
+                    f"{mismatch} Input.max_shape ({user_max}) exceeds the "
+                    f"exported program's max ({exp_max}). The program was "
+                    f"exported with this dimension bounded to "
+                    f"[{exp_min}, {exp_max}], so the compiled TensorRT engine "
+                    f"cannot accept shapes above {exp_max}. Either re-export "
+                    f"with Dim('{expr}', max={user_max}) or set "
+                    f"Input.max_shape <= {exp_max}."
+                )
+
+            if user_min < exp_min:
+                # 1->2 is the 0/1 specialization artifact, not a user error.
+                if user_min == 1 and exp_min == 2:
+                    logger.warning(
+                        "%s Input.min_shape=1 but the exported program's min "
+                        "is 2 (PyTorch 0/1 specialization -- Dim(min=1) is "
+                        "recorded as min=2). The compiled engine's min will "
+                        "be 2.",
+                        mismatch,
+                    )
+                    continue
+                raise ValueError(
+                    f"{mismatch} Input.min_shape ({user_min}) is below the "
+                    f"exported program's min ({exp_min}). The program was "
+                    f"exported with this dimension bounded to "
+                    f"[{exp_min}, {exp_max}], so the compiled TensorRT engine "
+                    f"cannot accept shapes below {exp_min}. Either re-export "
+                    f"with Dim('{expr}', min={user_min}) or set "
+                    f"Input.min_shape >= {exp_min}."
+                )
+
+            # Strict subset: engine profile narrows to the user's bounds
+            # (applied in ``extract_var_range_info``). Not a warning -- the
+            # user got exactly what they asked for.
+            logger.info(
+                "%s Narrowing engine profile to user bounds [%d, %d] "
+                "(exported program range was [%d, %d]).",
+                mismatch,
+                user_min,
+                user_max,
+                exp_min,
+                exp_max,
+            )
+
+    return user_symbol_bounds
+
+
+@fn_supports_debugger  # type: ignore[misc]
+def compile_module(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
+    settings: CompilationSettings = CompilationSettings(),
+    engine_cache: Optional[BaseEngineCache] = None,
+    *,
+    graph_signature: Optional[torch.export.graph_signature.ExportGraphSignature] = None,
+    _debugger_config: Optional[DebuggerConfig] = None,
+) -> torch.fx.GraphModule:
+    """Compile a traced FX module
+
+    Includes: Partitioning + Conversion Phases
+
+    Args:
+        module: FX GraphModule to convert
+        arg_inputs: Inputs to the module
+        kwarg_inputs: kwargs to the module
+        settings: Compilation settings
+        engine_cache: Engine cache instance to store/load compiled engines
+    Returns:
+        Compiled FX GraphModule
+    """
+    if any(v.requires_grad for v in gm.state_dict().values()):
+        logger.warning(
+            "The model may be in training mode, which may affect the performance of the compiled model!"
+        )
+    dryrun_tracker = DryRunTracker()
+    if sample_kwarg_inputs is None:
+        sample_kwarg_inputs = {}
+
+    # fallback_data_dependent_ops runs data-dependent ops in PyTorch during
+    # partitioning, which cannot coexist with require_full_compilation.
+    if settings.fallback_data_dependent_ops and settings.require_full_compilation:
+        raise ValueError(
+            "fallback_data_dependent_ops runs data-dependent ops in PyTorch, which "
+            "is incompatible with require_full_compilation=True; enable only one."
+        )
+
+    # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
+    # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
+    # graph_signature is None on the torch.compile path, which has no ExportedProgram.
+    user_symbol_bounds = (
+        _build_user_symbol_bounds(
+            gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
+        )
+        if graph_signature is not None
+        else {}
+    )
+
+    # Configure user compilation settings to converters.
+    CONVERTERS.set_compilation_settings(settings)
+
+    # Check the number of supported operations in the graph
+    num_supported_ops, total_ops = partitioning.get_graph_converter_support(
+        gm, settings.torch_executed_ops
+    )
+
+    dryrun_tracker.total_ops_in_graph = total_ops
+    dryrun_tracker.supported_ops_in_graph = num_supported_ops
+    dryrun_tracker.compilation_settings = settings
+
+    if settings.dryrun and settings.min_block_size > 1:
+        logger.info(
+            "It is recommended to run `dryrun` mode with `min_block_size=1`, "
+            "for the most thorough analysis"
+        )
+
+    # If the number of supported operations is 0 or less than the block size, skip the subgraph
+    # TODO: Add condition to second expression below when require_full_compilation is added
+    if num_supported_ops == 0 or (
+        num_supported_ops < settings.min_block_size and not settings.dryrun
+    ):
+        logger.warning(
+            f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
+            f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
+        )
+        return gm
+    else:
+        logger.debug(
+            f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
+        )
+
+    def contains_metadata(gm: torch.fx.GraphModule) -> bool:
+        for node in gm.graph.nodes:
+            if node.op != "output" and (not node.meta) and "val" not in node.meta:
+                logger.warning(
+                    f"Node {node.name} of op type {node.op} does not have metadata. This could sometimes lead to undefined behavior."
+                )
+                return False
+        return True
+
+    # Check if the module has metadata (shape, dtype).
+    if not contains_metadata(gm):
+        # TODO: For future, explore when nodes don't have metadata and if fake_tensor_prop can resolve this.
+        logger.warning(
+            "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
+        )
+
+    # Store the original input spec for later use
+    original_in_spec = getattr(gm, "_in_spec", None)
+    original_out_spec = getattr(gm, "_out_spec", None)
+
+    # Function to preserve and restore module specs
+    def preserve_module_specs(
+        in_spec: Any, out_spec: Any, target_module: torch.fx.GraphModule
+    ) -> None:
+        """
+        Applies input and output specs to the target module.
+
+        Args:
+            in_spec: The input spec to apply
+            out_spec: The output spec to apply
+            target_module: The module to apply specs to
+        """
+        # Apply specs to target module
+        if in_spec is not None:
+            target_module._in_spec = in_spec
+        if out_spec is not None:
+            target_module._out_spec = out_spec
+
+    # Partition module into components that can be TRT-accelerated
+    fast_partitioner_failed = False
+    # If specified, try using the fast partitioner and fall back to the global one on failure
+    if settings.use_fast_partitioner:
+        try:
+            logger.info("Partitioning the graph via the fast partitioner")
+            partitioned_module, supported_ops = partitioning.fast_partition(
+                gm,
+                min_block_size=settings.min_block_size,
+                torch_executed_ops=settings.torch_executed_ops,
+                require_full_compilation=settings.require_full_compilation,
+                skip_fusion=(num_supported_ops == total_ops),
+            )
+
+        except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
+            logger.error(
+                "Partitioning failed on the subgraph with fast partition. See trace above. "
+                "Retrying with global partition.",
+                exc_info=True,
+            )
+
+            fast_partitioner_failed = True
+            settings.use_fast_partitioner = False
+
+    if not settings.use_fast_partitioner:
+        logger.info("Partitioning the graph via the global partitioner")
+        partitioned_module, supported_ops = partitioning.global_partition(
+            gm,
+            min_block_size=settings.min_block_size,
+            torch_executed_ops=settings.torch_executed_ops,
+            require_full_compilation=settings.require_full_compilation,
+        )
+
+    if settings.enable_resource_partitioning:
+        partitioned_module = resource_partition(
+            partitioned_module,
+            cpu_memory_budget=settings.cpu_memory_budget,
+        )
+
+    dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
+
+    # The global partitioner leaves non-TRT nodes as-is
+    if not settings.use_fast_partitioner:
+        dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
+
+    submodule_node_dict = {}
+    for node in partitioned_module.graph.nodes:
+        if "_run_on_acc" not in node.name:
+            continue
+        submodule_node_dict[node.name] = node
+
+    preserve_module_specs(original_in_spec, original_out_spec, partitioned_module)
+
+    # Multi-profile propagation: build the map from export source
+    # symbols to per-profile bounds once, from the top-level inputs, then reuse
+    # it to attach the same profiles (by index) to every TRT submodule's inputs.
+    top_level_inputs: List[Input] = list(sample_arg_inputs)
+    if isinstance(sample_kwarg_inputs, dict):
+        top_level_inputs.extend(sample_kwarg_inputs.values())
+    num_profiles = validate_optimization_profiles(top_level_inputs)
+    profile_source_bounds = None
+    if num_profiles:
+        logger.info(
+            f"Building engine(s) with {num_profiles} "
+            "optimization profiles (selected by index)"
+        )
+        profile_source_bounds = partitioning.build_profile_source_bounds(
+            partitioned_module, top_level_inputs, num_profiles
+        )
+
+    # Store TRT replicas of Torch subgraphs
+    trt_modules = {}
+    # Iterate over all components that can be accelerated
+    # Generate the corresponding TRT Module for those
+
+    # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
+    # This is done to release CPU memory.
+    for attr in dir(gm):
+        if attr.startswith("_frozen_param"):
+            delattr(gm, attr)
+
+    for name, _ in partitioned_module.named_children():
+        submodule = getattr(partitioned_module, name)
+        # filter on the GraphModule
+        if not isinstance(submodule, torch.fx.graph_module.GraphModule):
+            continue
+        # Criteria for a module to be convertible to TRT
+        if settings.use_fast_partitioner and "_run_on_acc" not in name:
+            dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
+            logger.debug(
+                "Submodule in PyTorch: %s\n %s",
+                str(name),
+                str(submodule.graph),
+            )
+            submodule.to(to_torch_device(settings.device))
+            continue
+
+        if name not in submodule_node_dict:
+            raise ValueError(
+                f"node_name: {name} does not exist in the submodule node dictionary"
+            )
+
+        # set the submodule metadata back to the parent trt_module_node
+        metadata_list = get_output_metadata(submodule)
+        assert len(metadata_list) > 0
+        metadata_keys = ["val", "tensor_meta"]
+        for key in metadata_keys:
+            if key not in submodule_node_dict[name].meta:
+                meta_val_list = [
+                    metadata[key] for metadata in metadata_list if key in metadata
+                ]
+                submodule_node_dict[name].meta[key] = meta_val_list
+                logger.debug(
+                    f"Updated metadata for node: {name} with its corresponding submodule outputs"
+                )
+                break
+
+        subgraph_data = PerSubgraphData()
+        subgraph_data.subgraph_name = name
+        subgraph_data.subgraph_op_count = len(
+            [
+                node
+                for node in submodule.graph.nodes
+                if node.op in ("call_function", "call_method", "call_module")
+            ]
+        )
+
+        # Get the submodule inputs for min, opt, max shapes of the graph inputs.
+        # With multi-profile compile, propagate the profiles (by index) to each
+        # submodule input by symbolic substitution.
+        submodule_inputs = partitioning.construct_submodule_inputs(
+            submodule,
+            profile_source_bounds=profile_source_bounds,
+            num_profiles=num_profiles,
+            user_symbol_bounds=user_symbol_bounds,
+        )
+
+        assert submodule_inputs is not None
+
+        logger.debug(
+            "Converting submodule: %s\n Input shapes: %s\n %s",
+            str(name),
+            [input.shape for input in submodule_inputs],
+            str(submodule.graph),
+        )
+
+        # Handle long/double inputs if requested by the user
+        if settings.truncate_double:
+            submodule_inputs = repair_double_inputs(
+                partitioned_module,
+                submodule,
+                submodule_inputs,
+                to_torch_device(settings.device),
+                name,
+            )
+
+        # Parse the subgraph I/O and store it
+        parse_graph_io(submodule, subgraph_data)
+        dryrun_tracker.tensorrt_graph_count += 1
+        dryrun_tracker.per_subgraph_data.append(subgraph_data)
+        torch.cuda.empty_cache()
+        # Create TRT engines from submodule
+        if not settings.dryrun:
+            trt_module = convert_module(
+                submodule,
+                submodule_inputs,
+                settings=settings,
+                name=name,
+                engine_cache=engine_cache,
+            )
+
+            trt_modules[name] = trt_module
+
+            if _debugger_config:
+                if _debugger_config.save_engine_profile:
+                    if not ENABLED_FEATURES.torch_tensorrt_runtime:
+                        if _debugger_config.profile_format != "cudagraph":
+                            raise ValueError(
+                                "Profiling with TREX can only be enabled when using the C++ runtime. Python runtime profiling only support cudagraph visualization."
+                            )
+                        else:
+                            trt_module.enable_profiling()
+                    else:
+                        if _debugger_config.profile_format == "cudagraph":
+                            raise ValueError(
+                                "Profiling with Cudagraph can only be enabled when using the Python runtime. C++ runtime profiling only support TREX/Perfetto visualization."
+                            )
+                        else:
+                            path = os.path.join(
+                                _debugger_config.logging_dir,
+                                "engine_visualization_profile",
+                            )
+                            os.makedirs(path, exist_ok=True)
+                            trt_module.enable_profiling(
+                                profiling_results_dir=path,
+                                profile_format=_debugger_config.profile_format,
+                            )
+
+                if _debugger_config.save_layer_info:
+                    with open(
+                        os.path.join(
+                            _debugger_config.logging_dir, "engine_layer_info.json"
+                        ),
+                        "w",
+                    ) as f:
+                        f.write(trt_module.get_layer_info())
+
+    # Only set the requires_unique_output flag for the last TRT Module when user has access to the output tensor
+
+    # Parse the graph I/O and store it in dryrun tracker
+    parse_graph_io(gm, dryrun_tracker)
+
+    # Replace all FX Modules with TRT Modules
+    for name, trt_module in trt_modules.items():
+        setattr(partitioned_module, name, trt_module)
+        if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
+            trt_module = getattr(partitioned_module, name)
+            trt_module.setup_engine()
+
+    # Post-partition complex I/O boundary pass — runs in both normal and dryrun mode
+    # so the wrapper graph reflects the exact graph that will be executed/built.
+    _insert_complex_io_adapters(partitioned_module, gm, settings)
+
+    # Only set output tensors as unowned if not in dryrun mode (TRT modules exist)
+    if not settings.dryrun:
+        output_node = list(partitioned_module.graph.nodes)[-1]
+        for arg in output_node.args:
+            for output in arg:
+                target = output.target
+                if "_run_on_acc" not in str(target):
+                    continue
+                getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
+
+    # Reset settings object to user specification after fallback to global partitioning mode
+    if fast_partitioner_failed:
+        settings.use_fast_partitioner = True
+
+    dryrun_stats_display(dryrun_tracker, settings.dryrun)
+
+    return partitioned_module
+
+
+class BindingNameMismatchError(ValueError):
+    """Raised when user-supplied ``input_binding_names`` / ``output_binding_names``
+    don't match the exported program's pytree spec.
+
+    The user provides names shaped like their original ``forward()`` would
+    receive (for inputs) or return (for outputs).  We flatten via
+    ``pytree.tree_flatten`` and compare the resulting ``TreeSpec`` against
+    the spec the exported program already carries — they must be equal,
+    which guarantees a 1:1 mapping between the user's structured names and
+    FX's flattened placeholder / output order.  No runtime queue, no
+    in-band validator: spec equality up front, single flat list passed
+    through to the interpreter.
+
+    The error message shows both specs side-by-side plus a per-leaf path
+    listing of what each binding slot expects, so the user can read the
+    correct shape off the error and re-run.
+    """
+
+    def __init__(
+        self,
+        role: str,
+        expected_spec: Any,
+        provided: Any = None,
+        provided_spec: Any = None,
+        reason: str = "spec_mismatch",
+    ) -> None:
+        self.role = role
+        self.expected_spec = expected_spec
+        self.provided = provided
+        self.provided_spec = provided_spec
+        self.reason = reason
+        super().__init__(self._format_message())
+
+    def _expected_leaf_paths(self) -> List[str]:
+        import torch.utils._pytree as pytree
+
+        if self.expected_spec is None:
+            return []
+        # Reconstruct a dummy pytree from the spec so we can walk paths via
+        # tree_flatten_with_path.  Each leaf carries its position description.
+        try:
+            dummy = pytree.tree_unflatten(
+                [object()] * self.expected_spec.num_leaves, self.expected_spec
+            )
+            paths_leaves = pytree.tree_flatten_with_path(dummy)[0]
+            return [pytree.keystr(p) or "<root>" for p, _ in paths_leaves]
+        except Exception:
+            return []
+
+    def _format_message(self) -> str:
+        role_kw = f"{self.role}_binding_names"
+        paths = self._expected_leaf_paths()
+        expected_section = (
+            f"Expected structure (from exported program "
+            f"{self.role}_spec):\n  {self.expected_spec}"
+        )
+        if paths:
+            expected_section += (
+                "\n\nExpected leaf positions (in FX flattening order):\n"
+                + "\n".join(f"  [{i}] {p}" for i, p in enumerate(paths))
+            )
+
+        if self.reason == "duplicate":
+            return (
+                f"{role_kw} contains duplicate names. Each binding name "
+                f"must be unique.\n\nProvided structure:\n  {self.provided!r}"
+            )
+        if self.reason == "overlap":
+            return (
+                "Provided input_binding_names and output_binding_names "
+                "share one or more names. Engine binding names must be "
+                "globally unique.\n\n"
+                f"Overlap: {self.provided!r}"
+            )
+        if self.reason == "non_string_leaf":
+            return (
+                f"{role_kw} pytree leaves must all be strings.\n"
+                f"Provided structure:\n  {self.provided!r}"
+            )
+
+        # spec_mismatch
+        return (
+            f"{role_kw} structure does not match the exported program's "
+            f"{self.role}_spec.\n\n"
+            f"Provided structure:\n  {self.provided_spec}\n\n"
+            f"{expected_section}\n\n"
+            f"Hint: pass a pytree of strings whose structure matches the "
+            f"exported program's "
+            f"{'(args, kwargs)' if self.role == 'input' else 'forward() return value'}."
+        )
+
+
+def _binding_name_specs(
+    exported_program: ExportedProgram,
+) -> Tuple[Optional[Any], Optional[Any], Optional[Any]]:
+    """Extract (args_spec, kwargs_spec, out_spec) from an exported program.
+
+    ``in_spec`` on an exported program is a 2-tuple TreeSpec of
+    ``(args_spec, kwargs_spec)`` that mirrors how the program was traced.
+    We return them split so the API can validate ``arg_input_binding_names``
+    against args_spec and ``kwarg_input_binding_names`` against kwargs_spec
+    independently — matching the shape of the existing ``arg_inputs`` /
+    ``kwarg_inputs`` kwargs.  ``out_spec`` is the return spec.
+    """
+    args_spec = kwargs_spec = out_spec = None
+    if exported_program.module_call_graph:
+        sig = exported_program.module_call_graph[0].signature
+        in_spec = getattr(sig, "in_spec", None)
+        out_spec = getattr(sig, "out_spec", None)
+        if in_spec is not None:
+            try:
+                args_spec = in_spec.child(0)
+                kwargs_spec = in_spec.child(1)
+            except (AttributeError, IndexError):
+                pass
+    return args_spec, kwargs_spec, out_spec
+
+
+def _resolve_pytree_binding_names(
+    user: Any,
+    role: str,
+    expected_spec: Any,
+) -> Optional[List[str]]:
+    """Flatten the user's pytree of names and verify spec equality.
+
+    Returns the flat list of names in FX flattening order, or ``None`` when
+    no override was provided.  Raises :class:`BindingNameMismatchError` on
+    any structural / typing / duplicate problem.
+    """
+    if user is None:
+        return None
+
+    import torch.utils._pytree as pytree
+
+    if expected_spec is None:
+        # Exported program doesn't carry a spec for this slot — fall back
+        # to a plain pytree flatten with no structural validation.
+        leaves, _ = pytree.tree_flatten(user)
+        if not all(isinstance(x, str) for x in leaves):
+            raise BindingNameMismatchError(
+                role=role,
+                expected_spec=None,
+                provided=user,
+                reason="non_string_leaf",
+            )
+        return list(leaves)
+
+    leaves, user_spec = pytree.tree_flatten(user)
+    if not all(isinstance(x, str) for x in leaves):
+        raise BindingNameMismatchError(
+            role=role,
+            expected_spec=expected_spec,
+            provided=user,
+            reason="non_string_leaf",
+        )
+
+    if user_spec != expected_spec:
+        raise BindingNameMismatchError(
+            role=role,
+            expected_spec=expected_spec,
+            provided=user,
+            provided_spec=user_spec,
+            reason="spec_mismatch",
+        )
+
+    if len(set(leaves)) != len(leaves):
+        raise BindingNameMismatchError(
+            role=role,
+            expected_spec=expected_spec,
+            provided=user,
+            reason="duplicate",
+        )
+    return list(leaves)
+
+
+def convert_exported_program_to_serialized_trt_engine(
+    exported_program: ExportedProgram,
+    inputs: Optional[Sequence[Sequence[Any]]] = None,
+    *,
+    arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
+    device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
+    disable_tf32: bool = _defaults.DISABLE_TF32,
+    assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
+    engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
+    num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
+    workspace_size: int = _defaults.WORKSPACE_SIZE,
+    dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
+    dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
+    dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
+    truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
+    min_block_size: int = _defaults.MIN_BLOCK_SIZE,
+    torch_executed_ops: Optional[Collection[Target]] = None,
+    torch_executed_modules: Optional[List[str]] = None,
+    pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
+    version_compatible: bool = _defaults.VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
+    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
+    use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    dryrun: bool = _defaults.DRYRUN,
+    hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
+    cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
+    reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
+    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
+    custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
+    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
+    immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
+    enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
+    tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
+    l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
+    use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    lift_mutable_buffers: bool = False,
+    arg_input_binding_names: Any = None,
+    kwarg_input_binding_names: Any = None,
+    output_binding_names: Any = None,
+    **kwargs: Any,
+) -> bytes:
+    """Convert an ExportedProgram to a serialized TensorRT engine
+
+    Converts an ExportedProgram to a serialized TensorRT engine given a dictionary of conversion settings
+
+    When ``lift_mutable_buffers=True``, any module buffer that the model mutates
+    (a ``BUFFER_MUTATION`` in the EP's graph signature) is lifted from a baked-in
+    constant to an engine *input binding*. The resulting engine has additional
+    input bindings appended after the user-supplied inputs, in the order the
+    buffers appear in the EP. The caller is responsible for threading those
+    bindings at runtime — pass the current buffer values in on each call; the
+    engine writes through the binding via aliased I/O so the buffer's storage
+    is mutated in place. Use ``trt.ICudaEngine.get_aliased_input_tensor`` (or
+    the metadata exposed by ``TRTEngine`` via ``aliased_io``) to discover
+    which output binding aliases which input. The higher-level
+    :func:`torch_tensorrt.dynamo.compile` does this lifting and threading
+    automatically; this lower-level entry point exposes the same machinery
+    for callers that want to manage the bindings themselves.
+
+    Arguments:
+        exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
+        inputs (Optional[Sequence[Sequence[Any]]]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type.
+
+                .. code-block:: py
+
+                    inputs=[
+                        torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        torch_tensorrt.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ), # Dynamic input shape for input #2
+                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                    ]
+
+    Keyword Arguments:
+        arg_inputs (Optional[Sequence[Sequence[Any]]]): Same as inputs. Alias for better understanding with kwarg_inputs.
+        kwarg_inputs (Optional[dict[Any, Any]]): kwarg inputs to the module forward function.
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+
+        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
+        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
+        engine_capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
+        workspace_size (int): Maximum size of workspace given to TensorRT
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        truncate_double (bool): Truncate weights provided in double (float64) to float32
+        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
+        torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (Optional[List[str]]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
+        max_aux_streams (Optional[int]): Maximum streams in the engine
+        version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
+        optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
+        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
+        use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
+        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
+        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+        cache_built_engines (bool): Whether to save the compiled TRT engines to storage
+        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        engine_cache_dir (str): Directory to store the cached TRT engines
+        engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
+        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
+        use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
+            inputs and outputs. When combined with ``decompose_attention=True``, the complete
+            decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
+            final output is cast back to FP16. This option has no effect on FP32 or BF16 inputs.
+        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
+        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
+        enable_weight_streaming (bool): Enable weight streaming.
+        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
+        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
+        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model.
+        decompose_attention (bool): Whether to decompose attention layers into smaller operations
+            instead of using the attention converters. When combined with ``use_fp32_acc=True``,
+            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
+            the final output back to FP16.
+        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        **kwargs: Any,
+    Returns:
+        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
+    """
+
+    if kwargs.get("debug", False):
+        warnings.warn(
+            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if "truncate_long_and_double" in kwargs.keys():
+        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
+            raise ValueError(
+                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
+            )
+        else:
+            truncate_double = kwargs["truncate_long_and_double"]
+            warnings.warn(
+                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+    if use_python_runtime:
+        warnings.warn(
+            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
+            "runtimes have been merged; the runtime is now selected automatically based "
+            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
+            "be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["refit"]
+
+    if "make_refittable" in kwargs.keys():
+        warnings.warn(
+            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["make_refittable"]
+
+    if refit_identical_engine_weights:
+        if immutable_weights:
+            raise ValueError(
+                "`immutable_weights` must be False when `refit_identical_engine_weights` is True."
+            )
+
+    if (
+        "enable_cross_compile_for_windows" in kwargs.keys()
+        and kwargs["enable_cross_compile_for_windows"]
+    ):
+        raise ValueError(
+            "Please use torch_tensorrt.dynamo.cross_compile_for_windows() if you want to cross compile the module in Linux for inferencing in Windows."
+        )
+
+    engine_capability = EngineCapability._from(engine_capability)
+
+    if torch_executed_modules is not None and torch_executed_modules:
+        logger.warning(
+            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
+            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
+        )
+
+    if use_fp32_acc:
+        logger.debug(
+            "FP32 accumulation for FP16 matmul layers is enabled. If "
+            "decompose_attention is also enabled, the complete decomposed FP16 "
+            "scaled dot product attention calculation runs in FP32 and only its "
+            "final output is cast back to FP16. This option has no effect on FP32 "
+            "or BF16 inputs."
+        )
+
+    # Aliasing inputs to arg_inputs for better understanding
+    if arg_inputs is None and kwarg_inputs is None and inputs is None:
+        raise AssertionError(
+            "'arg_inputs', 'kwarg_inputs' and 'inputs' should not all be None."
+        )
+
+    elif arg_inputs is not None and inputs is not None:
+        raise AssertionError(
+            "'arg_inputs' and 'inputs' should not be used at the same time."
+        )
+
+    arg_inputs = inputs or arg_inputs
+
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
+
+    if not isinstance(arg_inputs, collections.abc.Sequence):
+        arg_inputs = [arg_inputs]  # type: ignore
+
+    # Prepare torch_trt inputs
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
+    trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(kwarg_inputs)
+    device = to_torch_tensorrt_device(device)
+
+    engine_cache = None
+    if cache_built_engines or reuse_cached_engines:
+        engine_cache = (
+            custom_engine_cache
+            if custom_engine_cache is not None
+            else DiskEngineCache(engine_cache_dir, engine_cache_size)
+        )
+
+    compilation_options = {
+        "device": device,
+        "assume_dynamic_shape_support": assume_dynamic_shape_support,
+        "workspace_size": workspace_size,
+        "min_block_size": min_block_size,
+        "torch_executed_ops": (
+            torch_executed_ops if torch_executed_ops is not None else set()
+        ),
+        "pass_through_build_failures": pass_through_build_failures,
+        "max_aux_streams": max_aux_streams,
+        "version_compatible": version_compatible,
+        "optimization_level": optimization_level,
+        "truncate_double": truncate_double,
+        "use_fast_partitioner": use_fast_partitioner,
+        "num_avg_timing_iters": num_avg_timing_iters,
+        "enable_experimental_decompositions": enable_experimental_decompositions,
+        "require_full_compilation": require_full_compilation,
+        "disable_tf32": disable_tf32,
+        "sparse_weights": sparse_weights,
+        "engine_capability": engine_capability,
+        "dla_sram_size": dla_sram_size,
+        "dla_local_dram_size": dla_local_dram_size,
+        "dla_global_dram_size": dla_global_dram_size,
+        "dryrun": dryrun,
+        "hardware_compatible": hardware_compatible,
+        "timing_cache_path": timing_cache_path,
+        "lazy_engine_init": lazy_engine_init,
+        "cache_built_engines": cache_built_engines,
+        "reuse_cached_engines": reuse_cached_engines,
+        "use_fp32_acc": use_fp32_acc,
+        "refit_identical_engine_weights": refit_identical_engine_weights,
+        "strip_engine_weights": strip_engine_weights,
+        "immutable_weights": immutable_weights,
+        "enable_cross_compile_for_windows": False,
+        "enable_weight_streaming": enable_weight_streaming,
+        "tiling_optimization_level": tiling_optimization_level,
+        "l2_limit_for_tiling": l2_limit_for_tiling,
+        "offload_module_to_cpu": offload_module_to_cpu,
+        "use_distributed_mode_trace": use_distributed_mode_trace,
+        "decompose_attention": decompose_attention,
+        "attn_bias_is_causal": attn_bias_is_causal,
+    }
+
+    settings = CompilationSettings(**compilation_options)
+    logger.info("Compilation Settings: %s\n", settings)
+    exported_program = pre_export_lowering(exported_program, settings)
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(
+            enable_experimental_decompositions,
+            decompose_attention,
+            use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
+        )
+    )
+
+    gm = exported_program.module()
+    # Move the weights in the state_dict to CPU
+    logger.debug("Input graph: " + str(gm.graph))
+
+    # Optional: lift mutated module buffers from get_attr to placeholder so the
+    # engine treats them as input bindings (enabling KV-cache aliasing for
+    # module-held caches). The caller is responsible for threading the
+    # resulting bindings at runtime — they are appended after the user inputs
+    # in the order returned here.
+    lifted_buffers: List[Tuple[str, str, torch.Tensor]] = []
+    if lift_mutable_buffers:
+        gm, lifted_buffers = lift_mutated_buffers(gm)
+        if lifted_buffers:
+            buffer_tensors = [t for _, _, t in lifted_buffers]
+            buffer_inputs = prepare_inputs(buffer_tensors)
+            trt_arg_inputs = list(trt_arg_inputs) + list(buffer_inputs)
+            logger.info(
+                "lift_mutable_buffers=True: lifted %d buffer(s) into engine "
+                "inputs (appended after user inputs): %s",
+                len(lifted_buffers),
+                [b for _, b, _ in lifted_buffers],
+            )
+
+    # Apply lowering on the graph module
+    gm = post_lowering(gm, settings)
+    logger.debug("Lowered Input graph: " + str(gm.graph))
+
+    # Move the weights in the state_dict to CPU
+    if offload_module_to_cpu:
+        deallocate_module(exported_program.module())
+        logger.info(
+            "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
+        )
+    else:
+        remaining_memory, total_memory = torch.cuda.mem_get_info()
+        if remaining_memory < total_memory // 2:
+            logger.warning(
+                "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
+            )
+
+    if trt_kwarg_inputs is None:
+        trt_kwarg_inputs = {}
+
+    flattened_input_list = get_flat_args_with_check(
+        exported_program, list(trt_arg_inputs), trt_kwarg_inputs
+    )[0]
+
+    # Validate user-provided pytree-shaped binding names against the
+    # exported program's args / kwargs / output specs.  The shape of these
+    # kwargs mirrors arg_inputs / kwarg_inputs: caller passes a pytree of
+    # strings in the same shape as the values it would pass at runtime.
+    # Spec / typing / duplicate errors fire here before any TRT work.
+    args_spec, kwargs_spec, out_spec = _binding_name_specs(exported_program)
+    arg_names = _resolve_pytree_binding_names(
+        arg_input_binding_names, role="arg_input", expected_spec=args_spec
+    )
+    kwarg_names = _resolve_pytree_binding_names(
+        kwarg_input_binding_names, role="kwarg_input", expected_spec=kwargs_spec
+    )
+    # FX flattens placeholders in (args, kwargs) order — concatenate the
+    # two resolved lists in the same order to get the positional input list.
+    if arg_names is None and kwarg_names is None:
+        flat_input_names: Optional[List[str]] = None
+    else:
+        flat_input_names = list(arg_names or []) + list(kwarg_names or [])
+
+    flat_output_names = _resolve_pytree_binding_names(
+        output_binding_names, role="output", expected_spec=out_spec
+    )
+
+    if flat_input_names is not None:
+        if len(set(flat_input_names)) != len(flat_input_names):
+            raise BindingNameMismatchError(
+                role="input",
+                expected_spec=None,
+                provided=flat_input_names,
+                reason="duplicate",
+            )
+    if flat_input_names is not None and flat_output_names is not None:
+        overlap = set(flat_input_names) & set(flat_output_names)
+        if overlap:
+            raise BindingNameMismatchError(
+                role="input",
+                expected_spec=None,
+                provided=sorted(overlap),
+                reason="overlap",
+            )
+
+    try:
+        interpreter_result = interpret_module_to_result(
+            gm,
+            inputs=flattened_input_list,
+            settings=settings,
+            engine_cache=engine_cache,
+            input_binding_names=flat_input_names,
+            output_binding_names=flat_output_names,
+        )
+    except UnsupportedOperatorException as e:
+        logger.error(
+            f"Conversion of module {gm} not currently fully supported or convertible!",
+            exc_info=True,
+        )
+        raise UnsupportedOperatorException(
+            f"Conversion of module {gm} not currently fully supported or convertible!"
+        ) from e
+    except Exception as e:
+        logger.error(
+            f"While interpreting the module got an error: {e}",
+            exc_info=True,
+        )
+        raise RuntimeError(f"While interpreting the module got an error: {e}") from e
+
+    serialized_engine: bytes = interpreter_result.serialized_engine
+    return serialized_engine
+
+
+@needs_cross_compile  # type: ignore[misc]
+def save_cross_compiled_exported_program(
+    gm: torch.fx.GraphModule,
+    file_path: str,
+) -> None:
+    """
+    Save cross compiled exported program to disk.
+
+    Arguments:
+        module (torch.fx.GraphModule): Cross compiled Torch-TensorRT module
+        file_path (str): the file path where the exported program will be saved to disk
+    """
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
+
+    from torch_tensorrt.dynamo._exporter import export
+
+    exp_program = export(gm, cross_compile_module=True)
+    torch.export.save(exp_program, file_path)
+    logger.debug(f"successfully saved the module for windows at {file_path}")
+
+
+def load_cross_compiled_exported_program(file_path: str = "") -> Any:
+    """
+    Load an ExportedProgram file in Windows which was previously cross compiled in Linux
+
+    Arguments:
+        file_path (str): Path to file on the disk
+
+    Raises:
+        ValueError: If the api is not called in windows or there is no file or the file is a valid ExportedProgram file
+    """
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
+
+    if platform.system() != "Windows" or platform.machine() != "AMD64":
+        raise ValueError(
+            "cross runtime compiled model for windows can only be loaded in Windows system"
+        )
+
+    try:
+        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
+        # TODO: think about how to handle the torch.jit.load route?
+        exp_program = torch.export.load(file_path)
+    except Exception as e:
+        logger.info(
+            f"Loading the provided file {file_path} via torch.export.load() failed with the following error: {e}",
+            exc_info=True,
+        )
+        raise ValueError(
+            f"cross_load the file {file_path} doesn't correspond to a valid ExportedProgram. Please verify the file path."
+        )
+
+    return replace_execute_engine_no_op_node(exp_program)

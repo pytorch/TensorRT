@@ -1,0 +1,52 @@
+##########################################################################
+# Copyright (c) 2018-2019 NVIDIA Corporation. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# File: DL4AGX/.bazelrc
+# Description: Default bazel settings and toolchain configuration
+##########################################################################
+
+# +------------------------------------------------------------+
+# | Build Configurations                                       |
+# +------------------------------------------------------------+
+
+common --enable_platform_specific_config
+
+build:linux --cxxopt="-std=c++20"
+build:linux --cxxopt="-fdiagnostics-color=always"
+
+build:windows --cxxopt="/GS-" --cxxopt="/std:c++20" --cxxopt="/permissive-"
+build:windows --cxxopt="/wd4244" --cxxopt="/wd4267" --cxxopt="/wd4819"
+build:windows --cxxopt="/utf-8"
+build:windows --features=windows_export_all_symbols
+
+build:python --define=target_lang=python
+
+build:cxx11_abi --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=1"
+build:cxx11_abi --linkopt="-D_GLIBCXX_USE_CXX11_ABI=1"
+build:cxx11_abi --define=abi=cxx11_abi
+
+build:jetpack --//toolchains/dep_collection:compute_libs=jetpack
+
+build:rtx --//toolchains/dep_collection:compute_libs=rtx
+build:dlfw --//:package_executorch=false
+
+build:ci_testing --define=torchtrt_src=prebuilt --cxxopt="-DDISABLE_TEST_IN_CI" --action_env "NVIDIA_TF32_OVERRIDE=0"
+build:use_precompiled_torchtrt --define=torchtrt_src=prebuilt
+
+test:ci_testing --define=torchtrt_src=prebuilt --cxxopt="-DDISABLE_TEST_IN_CI" --action_env "NVIDIA_TF32_OVERRIDE=0"
+test:use_precompiled_torchtrt --define=torchtrt_src=prebuilt
+
+# Load optional per-developer overrides, such as local resource limits.
+try-import %workspace%/.bazelrc.user

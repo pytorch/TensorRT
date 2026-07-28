@@ -1,0 +1,867 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Automatically generate a TensorRT Plugin for RMSNorm module and apply it in Llama2 &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/nbsphinx-code-cells.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/dynamo/llama2_flashinfer_rmsnorm';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Legacy notebooks" href="../../notebooks.html" />
+    <link rel="prev" title="Compiling SAM2 using the dynamo backend" href="torch_export_sam2.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">Vision</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Example: Compiling ResNet with dynamic shapes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Example: Compiling BERT with torch.compile</a></li>
+<li class="toctree-l1"><a class="reference internal" href="engine_caching_bert_example.html">Example: Engine Caching (BERT)</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Generative AI</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_gpt2.html">Example: Compiling GPT2 with torch.compile</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_sam2.html">Example: Compiling SAM2 with the dynamo backend</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Example: TensorRT Plugin for RMSNorm in Llama2</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../model_zoo.html" class="nav-link">Model Zoo</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Automaticall...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <p>.._llama2_flashinfer_rmsnorm:</p>
+<section id="Automatically-generate-a-TensorRT-Plugin-for-RMSNorm-module-and-apply-it-in-Llama2">
+<h1>Automatically generate a TensorRT Plugin for RMSNorm module and apply it in Llama2<a class="headerlink" href="#Automatically-generate-a-TensorRT-Plugin-for-RMSNorm-module-and-apply-it-in-Llama2" title="Link to this heading">#</a></h1>
+<p>This example showcases how to optimize inference for a LLaMA2 model by replacing its RMSNorm layers with FlashInfer’s high-performance implementation. It demonstrates the use of Torch-TensorRT’s automatic plugin feature, which dynamically generates and integrates custom TensorRT plugins during compilation.</p>
+<p>Key features: - Leverages automatic plugin registration for FlashInfer RMSNorm ops. - Applies a custom TorchDynamo lowering pass to replace standard RMSNorm ops. - Compiles the modified model using Torch-TensorRT’s Dynamo path. - Benchmarks inference performance with and without FlashInfer RMSNorm.</p>
+<p>This example illustrates advanced extensibility in Torch-TensorRT through automatic plugin generation and operator lowering customization.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from typing import Callable, Optional, Sequence, Union
+
+import flashinfer
+import torch
+import torch_tensorrt
+from torch.fx.passes.shape_prop import TensorMetadata
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
+    _aten_lowering_pass,
+)
+from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    clean_up_graph_after_modifications,
+)
+from transformers import LlamaConfig, LlamaForCausalLM
+
+
+@torch.library.custom_op(&quot;flashinfer::rmsnorm&quot;, mutates_args=())  # type: ignore[misc]
+def flashinfer_rmsnorm(
+    input: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6
+) -&gt; torch.Tensor:
+    return flashinfer.norm.rmsnorm(input, weight)
+
+
+@torch.library.register_fake(&quot;flashinfer::rmsnorm&quot;)
+def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -&gt; torch.Tensor:
+    return input
+
+
+torch_tensorrt.dynamo.conversion.plugins.custom_op(
+    &quot;flashinfer::rmsnorm&quot;, supports_dynamic_shapes=True
+)
+
+
+@_aten_lowering_pass
+def replace_rmsnorm(
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
+) -&gt; torch.fx.GraphModule:
+    for node in gm.graph.nodes:
+        if (
+            node.target == torch.ops.aten._to_copy.default
+            and node.kwargs.get(&quot;dtype&quot;) is torch.float32
+            and len(node.users) == 2
+        ):
+            if (
+                list(node.users)[0].target == torch.ops.aten.pow.Tensor_Scalar
+                and list(node.users)[1].target == torch.ops.aten.mul.Tensor
+            ):
+                pow_node = list(node.users)[0]
+                if (
+                    len(pow_node.users) == 1
+                    and list(pow_node.users)[0].target == torch.ops.aten.mean.dim
+                ):
+                    mean_node = list(pow_node.users)[0]
+                    if (
+                        len(mean_node.users) == 1
+                        and list(mean_node.users)[0].target == torch.ops.aten.add.Tensor
+                    ):
+                        add_node = list(mean_node.users)[0]
+                        if (
+                            len(add_node.users) == 1
+                            and list(add_node.users)[0].target
+                            == torch.ops.aten.sqrt.default
+                        ):
+                            sqrt_node = list(add_node.users)[0]
+                            if (
+                                len(sqrt_node.users) == 1
+                                and list(sqrt_node.users)[0].target
+                                == torch.ops.aten.div.Tensor
+                            ):
+                                div_node = list(sqrt_node.users)[0]
+                                if list(div_node.users)[0] == list(node.users)[1]:
+                                    mul_node = list(div_node.users)[0]
+                                    copy_node = list(mul_node.users)[0]
+                                    weight_mul_node = list(copy_node.users)[0]
+
+                                    weight = weight_mul_node.args[0]
+
+                                    original_meta = weight_mul_node.meta.get(
+                                        &quot;tensor_meta&quot;, {}
+                                    )
+                                    memory_format = original_meta.memory_format
+
+                                    with gm.graph.inserting_after(weight_mul_node):
+                                        b = gm.graph.create_node(
+                                            op=&quot;call_function&quot;,
+                                            target=torch.ops.aten.sym_size.int,
+                                            args=(node.args[0], 0),
+                                        )
+                                        b.meta[&quot;tensor_meta&quot;] = TensorMetadata(
+                                            shape=torch.Size([1]),
+                                            dtype=torch.int64,
+                                            requires_grad=False,
+                                            stride=None,
+                                            memory_format=memory_format,
+                                            is_quantized=False,
+                                            qparams={},
+                                        )
+                                        s = gm.graph.create_node(
+                                            op=&quot;call_function&quot;,
+                                            target=torch.ops.aten.sym_size.int,
+                                            args=(node.args[0], 1),
+                                        )
+                                        s.meta.update(b.meta)
+
+                                        d = gm.graph.create_node(
+                                            op=&quot;call_function&quot;,
+                                            target=torch.ops.aten.sym_size.int,
+                                            args=(node.args[0], 2),
+                                        )
+                                        d.meta.update(b.meta)
+
+                                    with gm.graph.inserting_after(b):
+                                        new_first_dim = gm.graph.create_node(
+                                            op=&quot;call_function&quot;,
+                                            target=torch.ops.aten.mul.Scalar,
+                                            args=(b, s),
+                                        )
+                                        new_first_dim.meta.update(b.meta)
+
+                                    with gm.graph.inserting_after(new_first_dim):
+                                        # with gm.graph.inserting_after(weight_mul_node):
+                                        reshape_node = gm.graph.create_node(
+                                            op=&quot;call_function&quot;,
+                                            target=torch.ops.aten.reshape.default,
+                                            args=(node.args[0], [new_first_dim, d]),
+                                        )
+                                        b_val = original_meta.shape[0]
+                                        s_val = original_meta.shape[1]
+                                        d_val = original_meta.shape[2]
+
+                                        reshape_node.meta[&quot;tensor_meta&quot;] = (
+                                            TensorMetadata(
+                                                shape=torch.Size(
+                                                    [b_val * s_val, d_val]
+                                                ),
+                                                dtype=original_meta.dtype,
+                                                requires_grad=True,
+                                                stride=None,
+                                                memory_format=memory_format,
+                                                is_quantized=False,
+                                                qparams={},
+                                            )
+                                        )
+
+                                    with gm.graph.inserting_after(reshape_node):
+                                        flashinfer_rmsnorm_node = gm.graph.create_node(
+                                            op=&quot;call_function&quot;,
+                                            target=torch.ops.flashinfer.rmsnorm.default,
+                                            args=(
+                                                reshape_node,
+                                                weight,
+                                                add_node.args[1],
+                                            ),
+                                        )
+                                        flashinfer_rmsnorm_node.meta.update(
+                                            reshape_node.meta
+                                        )
+
+                                    with gm.graph.inserting_after(
+                                        flashinfer_rmsnorm_node
+                                    ):
+                                        reshapback_node = gm.graph.create_node(
+                                            op=&quot;call_function&quot;,
+                                            target=torch.ops.aten.reshape.default,
+                                            args=(
+                                                flashinfer_rmsnorm_node,
+                                                [b, s, d],
+                                            ),
+                                        )
+
+                                    weight_mul_node.replace_all_uses_with(
+                                        reshapback_node
+                                    )
+                                    reshapback_node.meta.update(weight_mul_node.meta)
+
+                                    modified_graph = True
+
+                                    gm.graph.erase_node(weight_mul_node)
+                                    gm.graph.erase_node(copy_node)
+                                    gm.graph.erase_node(mul_node)
+                                    gm.graph.erase_node(div_node)
+                                    gm.graph.erase_node(sqrt_node)
+                                    gm.graph.erase_node(add_node)
+                                    gm.graph.erase_node(mean_node)
+                                    gm.graph.erase_node(pow_node)
+                                    gm.graph.erase_node(node)
+
+    if modified_graph:
+        gm = clean_up_graph_after_modifications(gm)
+
+    return gm
+
+
+# 1. Create a custom config with 1 layer
+config = LlamaConfig(
+    vocab_size=32000,
+    hidden_size=4096,  # LLaMA2-7B dimensions
+    intermediate_size=11008,  # FFN hidden_dim = 4 * 4096 * 0.7 (SwiGLU scaling)
+    num_hidden_layers=1,  # Only 1 decoder layer
+    num_attention_heads=32,
+    max_position_embeddings=4096,
+    use_cache=False,  # Disable KV caching for export
+)
+
+# 2. Initialize model (random weights)
+with torch.no_grad():
+    model = LlamaForCausalLM(config).cuda().half().eval()
+
+# 3. Export with static shapes
+input_ids = torch.randint(0, 32000, (1, 64))  # Static [batch=1, seq=64]
+exported = torch.export.export(
+    model,
+    (input_ids,),
+    dynamic_shapes=None,  # Fully static
+)
+
+# Test forward pass
+input_ids = torch.randint(0, 32000, (1, 64))
+output = model(input_ids)
+print(output)
+
+# Export validation
+
+DEVICE = torch.device(&quot;cuda:0&quot;)
+
+with torch_tensorrt.logging.errors():
+    trt_model = torch_tensorrt.dynamo.compile(
+        exported,
+        inputs=[input_ids],
+        enabled_precisions={torch.float32, torch.float16},
+        truncate_double=True,
+        device=DEVICE,
+        disable_tf32=True,
+        use_explicit_typing=False,
+        use_fp32_acc=True,
+    )
+
+input_ids = input_ids.to(DEVICE)
+
+with torch.no_grad():
+    res = trt_model.forward(input_ids)
+print(res)
+</pre></div>
+</div>
+</div>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="torch_export_sam2.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Compiling SAM2 using the dynamo backend</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../../notebooks.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Legacy notebooks</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/dynamo/llama2_flashinfer_rmsnorm.ipynb">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../_sources/tutorials/_rendered_examples/dynamo/llama2_flashinfer_rmsnorm.ipynb.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,119 @@
+#pragma once
+#include <array>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
+#include <utility>
+#include "ATen/core/function_schema.h"
+#include "NvInfer.h"
+#include "core/runtime/Platform.h"
+#include "core/runtime/RTDevice.h"
+#include "core/runtime/TRTEngine.h"
+#include "core/util/prelude.h"
+#include "torch/custom_class.h"
+
+namespace torch_tensorrt {
+namespace core {
+namespace runtime {
+
+using EngineID = int64_t;
+const std::string ABI_VERSION = "10";
+extern bool MULTI_DEVICE_SAFE_MODE;
+// AliasKind, AliasedIOSpec, and the alias_kind_(to|from)_string helpers are
+// declared in core/runtime/TRTEngine.h since runtime.h includes that header.
+
+typedef enum {
+  STANDARD = 0,
+  SUBGRAPH_CUDAGRAPHS,
+  WHOLE_GRAPH_CUDAGRAPHS,
+} CudaGraphsMode;
+
+extern CudaGraphsMode CUDAGRAPHS_MODE;
+
+typedef enum {
+  ABI_TARGET_IDX = 0,
+  NAME_IDX,
+  DEVICE_IDX,
+  ENGINE_IDX,
+  INPUT_BINDING_NAMES_IDX,
+  OUTPUT_BINDING_NAMES_IDX,
+  HW_COMPATIBLE_IDX,
+  SERIALIZED_METADATA_IDX,
+  TARGET_PLATFORM_IDX,
+  REQUIRES_OUTPUT_ALLOCATOR_IDX,
+  RESOURCE_ALLOCATION_STRATEGY_IDX,
+  REQUIRES_NATIVE_MULTIDEVICE_IDX,
+  ALIASED_IO_IDX,
+  SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
+} SerializedInfoIndex;
+
+inline constexpr std::array<const char*, SERIALIZATION_LEN> kSerializedInfoIndexNames = {{
+    "ABI_TARGET_IDX",
+    "NAME_IDX",
+    "DEVICE_IDX",
+    "ENGINE_IDX",
+    "INPUT_BINDING_NAMES_IDX",
+    "OUTPUT_BINDING_NAMES_IDX",
+    "HW_COMPATIBLE_IDX",
+    "SERIALIZED_METADATA_IDX",
+    "TARGET_PLATFORM_IDX",
+    "REQUIRES_OUTPUT_ALLOCATOR_IDX",
+    "RESOURCE_ALLOCATION_STRATEGY_IDX",
+    "REQUIRES_NATIVE_MULTIDEVICE_IDX",
+}};
+// For adding new serialized info indices, update above and update /dynamo/runtime/_serialized_engine_layout.py
+
+std::string base64_encode(const std::string& in);
+std::string base64_decode(const std::string& in);
+std::string serialize_bindings(const std::vector<std::string>& bindings);
+
+// Encode/decode the aliased_io map. Records are separated by BINDING_DELIM
+// ('%') and each record is "output_name@input_name@kind" (the '@' avoids
+// collision with TRT binding names which are alphanumeric + underscore).
+std::string serialize_aliased_io(const std::unordered_map<std::string, AliasedIOSpec>& aliased_io);
+std::unordered_map<std::string, AliasedIOSpec> deserialize_aliased_io(const std::string& s);
+
+c10::optional<RTDevice> get_most_compatible_device(
+    const RTDevice& target_device,
+    const RTDevice& curr_device = RTDevice(),
+    bool hardware_compatible = false);
+std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device, bool hardware_compatible);
+
+std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
+
+void multi_gpu_device_check();
+
+bool get_multi_device_safe_mode();
+
+void set_multi_device_safe_mode(bool multi_device_safe_mode);
+
+CudaGraphsMode get_cudagraphs_mode();
+
+void set_cudagraphs_mode(CudaGraphsMode cudagraphs_mode);
+
+class DeviceList {
+  using DeviceMap = std::unordered_map<int, RTDevice>;
+  DeviceMap device_list;
+
+ public:
+  // Scans and updates the list of available CUDA devices
+  DeviceList();
+
+ public:
+  void insert(int device_id, RTDevice cuda_device);
+  RTDevice find(int device_id);
+  DeviceMap get_devices();
+  std::string dump_list();
+};
+
+DeviceList get_available_device_list();
+const std::unordered_map<std::string, std::string>& get_dla_supported_SMs();
+
+void set_rt_device(RTDevice& cuda_device);
+// Gets the current active GPU (DLA will not show up through this)
+RTDevice get_current_device();
+
+} // namespace runtime
+} // namespace core
+} // namespace torch_tensorrt

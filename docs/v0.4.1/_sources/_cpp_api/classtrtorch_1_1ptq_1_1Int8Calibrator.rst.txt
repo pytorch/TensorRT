@@ -1,0 +1,25 @@
+.. _exhale_class_classtrtorch_1_1ptq_1_1Int8Calibrator:
+
+Template Class Int8Calibrator
+=============================
+
+- Defined in :ref:`file_cpp_include_trtorch_ptq.h`
+
+
+Inheritance Relationships
+-------------------------
+
+Base Type
+*********
+
+- ``private Algorithm``
+
+
+Class Documentation
+-------------------
+
+
+.. doxygenclass:: trtorch::ptq::Int8Calibrator
+   :members:
+   :protected-members:
+   :undoc-members:

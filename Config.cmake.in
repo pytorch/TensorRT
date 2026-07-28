@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(Torch)
+find_package(TensorRT QUIET)
+if (NOT TensorRT_FOUND)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/Modules")
+    find_dependency(TensorRT)
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/torchtrtTargets.cmake")
+
+check_required_components(MathFunctions)

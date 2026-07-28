@@ -1,0 +1,518 @@
+import logging
+import math
+from typing import Optional, Tuple, Union
+
+import tensorrt as trt
+import torch
+from tensorrt import ITensor as TRTTensor
+from torch.fx.node import Target
+from torch_tensorrt import _enums
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_trt_tensor,
+    prepend_ones,
+)
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+# FP8 E4M3 max representable magnitude. Softmax output is bounded to [0, 1],
+# so 1/448 saturates exactly at 1.0 and is data-independent (no calibration needed).
+_FP8_E4M3_MAX = 448.0
+
+
+def _maybe_set_fp8_softmax(
+    ctx: ConversionContext,
+    name: str,
+    attention_layer: trt.IAttention,
+) -> bool:
+    """Set FP8 softmax normalization quantization on the IAttention layer if the current
+    node was annotated with a softmax FP8 scale by the fp8_attention_softmax lowering pass.
+
+    Returns True if FP8 normalization was configured (caller must set decomposable=False).
+    """
+    if ctx.current_node is None:
+        return False
+    scale_val = ctx.current_node.meta.get("_fp8_softmax_scale")
+    if scale_val is None:
+        return False
+    # Scale dtype must match the IAttention output (= pre-quant Q/K/V) dtype;
+    # using float32 unconditionally fails TRT compilation on some platforms.
+    output_dtype = _enums.dtype._from(attention_layer.get_output(0).dtype).to(
+        torch.dtype
+    )
+    scale_tensor = get_trt_tensor(
+        ctx,
+        torch.tensor(scale_val, dtype=output_dtype),
+        name + "_softmax_fp8_scale",
+        dtype=output_dtype,
+    )
+    attention_layer.normalization_quantize_to_type = trt.DataType.FP8
+    attention_layer.normalization_quantize_scale = scale_tensor
+    return True
+
+
+def _normalize_attention_mask_rank(
+    ctx: ConversionContext,
+    mask: TRTTensor,
+    query: TRTTensor,
+    name: str,
+) -> TRTTensor:
+    """Make PyTorch-broadcastable attention masks rank-compatible with TensorRT."""
+    rank_diff = len(query.shape) - len(mask.shape)
+    if rank_diff > 0:
+        mask = prepend_ones(ctx, mask, name + "_prepend_ones", rank_diff)
+
+    return mask
+
+
+def _restore_static_query_heads(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    query: TRTTensor,
+) -> TRTTensor:
+    """Restore a static query-head count when dynamic reshapes obscure it as -1.
+
+    IAttention requires a static head count (dim 1). Models like Llama/Qwen often
+    reshape Q to ``[B, -1, S, D]``, so TRT sees ``query.shape[1] == -1``. Without
+    recovering the concrete head count from FX metadata, ``add_attention_v2``
+    produces an output with ``nbDims == -1``, and the next op (e.g. permute)
+    fails with ``ValueError: __len__() should return >= 0``.
+    """
+    if ctx.current_node is None or len(query.shape) != 4 or query.shape[1] != -1:
+        return query
+
+    query_node = ctx.current_node.args[0]
+    query_meta = (
+        query_node.meta.get("val") if isinstance(query_node, torch.fx.Node) else None
+    )
+    num_query_heads = (
+        query_meta.shape[1]
+        if query_meta is not None and len(query_meta.shape) == 4
+        else None
+    )
+    if not isinstance(num_query_heads, int):
+        return query
+
+    query_shape = [
+        (
+            num_query_heads
+            if i == 1
+            else (
+                impl.shape.shape(
+                    ctx, target, source_ir, f"{name}_query_dim_{i}", query, i
+                )
+                if dim == -1
+                else dim
+            )
+        )
+        for i, dim in enumerate(query.shape)
+    ]
+    return impl.shuffle.reshape(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_restore_query_heads",
+        query,
+        query_shape,
+    )
+
+
+def tril(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    row: TRTTensor,
+    col: TRTTensor,
+    sliding_window_size: Optional[int] = None,
+) -> TRTTensor:
+    """
+    Create a lower triangular mask tensor for attention mechanisms.
+
+    This function generates a lower triangular mask that can be used in attention
+    operations to enforce causal attention (each position can only attend to itself
+    and previous positions). It optionally supports sliding window attention by
+    limiting the attention span to a specified window size.
+
+    The function creates the mask by:
+    1. Generating row and column index tensors
+    2. Computing the difference between row and column indices
+    3. Creating a mask where row >= col (lower triangular)
+    4. Optionally applying sliding window constraints
+
+    Args:
+        ctx: TensorRT conversion context for managing the conversion process
+        target: Target operation identifier (usually the operation being converted)
+        source_ir: Source IR type (e.g., ATEN, TRT) - can be None
+        name: Base name for generated TensorRT operations (will be extended with suffixes)
+        row: Tensor representing the number of rows (sequence length dimension)
+        col: Tensor representing the number of columns (sequence length dimension)
+        sliding_window_size: Optional sliding window size for attention span limitation.
+                           If None, creates a full lower triangular mask.
+                           If specified, creates a sliding window mask where each position
+                           can only attend to positions within the window.
+
+    Returns:
+        TRTTensor: A boolean mask tensor with shape [batch, heads, seq_len, seq_len]
+                  where True values indicate allowed attention positions.
+
+    Example:
+        # Create a full lower triangular mask for causal attention
+        mask = tril(ctx, target, source_ir, "causal_mask", seq_len, seq_len)
+
+        # Create a sliding window mask with window size 3
+        mask = tril(ctx, target, source_ir, "sliding_mask", seq_len, seq_len, 3)
+
+    Mask Examples:
+        Without sliding window (sliding_window_size=None):
+        For seq_len=5, returns:
+        [[ True, False, False, False, False],
+         [ True,  True, False, False, False],
+         [ True,  True,  True, False, False],
+         [ True,  True,  True,  True, False],
+         [ True,  True,  True,  True,  True]]
+
+        With sliding window (sliding_window_size=3):
+        For seq_len=5, returns:
+        [[ True, False, False, False, False],
+         [ True,  True, False, False, False],
+         [ True,  True,  True, False, False],
+         [False,  True,  True,  True, False],
+         [False, False,  True,  True,  True]]
+
+    Note:
+        This function is specifically designed for attention mechanisms in transformer
+        models and is used internally by the scaled_dot_product_attention converter.
+        The sliding window functionality is particularly useful for models like Gemma3
+        that use sliding window attention to reduce computational complexity.
+    """
+    row_arange_tensor = impl.arange.arange(
+        ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
+    )
+    col_arange_tensor = impl.arange.arange(
+        ctx, target, source_ir, name + "_arange_col", start=0, end=col, step=1
+    )
+    row_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_row", row_arange_tensor, -1
+    )
+    col_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_col", col_arange_tensor, 0
+    )
+    # sub will return the following mask tensor:
+    # [[0, -1, -2, -3],
+    #  [1,  0, -1, -2],
+    #  [2,  1,  0, -1],
+    #  [3,  2,  1,  0]]
+    mask = impl.elementwise.sub(
+        ctx, target, source_ir, name + "_sub", row_arange_tensor, col_arange_tensor
+    )
+    ge_0_mask = impl.elementwise.ge(ctx, target, source_ir, name + "_ge_0", mask, 0.0)
+    if sliding_window_size is None:
+        # return the following lower triangular mask includes the main diagonal:
+        # 0 ■ ⬚ ⬚ ⬚ ⬚     tensor([[[[ True, False, False, False, False],
+        # 1 ■ ■ ⬚ ⬚ ⬚               [ True,  True, False, False, False],
+        # 2 ■ ■ ■ ⬚ ⬚               [ True,  True,  True, False, False],
+        # 3 ■ ■ ■ ■ ⬚               [ True,  True,  True,  True, False],
+        # 4 ■ ■ ■ ■ ■               [ True,  True,  True,  True,  True]]]])
+        return ge_0_mask
+
+    lt_window_mask = impl.elementwise.lt(
+        ctx, target, source_ir, name + "_lt_window_size", mask, sliding_window_size
+    )
+    mask = impl.elementwise.logical_and(
+        ctx, target, source_ir, name + "_logical_and", ge_0_mask, lt_window_mask
+    )
+    # return the following mask if sliding_window_size is 3:
+    # 0 ■ ⬚ ⬚ ⬚ ⬚      tensor([[[[ True, False, False, False, False],
+    # 1 ■ ■ ⬚ ⬚ ⬚                [ True,  True, False, False, False],
+    # 2 ■ ■ ■ ⬚ ⬚                [ True,  True,  True, False, False],
+    # 3 ⬚ ■ ■ ■ ⬚                [False,  True,  True,  True, False],
+    # 4 ⬚ ⬚ ■ ■ ■                [False, False,  True,  True,True]]]])
+    return mask
+
+
+def scaled_dot_product_attention(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    query: TRTTensor,
+    key: TRTTensor,
+    value: TRTTensor,
+    attn_mask: Optional[TRTTensor] = None,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    scale: Optional[float] = None,
+    enable_gqa: bool = False,
+) -> TRTTensor:
+    """Convert the scaled_dot_product_attention operation to a TensorRT attention layer.
+
+    Args:
+        ctx (ConversionContext): Conversion context for managing the conversion process
+        target (Target): Target operation identifier (usually the operation being converted)
+        source_ir (Optional[SourceIR]): Source IR type (e.g., ATEN)
+        name (str): Base name for generated TensorRT operations (will be extended with suffixes)
+        query (TRTTensor): Query tensor with shape [batch, heads, seq_len, head_dim]
+        key (TRTTensor): Key tensor with shape [batch, heads, seq_len, head_dim]
+        value (TRTTensor): Value tensor with shape [batch, heads, seq_len, head_dim]
+        attn_mask (Optional[TRTTensor], optional): Attention mask tensor. The shape must be broadcastable to the shape of attention weights. Two types of masks are supported. A boolean mask where a value of True indicates that the element should take part in attention. A float mask of the same type as query, key, value that is added to the attention score. If is_causal is set to True, attn_mask should be None.
+        dropout_p (float, optional): Ignored in inference stage
+        is_causal (bool, optional): Whether to apply causal masking. If True, the attention mask will be a lower triangular mask. If is_causal is set to True, the attn_mask argument should be None.
+        scale (Optional[float], optional): Scaling factor for the attention layer
+        enable_gqa (bool, optional): Whether to enable Group Query Attention (GQA). If True, the query tensor will be split into groups and the attention will be computed for each group.
+
+    Returns:
+        TRTTensor: Attention output tensor with shape [batch, heads, seq_len, head_dim]
+    """
+    # When FP8 softmax normalization is active (modelopt FP8 MHA pattern) TRT's
+    # FP8 MHA fusion requires the Q/DQ output to feed IAttention via a single
+    # same-dtype Mul; any HALF<->FLOAT cast inserted by the default dynamic
+    # 1/sqrt(D) computation breaks the fusion.  Use a static same-dtype scalar
+    # scale computed from the concrete head_dim.
+    fp8_norm_active = (
+        ctx.current_node is not None
+        and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
+    )
+    if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
+        scale = 1.0 / math.sqrt(query.shape[-1])
+
+    query = _restore_static_query_heads(ctx, target, source_ir, name, query)
+
+    if scale is None:
+        # 1 / math.sqrt(query.size(-1))
+        q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_q_dim", query, -1)
+        sqrt_q_dim = impl.unary.sqrt(
+            ctx, target, source_ir, f"{name}_sqrt_q_dim", q_dim
+        )
+        sqrt_q_dim = cast_trt_tensor(
+            ctx, sqrt_q_dim, query.dtype, f"{name}_cast_sqrt_q_dim", target, source_ir
+        )
+        scaled_query = impl.elementwise.div(
+            ctx, target, source_ir, f"{name}_scaled_query", query, sqrt_q_dim
+        )
+    else:
+        scale = get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype)
+        scaled_query = impl.elementwise.mul(
+            ctx, target, source_ir, f"{name}_scaled_query", query, scale
+        )
+
+    attention_layer = ctx.net.add_attention_v2(
+        scaled_query,
+        key,
+        value,
+        trt.AttentionNormalizationOp.SOFTMAX,
+        trt.CausalMaskKind.NONE,
+    )
+    assert attention_layer is not None, "attention layer is None"
+
+    if is_causal:
+        attention_layer.causal_kind = trt.CausalMaskKind.LOWER_RIGHT
+    else:
+        if attn_mask is not None:
+            attn_mask = get_trt_tensor(ctx, attn_mask, f"{name}_attn_mask")
+            if attn_mask.dtype == trt.DataType.BOOL:
+                mask = attn_mask
+            elif attn_mask.dtype != query.dtype:
+                mask = cast_trt_tensor(
+                    ctx,
+                    attn_mask,
+                    query.dtype,
+                    f"{name}_cast_attn_mask",
+                    target,
+                    source_ir,
+                )
+            else:
+                mask = attn_mask
+            mask = _normalize_attention_mask_rank(
+                ctx, mask, query, f"{name}_normalize_attn_mask"
+            )
+            attention_layer.mask = mask
+
+    fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
+    attention_layer.decomposable = not fp8_norm
+    return attention_layer.get_output(0)
+
+
+def scaled_dot_product_flash_attention(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    query: TRTTensor,
+    key: TRTTensor,
+    value: TRTTensor,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    return_debug_mask: bool = False,
+    scale: Optional[float] = None,
+) -> Tuple[
+    TRTTensor,
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+]:
+    sdpa_output = scaled_dot_product_attention(
+        ctx,
+        target,
+        source_ir,
+        name,
+        query,
+        key,
+        value,
+        is_causal=is_causal,
+        scale=scale,
+    )
+    return sdpa_output, None, None, None, 0.0, 0.0, None, None, None
+
+
+def scaled_dot_product_efficient_attention(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    query: TRTTensor,
+    key: TRTTensor,
+    value: TRTTensor,
+    attn_bias: Optional[TRTTensor] = None,
+    compute_log_sumexp: bool = False,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    scale: Optional[float] = None,
+) -> Tuple[TRTTensor, Optional[TRTTensor], Optional[TRTTensor], Optional[TRTTensor]]:
+    fp8_norm_active = (
+        ctx.current_node is not None
+        and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
+    )
+    if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
+        scale = 1.0 / math.sqrt(query.shape[-1])
+
+    query = _restore_static_query_heads(ctx, target, source_ir, name, query)
+
+    if scale is None:
+        # 1 / math.sqrt(query.size(-1))
+        q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_q_dim", query, -1)
+        sqrt_q_dim = impl.unary.sqrt(
+            ctx, target, source_ir, f"{name}_sqrt_q_dim", q_dim
+        )
+        sqrt_q_dim = cast_trt_tensor(
+            ctx, sqrt_q_dim, query.dtype, f"{name}_cast_sqrt_q_dim", target, source_ir
+        )
+        scaled_query = impl.elementwise.div(
+            ctx, target, source_ir, f"{name}_scaled_query", query, sqrt_q_dim
+        )
+    else:
+        scale = get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype)
+        scaled_query = impl.elementwise.mul(
+            ctx, target, source_ir, f"{name}_scaled_query", query, scale
+        )
+
+    attention_layer = ctx.net.add_attention_v2(
+        scaled_query,
+        key,
+        value,
+        trt.AttentionNormalizationOp.SOFTMAX,
+        trt.CausalMaskKind.NONE,
+    )
+    assert attention_layer is not None, "attention layer is None"
+
+    if is_causal:
+        if attn_bias is not None:
+            # TRT's IAttention layer does not support passing in both attn_bias/mask and causal mask at the same time,
+            # so we convert causal mask to an additive causal mask and add it to the attn_bias
+            attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
+
+            L = impl.shape.shape(ctx, target, source_ir, f"{name}_L", query, -2)
+            S = impl.shape.shape(ctx, target, source_ir, f"{name}_S", key, -2)
+            mask = tril(ctx, target, source_ir, f"{name}_tril", L, S)
+            # TODO: Whether explicitly prepend 1s to the mask shape is more performant or not?
+            # diff = len(query.shape) - len(mask.shape)
+            # if diff > 0:
+            #     mask = prepend_ones(ctx, mask, f"{name}_prepend_ones", diff)
+
+            # Convert causal bool mask to additive bias mask: True -> 0.0 (keep), False -> -inf (block)
+            zero_bias = get_trt_tensor(
+                ctx, 0.0, f"{name}_causal_additive_bias_zero", query.dtype
+            )
+            neg_inf_bias = get_trt_tensor(
+                ctx, float("-inf"), f"{name}_causal_additive_bias_neg_inf", query.dtype
+            )
+            additive_causal_mask = impl.condition.where(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_additive_causal_mask",
+                zero_bias,
+                neg_inf_bias,
+                mask,
+            )
+            mask = impl.elementwise.add(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_attn_bias_add_causal_mask",
+                attn_bias,
+                additive_causal_mask,
+            )
+            attention_layer.mask = mask
+        else:
+            attention_layer.causal_kind = trt.CausalMaskKind.LOWER_RIGHT
+    else:
+        if attn_bias is not None:
+            attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
+            attention_layer.mask = attn_bias
+
+    fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
+    attention_layer.decomposable = not fp8_norm
+    return attention_layer.get_output(0), None, None, None
+
+
+def scaled_dot_product_cudnn_attention(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    query: TRTTensor,
+    key: TRTTensor,
+    value: TRTTensor,
+    attn_bias: Optional[TRTTensor] = None,
+    compute_log_sumexp: bool = False,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    return_debug_mask: bool = False,
+    scale: Optional[float] = None,
+) -> Tuple[
+    TRTTensor,
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+    Optional[TRTTensor],
+]:
+    output, _, _, _ = scaled_dot_product_efficient_attention(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_efficient",
+        query,
+        key,
+        value,
+        attn_bias,
+        compute_log_sumexp,
+        dropout_p,
+        is_causal,
+        scale,
+    )
+    return output, None, None, None, 0.0, 0.0, None, None, None

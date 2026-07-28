@@ -1,0 +1,71 @@
+import importlib
+import os
+import sys
+import unittest
+
+import pytest
+import torch
+import torch_tensorrt
+
+if importlib.util.find_spec("transformers"):
+    from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../../tools/llm"))
+import argparse
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("precision", ["FP16", "BF16", "FP32"])
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("transformers"),
+    "transformers is not installed",
+)
+def test_llm_decoder_layer(precision):
+    from run_llm import compile_torchtrt
+    from torchtrt_ext import register_sdpa
+
+    with torch.inference_mode():
+        args = argparse.Namespace()
+        args.debug = False
+        args.num_tokens = 128
+        args.model = "Qwen/Qwen2.5-0.5B-Instruct"
+        args.model_precision = precision
+        args.min_block_size = 1
+        args.prompt = "What is parallel programming ?"
+        if args.model_precision == "FP16":
+            dtype = torch.float16
+        elif args.model_precision == "BF16":
+            dtype = torch.bfloat16
+        else:
+            args.model_precision = "FP32"
+            dtype = torch.float32
+
+        model = (
+            AutoModelForCausalLM.from_pretrained(
+                args.model,
+                use_cache=False,
+                attn_implementation="sdpa",
+                num_hidden_layers=1,
+            )
+            .eval()
+            .to("cuda")
+        )
+
+        register_sdpa.enable_sdpa_converter(args.model, model.config)
+        model = model.to(dtype)
+        # use randint will generate nan values in the logits, use a fixed input_ids for now
+        # input_ids = torch.randint(0, model.config.vocab_size, (1, args.num_tokens)).to("cuda")
+        input_ids = torch.tensor([[2, 3689, 563, 10616, 14929, 2360]]).to("cuda")
+
+        position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to("cuda")
+        pyt_outputs = model(input_ids.clone(), position_ids=position_ids.clone())
+        trt_model = compile_torchtrt(model, input_ids, args)
+        trt_outputs = trt_model(input_ids, position_ids=position_ids)
+
+        torch.testing.assert_close(
+            pyt_outputs.logits, trt_outputs.logits, rtol=5e-1, atol=5e-1
+        )

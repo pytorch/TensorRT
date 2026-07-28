@@ -1,0 +1,90 @@
+name: Lint Code
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, review_requested, reopened]
+
+jobs:
+  cpp-linting:
+    name: C++ Linting
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+      deployments: none
+      id-token: write
+      issues: write
+      discussions: write
+      packages: write
+      pull-requests: write
+      repository-projects: none
+      security-events: none
+      statuses: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Setup env
+        run: |
+          sudo ln -s $GITHUB_EVENT_PATH /GITHUB_EVENT.json
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install dependencies
+        run: |
+          uv pip install --system -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
+          python3 -c "import tomllib, subprocess; deps = tomllib.load(open('pyproject.toml', 'rb'))['dependency-groups']['lint']; subprocess.run(['uv', 'pip', 'install', '--system'] + deps, check=True)"
+      - name: Lint C++
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 $GITHUB_WORKSPACE/.github/scripts/run_cpp_linter.py
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+  py-linting:
+    name: Python Linting
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+      deployments: none
+      id-token: write
+      issues: write
+      discussions: write
+      packages: write
+      pull-requests: write
+      repository-projects: none
+      security-events: none
+      statuses: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Setup env
+        run: |
+          sudo ln -s $GITHUB_EVENT_PATH /GITHUB_EVENT.json
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install dependencies
+        run: |
+          uv pip install --system -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
+          python3 -c "import tomllib, subprocess; deps = tomllib.load(open('pyproject.toml', 'rb'))['dependency-groups']['lint']; subprocess.run(['uv', 'pip', 'install', '--system'] + deps, check=True)"
+      - name: Lint Python
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 $GITHUB_WORKSPACE/.github/scripts/run_py_linter.py
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

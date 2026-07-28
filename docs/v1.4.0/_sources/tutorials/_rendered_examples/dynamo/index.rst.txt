@@ -1,0 +1,86 @@
+
+
+.. _sphx_glr_tutorials__rendered_examples_dynamo:
+
+.. _dynamo_compile:
+
+Dynamo / ``torch.compile``
+----------------------------
+
+Torch-TensorRT provides a backend for the new ``torch.compile`` API released in PyTorch 2.0. In the following examples we describe
+a number of ways you can leverage this backend to accelerate inference.
+
+* :ref:`dynamo_compile_resnet`: Compiling a ResNet model using the Dyanmo Compile Frontend for ``torch_tensorrt.compile``
+* :ref:`torch_compile_transformer`: Compiling a Transformer model using ``torch.compile``
+* :ref:`dynamo_compile_advanced_usage`: Advanced usage including making a custom backend to use directly with the ``torch.compile`` API
+
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the torch_tensorrt.dynamo.compile workflow o...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_dynamo_compile_resnet_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_dynamo_compile_resnet_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling ResNet using the Torch-TensorRT Dyanmo Frontend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the torch_tensorrt.dynamo.compile workflow o...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_dynamo_compile_transformers_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_dynamo_compile_transformers_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling a Transformer using torch.compile and TensorRT</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.dynam...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_dynamo_compile_advanced_usage_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_dynamo_compile_advanced_usage.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Dynamo Compile Advanced Usage</div>
+    </div>
+
+
+.. raw:: html
+
+    </div>
+
+
+.. toctree::
+   :hidden:
+
+   /tutorials/_rendered_examples/dynamo/dynamo_compile_resnet_example
+   /tutorials/_rendered_examples/dynamo/dynamo_compile_transformers_example
+   /tutorials/_rendered_examples/dynamo/dynamo_compile_advanced_usage
+

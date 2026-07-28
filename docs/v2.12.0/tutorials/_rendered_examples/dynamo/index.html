@@ -1,0 +1,709 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Dynamo Examples &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/dynamo/index';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">Dynamo Examples</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="dynamo-examples">
+<span id="torch-tensorrt-examples"></span><h1>Dynamo Examples<a class="headerlink" href="#dynamo-examples" title="Link to this heading">#</a></h1>
+<p>Here we provide examples of Torch-TensorRT compilation of popular computer vision and language models.</p>
+<section id="dependencies">
+<h2>Dependencies<a class="headerlink" href="#dependencies" title="Link to this heading">#</a></h2>
+<p>Please install the following external dependencies (assuming you already have correct <cite>torch</cite>, <cite>torch_tensorrt</cite> and <cite>tensorrt</cite> libraries installed (<a class="reference external" href="https://github.com/pytorch/TensorRT?tab=readme-ov-file#dependencies">dependencies</a>))</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">r</span> <span class="n">requirements</span><span class="o">.</span><span class="n">txt</span>
+</pre></div>
+</div>
+</section>
+<section id="model-zoo">
+<h2>Model Zoo<a class="headerlink" href="#model-zoo" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><span class="xref std std-ref">torch_compile_resnet</span>: Compiling a ResNet model using the Torch Compile Frontend for <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code></p></li>
+<li><p><span class="xref std std-ref">torch_compile_transformer</span>: Compiling a Transformer model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
+<li><p><span class="xref std std-ref">torch_compile_stable_diffusion</span>: Compiling a Stable Diffusion model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
+<li><p><span class="xref std std-ref">_torch_compile_gpt2</span>: Compiling a GPT2 model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
+<li><p><span class="xref std std-ref">_torch_export_gpt2</span>: Compiling a GPT2 model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
+<li><p><span class="xref std std-ref">_torch_export_llama2</span>: Compiling a Llama2 model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
+<li><p><span class="xref std std-ref">_torch_export_sam2</span>: Compiling SAM2 model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
+<li><p><span class="xref std std-ref">_torch_export_flux_dev</span>: Compiling FLUX.1-dev model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
+<li><p><span class="xref std std-ref">debugger_example</span>: Debugging Torch-TensorRT Compilation</p></li>
+<li><p><span class="xref std std-ref">torch_export_3d_rope</span>: Compiling a 3D RoPE video-transformer block with complex numerics support</p></li>
+</ul>
+<div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_stable_diffusion_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_stable_diffusion.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling Stable Diffusion model using the torch.compile backend</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This script demonstrates how to use dynamic memory allocation with Torch-TensorRT to reduce GPU..."><img alt="" src="../../../_images/sphx_glr_dynamic_memory_allocation_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_dynamic_memory_allocation.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Dynamic Memory Allocation</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="TensorRT conversion can perform many graph transformations and backend specific optimizations t..."><img alt="" src="../../../_images/sphx_glr_debugger_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_debugger_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Debugging Torch-TensorRT Compilation</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Cross runtime compilation for windows example =================================================..."><img alt="" src="../../../_images/sphx_glr_cross_runtime_compilation_for_windows_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_cross_runtime_compilation_for_windows.py</span></p>
+  <div class="sphx-glr-thumbnail-title">cross runtime compilation limitations:</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Compilation is an expensive operation as it involves many graph transformations, translations a..."><img alt="" src="../../../_images/sphx_glr_refit_engine_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_refit_engine_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Refitting Torch-TensorRT Programs with New Weights</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_transformers_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_transformers_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling BERT using the torch.compile backend</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model GPT2 optimized using torch.compile frontend..."><img alt="" src="../../../_images/sphx_glr_torch_compile_gpt2_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_gpt2.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the Torch-TensorRT torch.compile frontend</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Dynamic shapes are essential when your model needs to handle varying batch sizes or sequence le..."><img alt="" src="../../../_images/sphx_glr_compile_with_dynamic_inputs_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_compile_with_dynamic_inputs.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling Models with Dynamic Input Shapes</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_advanced_usage_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_advanced_usage.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT."><img alt="" src="../../../_images/sphx_glr_engine_caching_bert_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_bert_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci..."><img alt="" src="../../../_images/sphx_glr_torch_export_cudagraphs_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="The TensorRT runtime module acts as a wrapper around a PyTorch model (or subgraph) that has bee..."><img alt="" src="../../../_images/sphx_glr_pre_allocated_output_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_pre_allocated_output_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to register a custom Triton kernel as a TensorRT plugin using the..."><img alt="" src="../../../_images/sphx_glr_auto_generate_plugins_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugins.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_resnet_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_resnet_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling ResNet with dynamic shapes using the torch.compile backend</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use Torch-TensorRT Autocast with PyTorch Autocast to compile a..."><img alt="" src="../../../_images/sphx_glr_autocast_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_autocast_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">An example of using Torch-TensorRT Autocast</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT."><img alt="" src="../../../_images/sphx_glr_torch_export_flux_dev_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_export_flux_dev.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a converter for a custom kernel using..."><img alt="" src="../../../_images/sphx_glr_auto_generate_converters_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_converters.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Automatically Generate a Converter for a Custom Kernel</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch..."><img alt="" src="../../../_images/sphx_glr_low_cpu_memory_compilation_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_low_cpu_memory_compilation.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Low CPU Memory Compilation Example</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates BOTH methods for saving Torch-TensorRT compiled models with dynamic i..."><img alt="" src="../../../_images/sphx_glr_save_dynamic_shapes_both_methods_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_save_dynamic_shapes_both_methods.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Saving Models with Dynamic Shapes - Both Methods</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t..."><img alt="" src="../../../_images/sphx_glr_converter_overloading_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_converter_overloading.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to save and load Torch-TensorRT compiled models with dynamic inpu..."><img alt="" src="../../../_images/sphx_glr_save_dynamic_shapes_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_save_dynamic_shapes_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Saving and Loading Models with Dynamic Shapes</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="JIT vs AOT — the key difference:"><img alt="" src="../../../_images/sphx_glr_aot_plugin_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_aot_plugin.py</span></p>
+  <div class="sphx-glr-thumbnail-title">This example builds on auto_generate_plugins by showing the AOT (Ahead-of-Time)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Basic example on how to use the hierarchical adjacency partitioner function and manually compil..."><img alt="" src="../../../_images/sphx_glr_hierarchical_partitioner_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_hierarchical_partitioner_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Hierarchical Partitioner Example</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int..."><img alt="" src="../../../_images/sphx_glr_mutable_torchtrt_module_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_mutable_torchtrt_module_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Weight streaming in TensorRT is a powerful feature designed to overcome GPU memory limitations ..."><img alt="" src="../../../_images/sphx_glr_weight_streaming_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_weight_streaming_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Weight Streaming</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model Segment Anything Model 2 (SAM2) optimized u..."><img alt="" src="../../../_images/sphx_glr_torch_export_sam2_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_export_sam2.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling SAM2 using the dynamo backend</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Here we demonstrate how to deploy a model quantized to INT8 or FP8 using the Dynamo frontend of..."><img alt="" src="../../../_images/sphx_glr_vgg16_ptq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_vgg16_ptq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Deploy Quantized Models using Torch-TensorRT</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="As model sizes increase, the cost of compilation will as well. With AOT methods like torch.dyna..."><img alt="" src="../../../_images/sphx_glr_engine_caching_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Engine Caching</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use the NVIDIA Runtime Compilation (NVRTC) library to compile ..."><img alt="" src="../../../_images/sphx_glr_nvrtc_aot_plugin_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_nvrtc_aot_plugin.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Automatically generate a TensorRT Plugin for RMSNorm module and apply it in Llama2 ============..."><img alt="" src="../../../_images/sphx_glr_llama2_flashinfer_rmsnorm_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_llama2_flashinfer_rmsnorm.py</span></p>
+  <div class="sphx-glr-thumbnail-title">.._llama2_flashinfer_rmsnorm:</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="3D RoPE is the positional encoding used in video generation transformers such as CogVideoX, Wan..."><img alt="" src="../../../_images/sphx_glr_torch_export_3d_rope_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_export_3d_rope.py</span></p>
+  <div class="sphx-glr-thumbnail-title">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how a developer could include a custom kernel in a TensorRT engine ..."><img alt="" src="../../../_images/sphx_glr_custom_kernel_plugins_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_custom_kernel_plugins.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</div>
+</div></div><div class="toctree-wrapper compound">
+</div>
+<div class="sphx-glr-footer sphx-glr-footer-gallery docutils container">
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../../../_downloads/da8003dffd2ae6ec9bedf975c4e4d10a/dynamo_python.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">all</span> <span class="pre">examples</span> <span class="pre">in</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">dynamo_python.zip</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../../../_downloads/248162f46433d4e361cac9add475963e/dynamo_jupyter.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">all</span> <span class="pre">examples</span> <span class="pre">in</span> <span class="pre">Jupyter</span> <span class="pre">notebooks:</span> <span class="pre">dynamo_jupyter.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dependencies">Dependencies</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#model-zoo">Model Zoo</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/dynamo/index.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../_sources/tutorials/_rendered_examples/dynamo/index.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

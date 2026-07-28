@@ -1,0 +1,207 @@
+module(
+    name = "torch_tensorrt",
+    repo_name = "org_pytorch_tensorrt",
+    version = "${BUILD_VERSION}"
+)
+
+bazel_dep(name = "googletest", version = "1.16.0")
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "rules_cc", version = "0.1.1")
+bazel_dep(name = "rules_python", version = "1.3.0")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    ignore_root_user_error = True,
+    python_version = "3.11",
+)
+
+bazel_dep(name = "rules_pkg", version = "1.0.1")
+git_override(
+    module_name = "rules_pkg",
+    commit = "17c57f4",
+    remote = "https://github.com/narendasan/rules_pkg",
+)
+
+# Developer tooling: clangd-compatible compile_commands.json extractor.
+# `dev_dependency = True` keeps this out of the dep graph for any project that
+# consumes torch_tensorrt as a Bazel module. Refresh with:
+#     bazel run //:refresh_compile_commands
+# See CONTRIBUTING.md ("Editor / clangd setup") for details.
+bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
+git_override(
+    module_name = "hedron_compile_commands",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
+    commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
+)
+
+local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+
+torch_nccl_detect = use_repo_rule("//toolchains/torch_nccl:defs.bzl", "torch_nccl_detect")
+
+torch_nccl_detect(name = "torch_nccl")
+
+# External dependency for torch_tensorrt if you already have precompiled binaries.
+local_repository(
+    name = "torch_tensorrt",
+    path = "/opt/conda/lib/python3.11/site-packages/torch_tensorrt",
+)
+
+
+new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+new_git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
+
+# CUDA should be installed on the system locally
+
+new_local_repository(
+    name = "cuda",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "${CUDA_HOME}",
+)
+
+# These versions can be selected using the flag `--//toolchains/dep_collection:compute_libs="jetpack"`
+new_local_repository(
+    name = "cuda_l4t",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "/usr/local/cuda-12.6",
+)
+
+new_local_repository(
+    name = "cuda_win",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "${CUDA_HOME}",
+)
+
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+#############################################################################################################
+# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
+#############################################################################################################
+
+#http_archive(
+#    name = "libtorch",
+#    build_file = "@//third_party/libtorch:BUILD",
+#    strip_prefix = "libtorch",
+#    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-shared-with-deps-latest.zip"],
+#)
+
+# Download these tarballs manually from the NVIDIA website
+# Either place them in the distdir directory in third_party and use the --distdir flag
+# or modify the urls to "file:///<PATH TO ARCHIVE>/<ARCHIVE NAME>"
+
+http_archive(
+    name = "tensorrt",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    strip_prefix = "TensorRT-11.0.0.114",
+    type = "tar.zst",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/tars/TensorRT-Enterprise-11.0.0.114-Linux-x86_64-cuda-${CU_UPPERBOUND}-Release-external.tar.zst",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_rtx",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.5.0.114",
+    type = "tar.zst",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Linux-x86_64-cuda-${CU_UPPERBOUND}-Release-external.tar.zst",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_rtx_sbsa",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.5.0.114",
+    type = "tar.zst",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Linux-aarch64-cuda-${CU_UPPERBOUND}-Release-external.tar.zst",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_sbsa",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    strip_prefix = "TensorRT-11.0.0.114",
+    type = "tar.zst",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/tars/TensorRT-Enterprise-11.0.0.114-Linux-aarch64-cuda-13.2-Release-external.tar.zst",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_l4t",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    strip_prefix = "TensorRT-10.3.0.26",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/tars/TensorRT-10.3.0.26.l4t.aarch64-gnu.cuda-12.6.tar.gz",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_win",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    strip_prefix = "TensorRT-11.0.0.114",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.0.0/zip/TensorRT-Enterprise-11.0.0.114-Windows-amd64-cuda-${CU_UPPERBOUND}-Release-external.zip",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_rtx_win",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.5.0.114",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Windows-amd64-cuda-${CU_UPPERBOUND}-Release-external.zip",
+    ],
+)
+
+####################################################################################
+# Locally installed dependencies (use in cases of custom dependencies or aarch64)
+####################################################################################
+
+# NOTE: If you are using a local build of torch, just point the Libtorch dep to that path.
+
+new_local_repository(
+    name = "libtorch",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+new_local_repository(
+    name = "libtorch_win",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+new_local_repository(
+    name = "torch_l4t",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+# Pinned to the ExecuTorch release/1.4 branch head.
+new_git_repository(
+    name = "executorch",
+    build_file = "@//third_party/executorch:BUILD",
+    # latest commit in release/1.4 branch
+    commit = "cd380e7aefd18c171271cc228d3a155455095219",
+    recursive_init_submodules = True,
+    patch_cmds = [
+        "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
+        "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",
+    ],
+    patch_cmds_win = [
+        "Get-ChildItem -Recurse -Include BUILD,BUILD.bazel | Where-Object { $_.DirectoryName -ne (Get-Location).Path } | Remove-Item -Force",
+        "New-Item -ItemType Directory executorch | Out-Null; Get-ChildItem -Force | Where-Object { $_.Name -notin @('executorch','BUILD','BUILD.bazel','REPO.bazel') } | Copy-Item -Destination executorch -Recurse -Force",
+    ],
+    remote = "https://github.com/pytorch/executorch.git",
+)
+
+#new_local_repository(
+#   name = "tensorrt",
+#   path = "/usr/",
+#   build_file = "@//third_party/tensorrt/local:BUILD"
+#)

@@ -1,0 +1,32 @@
+FROM nvcr.io/nvidia/tensorrt:22.06-py3
+
+ARG BAZEL_VERSION=6.2.1
+
+RUN curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
+RUN echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
+
+RUN apt-get update && apt-get install -y bazel-${BAZEL_VERSION} clang-format-9 libjpeg9 libjpeg9-dev
+RUN ln -s /usr/bin/bazel-${BAZEL_VERSION} /usr/bin/bazel
+
+# Workaround for bazel expecting both static and shared versions, we only use shared libraries inside container
+RUN cp /usr/lib/x86_64-linux-gnu/libnvinfer.so /usr/lib/x86_64-linux-gnu/libnvinfer_static.a
+
+RUN python3 -m pip install --upgrade pip
+COPY ./requirements-dev.txt requirements-dev.txt
+RUN pip3 install -r requirements-dev.txt
+
+COPY ./py/requirements.txt requirements.txt
+RUN pip3 install -r requirements.txt
+
+# Locale is not set by default
+RUN apt-get update && apt install -y locales ninja-build doxygen pandoc && locale-gen en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+COPY ./docsrc/requirements.txt requirements.txt
+RUN pip3 install -r requirements.txt
+RUN rm requirements.txt
+
+RUN rm -rf /workspace
+WORKDIR /

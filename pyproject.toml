@@ -1,0 +1,474 @@
+[build-system]
+requires = [
+    "setuptools>=77.0.0",
+    "packaging>=23.1",
+    "wheel>=0.40.0",
+    "ninja>=1.11.0",
+    "pyyaml>=6.0",
+    "cffi>=1.15.1",
+    "torch>=2.14.0.dev,<2.15.0",
+    "pybind11==2.6.2",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torch_tensorrt"
+authors = [{ name = "NVIDIA Corporation", email = "narens@nvidia.com" }]
+description = "Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch"
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "License :: OSI Approved :: BSD License",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: C++",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+]
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
+keywords = [
+    "pytorch",
+    "torch",
+    "tensorrt",
+    "trt",
+    "ai",
+    "artificial intelligence",
+    "ml",
+    "machine learning",
+    "dl",
+    "deep learning",
+    "compiler",
+    "dynamo",
+    "torchscript",
+    "inference",
+]
+
+dynamic = ["version", "dependencies", "optional-dependencies"]
+
+[dependency-groups]
+lint = [
+    "black>=24.0.0",
+    "clang-format==14.0.6",
+]
+
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+    "pre-commit>=2.20.0",
+    "typos",
+    "mypy",
+    "isort",
+    "ruff",
+    "pyyaml",
+]
+
+debug = [
+    "pydot >= 4.0.0",
+    "tabulate >= 0.8.10",
+    "graphviz >= 0.20.3"
+]
+
+test = [
+    "expecttest==0.1.6",
+    "networkx",
+    "numpy",
+    "parameterized>=0.2.0",
+    "pytest>=9.0.3",
+    "pytest-forked>=1.6.0",
+    # Emits ``::error file=...,line=...::`` annotations on test failure so
+    # GitHub renders them inline on the PR's Files Changed tab. Inert when
+    # ``GITHUB_ACTIONS`` is unset (local runs are unaffected).
+    "pytest-github-actions-annotate-failures>=0.2.0",
+    # pytest-rerunfailures lets CI retry tests that hit known transient
+    # CUDA / cudagraphs / engine-deserialization failures (see L0/L1
+    # ``--only-rerun`` regex in the workflows) without papering over real
+    # bugs in numerical / model-accuracy suites where it is omitted.
+    "pytest-rerunfailures>=14.0",
+    "pytest-xdist>=3.6.1",
+    "pyyaml",
+    "setuptools",
+]
+
+test-ext = [
+    "timm>=1.0.3",
+    "transformers>=5.4.0",
+    "torchvision>=0.29.0.dev,<0.30.0",
+    "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
+]
+
+docs = [
+    "sphinx==7.2.6",
+    "sphinx-gallery==0.13.0",
+    "breathe==4.36.0",
+    "exhale==0.3.7",
+    "pytorch_sphinx_theme2==0.4.4",
+    "nbsphinx==0.9.3",
+    "docutils==0.20",
+    "pillow",
+]
+
+quantization = [
+    "nvidia-modelopt[hf]>=0.44.0; python_version > '3.9' and python_version < '3.13'",
+]
+
+# Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
+# which compiles user-supplied CUDA C++ kernels via NVRTC. The high-level
+# launch/compile API (``cuda.core``) lives in cuda-core; cuda-python's
+# bindings are still pulled in for the lower-level driver/runtime shims.
+kernels = ["cuda-python", "cuda-core"]
+
+[project.urls]
+Homepage = "https://pytorch.org/tensorrt"
+Documentation = "https://pytorch.org/tensorrt"
+Repository = "https://github.com/pytorch/tensorrt.git"
+Changelog = "https://github.com/pytorch/tensorrt/releases"
+
+[project.scripts]
+torchtrtrun = "torch_tensorrt.distributed.run:main"
+
+[tool.setuptools]
+package-dir = { "" = "py" }
+include-package-data = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests/py"]
+addopts = "-n auto --dist=loadfile"
+markers = [
+    "unit: a focused unit test (the bulk of the suite)",
+    "critical: a smoke/critical-path case run in the L1 tier (pytest -m critical); the L2 tier runs the complement (-m 'not critical')",
+]
+norecursedirs = [
+    "bazel-*",
+    ".venv",
+    "__pycache__",
+    "*.egg-info",
+    "ts",
+    "distributed",
+    "examples",
+    "experiments",
+    "tools",
+    "modules",
+    "utils",
+]
+
+[tool.uv]
+package = true
+environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
+required-environments = [
+    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'aarch64'",
+    "sys_platform == 'win32' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'AMD64'"
+]
+prerelease = "if-necessary-or-explicit"
+index-strategy = "unsafe-best-match"
+conflicts = [
+    [
+      { group = "test_ext" },
+      { group = "quantization" },
+    ],
+]
+constraint-dependencies = [
+    "transformers>=5.4.0",
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-nightly-cu130" },
+]
+torchvision = [
+    { index = "pytorch-nightly-cu130" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-nightly-cu130"
+url = "https://download.pytorch.org/whl/nightly/cu130"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-nightly-cu128"
+url = "https://download.pytorch.org/whl/nightly/cu128"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-nightly-cu126"
+url = "https://download.pytorch.org/whl/nightly/cu126"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-test-cu130"
+url = "https://download.pytorch.org/whl/test/cu130"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-test-cu128"
+url = "https://download.pytorch.org/whl/test/cu128"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-test-cu126"
+url = "https://download.pytorch.org/whl/test/cu126"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-release-cu130"
+url = "https://download.pytorch.org/whl/release/cu130"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-release-cu128"
+url = "https://download.pytorch.org/whl/release/cu128"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-release-cu126"
+url = "https://download.pytorch.org/whl/release/cu126"
+explicit = false
+
+# [[tool.uv.index]]
+# name = "jetson-containers"
+# url = "https://pypi.jetson-ai-lab.io/jp6/cu126"
+# explicit = false
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+explicit = false
+
+
+[tool.ruff]
+# NOTE: Synchoronize the ignores with .flake8
+lint.ignore = [
+    # these ignores are from flake8-bugbear; please fix!
+    "B007",
+    "B008",
+    "B017",
+    "B018",   # Useless expression
+    "B019",
+    "B020",
+    "B023",
+    "B024",
+    "B026",
+    "B028",   # No explicit `stacklevel` keyword argument found
+    "B904",
+    "B905",
+    "E402",
+    "C408",   # C408 ignored because we like the dict keyword argument syntax
+    "E501",   # E501 is not flexible enough, we're using B950 instead
+    "E721",
+    "E731",   # Assign lambda expression
+    "E741",
+    "EXE001",
+    "F405",
+    "F821",
+    "F841",
+    # these ignores are from flake8-logging-format; please fix!
+    "G101",
+    "G201",
+    "G202",
+    "G003",
+    "G004",
+    # these ignores are from RUFF perf; please fix!
+    "PERF203",
+    "PERF4",
+    "SIM102",
+    "SIM103",
+    "SIM112",  # flake8-simplify code styles
+    "SIM105",  # these ignores are from flake8-simplify. please fix or ignore with commented reason
+    "SIM108",
+    "SIM110",
+    "SIM114",  # Combine `if` branches using logical `or` operator
+    "SIM115",
+    "SIM116",  # Disable Use a dictionary instead of consecutive `if` statements
+    "SIM117",
+    "SIM118",
+]
+#line-length = 120
+lint.select = [
+    "B",
+    "C4",
+    "G",
+    "E",
+    "F",
+    "SIM1",
+    "W",
+    # Not included in flake8
+    "PERF",
+    "PLE",
+    "TRY302",
+]
+
+# Allow unused variables when underscore-prefixed.
+lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+lint.fixable = [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "I",
+    "N",
+    "Q",
+    "S",
+    "T",
+    "W",
+    "ANN",
+    "ARG",
+    "BLE",
+    "COM",
+    "DJ",
+    "DTZ",
+    "EM",
+    "ERA",
+    "EXE",
+    "FBT",
+    "ICN",
+    "INP",
+    "ISC",
+    "NPY",
+    "PD",
+    "PGH",
+    "PIE",
+    "PL",
+    "PT",
+    "PTH",
+    "PYI",
+    "RET",
+    "RSE",
+    "RUF",
+    "SIM",
+    "SLF",
+    "TCH",
+    "TID",
+    "TRY",
+    "UP",
+    "YTT",
+]
+lint.unfixable = []
+target-version = "py311"
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "env",
+    "py/torch_tensorrt/fx",
+    ".github",
+    "examples",
+    "tests",
+    "tools",
+    "docs",
+    "docsrc",
+    "tests",
+    "setup.py",
+    "noxfile.py",
+    "__init__.py",
+]
+
+[tool.ruff.lint.mccabe]
+# Unlike Flake8, default to a complexity level of 10.
+max-complexity = 10
+
+[tool.isort]
+profile = "black"
+py_version = 311
+skip = ["py/torch_tensorrt/fx"]
+
+[tool.black]
+#line-length = 120
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+force-exclude = """
+elu_converter/setup.py
+| docs/
+| examples/fx/
+| py/torch_tensorrt/fx
+"""
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+show_error_codes = true
+disable_error_code = "attr-defined"
+no_implicit_optional = true
+exclude = [
+    "^py/torch_tensorrt/fx",
+    "py/torch_tensorrt/fx",
+    "torch_tensorrt/fx",
+    "py/torch_tensorrt/_C.so",
+    "examples",
+    "docs",
+    "docsrc",
+    "tests",
+    "setup.py",
+    "noxfile.py",
+]
+python_version = "3.11"
+
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = "torch_tensorrt.dynamo.conversion.aten_converters"
+disable_error_code = "arg-type"
+
+[[tool.mypy.overrides]]
+module = "torch_tensorrt.dynamo.lowering._decompositions"
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "torch_tensorrt.fx.*"
+ignore_errors = true
+follow_imports = "skip"
+
+[tool.typos]
+files.extend-exclude = [
+    "docs/**/*",
+    "*/fx/*",
+    "docsrc/_rendered_examples/",
+    "core/*",
+    "!core/runtime/",
+    "third_party/",
+    "CHANGELOG.md",
+    "*.ipynb",
+    "cpp/",
+    "py/torch_tensorrt/fx/",
+]
+
+[tool.typos.default]
+extend-ignore-identifiers-re = [
+    "^([A-z]|[a-z])*Nd*",
+    "^([A-z]|[a-z])*nd*",
+    "activ*([A-z]|[a-z]|[0-9])*,",
+]
+
+[tool.typos.default.extend-words]
+arange = "arange"
+thw = "thw"

@@ -1,0 +1,763 @@
+#include "ATen/cuda/CUDAEvent.h"
+#include "c10/cuda/CUDAGuard.h"
+#include "c10/cuda/CUDAStream.h"
+
+#include "torch/csrc/jit/runtime/custom_operator.h"
+#include "torch/torch.h"
+
+#include "core/runtime/TRTEngineProfiler.h"
+#include "core/runtime/runtime.h"
+#include "core/util/prelude.h"
+
+namespace torch_tensorrt {
+namespace core {
+namespace runtime {
+
+// Checks if the context switch required for device ID
+bool is_switch_required(const RTDevice& curr_device, const RTDevice& engine_device) {
+  // If SM capability is not the same as configured then switch
+  if ((curr_device.major != engine_device.major) || (curr_device.minor != engine_device.minor)) {
+    LOG_WARNING(
+        "Configured SM capability " << engine_device.getSMCapability()
+                                    << " does not match with current device SM capability "
+                                    << curr_device.getSMCapability() << " (" << curr_device
+                                    << "). Switching device context");
+    return true;
+  }
+
+  // GPU case
+  if (engine_device.device_type == nvinfer1::DeviceType::kGPU) {
+    if (curr_device.device_name != engine_device.device_name) {
+      LOG_WARNING(
+          "Program compiled for " << engine_device.device_name << " but current CUDA device is " << curr_device
+                                  << ". Attempting to switch device context for better compatibility");
+      return true;
+    }
+  }
+
+  if (curr_device.id != engine_device.id) {
+    LOG_WARNING(
+        "Configured Device ID: " << engine_device.id << " is different that current device ID: " << curr_device.id
+                                 << ". Moving input tensors to device: " << engine_device.id);
+    return true;
+  }
+
+  return false;
+}
+
+RTDevice select_rt_device(const RTDevice& engine_device, const RTDevice& curr_device, bool hardware_compatible) {
+  auto new_target_device_opt = get_most_compatible_device(engine_device, curr_device, hardware_compatible);
+
+  // REVIEW: THIS DOES NOT LIST DLA PROBABLY, WHICH WE SHOULD
+  // TODO: I think this logic could be way simpler at execution time since if the tensors arent on the right
+  // device, its not going to run. We should just set device to engine device and maybe reset and memcpy tensors
+  // back to orginal device if needed.
+  TORCHTRT_CHECK(
+      new_target_device_opt,
+      "No compatible device found on system to run program.\n Program targets "
+          << engine_device << "\n Available targets: \n"
+          << get_available_device_list().dump_list() << "\n(runtime.select_cuda_device)");
+  return new_target_device_opt.value();
+}
+
+bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  // Validate whether the current input shapes to the engine has changed
+
+  // Populate the shape key for the inputs
+  // x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
+  std::stringstream new_shape_key_ss;
+  for (auto input : inputs) {
+    new_shape_key_ss << "(";
+    auto sizes = input.sizes();
+    auto rank = input.sizes().size();
+    for (size_t i = 0; i < rank; i++) {
+      new_shape_key_ss << sizes[i];
+      // For all but the final dimension in the shape key, add comma separator
+      if (i < rank - 1) {
+        new_shape_key_ss << ",";
+      }
+    }
+    new_shape_key_ss << ")";
+  }
+
+  auto new_shape_key = new_shape_key_ss.str();
+
+  // Compare the shape key to the original key
+  if (new_shape_key != compiled_engine->shape_key) {
+    LOG_DEBUG("Input shape changed " << compiled_engine->shape_key << " -> " << new_shape_key);
+    compiled_engine->shape_key = new_shape_key;
+    return true;
+  }
+
+  return false;
+}
+
+void setup_input_tensors(
+    std::vector<at::Tensor> inputs,
+    c10::intrusive_ptr<TRTEngine> compiled_engine,
+    bool cudagraphs_enabled,
+    bool need_cudagraphs_record,
+    std::unordered_map<std::string, at::Tensor>& bound_inputs_by_name) {
+  auto* ctx = compiled_engine->exec_ctx();
+  compiled_engine->reset_active_input_tensors();
+
+  for (size_t i = 0; i < inputs.size(); i++) {
+    const auto& binding = compiled_engine->input_binding_infos[i];
+    const auto& name = binding.name;
+
+    TORCHTRT_CHECK(
+        inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
+
+    TORCHTRT_CHECK(
+        inputs[i].dtype() == binding.expected_type,
+        "Expected input tensors to have type " << binding.expected_type << ", found type " << inputs[i].dtype());
+
+    auto dims = core::util::toDims(inputs[i].sizes());
+    auto shape = core::util::toVec(dims);
+    LOG_DEBUG("Input Name: " << name << " Shape: " << dims << " isShapeInferenceIO: " << binding.is_shape_tensor);
+
+    if (binding.is_shape_tensor) {
+      // Shape tensor inputs are casted to int64 explicitly.
+      // Refer to
+      // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
+      auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
+      std::vector<int64_t> inputs_cpu_vec(
+          input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
+      compiled_engine->active_shape_tensor_values.emplace_back(std::move(inputs_cpu_vec));
+      TORCHTRT_CHECK(
+          ctx->setTensorAddress(name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
+          "Error while setting the tensor address for shape inputs");
+
+      if (cudagraphs_enabled) {
+        // @peri044 I dont know if this makes sense since they are supposed to be GPU buffers
+        compiled_engine->cudagraph_input_staging_buffers[i] = input_cpu;
+      }
+      TORCHTRT_CHECK(
+          ctx->setTensorAddress(name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
+          "Error while setting the tensor address for shape inputs");
+
+    } else {
+      compiled_engine->active_input_tensors[i] = inputs[i].view(shape).contiguous();
+
+      // An aliased input is one whose data_ptr will also be the address of an
+      // aliased output binding. Cudagraphs normally clone inputs into a
+      // persistent buffer so addresses are stable across replays; for an
+      // aliased input we deliberately bind to the user's tensor instead, so
+      // the engine writes through to the user's storage. The user is already
+      // required to pass stable input addresses under cudagraphs, so the
+      // aliasing contract is compatible. Membership is precomputed at engine
+      // construction (InputBindingInfo::is_aliased_input) to avoid rescanning
+      // aliased_io on every input, every execution.
+      const bool is_aliased_input = binding.is_aliased_input;
+
+      if (need_cudagraphs_record && !is_aliased_input) {
+        // Create a persistent CUDA graph input staging buffer with a stable replay address.
+        compiled_engine->cudagraph_input_staging_buffers[i] = compiled_engine->active_input_tensors[i].clone();
+      }
+
+      TORCHTRT_CHECK(ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
+
+      at::Tensor final_input;
+      if (cudagraphs_enabled && !is_aliased_input) {
+        // If using CUDAGraphs copy formatted input to the corresponding persistent staging buffer.
+        compiled_engine->cudagraph_input_staging_buffers[i].copy_(compiled_engine->active_input_tensors[i], true);
+        final_input = compiled_engine->cudagraph_input_staging_buffers[i];
+      } else {
+        // Aliased inputs OR non-cudagraphs path: use the active input tensor directly.
+        final_input = compiled_engine->active_input_tensors[i];
+      }
+
+      // Get tensor address, using placeholder for empty tensors
+      // TensorRT requires non-null address even if numel() = 0
+      // empty_tensor_placeholder is pre-allocated in TRTEngine constructor
+      void* input_addr = final_input.numel() == 0 ? compiled_engine->empty_tensor_placeholder : final_input.data_ptr();
+
+      TORCHTRT_CHECK(ctx->setTensorAddress(name.c_str(), input_addr), "Failed to bind tensor address for " << name);
+
+      // Record the bound tensor by binding name so the output-binding loop
+      // can resolve aliased outputs to their source input's storage.
+      bound_inputs_by_name[name] = final_input;
+    }
+  }
+}
+
+std::vector<at::Tensor> create_output_tensors(
+    c10::intrusive_ptr<TRTEngine> compiled_engine,
+    const std::unordered_map<std::string, at::Tensor>& bound_inputs_by_name) {
+  auto* ctx = compiled_engine->exec_ctx();
+  std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
+  for (auto output_indices : compiled_engine->out_binding_map) {
+    // out_binding_map stores TRT_IDX: PYT_IDX
+    auto pyt_idx = output_indices.second;
+
+    std::string name = compiled_engine->out_binding_names[pyt_idx];
+    auto out_shape = ctx->getTensorShape(name.c_str());
+    LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
+
+    auto dims = core::util::toVec(out_shape);
+    auto type = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
+
+    // Aliased outputs share storage with a source input binding. Don't
+    // allocate; reuse the input tensor by identity. The wrapping Python
+    // module is responsible for excluding aliased outputs from the
+    // user-facing return tuple.
+    auto alias_it = compiled_engine->aliased_io.find(name);
+    if (alias_it != compiled_engine->aliased_io.end()) {
+      auto in_it = bound_inputs_by_name.find(alias_it->second.input_binding_name);
+      TORCHTRT_CHECK(
+          in_it != bound_inputs_by_name.end(),
+          "Aliased output " << name << " references input binding " << alias_it->second.input_binding_name
+                            << " but that input was not bound during this call.");
+      const auto& aliased_input = in_it->second;
+      TORCHTRT_CHECK(
+          aliased_input.sizes() == c10::IntArrayRef(dims),
+          "Aliased output " << name << " shape (" << dims << ") does not match source input "
+                            << alias_it->second.input_binding_name << " shape (" << aliased_input.sizes() << ")");
+      outputs[pyt_idx] = aliased_input;
+      LOG_DEBUG(
+          "Aliased output " << name << " (kind=" << alias_kind_to_string(alias_it->second.kind) << ") bound to input "
+                            << alias_it->second.input_binding_name << " — skipping fresh allocation");
+      continue;
+    }
+
+    auto options = torch::TensorOptions()
+                       .dtype(type)
+                       .layout(at::kStrided)
+                       .device(at::kCUDA, compiled_engine->device_info.id)
+                       .requires_grad(false);
+    outputs[pyt_idx] = std::move(at::empty(dims, options).contiguous());
+  }
+
+  return outputs;
+}
+
+void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  auto* ctx = compiled_engine->exec_ctx();
+  if (compiled_engine->output_allocator == nullptr) {
+    std::unordered_map<std::string, at::ScalarType> output_dtypes_dict;
+    for (size_t o = 0; o < compiled_engine->out_binding_names.size(); ++o) {
+      auto name = compiled_engine->out_binding_names[o];
+      output_dtypes_dict[name] = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
+    }
+    compiled_engine->output_allocator = std::make_shared<DynamicOutputAllocator>(output_dtypes_dict);
+  }
+  for (const auto& output_name : compiled_engine->out_binding_names) {
+    if (!ctx->setOutputAllocator(output_name.c_str(), compiled_engine->output_allocator.get())) {
+      TORCHTRT_THROW_ERROR("Failed to set output allocator for " + output_name);
+    }
+  }
+}
+
+std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  // All inputs are expected to be on CUDA. Warn and move any that are not.
+  for (auto& inp : inputs) {
+    if (inp.defined() && !inp.is_cuda()) {
+      LOG_WARNING(
+          "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
+          "For best performance, ensure all inputs are on the correct CUDA device before "
+          "calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device)).");
+      inp = inp.cuda();
+    }
+  }
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // Lazy one-shot NCCL bind: fires on the first real execute_engine call when
+  // the constructor-time bind was deferred (e.g. no collective had been issued
+  // at construction time, or for serialized programs loaded inline where there
+  // is no Python _TorchTensorRTModule.forward wrapper).
+  if (compiled_engine->requires_native_multidevice && !compiled_engine->nccl_initialized) {
+    compiled_engine->bind_nccl_comm();
+  }
+#endif
+
+  // Materialize the IExecutionContext once for this call. Holding the raw
+  // pointer locally avoids paying the null-check + virtual dispatch through
+  // ``compiled_engine->exec_ctx()`` at every TRT API call below; the lock on
+  // ``compiled_engine->mu`` (acquired further down) keeps the pointer stable
+  // for the remainder of the call.
+  auto* ctx = compiled_engine->exec_ctx();
+
+  torch::Tensor dynamic_workspace;
+  if (compiled_engine->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
+    dynamic_workspace = torch::empty(compiled_engine->cuda_engine->getDeviceMemorySizeV2(), {torch::kCUDA});
+    ctx->setDeviceMemory(dynamic_workspace.data_ptr());
+  }
+
+  auto run_standard_execution = [&]() {
+    bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
+    // effective_cudagraphs controls the manual at::cuda::CUDAGraph path below. For TRT-RTX
+    // the runtime owns capture/replay inside enqueueV3 whenever it has a cuda_graph_strategy
+    // set or subgraph cudagraphs are enabled.  The `uses_internal_capture` API below lets the caller
+    // know to skip the manual capture path. If an outer stream capture is already in progress
+    // (e.g. the caller wraps this module in  CudaGraphsTorchTensorRTModule for whole-graph capture),
+    // engine-internal capture would collide, so we disable it one-shot here.
+    bool effective_cudagraphs = cudagraphs_enabled;
+    if (compiled_engine->runtime_cfg.uses_internal_capture(cudagraphs_enabled)) {
+      effective_cudagraphs = false;
+      cudaStreamCaptureStatus capture_status;
+      cudaStreamIsCapturing(compiled_engine->engine_stream.stream(), &capture_status);
+      if (capture_status != cudaStreamCaptureStatusNone) {
+        compiled_engine->disable_rtx_native_cudagraphs();
+      }
+    }
+
+    // Resolve the execution stream first so the optimization-profile switch below
+    // is issued on the same stream the engine will actually enqueue on. This keeps
+    // the switch consistent with execution and, for a default-stream caller, keeps
+    // it on the pool stream instead of serializing the device on the default stream.
+    auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
+    auto default_stream = compiled_engine->default_stream;
+    auto previous_engine_stream = compiled_engine->engine_stream;
+    compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
+    bool caller_on_default = (compiled_engine->caller_stream == default_stream);
+    if (caller_on_default) {
+      compiled_engine->engine_stream = compiled_engine->owned_pool_stream;
+    } else {
+      // Honor caller's non-default stream so its scheduling choice (e.g. SM
+      // partitioning via a CUDA Green Context) is preserved end to end.
+      compiled_engine->engine_stream = compiled_engine->caller_stream;
+    }
+    if (cudagraphs_enabled && compiled_engine->engine_stream != previous_engine_stream) {
+      // Captured CUDA graph was recorded against the old stream; force re-record.
+      compiled_engine->runtime_states.context_changed = true;
+    }
+
+    // Validate shapes first so auto-selection is skipped entirely when the input
+    // shape is unchanged: the previously selected profile still fits, so it stays
+    // active. When the shape did change, auto_select_profile keeps the active
+    // profile if it still fits (no-op) or switches otherwise. A switch sets
+    // context_changed (consumed by set_runtime_states regardless of order), and
+    // shape_changed is already true here, so the cudagraph record/reset below
+    // still fires. Only auto-selection runs per call; manual pins are eager.
+    bool shape_changed = _validate_shapes(inputs, compiled_engine);
+    if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
+      compiled_engine->auto_select_profile(inputs);
+    }
+
+    // Whether cudagraphs needs to record the graph on this pass
+    auto result = compiled_engine->runtime_states.set_runtime_states(
+        effective_cudagraphs, compiled_engine->use_pre_allocated_outputs, shape_changed);
+
+    bool need_cudagraphs_record = std::get<0>(result);
+    bool can_use_pre_allocated_outputs = std::get<1>(result);
+    bool need_cudagraphs_reset = std::get<2>(result);
+
+    // Pre-allocated outputs are disabled entirely for engines with aliased I/O.
+    // An aliased output reuses the caller's input storage, so there is no
+    // allocation to amortize by caching, and caching would pin a caller-owned
+    // tensor across calls. Only the non-aliased outputs could benefit, and that
+    // win is too small to justify the extra staleness/lifetime surface. See the
+    // cache-refresh guard below, which is the counterpart to this one.
+    if (!compiled_engine->aliased_io.empty()) {
+      if (compiled_engine->use_pre_allocated_outputs) {
+        LOG_WARNING(
+            "pre_allocated_outputs is enabled but this engine has aliased I/O; "
+            "pre-allocation is disabled for aliased engines (aliased outputs reuse "
+            "the caller's input storage, so there is nothing to pre-allocate). "
+            "Outputs are allocated fresh each call.");
+      }
+      can_use_pre_allocated_outputs = false;
+    }
+
+    if (need_cudagraphs_reset) {
+      compiled_engine->cudagraph.reset();
+    }
+
+    std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
+
+    // Bound input tensors keyed by binding name. Populated by setup_input_tensors
+    // and consumed by create_output_tensors / the output binding loop to alias
+    // outputs to their source-input device pointers (no fresh allocation, no
+    // post-engine copy). The map's tensor refs keep the storage alive for the
+    // duration of the engine call.
+    std::unordered_map<std::string, at::Tensor> bound_inputs_by_name;
+
+    // Intialize inputs and outputs to be available throughout the succeeding scopes
+    { // Input Setup
+      std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
+      if (compiled_engine->profile_execution) {
+        input_profiler_guard =
+            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
+      }
+
+      setup_input_tensors(inputs, compiled_engine, effective_cudagraphs, need_cudagraphs_record, bound_inputs_by_name);
+      // Check if input shapes can be inferred.
+      int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
+      std::vector<char const*> names(io_size);
+      int32_t const nbNames = ctx->inferShapes(names.size(), names.data());
+      TORCHTRT_CHECK(
+          nbNames == 0,
+          "The shapes of the inputs: "
+              << names
+              << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
+    }
+
+    { // Output Setup
+      std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
+      if (compiled_engine->profile_execution) {
+        output_profiler_guard =
+            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
+      }
+      if (can_use_pre_allocated_outputs) {
+        // Never reached for engines with aliased I/O: can_use_pre_allocated_outputs
+        // is forced false above when aliased_io is non-empty, so cached outputs
+        // never hold an aliased (caller-owned) slot.
+        outputs = compiled_engine->pre_allocated_outputs;
+      } else {
+        outputs = create_output_tensors(compiled_engine, bound_inputs_by_name);
+      }
+
+      for (auto output_indices : compiled_engine->out_binding_map) {
+        auto pyt_idx = output_indices.second;
+        std::string name = compiled_engine->out_binding_names[pyt_idx];
+
+        // Aliased outputs share storage with a source input. We bind directly
+        // to the input's data_ptr and intentionally bypass the cudagraphs
+        // persistent-output-buffer path: there is no separate buffer to keep
+        // in sync, and copying into a persistent buffer would defeat the
+        // aliasing.
+        auto alias_it = compiled_engine->aliased_io.find(name);
+        if (alias_it != compiled_engine->aliased_io.end()) {
+          auto in_it = bound_inputs_by_name.find(alias_it->second.input_binding_name);
+          TORCHTRT_CHECK(
+              in_it != bound_inputs_by_name.end(),
+              "Aliased output " << name << " references unbound input " << alias_it->second.input_binding_name);
+          TORCHTRT_CHECK(
+              ctx->setTensorAddress(name.c_str(), in_it->second.data_ptr()),
+              "Failed to bind aliased output " << name << " to input " << alias_it->second.input_binding_name);
+          continue;
+        }
+
+        if (need_cudagraphs_record) {
+          // If recording a CUDA graph, update the persistent output staging buffer.
+          compiled_engine->cudagraph_output_staging_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
+        }
+
+        if (effective_cudagraphs) {
+          TORCHTRT_CHECK(
+              ctx->setTensorAddress(
+                  name.c_str(), compiled_engine->cudagraph_output_staging_buffers[pyt_idx].data_ptr()),
+              "Error while setting the output tensor address");
+        } else {
+          TORCHTRT_CHECK(
+              ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
+              "Error while setting the output tensor address");
+        }
+      }
+    }
+
+    compiled_engine->record_active_input_tensor_stream_usage(
+        cudagraphs_enabled ? compiled_engine->caller_stream : compiled_engine->engine_stream);
+
+    { // Engine Execution (execute on engine stream)
+      c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
+
+      std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
+      if (compiled_engine->profile_execution) {
+        enqueue_profiler_guard =
+            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
+      }
+
+      if (caller_on_default) {
+        // Block engine stream until results are available on caller stream
+        at::cuda::CUDAEvent caller_exec_complete;
+        caller_exec_complete.record(compiled_engine->caller_stream);
+        caller_exec_complete.block(compiled_engine->engine_stream);
+      }
+
+      if (!effective_cudagraphs) {
+        // Direct execution uses the caller buffers directly. On TRT-RTX with a
+        // cuda_graph_strategy set, the engine captures/replays internally during
+        // this enqueueV3 call.
+        ctx->enqueueV3(compiled_engine->engine_stream);
+      } else {
+        if (need_cudagraphs_record) {
+          // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
+          c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
+          compiled_engine->cudagraph.capture_begin();
+          ctx->enqueueV3(recording_stream);
+          compiled_engine->cudagraph.capture_end();
+          compiled_engine->cudagraph.instantiate();
+          if (compiled_engine->profile_execution) {
+            cudaError_t debug_dump_err = cudaGraphDebugDotPrint(
+                compiled_engine->cudagraph.raw_cuda_graph(),
+                compiled_engine->cuda_graph_debug_path.c_str(),
+                cudaGraphDebugDotFlagsVerbose);
+            if (debug_dump_err != cudaSuccess) {
+              LOG_WARNING(
+                  "Failed to dump CUDA graph debug DOT to " << compiled_engine->cuda_graph_debug_path << ": "
+                                                            << cudaGetErrorString(debug_dump_err));
+            }
+          }
+        }
+
+        // Replay the CUDAGraph
+        compiled_engine->cudagraph.replay(); // Has a cudaDeviceSynchronize internally
+      }
+    } // End engine exeuction (resets to caller stream)
+
+    compiled_engine->clear_active_input_tensors();
+
+    // When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first
+    // execution or when shape is changed.
+    //
+    // Disabled entirely for engines with aliased I/O: an aliased output reuses
+    // the caller's input storage (no allocation to amortize), and caching would
+    // pin a caller-owned tensor across calls. This mirrors the
+    // can_use_pre_allocated_outputs gate above so the cache is never populated
+    // for aliased engines in the first place.
+    if (compiled_engine->use_pre_allocated_outputs && compiled_engine->aliased_io.empty() &&
+        (compiled_engine->pre_allocated_outputs.size() == 0 || compiled_engine->output_tensors_are_unowned ||
+         shape_changed)) {
+      compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine, bound_inputs_by_name);
+    }
+
+    if (caller_on_default) {
+      // Block caller stream until engine execution is complete
+      at::cuda::CUDAEvent trt_exec_complete;
+      trt_exec_complete.record(compiled_engine->engine_stream);
+      trt_exec_complete.block(compiled_engine->caller_stream);
+    }
+
+    if (effective_cudagraphs) {
+      // If in CUDAGraph mode, copy persistent staging outputs to returned tensors on the caller stream.
+      // Aliased outputs are skipped: the engine wrote directly into the user's
+      // input storage (we bound the aliased output binding to the user's
+      // tensor data_ptr in create_output_tensors / the output-binding loop),
+      // so no copy-back is needed AND cudagraph_output_staging_buffers[o] is
+      // uninitialized for aliased indices.
+      for (size_t o = 0; o < compiled_engine->cudagraph_output_staging_buffers.size(); o++) {
+        const auto& name = compiled_engine->out_binding_names[o];
+        if (compiled_engine->aliased_io.find(name) != compiled_engine->aliased_io.end()) {
+          continue;
+        }
+        outputs[o].copy_(compiled_engine->cudagraph_output_staging_buffers[o], false);
+      }
+    }
+
+    if (compiled_engine->profile_execution) {
+      LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
+      dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);
+      compiled_engine->dump_engine_layer_info();
+    }
+
+    return outputs;
+  };
+
+  auto run_output_allocator = [&]() {
+    // Resolve the execution stream first so the optimization-profile switch below
+    // is issued on the same stream the engine will actually enqueue on.
+    auto current_device_id = inputs.size() > 0 ? inputs[0].device().index() : at::cuda::current_device();
+    auto default_stream = compiled_engine->default_stream;
+    compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
+    bool caller_on_default = (compiled_engine->caller_stream == default_stream);
+    if (caller_on_default) {
+      compiled_engine->engine_stream = compiled_engine->owned_pool_stream;
+    } else {
+      // Honor caller's non-default stream so its scheduling choice (e.g. SM
+      // partitioning via a CUDA Green Context) is preserved end to end.
+      compiled_engine->engine_stream = compiled_engine->caller_stream;
+    }
+
+    // Validate shapes first so auto-selection is skipped entirely when the input
+    // shape is unchanged: the previously selected profile still fits, so it
+    // stays active. When the shape did change, auto_select_profile keeps the
+    // active profile if it still fits (no-op) or switches otherwise.
+    bool shape_changed = _validate_shapes(inputs, compiled_engine);
+    if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
+      compiled_engine->auto_select_profile(inputs);
+    }
+
+    // Discard map: the output-allocator path is incompatible with aliased I/O
+    // (validated at engine construction). The bound-inputs map is unused here.
+    std::unordered_map<std::string, at::Tensor> bound_inputs_by_name;
+
+    { // Input Setup
+      std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
+      if (compiled_engine->profile_execution) {
+        input_profiler_guard =
+            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
+      }
+
+      setup_input_tensors(inputs, compiled_engine, false, false, bound_inputs_by_name);
+      // Check if input shapes can be inferred.
+      int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
+      std::vector<char const*> names(io_size);
+      int32_t const nbNames = ctx->inferShapes(names.size(), names.data());
+      TORCHTRT_CHECK(
+          nbNames == 0,
+          "The shapes of the inputs: "
+              << names
+              << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
+    }
+
+    { // OutputAllocator Setup
+      std::unique_ptr<torch::autograd::profiler::RecordProfile> output_allocator_profiler_guard;
+      if (compiled_engine->profile_execution) {
+        output_allocator_profiler_guard =
+            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
+      }
+      create_output_allocator(compiled_engine);
+    }
+
+    compiled_engine->record_active_input_tensor_stream_usage(compiled_engine->engine_stream);
+
+    { // Engine Execution (execute on engine stream)
+      c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
+
+      std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
+      if (compiled_engine->profile_execution) {
+        enqueue_profiler_guard =
+            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
+      }
+
+      if (caller_on_default) {
+        // Block engine stream until results are available on caller stream
+        at::cuda::CUDAEvent caller_exec_complete;
+        caller_exec_complete.record(compiled_engine->caller_stream);
+        caller_exec_complete.block(compiled_engine->engine_stream);
+      }
+
+      // Direct execution uses the caller buffers directly
+      ctx->enqueueV3(compiled_engine->engine_stream);
+
+    } // End engine exeuction (resets to caller stream)
+
+    compiled_engine->clear_active_input_tensors();
+
+    if (caller_on_default) {
+      // Block caller stream until engine execution is complete
+      at::cuda::CUDAEvent trt_exec_complete;
+      trt_exec_complete.record(compiled_engine->engine_stream);
+      trt_exec_complete.block(compiled_engine->caller_stream);
+    }
+
+    std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
+    if (compiled_engine->profile_execution) {
+      output_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
+    }
+    std::vector<at::Tensor> outputs;
+    for (size_t i = 0; i < compiled_engine->out_binding_names.size(); i++) {
+      auto name = compiled_engine->out_binding_names[i];
+      auto dims = compiled_engine->output_allocator->getShapes().at(name);
+      auto dtype = util::TRTDataTypeToScalarType(ctx->getEngine().getTensorDataType(name.c_str()));
+      at::Tensor output = compiled_engine->output_allocator->getBuffers().at(name).clone().detach();
+      int64_t prod = 1;
+      for (int i = 0; i < dims.nbDims; ++i) {
+        prod *= dims.d[i];
+      }
+      std::vector<int64_t> shape(dims.nbDims);
+      for (int i = 0; i < dims.nbDims; ++i) {
+        shape[i] = dims.d[i];
+      }
+      // When using the OutputAllocator, the allocated buffer might be larger than the size of the output,
+      // so we need to reshape the buffer to the output shape
+      output = output.reshape(-1).view(dtype).slice(0, 0, prod).reshape(shape);
+      outputs.push_back(output);
+    }
+
+    if (compiled_engine->profile_execution) {
+      LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
+      dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);
+      compiled_engine->dump_engine_layer_info();
+    }
+
+    return outputs;
+  };
+
+  LOG_DEBUG(
+      "Attempting to run engine (ID: " << compiled_engine->name
+                                       << "); Hardware Compatible: " << compiled_engine->hardware_compatible);
+  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
+  // Other IExecutionContext methods and runtime states should be in same scope as well
+  std::unique_lock<std::mutex> lock(compiled_engine->mu);
+  if (compiled_engine->profile_execution) {
+    std::stringstream ss;
+    ss << "Execution profiling is enabled, find results here:" << std::endl;
+    compiled_engine->set_profiling_paths();
+    ss << "  Device selection profile: " << compiled_engine->device_profile_path << std::endl;
+    ss << "  Input packing profile: " << compiled_engine->input_profile_path << std::endl;
+    ss << "  Output packing profile: " << compiled_engine->output_profile_path << std::endl;
+    ss << "  TRT enqueue profile: " << compiled_engine->enqueue_profile_path << std::endl;
+    ss << "  Engine execution profile: " << compiled_engine->trt_engine_profile_path << std::endl;
+    ss << "  CUDA Graph trace: " << compiled_engine->cuda_graph_debug_path << std::endl;
+    auto log_info = ss.str();
+    LOG_INFO("" << log_info);
+    compiled_engine->cudagraph.enable_debug_mode();
+  }
+  bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
+
+  if (MULTI_DEVICE_SAFE_MODE) {
+    std::unique_ptr<torch::autograd::profiler::RecordProfile> device_profiler_guard;
+    if (compiled_engine->profile_execution) {
+      device_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->device_profile_path);
+    }
+
+    RTDevice curr_device = get_current_device();
+    LOG_DEBUG("Current Device: " << curr_device);
+
+    // Generic Target Device Prefix
+    std::string target_device = "cuda:";
+
+    if (is_switch_required(curr_device, compiled_engine->device_info)) {
+      // Scan through available CUDA devices and set the CUDA device context correctly
+      RTDevice device =
+          select_rt_device(compiled_engine->device_info, curr_device, compiled_engine->hardware_compatible);
+      set_rt_device(device);
+
+      // Target device is new device
+      target_device += std::to_string(device.id);
+
+      for (auto& in : inputs) {
+        in = in.to(torch::Device(target_device));
+      }
+    } else {
+      // Target device is current device
+      target_device += std::to_string(curr_device.id);
+    }
+
+    // For each input, ensure its current device is the desired target device
+    for (size_t i = 0; i < inputs.size(); i++) {
+      at::Tensor* in = &inputs[i];
+      std::string current_tensor_device = in->device().str();
+
+      // If current device string does not match target device, display warning and move tensor accordingly
+      if (current_tensor_device != target_device) {
+        LOG_WARNING(
+            "Input " << i << " of engine " << compiled_engine->name << " was found to be on " << current_tensor_device
+                     << " but should be on " << target_device << ". This tensor is being moved by the runtime but "
+                     << "for performance considerations, ensure your inputs are all on GPU "
+                     << "and open an issue here (https://github.com/pytorch/TensorRT/issues) if this "
+                     << "warning persists.");
+        *in = in->to(torch::Device(target_device));
+      }
+    }
+  }
+
+  if (compiled_engine->requires_output_allocator) { // engine requires OA
+    if (cudagraphs_enabled) {
+      TORCHTRT_THROW_ERROR(
+          "The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.");
+    }
+    LOG_DEBUG("Using the dynamic allocator runtime mode.");
+    return run_output_allocator();
+  } else {
+    if (compiled_engine->use_output_allocator_outputs) { // users call OA context manager
+      if (cudagraphs_enabled) {
+        TORCHTRT_THROW_ERROR(
+            "Both CUDA Graphs and dynamic output allocation are enabled, which are incompatible runtime modes. Please disable one of the two.");
+      }
+      LOG_DEBUG("Using the dynamic allocator runtime mode.");
+      return run_output_allocator();
+    } else {
+      LOG_DEBUG("Using the standard execution runtime mode with cudagraphs=" << cudagraphs_enabled << ".");
+      return run_standard_execution();
+    }
+  }
+}
+
+} // namespace runtime
+} // namespace core
+} // namespace torch_tensorrt

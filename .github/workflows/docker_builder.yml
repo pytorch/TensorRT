@@ -1,0 +1,73 @@
+name: 'Torch-TensorRT Docker Build'
+
+# Apply workflow only to main, nightly, release branches
+on:
+  push:
+    branches:
+      - main
+      - nightly
+      - release/*
+    paths-ignore:
+      - 'docs/**'
+  workflow_dispatch:
+
+# If pushes to main are made in rapid succession,
+# cancel existing docker builds and use newer commits
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    permissions:
+      packages: write
+
+    runs-on: linux.4xlarge
+
+    # Define key environment variables
+    # Container name is of the form torch_tensorrt:<branch_name>
+    env:
+      DOCKER_REGISTRY: ghcr.io/pytorch/tensorrt
+      CONTAINER_NAME: torch_tensorrt:${{ github.ref_name }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Fix Slashes Repo Name
+      id: fix_slashes
+      run: |
+        export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
+        echo "container_name=$container_name" >> $GITHUB_OUTPUT
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.DOCKER_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Automatically detect TensorRT default versions for Torch-TRT build
+    - name: Build Docker image
+      env:
+        DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
+      run: |
+        python3 -m pip install pyyaml
+        TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
+        echo "TRT VERSION = ${TRT_VERSION}"
+
+        DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION -f docker/Dockerfile --tag $DOCKER_TAG .
+
+    - name: Push Docker image
+      env:
+        DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
+      run: docker push $DOCKER_URL
+
+    # Clean up all untagged containers in registry
+    - name: Container Registry Cleanup
+      uses: actions/delete-package-versions@v4
+      with:
+        package-name: "tensorrt/torch_tensorrt"
+        package-type: container
+        min-versions-to-keep: 0
+        delete-only-untagged-versions: True

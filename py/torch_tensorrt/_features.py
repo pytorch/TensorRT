@@ -1,0 +1,261 @@
+import importlib
+import os
+import sys
+from collections import namedtuple
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
+
+import tensorrt
+from torch_tensorrt._utils import (
+    check_cross_compile_trt_win_lib,
+    check_native_trt_collectives,
+    load_tensorrt_llm_for_nccl,
+    sanitized_torch_version,
+)
+
+from packaging import version
+
+FeatureSet = namedtuple(
+    "FeatureSet",
+    [
+        "torchscript_frontend",
+        "torch_tensorrt_runtime",
+        "dynamo_frontend",
+        "fx_frontend",
+        "refit",
+        "qdp_plugin",
+        "windows_cross_compile",
+        "tensorrt_rtx",
+        "trtllm_for_nccl",
+        "native_trt_collectives",
+    ],
+)
+
+trtorch_dir = os.path.dirname(__file__)
+linked_file = os.path.join(
+    "lib", "torchtrt.dll" if sys.platform.startswith("win") else "libtorchtrt.so"
+)
+linked_file_runtime = os.path.join(
+    "lib",
+    (
+        "torchtrt_runtime.dll"
+        if sys.platform.startswith("win")
+        else "libtorchtrt_runtime.so"
+    ),
+)
+linked_file_full_path = os.path.join(trtorch_dir, linked_file)
+linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
+
+_TENSORRT_RTX = getattr(tensorrt, "_package_name", "") == "tensorrt_rtx"
+_TS_FE_AVAIL = os.path.isfile(linked_file_full_path)
+_TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_path)
+_DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
+_FX_FE_AVAIL = False if _TENSORRT_RTX else True
+_REFIT_AVAIL = True
+_WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
+
+# Check if native TRT collectives are available (TRT 10.16+ with NCCL)
+_NATIVE_TRT_COLLECTIVES_AVAIL = check_native_trt_collectives(
+    linked_file_full_path, linked_file_runtime_full_path
+)
+
+# Only load TRT-LLM for NCCL if native TRT collectives are not available
+_TRTLLM_AVAIL = False
+if not _NATIVE_TRT_COLLECTIVES_AVAIL:
+    _TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
+
+if _TENSORRT_RTX:
+    _QDP_PLUGIN_AVAIL = False
+elif importlib.util.find_spec("tensorrt.plugin") and importlib.util.find_spec(
+    "tensorrt.plugin._lib"
+):
+    # TensorRT 10.14.* has a known bug that breaks QDP plugins; 10.15.+ works.
+    if tensorrt.__version__.startswith("10.14."):
+        _QDP_PLUGIN_AVAIL = False
+    else:
+        _QDP_PLUGIN_AVAIL = True
+else:
+    _QDP_PLUGIN_AVAIL = False
+
+ENABLED_FEATURES = FeatureSet(
+    _TS_FE_AVAIL,
+    _TORCHTRT_RT_AVAIL,
+    _DYNAMO_FE_AVAIL,
+    _FX_FE_AVAIL,
+    _REFIT_AVAIL,
+    _QDP_PLUGIN_AVAIL,
+    _WINDOWS_CROSS_COMPILE,
+    _TENSORRT_RTX,
+    _TRTLLM_AVAIL,
+    _NATIVE_TRT_COLLECTIVES_AVAIL,
+)
+
+T = TypeVar("T")
+
+
+def _enabled_features_str() -> str:
+    enabled = lambda x: "ENABLED" if x else "DISABLED"
+    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n - Native TRT Collectives: {enabled(_NATIVE_TRT_COLLECTIVES_AVAIL)}\n"  # type: ignore[no-untyped-call]
+    return out_str
+
+
+# Inline helper functions for checking feature availability
+def has_torch_tensorrt_runtime() -> bool:
+    """Check if Torch-TensorRT C++ runtime is available.
+
+    Returns:
+        bool: True if libtorchtrt_runtime.so or libtorchtrt.so is available
+    """
+    return bool(ENABLED_FEATURES.torch_tensorrt_runtime)
+
+
+def has_torchscript_frontend() -> bool:
+    """Check if TorchScript frontend is available.
+
+    Returns:
+        bool: True if libtorchtrt.so is available
+    """
+    return bool(ENABLED_FEATURES.torchscript_frontend)
+
+
+def needs_tensorrt_rtx(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.tensorrt_rtx:
+            return f(*args, **kwargs)
+        else:
+            raise NotImplementedError("TensorRT-RTX is not available")
+
+    return wrapper
+
+
+def needs_not_tensorrt_rtx(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            return f(*args, **kwargs)
+        else:
+            raise NotImplementedError(
+                "This is only available in non TensorRT-RTX environments, currently running in TensorRT-RTX"
+            )
+
+    return wrapper
+
+
+def needs_torch_tensorrt_runtime(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.torch_tensorrt_runtime:
+            return f(*args, **kwargs)
+        else:
+
+            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+                raise NotImplementedError("Torch-TensorRT Runtime is not available")
+
+            return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_qdp_plugin(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.qdp_plugin:
+            return f(*args, **kwargs)
+        else:
+
+            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+                raise NotImplementedError(
+                    "TensorRT QDP(Quick Deploy Plugins) not available, requires TensorRT 10.7.0 or higher"
+                )
+
+            return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_refit(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.refit:
+            return f(*args, **kwargs)
+        else:
+
+            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+                raise NotImplementedError(
+                    "Refit feature is currently not available in Python 3.13 or higher"
+                )
+
+            return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_cross_compile(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.windows_cross_compile:
+            return f(*args, **kwargs)
+        else:
+
+            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+                raise NotImplementedError(
+                    "Windows cross compilation feature is not available"
+                )
+
+            return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_trtllm_for_nccl(f: Callable[..., Any]) -> Callable[..., Any]:
+    """
+    Runtime check decorator for TensorRT-LLM NCCL plugin availability.
+
+    WARNING: This decorator CANNOT prevent registration of converters at import time.
+    When used with @dynamo_tensorrt_converter, the converter is always registered
+    regardless of decorator order, because registration happens at import time before
+    the wrapper is called.
+
+    This decorator is kept for potential non-registration use cases where
+    runtime checks are appropriate.
+    @apbose: to discuss if this is required
+    """
+
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.trtllm_for_nccl:
+            return f(*args, **kwargs)
+        else:
+
+            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+                raise NotImplementedError(
+                    "TensorRT-LLM plugin for NCCL is not available"
+                )
+
+            return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_native_collectives(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.native_trt_collectives:
+            return f(*args, **kwargs)
+        else:
+            raise NotImplementedError(
+                f"Native TensorRT NCCL collectives are unavailable. "
+                f"Detected TensorRT {tensorrt.version}; native collectives require TRT 10.16+ "
+                f"with a runtime built with NCCL support. Set USE_NATIVE_TRT_COLLECTIVES=0 to fall back "
+                f"to the TensorRT-LLM plugin path."
+            )
+
+    return wrapper
+
+
+def for_all_methods(
+    decorator: Callable[..., Any], exclude: Optional[List[str]] = None
+) -> Callable[..., Any]:
+    exclude_list: List[str] = []
+    if exclude:
+        exclude_list = exclude
+
+    def decorate(cls: Type[T]) -> Type[T]:
+        for attr in cls.__dict__:
+            if callable(getattr(cls, attr)) and attr not in exclude_list:
+                setattr(cls, attr, decorator(getattr(cls, attr)))
+        return cls
+
+    return decorate

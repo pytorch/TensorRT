@@ -1,0 +1,4 @@
+setuptools==78.1.1
+numpy<2.0.0
+packaging
+pyyaml

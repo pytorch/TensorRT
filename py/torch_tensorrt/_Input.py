@@ -1,0 +1,613 @@
+from __future__ import annotations
+
+import logging
+from enum import Enum
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+import torch
+from torch_tensorrt._enums import dtype, memory_format
+
+logger = logging.getLogger(__name__)
+
+
+class Input(object):
+    """
+    Defines an input to a module in terms of expected shape, data type and tensor format.
+
+    Attributes:
+        shape_mode (torch_tensorrt.Input._ShapeMode): Is input statically or dynamically shaped
+        shape (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape.
+            Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form
+
+            .. code-block:: py
+
+                {"min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple}
+
+        dtype (torch_tensorrt.dtype): The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
+        format (torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
+    """
+
+    class _ShapeMode(Enum):
+        STATIC = 0
+        DYNAMIC = 1
+
+    shape_mode: Optional[_ShapeMode] = (
+        None  #: Is input statically or dynamically shaped
+    )
+    shape: Optional[Tuple[int, ...] | Dict[str, Tuple[int, ...]]] = (
+        None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
+    )
+    dtype: dtype = (
+        dtype.unknown
+    )  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
+    _explicit_set_dtype: bool = False
+    format: memory_format = (
+        memory_format.linear
+    )  #: The expected format of the input tensor (default: torch_tensorrt.memory_format.linear)
+
+    DOMAIN_OFFSET: float = 2.0
+    low_tensor_domain_incl: float = 0.0
+    high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
+    torch_tensor: torch.Tensor = None
+    name: str = ""
+    is_shape_tensor: bool = False
+    shared_dims: Dict[int, str] = (
+        {}
+    )  #: Optional {axis_index: name} for dynamic axes. The same name across inputs is exported as one shared ``torch.export.Dim`` (e.g. a batch axis shared by ``input_ids`` and ``attention_mask``).
+    #: Optional ordered optimization profiles for multi-profile engines. A list
+    #: of dicts, one per profile; the list index is the TRT optimization-profile
+    #: index used to select the profile at runtime. Each entry has
+    #: ``min_shape`` / ``opt_shape`` / ``max_shape`` tuples. ``None`` for the
+    #: default zero/one-profile behavior. ``profiles`` may be combined with ``shared_dims``: the profiles
+    #: define the per-profile TRT ranges while ``shared_dims`` names dynamic axes
+    #: on the union envelope so they export as one shared ``torch.export.Dim``
+    #: across inputs.
+    profiles: Optional[List[Dict[str, Tuple[int, ...]]]] = None
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """__init__ Method for torch_tensorrt.Input
+
+        Input accepts one of a few construction patterns
+
+        Args:
+            shape (Tuple or List, optional): Static shape of input tensor
+
+        Keyword Arguments:
+            shape (Tuple or List, optional): Static shape of input tensor
+            min_shape (Tuple or List, optional): Min size of input tensor's shape range
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
+            opt_shape (Tuple or List, optional): Opt size of input tensor's shape range
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
+            max_shape (Tuple or List, optional): Max size of input tensor's shape range
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
+            dtype (torch.dtype or torch_tensorrt.dtype): Expected data type for input tensor (default: torch_tensorrt.dtype.float32)
+            format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
+            tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
+                Note: Entering "None" (or not specifying) will set the bound to [0, 2)
+            torch_tensor (torch.Tensor): Holds a corresponding torch tensor with this Input.
+            name (str, optional): Name of this input in the input nn.Module's forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.
+        Examples:
+            - Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)
+            - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)
+            - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW
+        """
+        # Multi optimization profile support. ``profiles`` is validated and
+        # translated into the union ``min_shape`` / ``opt_shape`` / ``max_shape``
+        # kwargs so the regular dynamic-shape path below constructs the Input
+        # unchanged.
+        if kwargs.get("profiles") is not None:
+            self._init_from_profiles(args, kwargs)
+
+        # Compatibility code for switching over from InputTensorSpec.
+        # Mutually exclusive with `profiles` above (which translates into
+        # min/opt/max kwargs and forbids `shape`/`shape_ranges`).
+        elif "shape" in kwargs and "shape_ranges" in kwargs:
+            assert (
+                len(kwargs["shape_ranges"]) == 1 and len(kwargs["shape_ranges"][0]) == 3
+            )
+            del kwargs["shape"]
+
+            kwargs["min_shape"] = kwargs["shape_ranges"][0][0]
+            kwargs["opt_shape"] = kwargs["shape_ranges"][0][1]
+            kwargs["max_shape"] = kwargs["shape_ranges"][0][2]
+
+        if len(args) == 1:
+            if not Input._supported_input_size_type(args[0]):
+                raise TypeError(
+                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                    + str(type(args[0]))
+                )
+            if any(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"]):
+                raise ValueError(
+                    "Found that both shape (as a positional argument), and one or more of min_shape, opt_shape, max_shape were specified\nclass Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined"
+                )
+            self.shape = tuple(args[0])
+            self.shape_mode = Input._ShapeMode.STATIC
+
+        elif len(args) == 0:
+            if "shape" not in kwargs and not (
+                all(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"])
+            ):
+                raise ValueError(
+                    "Missing required arguments for class Input\nEither shape or all three of min_shape, opt_shape, max_shape must be defined"
+                )
+            elif ("shape" in kwargs) and all(
+                k in kwargs for k in ["min_shape", "opt_shape", "max_shape"]
+            ):
+                raise ValueError(
+                    "Found that both shape, and one or more of min_shape, opt_shape, max_shape were specified\nclass Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined"
+                )
+
+            if "shape" in kwargs:
+                if not Input._supported_input_size_type(kwargs["shape"]):
+                    raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(kwargs["shape"]))
+                    )
+                self.shape = tuple(kwargs["shape"])
+                self.shape_mode = Input._ShapeMode.STATIC
+            else:
+                if not Input._supported_input_size_type(kwargs["min_shape"]):
+                    raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(kwargs["min_shape"]))
+                        + " for min_shape"
+                    )
+                if not Input._supported_input_size_type(kwargs["opt_shape"]):
+                    raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(kwargs["opt_shape"]))
+                        + " for opt_shape"
+                    )
+                if not Input._supported_input_size_type(kwargs["max_shape"]):
+                    raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(kwargs["max_shape"]))
+                        + " for max_shape"
+                    )
+
+                self.shape = {
+                    "min_shape": tuple(kwargs["min_shape"]),
+                    "opt_shape": tuple(kwargs["opt_shape"]),
+                    "max_shape": tuple(kwargs["max_shape"]),
+                }
+                self.shape_mode = Input._ShapeMode.DYNAMIC
+
+                # Warn if min_shape has any 0 dimension (empty tensor) - TensorRT doesn't support this
+                # @apbose: Is this warning necessary?
+                if any(dim == 0 for dim in self.shape["min_shape"]):
+                    logger.warning(
+                        f"min_shape contains a 0 dimension: {self.shape['min_shape']}. "
+                        "TensorRT does not support dynamic shapes with min dimension of 0 (empty tensors). "
+                        "TensorRT will internally clamp min dimensions to 1, which may cause runtime errors "
+                        "if you try to run inference with empty tensor inputs."
+                    )
+
+                if "shared_dims" in kwargs and kwargs["shared_dims"]:
+                    self.shared_dims = Input._parse_shared_dims(
+                        kwargs["shared_dims"], self.shape
+                    )
+
+        else:
+            raise ValueError(
+                f"Unexpected number of positional arguments for class Input \n    Found {len(args)} arguments, expected either zero or a single positional arguments"
+            )
+
+        if kwargs.get("shared_dims") and self.shape_mode != Input._ShapeMode.DYNAMIC:
+            raise ValueError(
+                "shared_dims is only valid for dynamic inputs (min_shape/opt_shape/max_shape); "
+                "it has no meaning for a statically shaped Input."
+            )
+
+        if "dtype" in kwargs:
+            self.dtype = dtype._from(kwargs["dtype"])
+
+        if self.dtype != dtype.unknown:
+            self._explicit_set_dtype = True
+        else:
+            self._explicit_set_dtype = False
+
+        if "is_shape_tensor" in kwargs:
+            self.is_shape_tensor = kwargs["is_shape_tensor"]
+
+        if "format" in kwargs:
+            self.format = memory_format._from(kwargs["format"])
+
+        if "tensor_domain" in kwargs:
+            domain = kwargs["tensor_domain"]
+        else:
+            domain = None
+
+        self.tensor_domain = Input._parse_tensor_domain(domain)
+
+        if "torch_tensor" in kwargs:
+            self.torch_tensor = kwargs["torch_tensor"]
+        else:
+            if self.is_shape_tensor:
+                self.torch_tensor = torch.tensor(
+                    kwargs["opt_shape"], dtype=kwargs["dtype"]
+                )
+            elif self.shape_mode == Input._ShapeMode.DYNAMIC:
+                self.torch_tensor = self.example_tensor("opt_shape")
+            else:
+                self.torch_tensor = self.example_tensor()
+
+        if "name" in kwargs:
+            self.name = kwargs["name"]
+
+    def _init_from_profiles(self, args: Any, kwargs: Any) -> None:
+        """Validate ``profiles`` and translate them into union shape kwargs.
+
+        ``profiles`` (``kwargs["profiles"]``) is an ordered list of dicts (one per
+        profile); the list index is the TRT optimization-profile index selected at
+        runtime. Each entry has ``min_shape`` / ``opt_shape`` / ``max_shape``
+        tuples. This stores the normalized list on ``self.profiles`` and fills
+        ``kwargs`` with the elementwise union envelope (the range ``torch.export``
+        must cover), so the regular dynamic-shape path in ``__init__`` builds the
+        Input.
+
+        ``shared_dims`` is intentionally *not* mutually exclusive with
+        ``profiles``: profiles describe the per-profile TRT shape ranges, whereas
+        ``shared_dims`` names dynamic axes so they export as a single shared
+        ``torch.export.Dim`` across inputs. The two compose -- ``shared_dims`` is
+        left in ``kwargs`` and validated against the union envelope by the regular
+        dynamic-shape path (a named axis must be dynamic in the union).
+        """
+        profiles = kwargs["profiles"]
+        # ``profiles`` is the only *shape* specifier when used (``shared_dims`` is
+        # an axis-naming modifier, not a shape, so it is allowed alongside).
+        if len(args) != 0:
+            raise ValueError(
+                "Found both a positional shape argument and `profiles`. "
+                "class Input expects `profiles` to be the only shape specifier when used."
+            )
+        if any(
+            k in kwargs
+            for k in ["shape", "min_shape", "opt_shape", "max_shape", "shape_ranges"]
+        ):
+            raise ValueError(
+                "`profiles` is mutually exclusive with `shape` / `min_shape` / "
+                "`opt_shape` / `max_shape`. Specify only one shape declaration on an Input."
+            )
+        if not isinstance(profiles, (list, tuple)) or len(profiles) == 0:
+            raise ValueError(
+                "`profiles` must be a non-empty list of dicts, each with keys "
+                "'min_shape', 'opt_shape', 'max_shape'. The list index is the optimization-profile "
+                "index used to select the profile at runtime."
+            )
+
+        normalized: List[Dict[str, Tuple[int, ...]]] = []
+        rank: Optional[int] = None
+        for i, prof in enumerate(profiles):
+            if not isinstance(prof, dict) or not all(
+                k in prof for k in ("min_shape", "opt_shape", "max_shape")
+            ):
+                raise ValueError(
+                    f"Profile at index {i} must be a dict with keys 'min_shape', 'opt_shape', 'max_shape'"
+                )
+
+            for field_name in ("min_shape", "opt_shape", "max_shape"):
+                if not Input._supported_input_size_type(prof[field_name]):
+                    raise TypeError(
+                        f"Profile at index {i} field '{field_name}' must be a List, "
+                        f"tuple or torch.Size, found {type(prof[field_name])}"
+                    )
+
+            min_shape = tuple(prof["min_shape"])
+            opt_shape = tuple(prof["opt_shape"])
+            max_shape = tuple(prof["max_shape"])
+
+            if not (len(min_shape) == len(opt_shape) == len(max_shape)):
+                raise ValueError(
+                    f"Profile at index {i} min/opt/max shapes must have the same number "
+                    f"of dimensions, found {len(min_shape)}/{len(opt_shape)}/{len(max_shape)}"
+                )
+            if rank is None:
+                rank = len(min_shape)
+            elif rank != len(min_shape):
+                raise ValueError(
+                    "All profiles on an Input must have the same number of dimensions. "
+                    f"Profile at index {i} has {len(min_shape)}, expected {rank}."
+                )
+
+            for d in range(len(min_shape)):
+                # No min=0 (and TRT requires >= 1).
+                if min_shape[d] < 1:
+                    raise ValueError(
+                        f"Profile at index {i} min_shape[{d}]={min_shape[d]} is invalid; "
+                        "every dimension must have min >= 1 (min=0 is not supported)."
+                    )
+                if not (min_shape[d] <= opt_shape[d] <= max_shape[d]):
+                    raise ValueError(
+                        f"Profile at index {i} requires min <= opt <= max element-wise. "
+                        f"Got min={min_shape[d]}, opt={opt_shape[d]}, max={max_shape[d]} at dim {d}."
+                    )
+
+            normalized.append(
+                {
+                    "min_shape": min_shape,
+                    "opt_shape": opt_shape,
+                    "max_shape": max_shape,
+                }
+            )
+
+        self.profiles = normalized
+
+        # Derive the export envelope: elementwise union over every profile. opt
+        # is taken from the first declared profile (the shape export will trace /
+        # specialize at). The regular dynamic-shape path in ``__init__`` consumes
+        # these to set ``self.shape`` and ``shape_mode``.
+        assert rank is not None
+        union_min = [min(p["min_shape"][d] for p in normalized) for d in range(rank)]
+        union_max = [max(p["max_shape"][d] for p in normalized) for d in range(rank)]
+        kwargs["min_shape"] = tuple(union_min)
+        kwargs["opt_shape"] = tuple(normalized[0]["opt_shape"])
+        kwargs["max_shape"] = tuple(union_max)
+
+    def __str__(self) -> str:
+        if self.shape_mode == Input._ShapeMode.STATIC:
+            return "Input(shape={}, dtype={}, format={}, domain=[{}, {}))".format(
+                self.shape,
+                str(self.dtype),
+                str(self.format),
+                str(self.tensor_domain[0]),
+                str(self.tensor_domain[1]),
+            )
+        elif self.shape_mode == Input._ShapeMode.DYNAMIC:
+            if isinstance(self.shape, dict):
+                profiles_str = (
+                    ", profiles={}".format(
+                        [
+                            {k: tuple(v) for k, v in prof.items()}
+                            for prof in self.profiles
+                        ]
+                    )
+                    if self.profiles
+                    else ""
+                )
+                return "Input(min_shape={}, opt_shape={}, max_shape={}{}, dtype={}, format={}, domain=[{}, {}))".format(
+                    self.shape["min_shape"],
+                    self.shape["opt_shape"],
+                    self.shape["max_shape"],
+                    profiles_str,
+                    str(self.dtype),
+                    str(self.format),
+                    str(self.tensor_domain[0]),
+                    str(self.tensor_domain[1]),
+                )
+            else:
+                raise RuntimeError(
+                    f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
+                )
+        else:
+            raise RuntimeError("Unknown input shape mode")
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @staticmethod
+    def equivalent_spec(a: Input, b: Input) -> bool:
+        if a.shape_mode != b.shape_mode:
+            return False
+
+        if a.shape_mode == Input._ShapeMode.DYNAMIC:
+            assert isinstance(a.shape, dict)
+            assert isinstance(b.shape, dict)
+            checks = [
+                a.shape["min_shape"] == b.shape["min_shape"],
+                a.shape["opt_shape"] == b.shape["opt_shape"],
+                a.shape["max_shape"] == b.shape["max_shape"],
+                a.profiles == b.profiles,
+                a.dtype == b.dtype,
+                a.format == b.format,
+                a.low_tensor_domain_incl == b.low_tensor_domain_incl,
+                a.high_tensor_domain_excl == b.high_tensor_domain_excl,
+            ]
+            return all(checks)
+        else:
+            checks = [
+                a.shape == b.shape,
+                a.dtype == b.dtype,
+                a.format == b.format,
+                a.low_tensor_domain_incl == b.low_tensor_domain_incl,
+                a.high_tensor_domain_excl == b.high_tensor_domain_excl,
+            ]
+            return all(checks)
+
+    @staticmethod
+    def _parse_shared_dims(
+        shared_dims: Any, shape: Dict[str, Tuple[int, ...]]
+    ) -> Dict[int, str]:
+        """Validate and normalize the ``shared_dims`` mapping ({axis: name}).
+
+        Each named axis must be a valid index into the shape and must be
+        genuinely dynamic (``min != max``); a static axis cannot vary, so naming
+        it for cross-input sharing is a user error.
+        """
+        if not isinstance(shared_dims, dict):
+            raise TypeError(
+                f"shared_dims must be a dict of {{axis_index: name}}, got {type(shared_dims)}"
+            )
+        rank = len(shape["min_shape"])
+        parsed: Dict[int, str] = {}
+        for axis, dim_name in shared_dims.items():
+            if not isinstance(axis, int) or not (0 <= axis < rank):
+                raise ValueError(
+                    f"shared_dims key {axis!r} is not a valid axis index for an input of rank {rank}"
+                )
+            if not isinstance(dim_name, str) or not dim_name:
+                raise ValueError(
+                    f"shared_dims value for axis {axis} must be a non-empty string, got {dim_name!r}"
+                )
+            if shape["min_shape"][axis] == shape["max_shape"][axis]:
+                raise ValueError(
+                    f"Axis {axis} named '{dim_name}' is static "
+                    f"(min == max == {shape['min_shape'][axis]}); only dynamic axes can be named."
+                )
+            parsed[axis] = dim_name
+        return parsed
+
+    @staticmethod
+    def _supported_input_size_type(input_size: Any) -> bool:
+        if isinstance(input_size, torch.Size):
+            return True
+        elif isinstance(input_size, tuple):
+            return True
+        elif isinstance(input_size, list):
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def _parse_tensor_domain(
+        domain: Optional[Tuple[float, float]],
+    ) -> Tuple[float, float]:
+        """
+        Produce a tuple of integers which specifies a tensor domain in the interval format: [lo, hi)
+
+        Args:
+            domain (Tuple[int, int]): A tuple of integers (or NoneTypes) to verify
+
+        Returns:
+            A tuple of two int32_t-valid integers
+        """
+        if domain is None:
+            result_domain = (
+                Input.low_tensor_domain_incl,
+                Input.high_tensor_domain_excl,
+            )
+
+        elif len(domain) == 2:
+            domain_lo, domain_hi = domain
+
+            # Validate type and provided values for domain
+            valid_type_lo = isinstance(domain_lo, (int, float))
+            valid_type_hi = isinstance(domain_hi, (int, float))
+
+            if not valid_type_lo:
+                raise ValueError(
+                    f"Expected value for tensor domain low specifier, got {domain_lo}"
+                )
+            elif not valid_type_hi:
+                raise ValueError(
+                    f"Expected value for tensor domain high specifier, got {domain_hi}"
+                )
+
+            if domain_hi <= domain_lo:
+                raise ValueError(
+                    "Expected provided integer range to have low tensor domain value "
+                    + f"< high tensor domain value, got invalid range [{domain_lo}, {domain_hi})"
+                )
+            result_domain = (float(domain_lo), float(domain_hi))
+        else:
+            raise ValueError(
+                f"Expected 2 values for domain, got {len(domain)}: {domain}"
+            )
+
+        return result_domain
+
+    @classmethod
+    def from_tensor(
+        cls, t: torch.Tensor, disable_memory_format_check: bool = False
+    ) -> "Input":
+        """
+        Produce a Input which contains the information of the given PyTorch tensor.
+
+        Args:
+            tensor (torch.Tensor): A PyTorch tensor.
+            disable_memory_format_check (bool): Whether to validate the memory formats of input tensors
+
+        Returns:
+            A Input object.
+        """
+        if not (
+            disable_memory_format_check
+            or t.is_contiguous(memory_format=torch.contiguous_format)
+            or t.is_contiguous(memory_format=torch.channels_last)
+        ):
+            raise ValueError(
+                "Tensor does not have a supported memory format, supported formats are contiguous or channel_last"
+            )
+        frmt = (
+            torch.contiguous_format
+            if (
+                disable_memory_format_check
+                or t.is_contiguous(memory_format=torch.contiguous_format)
+            )
+            else torch.channels_last
+        )
+        return cls(shape=t.shape, dtype=t.dtype, format=frmt, torch_tensor=t)
+
+    @classmethod
+    def from_tensors(
+        cls, ts: Sequence[torch.Tensor], disable_memory_format_check: bool = False
+    ) -> List["Input"]:
+        """
+        Produce a list of Inputs which contain
+        the information of all the given PyTorch tensors.
+
+        Args:
+            tensors (Iterable[torch.Tensor]): A list of PyTorch tensors.
+            disable_memory_format_check (bool): Whether to validate the memory formats of input tensors
+
+        Returns:
+            A list of Inputs.
+        """
+
+        assert isinstance(ts, (list, tuple))
+        return [
+            cls.from_tensor(t, disable_memory_format_check=disable_memory_format_check)
+            for t in ts
+        ]
+
+    def example_tensor(
+        self, optimization_profile_field: Optional[str] = None
+    ) -> torch.Tensor:
+        """
+        Get an example tensor of the shape specified by the Input object
+
+        Args:
+            optimization_profile_field (Optional(str)): Name of the field to use for shape in the case the Input is dynamically shaped
+
+        Returns:
+            A PyTorch Tensor
+        """
+        if self.shape_mode == Input._ShapeMode.STATIC:
+            if optimization_profile_field is not None:
+                raise ValueError(
+                    "Specified a optimization profile field but the input is static"
+                )
+            else:
+                if isinstance(self.shape, tuple):
+                    return torch.rand(self.shape).to(
+                        dtype=self.dtype.to(torch.dtype, use_default=True)
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
+                    )
+        else:
+            if optimization_profile_field is not None:
+                try:
+                    assert any(
+                        optimization_profile_field == field_name
+                        for field_name in ["min_shape", "opt_shape", "max_shape"]
+                    )
+                except AssertionError:
+                    raise ValueError(
+                        "Invalid field name, expected one of min_shape, opt_shape, max_shape"
+                    )
+
+                if isinstance(self.shape, dict):
+                    return torch.rand(self.shape[optimization_profile_field]).to(
+                        dtype=self.dtype.to(torch.dtype, use_default=True)
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
+                    )
+
+            else:
+                raise ValueError(
+                    "Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."
+                )

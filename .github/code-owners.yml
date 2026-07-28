@@ -1,0 +1,133 @@
+"component: api [C++]":
+    - "narendasan"
+
+"component: api [Python]":
+    - "narendasan"
+    - "zewenli98"
+
+"component: api":
+    - "narendasan"
+
+"component: build system":
+    - "narendasan"
+    - "lanluo-nvidia"
+
+"component: conversion":
+    - "apbose"
+    - "zewenli98"
+
+"component: converters":
+    - "apbose"
+    - "zewenli98"
+
+"component: core":
+    - "narendasan"
+    - "zewenli98"
+    - "cehongwang"
+
+"component: dynamo":
+    - "narendasan"
+    - "zewenli98"
+    - "cehongwang"
+
+"component: evaluators":
+    - "zewenli98"
+    - "apbose"
+
+"component: execution":
+    - "narendasan"
+
+"component: lowering":
+    - "zewenli98"
+    - "cehongwang"
+
+"component: partitioning":
+    - "bowang007"
+    - "cehongwang"
+
+"component: plugins":
+    - "narendasan"
+    - "bowang007"
+
+"component: mgmn":
+    - "apbose"
+
+"component: quantization":
+    - "zewenli98"
+    - "lanluo-nvidia"
+
+"component: runtime":
+    - "narendasan"
+    - "cehongwang"
+
+"component: tests":
+    - "lanluo-nvidia"
+
+"component: torch_compile":
+    - "zewenli98"
+    - "narendasan"
+
+"component: torchtrtc":
+    - "narendasan"
+
+"component: dependencies":
+    # Work RE: upgrading dependencies in the compiler / testing new versions
+    - "lanluo-nvidia"
+    - "narendasan"
+
+"documentation":
+    - "narendasan"
+
+"examples":
+    # Sample applications and notebooks on how to use TorchTRT features
+    - "narendasan"
+
+"infrastructre":
+    - "narendasan"
+    - "lanluo-nvidia"
+
+"component: packaging":
+    - "narendasan"
+    - "lanluo-nvidia"
+
+"channel: NGC":
+    - "apbose"
+    - "lanluo-nvidia"
+
+"channel: linux-x86":
+    - "narendasan"
+    - "lanluo-nvidia"
+
+"channel: linux-sbsa":
+    - "narendasan"
+    - "lanluo-nvidia"
+
+"channel: windows":
+    - "lanluo-nvidia"
+
+"channel: linux-jetpack":
+    - "narendasan"
+    - "lanluo-nvidia"
+
+"component: tooling":
+    - "narendasan"
+
+"backend: tensorrt":
+    - "zewenli98"
+
+"backend: tensorrt-rtx":
+    - "lanluo-nvidia"
+
+"performance":
+    - "cehongwang"
+    - "bowang007"
+
+"channel: docker":
+    - "narendasan"
+
+"ux":
+    # Issues related to the user experience including debugging and installation
+    - "narendasan"
+
+"component: fx":
+    - "narendasan"

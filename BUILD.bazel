@@ -1,0 +1,355 @@
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+
+bool_flag(
+    name = "package_executorch",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
+config_setting(
+    name = "rtx_win",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "jetpack",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "jetpack",
+    },
+)
+
+config_setting(
+    name = "rtx_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "rtx_sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "no_package_executorch",
+    flag_values = {
+        ":package_executorch": "false",
+    },
+)
+
+pkg_tar(
+    name = "include_core",
+    package_dir = "include/torch_tensorrt",
+    deps = [
+        "//core:include",
+        "//core/conversion:include",
+        "//core/conversion/conversionctx:include",
+        "//core/conversion/converters:include",
+        "//core/conversion/evaluators:include",
+        "//core/conversion/tensorcontainer:include",
+        "//core/conversion/var:include",
+        "//core/ir:include",
+        "//core/lowering:include",
+        "//core/lowering/passes:include",
+        "//core/partitioning:include",
+        "//core/partitioning/partitioningctx:include",
+        "//core/partitioning/partitioninginfo:include",
+        "//core/partitioning/segmentedblock:include",
+        "//core/plugins:impl_include",
+        "//core/plugins:include",
+        "//core/runtime:include",
+        "//core/util:include",
+        "//core/util/logging:include",
+    ],
+)
+
+pkg_tar(
+    name = "include_rt",
+    package_dir = "include/torch_tensorrt",
+    deps = [
+        "//core/runtime:include",
+    ],
+)
+
+pkg_tar(
+    name = "include",
+    srcs = [
+        "//cpp:api_headers",
+    ],
+    package_dir = "include/torch_tensorrt/",
+)
+
+pkg_files(
+    name = "include_executorch_pkg_files",
+    srcs = [
+        "//cpp:executorch_api_headers",
+    ],
+    prefix = "include/torch_tensorrt/executorch/",
+)
+
+pkg_tar(
+    name = "include_executorch",
+    srcs = [
+        ":include_executorch_pkg_files",
+        "//core/runtime:binding_names_include_pkg_files",
+    ],
+    package_dir = "",
+)
+
+# Non-Windows tar target for lib
+pkg_tar(
+    name = "lib",
+    srcs = [
+        "//cpp/lib:libtorchtrt.so",
+        "//cpp/lib:libtorchtrt_plugins.so",
+        "//cpp/lib:libtorchtrt_runtime.so",
+    ],
+    mode = "0755",
+    package_dir = "lib/",
+)
+
+genrule(
+    name = "executorch_core_archive",
+    srcs = ["@executorch//:executorch_core"],
+    outs = ["libexecutorch_core.a"],
+    cmd = "cp $(location @executorch//:executorch_core) $@",
+)
+
+genrule(
+    name = "executorch_trt_backend_archive",
+    srcs = ["//cpp:tensorrt_executorch_backend"],
+    outs = ["libexecutorch_trt_backend.a"],
+    cmd = """
+set -e
+for f in $(locations //cpp:tensorrt_executorch_backend); do
+  case "$$f" in
+    *.lo) exec ar rcs $@ "$$f" ;;
+  esac
+done
+echo "Could not find a .lo object for //cpp:tensorrt_executorch_backend" >&2
+exit 1
+""",
+)
+
+alias(
+    name = "executorch_trt_backend",
+    actual = ":executorch_trt_backend_archive",
+)
+
+# Ship only the shared caller-stream library. The packaged reference runner
+# builds the ExecuTorch core and TensorRT backend from source (its CMake uses
+# add_subdirectory), so prebuilt .a archives are not consumed by that flow -- but
+# libextension_cuda.so must ship so the runner has a single shared caller-stream
+# TLS at runtime. Package the .so target directly so the tarball never contains a
+# static caller-stream archive.
+pkg_files(
+    name = "executorch_extension_cuda_pkg_files",
+    srcs = ["@executorch//:libextension_cuda.so"],
+    prefix = "lib/",
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "executorch_extension_cuda_lib",
+    srcs = [":executorch_extension_cuda_pkg_files"],
+    mode = "0755",
+    package_dir = "",
+)
+
+pkg_files(
+    name = "executorch_backend_source_pkg_files",
+    srcs = [
+        "//cpp:executorch_backend_source_files",
+    ],
+    prefix = "src/torch_tensorrt/executorch/",
+)
+
+pkg_files(
+    name = "executorch_backend_cmake_module_pkg_files",
+    srcs = ["cmake/Modules/FindTensorRT.cmake"],
+    prefix = "src/torch_tensorrt/executorch/cmake/Modules/",
+)
+
+pkg_files(
+    name = "executorch_reference_runner_pkg_files",
+    srcs = [
+        "//examples/executorch_reference_runner:source_files",
+    ],
+    prefix = "examples/executorch_reference_runner/",
+)
+
+pkg_tar(
+    name = "executorch_source_package",
+    srcs = [
+        ":executorch_backend_cmake_module_pkg_files",
+        ":executorch_backend_source_pkg_files",
+        ":executorch_reference_runner_pkg_files",
+    ],
+    mode = "0644",
+    package_dir = "",
+)
+
+# Non-Windows tar target for lib_rt
+pkg_tar(
+    name = "lib_rt",
+    srcs = ["//cpp/lib:libtorchtrt_runtime.so"],
+    mode = "0755",
+    package_dir = "lib/",
+)
+
+pkg_tar(
+    name = "bin",
+    srcs = ["//cpp/bin/torchtrtc"] + select({
+        ":jetpack": [],
+        ":no_package_executorch": [],
+        ":rtx_win": [],
+        ":rtx_x86_64": [],
+        ":rtx_sbsa": [],
+        ":windows": [],
+        "//conditions:default": [
+            "//examples/executorch_reference_runner:example_executorch_runner",
+        ],
+    }),
+    mode = "0755",
+    package_dir = "bin/",
+)
+
+# Windows-specific zip target
+pkg_zip(
+    name = "libtorchtrt_zip",
+    srcs = [
+        "//:LICENSE",
+        "//core:include_pkg_files",
+        "//core/plugins:impl_include_pkg_files",
+        "//core/runtime:include_pkg_files",
+        "//core/util:include_pkg_files",
+        "//core/util/logging:include_pkg_files",
+        "//cpp/lib:lib_pkg_files",
+        "//third_party/torch_tensorrt:BUILD",
+    ],
+    out = "libtorchtrt.zip",
+    package_dir = "torch_tensorrt",
+)
+
+# Main Torch-TensorRT C++ package payload.
+pkg_tar(
+    name = "torch_tensorrt_package",
+    srcs = [
+        "//:LICENSE",
+        "//third_party/torch_tensorrt:BUILD",
+    ],
+    package_dir = "torch_tensorrt",
+    deps = [
+        ":include",
+        ":include_core",
+        ":lib",
+    ] + select({
+        ":jetpack": [],
+        ":no_package_executorch": [],
+        ":rtx_win": [],
+        ":rtx_x86_64": [],
+        ":rtx_sbsa": [],
+        ":windows": [],
+        "//conditions:default": [
+            ":executorch_extension_cuda_lib",
+            ":executorch_source_package",
+            ":include_executorch",
+        ],
+    }) + select({
+        ":rtx_win": [],
+        ":windows": [],
+        "//conditions:default": [":bin"],
+    }),
+)
+
+# Combined release tarball.
+pkg_tar(
+    name = "libtorchtrt_tar",
+    out = "libtorchtrt.tar.gz",
+    extension = "tar.gz",
+    package_dir = "",
+    deps = [
+        ":torch_tensorrt_package",
+    ],
+)
+
+# Main target that selects between zip and tar based on platform
+alias(
+    name = "libtorchtrt",
+    actual = select({
+        ":rtx_win": ":libtorchtrt_zip",
+        ":windows": ":libtorchtrt_zip",
+        "//conditions:default": ":libtorchtrt_tar",
+    }),
+)
+
+# Non-Windows tar target for runtime
+pkg_tar(
+    name = "libtorchtrt_runtime_tar",
+    srcs = [
+        "//:LICENSE",
+        "//third_party/torch_tensorrt:BUILD",
+    ],
+    out = "libtorchtrt_runtime.tar.gz",
+    extension = "tar.gz",
+    package_dir = "torch_tensorrt_runtime",
+    deps = [
+        ":include_rt",
+        ":lib_rt",
+    ],
+)
+
+# Main target that selects between zip and tar based on platform
+alias(
+    name = "libtorchtrt_runtime",
+    actual = select({
+        ":rtx_win": ":libtorchtrt_runtime_zip",
+        ":windows": ":libtorchtrt_runtime_zip",
+        "//conditions:default": ":libtorchtrt_runtime_tar",
+    }),
+)
+
+# ---------------------------------------------------------------------------
+# Developer tooling
+# ---------------------------------------------------------------------------
+# Generates `compile_commands.json` at the workspace root for clangd-based
+# editors. Output is gitignored. Run on first checkout and after material
+# build-graph changes:
+#     bazel run //:refresh_compile_commands
+# See CONTRIBUTING.md ("Editor / clangd setup") for details.
+refresh_compile_commands(
+    name = "refresh_compile_commands",
+    tags = ["manual"],
+    targets = [
+        "//core/...",
+        "//cpp/...",
+        "//tests/...",
+    ],
+)
