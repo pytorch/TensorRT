@@ -73,11 +73,15 @@ def _cuda_partitioner():
     return CudaPartitioner([CudaBackend.generate_method_name_compile_spec("forward")])
 
 
-def _delegate_ids(pte_path):
-    """Backend ids of every delegate in the serialized program, in order."""
+def _deserialize_program(pte_path):
     from executorch.exir._serialize._program import deserialize_pte_binary
 
-    program = deserialize_pte_binary(pte_path.read_bytes()).program
+    return deserialize_pte_binary(pte_path.read_bytes()).program
+
+
+def _delegate_ids(pte_path):
+    """Backend ids of every delegate in the serialized program, in order."""
+    program = _deserialize_program(pte_path)
     return [
         delegate.id for plan in program.execution_plan for delegate in plan.delegates
     ]
@@ -176,7 +180,11 @@ def test_weighted_partition_persists_external_data(tmp_path):
         partitioners=[_cuda_partitioner()],
     )
 
+    assert out.exists()
     delegate_ids = _delegate_ids(out)
+    assert (
+        "TensorRTBackend" in delegate_ids
+    ), f"tanh/cos were not delegated to TensorRT; delegates={delegate_ids}"
     assert (
         "CudaBackend" in delegate_ids
     ), f"the pinned mm did not route to the CUDA backend; delegates={delegate_ids}"
@@ -187,6 +195,103 @@ def test_weighted_partition_persists_external_data(tmp_path):
     assert all(
         p.stat().st_size > 0 for p in ptd_files
     ), f"external .ptd data file is empty: {ptd_files}"
+
+
+def test_multimethod_trt_export_preserves_methods(tmp_path):
+    """Independent TRT programs remain separate delegated methods after lowering."""
+    import torch_tensorrt
+
+    class Prefill(torch.nn.Module):
+        def forward(self, x):
+            return torch.cos(x)
+
+    class Decode(torch.nn.Module):
+        def forward(self, x):
+            return torch.tanh(x)
+
+    inputs = (torch.randn(16, 16, device="cuda"),)
+    programs = {}
+    source_snapshots = {}
+    for name, model in (
+        ("prefill", Prefill()),
+        ("decode", Decode()),
+    ):
+        exported = torch.export.export(model.eval().to("cuda"), inputs)
+        trt_gm = torch_tensorrt.dynamo.compile(
+            exported,
+            inputs=list(inputs),
+            min_block_size=1,
+            truncate_double=True,
+        )
+        program = torch_tensorrt.dynamo._exporter.export(
+            trt_gm,
+            arg_inputs=inputs,
+            use_legacy_exporter=False,
+        )
+        programs[name] = program
+        source_snapshots[name] = (
+            program.graph_module.code,
+            tuple(program.state_dict),
+            tuple(program.constants),
+            tuple(node.target for node in program.graph.nodes),
+        )
+
+    edge = torch_tensorrt.executorch.export(programs)
+    out = tmp_path / "multimethod_trt.pte"
+    with out.open("wb") as output:
+        edge.to_executorch().write_to_file(output)
+
+    execution_plans = _deserialize_program(out).execution_plan
+    assert {plan.name for plan in execution_plans} == {"prefill", "decode"}
+    assert all(
+        any(delegate.id == "TensorRTBackend" for delegate in plan.delegates)
+        for plan in execution_plans
+    )
+    for name, program in programs.items():
+        assert source_snapshots[name] == (
+            program.graph_module.code,
+            tuple(program.state_dict),
+            tuple(program.constants),
+            tuple(node.target for node in program.graph.nodes),
+        )
+        assert not any(key.startswith("_trt_engine_") for key in program.state_dict)
+
+
+def test_graph_module_export_preserves_source(tmp_path):
+    import torch_tensorrt
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return torch.cos(torch.tanh(x))
+
+    inputs = (torch.randn(16, 16, device="cuda"),)
+    exported = torch.export.export(Model().eval().to("cuda"), inputs)
+    trt_gm = torch_tensorrt.dynamo.compile(
+        exported,
+        inputs=list(inputs),
+        min_block_size=1,
+        truncate_double=True,
+    )
+    source_code = trt_gm.code
+    source_state = tuple(trt_gm.state_dict())
+    source_attrs = tuple(name for name, _ in trt_gm.named_modules())
+
+    edge = torch_tensorrt.executorch.export(
+        trt_gm,
+        arg_inputs=inputs,
+        retrace=False,
+    )
+    out = tmp_path / "graph_module_trt.pte"
+    with out.open("wb") as output:
+        edge.to_executorch().write_to_file(output)
+
+    assert "TensorRTBackend" in _delegate_ids(out)
+    assert trt_gm.code == source_code
+    assert tuple(trt_gm.state_dict()) == source_state
+    assert tuple(name for name, _ in trt_gm.named_modules()) == source_attrs
+    assert not any(
+        name.startswith("_trt_engine_") for name, _ in trt_gm.named_buffers()
+    )
 
 
 def test_trt_only_writes_no_ptd(tmp_path):

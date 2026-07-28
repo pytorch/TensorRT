@@ -13,7 +13,12 @@ from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
 
 @pytest.mark.unit
 def test_lazy_import_error_when_executorch_missing(monkeypatch):
+    import torch_tensorrt
+
     original_module = sys.modules.pop("torch_tensorrt.executorch", None)
+    original_attribute = getattr(torch_tensorrt, "executorch", None)
+    if hasattr(torch_tensorrt, "executorch"):
+        delattr(torch_tensorrt, "executorch")
     original_find_spec = importlib.util.find_spec
 
     def fake_find_spec(name, package=None):
@@ -30,6 +35,10 @@ def test_lazy_import_error_when_executorch_missing(monkeypatch):
     sys.modules.pop("torch_tensorrt.executorch", None)
     if original_module is not None:
         sys.modules["torch_tensorrt.executorch"] = original_module
+    if original_attribute is not None:
+        torch_tensorrt.executorch = original_attribute
+    elif hasattr(torch_tensorrt, "executorch"):
+        delattr(torch_tensorrt, "executorch")
 
 
 @pytest.mark.unit
@@ -59,6 +68,8 @@ def test_public_api_symbols_present():
     assert "get_edge_compile_config" in module.__all__
     assert "TensorRTPartitioner" in module.__all__
     assert "TensorRTBackend" in module.__all__
+    assert "export" in module.__all__
+    assert "to_executorch" not in module.__all__
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
