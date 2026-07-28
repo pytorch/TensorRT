@@ -168,14 +168,24 @@ order (pointers as ``*<dtype>``, scalars as the bare dtype) and
 Because the launch is built from symbolic shape expressions, ``triton_op``
 supports dynamic shapes by default.  Pass ``eager_fn`` to also give the op
 a CUDA implementation outside TensorRT, or ``aot_fn`` to replace the
-derived launch entirely.
+derived launch entirely.  ``num_warps`` and ``num_stages`` are forwarded to
+``triton.compile``; ``num_warps`` also sets the launch's threads-per-block.
+
+The calling convention is enforced at registration time, because violating
+it does not fail loudly — the kernel would read whatever TensorRT happened
+to place in those argument slots.  :func:`triton_op` raises
+:class:`ValueError` if ``signature`` begins or ends with a scalar,
+interleaves scalars between pointers, disagrees with ``meta_fn``'s arity,
+or declares scalars without an ``extra_args_fn`` to supply them.
 
 .. note::
 
    A ``triton_op`` registration compiles a single PTX for the given
-   ``signature`` and ``constexprs``, so runtime input dtypes must match
-   the compiled ones.  Multi-config autotuning and dtype specialization
-   are not yet supported.
+   ``signature`` and ``constexprs``.  Inputs or outputs whose dtypes differ
+   from the compiled ones are detected during conversion: the op is left
+   out of the engine and runs in PyTorch, with a warning naming the
+   mismatch.  Register a second op if you need a second dtype —
+   multi-config autotuning and dtype specialization are not yet supported.
 
    Triton emits PTX at the ISA version of its own bundled ``ptxas``, which
    can be newer than the installed CUDA driver accepts.  ``triton_op``

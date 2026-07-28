@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional, Union, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, get_type_hints
 
 import torch
 
@@ -59,31 +59,63 @@ _TORCH_TYPE_TO_SCHEMA = {
 }
 
 
-def _infer_schema(fn: Callable[..., Any]) -> str:
-    """Derive a TorchScript schema like '(Tensor x, int n) -> Tensor' from type hints."""
+def _schema_parts(fn: Callable[..., Any]) -> Tuple[List[Tuple[str, str]], List[str]]:
+    """``([(schema type, arg name)], [return schema types])`` from a fn's hints.
+
+    The single reader of those hints, so a schema built from them and an arity
+    counted from them cannot drift apart.
+    """
     try:
         hints = get_type_hints(fn)
     except Exception:
         hints = {}
 
-    params = list(inspect.signature(fn).parameters.keys())
-    args_str = ", ".join(
-        "{} {}".format(
-            _TORCH_TYPE_TO_SCHEMA.get(hints.get(p, torch.Tensor), "Tensor"), p
-        )
-        for p in params
-    )
+    args = [
+        (_TORCH_TYPE_TO_SCHEMA.get(hints.get(name, torch.Tensor), "Tensor"), name)
+        for name in inspect.signature(fn).parameters
+    ]
 
     ret = hints.get("return", torch.Tensor)
-    origin = getattr(ret, "__origin__", None)
-    if origin is tuple:
-        ret_str = "({})".format(
-            ", ".join(_TORCH_TYPE_TO_SCHEMA.get(t, "Tensor") for t in ret.__args__)
-        )
+    if getattr(ret, "__origin__", None) is tuple:
+        returns = [_TORCH_TYPE_TO_SCHEMA.get(t, "Tensor") for t in ret.__args__]
     else:
-        ret_str = _TORCH_TYPE_TO_SCHEMA.get(ret, "Tensor")
+        returns = [_TORCH_TYPE_TO_SCHEMA.get(ret, "Tensor")]
+    return args, returns
 
+
+def _infer_schema(fn: Callable[..., Any]) -> str:
+    """Derive a TorchScript schema like '(Tensor x, int n) -> Tensor' from type hints."""
+    args, returns = _schema_parts(fn)
+    args_str = ", ".join(f"{schema_type} {name}" for schema_type, name in args)
+    ret_str = returns[0] if len(returns) == 1 else "({})".format(", ".join(returns))
     return f"({args_str}) -> {ret_str}"
+
+
+def tensor_arity(
+    meta_fn: Callable[..., Any], schema: Optional[str] = None
+) -> Optional[Tuple[int, int]]:
+    """``(tensor inputs, outputs)`` of the op that will actually be registered.
+
+    Reads an explicit ``schema`` when one is given, since that is what reaches
+    the dispatcher, and otherwise the same hints :func:`_infer_schema` reads.
+    Returns ``None`` when neither can be interpreted, so callers skip an arity
+    cross-check rather than reject an op over an unreadable annotation.
+    """
+    try:
+        if schema is not None:
+            parsed = torch._C.parse_schema(f"_ttk::_probe{schema}")
+            tensor_type = torch._C.TensorType.get()
+            num_inputs = sum(
+                1 for arg in parsed.arguments if arg.type.isSubtypeOf(tensor_type)
+            )
+            return num_inputs, len(parsed.returns)
+        args, returns = _schema_parts(meta_fn)
+        return sum(1 for schema_type, _ in args if schema_type == "Tensor"), len(
+            returns
+        )
+    except Exception as exc:
+        _LOGGER.debug("Could not determine tensor arity: %s", exc)
+        return None
 
 
 def _torch_op_already_registered(op_name: str) -> bool:
@@ -297,7 +329,3 @@ def register_qdp_plugin(
     )
 
     _LOGGER.info("QDP plugin '%s' registered successfully", op_name)
-
-
-# Back-compat alias: ``cuda_kernel_op`` / ``ptx_op`` call this name.
-register_cuda_python_plugin = register_qdp_plugin
