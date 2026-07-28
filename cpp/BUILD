@@ -25,6 +25,17 @@ config_setting(
 )
 
 config_setting(
+    name = "rtx_sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
     name = "sbsa",
     constraint_values = [
         "@platforms//cpu:aarch64",

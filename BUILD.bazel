@@ -47,6 +47,17 @@ config_setting(
 )
 
 config_setting(
+    name = "rtx_sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
     name = "no_package_executorch",
     flag_values = {
         ":package_executorch": "false",
@@ -217,6 +228,7 @@ pkg_tar(
         ":no_package_executorch": [],
         ":rtx_win": [],
         ":rtx_x86_64": [],
+        ":rtx_sbsa": [],
         ":windows": [],
         "//conditions:default": [
             "//examples/executorch_reference_runner:example_executorch_runner",
@@ -260,6 +272,7 @@ pkg_tar(
         ":no_package_executorch": [],
         ":rtx_win": [],
         ":rtx_x86_64": [],
+        ":rtx_sbsa": [],
         ":windows": [],
         "//conditions:default": [
             ":executorch_source_package",

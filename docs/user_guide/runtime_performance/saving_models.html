@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=71a86b84"></script>
+    <script src="../../_static/documentation_options.js?v=d6f7fb66"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -545,6 +545,7 @@ specifying the <cite>output_format</cite> flag. Here are the options <cite>outpu
 <li><p><cite>exported_program</cite> : This is the default. We perform transformations on the graphmodule first and use <cite>torch.export.save</cite> to save the module.</p></li>
 <li><p><cite>torchscript</cite> : We trace the graphmodule via <cite>torch.jit.trace</cite> and save it via <cite>torch.jit.save</cite>.</p></li>
 <li><p><cite>PT2 Format</cite> : This is a next generation runtime for PyTorch models, allowing them to run in Python and in C++</p></li>
+<li><p><cite>executorch</cite> : We lower the graphmodule to an ExecuTorch <code class="docutils literal notranslate"><span class="pre">.pte</span></code> program, delegating the TensorRT engines to the ExecuTorch backend. Linux-only; requires the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> package.</p></li>
 </ul>
 <section id="a-exportedprogram">
 <h3>a) ExportedProgram<a class="headerlink" href="#a-exportedprogram" title="Link to this heading">#</a></h3>
@@ -719,6 +720,55 @@ can be loaded in Python or C++ without a Torch-TensorRT runtime dependency.</p>
 <p>For dynamic shapes, C++ deployment, and a full comparison with the ExportedProgram format,
 see <a class="reference internal" href="aot_inductor.html#aot-inductor"><span class="std std-ref">AOTInductor Deployment</span></a>.</p>
 </section>
+<section id="c-executorch-pte">
+<span id="executorch-save"></span><h3>c) ExecuTorch (.pte)<a class="headerlink" href="#c-executorch-pte" title="Link to this heading">#</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">executorch</span></code> output format lowers the compiled module to an ExecuTorch
+<code class="docutils literal notranslate"><span class="pre">.pte</span></code> program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
+backend. It requires the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> package (<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span>
+<span class="pre">&quot;torch_tensorrt[executorch]&quot;</span></code>) and is Linux-only.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.pte&quot;</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;executorch&quot;</span><span class="p">,</span>
+    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Coalesced TensorRT + CUDA .pte</strong></p>
+<p>To run the ops TensorRT does not take on ExecuTorch’s CUDA (AOTInductor) backend
+instead of leaving them non-delegated, pass a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> via
+<code class="docutils literal notranslate"><span class="pre">partitioners=</span></code>. It is appended after the TensorRT partitioner, so TensorRT
+claims what it can and the <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> picks up the rest as a catch-all:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaBackend</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaPartitioner</span>
+
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.pte&quot;</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;executorch&quot;</span><span class="p">,</span>
+    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">partitioners</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">CudaPartitioner</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">&quot;forward&quot;</span><span class="p">)]</span>
+        <span class="p">)</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This needs ExecuTorch’s CUDA backend and a CUDA toolkit (nvcc/ptxas) at export
+time, and produces a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> that requires a CUDA runtime at load. Any external
+CUDA weights are written as <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> data file(s) next to the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>; the runtime
+must be pointed at those data files to load them.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The CUDA backend names its external weight blob per-device (e.g.
+<code class="docutils literal notranslate"><span class="pre">aoti_cuda_blob.ptd</span></code>), not per-model, so saving two different coalesced
+<code class="docutils literal notranslate"><span class="pre">.pte</span></code> into the same directory overwrites the blob and the first <code class="docutils literal notranslate"><span class="pre">.pte</span></code>
+will fail to load. Save each coalesced model into its own directory.</p>
+</div>
+</section>
 </section>
 <section id="saving-torch-compile-models">
 <h2>Saving torch.compile models<a class="headerlink" href="#saving-torch-compile-models" title="Link to this heading">#</a></h2>
@@ -846,6 +896,7 @@ serializable <code class="docutils literal notranslate"><span class="pre">torch.
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torchscript-ir">Torchscript IR</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-the-models">Loading the models</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#b-pt2-format-aotinductor">b) PT2 Format (AOTInductor)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#c-executorch-pte">c) ExecuTorch (.pte)</a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#saving-torch-compile-models">Saving torch.compile models</a></li>
