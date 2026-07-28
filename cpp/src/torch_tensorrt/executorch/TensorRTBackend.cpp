@@ -6,6 +6,7 @@
  */
 
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
+#include "EngineHandle.h"
 #include "torch_tensorrt/executorch/TensorRTBindingNames.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
@@ -51,6 +52,11 @@ using ::executorch::runtime::Span;
 namespace {
 thread_local cudaStream_t g_user_stream = nullptr;
 thread_local bool g_user_stream_set = false;
+// The profile request in effect for this thread: an exact index to pin,
+// kAutoSelectProfile, or unset (profile 0). Read by execute(), never by the
+// guard itself.
+thread_local int32_t g_profile_request = 0;
+thread_local bool g_profile_request_set = false;
 } // namespace
 
 CudaStreamGuard::CudaStreamGuard(cudaStream_t stream) : prev_stream_(g_user_stream), prev_set_(g_user_stream_set) {
@@ -61,6 +67,17 @@ CudaStreamGuard::CudaStreamGuard(cudaStream_t stream) : prev_stream_(g_user_stre
 CudaStreamGuard::~CudaStreamGuard() {
   g_user_stream = prev_stream_;
   g_user_stream_set = prev_set_;
+}
+
+OptimizationProfileGuard::OptimizationProfileGuard(int32_t profile_index)
+    : prev_index_(g_profile_request), prev_set_(g_profile_request_set) {
+  g_profile_request = profile_index;
+  g_profile_request_set = true;
+}
+
+OptimizationProfileGuard::~OptimizationProfileGuard() {
+  g_profile_request = prev_index_;
+  g_profile_request_set = prev_set_;
 }
 
 void TRTLogger::log(Severity severity, const char* msg) noexcept {
@@ -175,18 +192,74 @@ Error initialize_input_profiles(EngineHandle& handle) {
     }
   }
 
-  handle.input_profile_bounds.reserve(handle.num_inputs);
-  for (const auto& name : handle.input_binding_names) {
-    InputProfileBounds bounds;
-    bounds.min = handle.engine->getProfileShape(name.c_str(), 0, nvinfer1::OptProfileSelector::kMIN);
-    bounds.max = handle.engine->getProfileShape(name.c_str(), 0, nvinfer1::OptProfileSelector::kMAX);
-    if (bounds.min.nbDims < 0 || bounds.max.nbDims < 0) {
-      ET_LOG(Error, "TensorRTBackend::init: getProfileShape failed for input '%s'", name.c_str());
-      return Error::InvalidProgram;
-    }
-    handle.input_profile_bounds.push_back(bounds);
+  const int32_t num_profiles = handle.engine->getNbOptimizationProfiles();
+  if (num_profiles < 1) {
+    ET_LOG(Error, "TensorRTBackend::init: engine reports %d optimization profiles", num_profiles);
+    return Error::InvalidProgram;
   }
 
+  handle.profiles.bounds.resize(static_cast<size_t>(num_profiles));
+  for (int32_t p = 0; p < num_profiles; ++p) {
+    auto& bounds_for_profile = handle.profiles.bounds[static_cast<size_t>(p)];
+    bounds_for_profile.reserve(handle.num_inputs);
+    for (const auto& name : handle.input_binding_names) {
+      InputProfileBounds bounds;
+      bounds.min = handle.engine->getProfileShape(name.c_str(), p, nvinfer1::OptProfileSelector::kMIN);
+      bounds.max = handle.engine->getProfileShape(name.c_str(), p, nvinfer1::OptProfileSelector::kMAX);
+      if (bounds.min.nbDims < 0 || bounds.max.nbDims < 0) {
+        ET_LOG(Error, "TensorRTBackend::init: getProfileShape failed for input '%s' in profile %d", name.c_str(), p);
+        return Error::InvalidProgram;
+      }
+      for (int d = 0; d < bounds.min.nbDims; ++d) {
+        if (bounds.min.d[d] != bounds.max.d[d]) {
+          handle.profiles.all_inputs_static = false;
+        }
+      }
+      bounds_for_profile.push_back(bounds);
+    }
+  }
+
+  return Error::Ok;
+}
+
+// Turns this thread's guard state into the request the policy understands.
+ProfileRequest current_profile_request() {
+  if (!g_profile_request_set) {
+    return ProfileRequest::kUnset;
+  }
+  return g_profile_request == kAutoSelectProfile ? ProfileRequest::kAuto : ProfileRequest::kPinned;
+}
+
+Error validate_input_dims(const EngineHandle& handle, int32_t profile, const std::vector<nvinfer1::Dims>& input_dims) {
+  const auto& bounds = handle.profiles.bounds[static_cast<size_t>(profile)];
+  for (size_t i = 0; i < input_dims.size(); ++i) {
+    const char* name = handle.input_binding_names[i].c_str();
+    const nvinfer1::Dims& dims = input_dims[i];
+    if (dims.nbDims != bounds[i].min.nbDims) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: input '%s' rank %d does not match profile %d rank %d",
+          name,
+          dims.nbDims,
+          profile,
+          bounds[i].min.nbDims);
+      return Error::InvalidArgument;
+    }
+    for (int d = 0; d < dims.nbDims; ++d) {
+      if (dims.d[d] < bounds[i].min.d[d] || dims.d[d] > bounds[i].max.d[d]) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: input '%s' dim %d is %ld, outside profile %d bounds [%ld, %ld]",
+            name,
+            d,
+            static_cast<long>(dims.d[d]),
+            profile,
+            static_cast<long>(bounds[i].min.d[d]),
+            static_cast<long>(bounds[i].max.d[d]));
+        return Error::InvalidArgument;
+      }
+    }
+  }
   return Error::Ok;
 }
 
@@ -393,8 +466,13 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 1. Bind input shapes and addresses
+  // 1. Collect the input shapes and settle on an optimization profile
+  //
+  // TensorRT requires setOptimizationProfileAsync() to precede setInputShape()
+  // for dynamic inputs, so the shapes are gathered and the profile chosen,
+  // validated, and switched up front rather than inside the binding loop below.
   // ------------------------------------------------------------------
+  std::vector<nvinfer1::Dims> input_dims(num_inputs);
   for (size_t i = 0; i < num_inputs; ++i) {
     EValue* arg = args[i];
     TORCHTRT_ET_CHECK_NOT_NULL(arg, Error::InvalidArgument, "TensorRTBackend::execute: input %zu is not a tensor", i);
@@ -402,31 +480,56 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       ET_LOG(Error, "TensorRTBackend::execute: input %zu is not a tensor", i);
       return Error::InvalidArgument;
     }
-
-    exec_aten::Tensor et_in = arg->toTensor();
-    const std::string& name = engine->input_binding_names[i];
-    nvinfer1::Dims dims = to_trt_dims(et_in);
-    if (dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
-      ET_LOG(Error, "TensorRTBackend::execute: input '%s' rank exceeds TensorRT limit", name.c_str());
-      return Error::InvalidArgument;
-    }
-
-    const auto& bounds = engine->input_profile_bounds[i];
-    if (dims.nbDims != bounds.min.nbDims) {
+    input_dims[i] = to_trt_dims(arg->toTensor());
+    if (input_dims[i].nbDims > nvinfer1::Dims::MAX_DIMS) {
       ET_LOG(
           Error,
-          "TensorRTBackend::execute: input '%s' rank %d does not match profile rank %d",
-          name.c_str(),
-          dims.nbDims,
-          bounds.min.nbDims);
+          "TensorRTBackend::execute: input '%s' rank exceeds TensorRT limit",
+          engine->input_binding_names[i].c_str());
       return Error::InvalidArgument;
     }
-    for (int d = 0; d < dims.nbDims; ++d) {
-      if (dims.d[d] < bounds.min.d[d] || dims.d[d] > bounds.max.d[d]) {
-        ET_LOG(Error, "TensorRTBackend::execute: input '%s' dim %d is outside profile bounds", name.c_str(), d);
-        return Error::InvalidArgument;
-      }
+  }
+
+  int32_t profile = 0;
+  switch (select_profile(engine->profiles, current_profile_request(), g_profile_request, input_dims, profile)) {
+    case ProfileSelection::kOk:
+      break;
+    case ProfileSelection::kRequestedProfileUnavailable:
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: OptimizationProfileGuard requested profile %d but this engine has %d profile(s)",
+          g_profile_request,
+          engine->profiles.size());
+      return Error::InvalidArgument;
+    case ProfileSelection::kNoProfileMatchesInputs:
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: none of the engine's %d optimization profiles accept the input shapes; "
+          "fix the shapes or pin a profile with OptimizationProfileGuard",
+          engine->profiles.size());
+      return Error::InvalidArgument;
+  }
+
+  Error profile_err = validate_input_dims(*engine, profile, input_dims);
+  if (profile_err != Error::Ok) {
+    return profile_err;
+  }
+  if (profile != engine->profiles.active) {
+    if (!ctx->setOptimizationProfileAsync(profile, stream)) {
+      ET_LOG(Error, "TensorRTBackend::execute: setOptimizationProfileAsync(%d) failed", profile);
+      return Error::InvalidState;
     }
+    engine->profiles.active = profile;
+    ET_LOG(Info, "TensorRTBackend::execute: switched to optimization profile %d", profile);
+  }
+
+  // ------------------------------------------------------------------
+  // 2. Bind input shapes and addresses
+  // ------------------------------------------------------------------
+  for (size_t i = 0; i < num_inputs; ++i) {
+    exec_aten::Tensor et_in = args[i]->toTensor();
+    const std::string& name = engine->input_binding_names[i];
+    const nvinfer1::Dims& dims = input_dims[i];
 
     if (!ctx->setInputShape(name.c_str(), dims)) {
       ET_LOG(Error, "TensorRTBackend::execute: setInputShape failed for '%s'", name.c_str());
@@ -479,7 +582,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 2. Infer output shapes (requires all input shapes to be set first)
+  // 3. Infer output shapes (requires all input shapes to be set first)
   // ------------------------------------------------------------------
   {
     const int32_t io_size = engine->engine->getNbIOTensors();
@@ -492,7 +595,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 3. Bind output addresses
+  // 4. Bind output addresses
   // ExecuTorch pre-allocates output tensors at the maximum shape for
   // dynamic models.  After inferShapes() TRT knows the actual output
   // dims, so update the ExecuTorch TensorImpl's sizes before computing
@@ -566,7 +669,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 4. Enqueue inference on the current CUDA stream
+  // 5. Enqueue inference on the current CUDA stream
   // ------------------------------------------------------------------
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(

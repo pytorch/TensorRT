@@ -22,9 +22,11 @@ union of all profiles), each profile gets its own TensorRT kernel tuning, and yo
 select the active profile per call (by index, or ``"auto"``).
 
 This example compiles `google/gemma-3-1b-it
-<https://huggingface.co/google/gemma-3-1b-it>`_ **twice** -- once with a single
-profile and once with separate prefill/decode profiles -- and compares the decode
-and prefill latency of the two engines.
+<https://huggingface.co/google/gemma-3-1b-it>`_ **once** into a two-profile
+engine and then runs the same engine two ways: every call on the prefill profile
+(which accepts ``seq == 1`` as well, so it is what a conventional single-profile
+engine gives you) versus each phase on its own profile. One engine, one set of
+weights; the only difference is which profile is active when the call runs.
 
 .. note::
 
@@ -44,10 +46,9 @@ and prefill latency of the two engines.
 # Imports and Setup
 # ^^^^^^^^^^^^^^^^^^
 #
-# The HuggingFace attention path needs a TensorRT-friendly SDPA lowering. The
-# reusable LLM helpers ``register_sdpa`` (a Gemma-3-specific SDPA pass) and
-# ``export_llm`` live under ``tools/llm`` in the Torch-TensorRT repo, so we add
-# that directory to ``sys.path``.
+# ``export_llm``, a reusable helper that traces a decoder over a dynamic
+# sequence length, lives under ``tools/llm`` in the Torch-TensorRT repo, so we
+# add that directory to ``sys.path``.
 
 import sys
 import timeit
@@ -74,8 +75,10 @@ DECODE_IDX, PREFILL_IDX = 0, 1
 # ^^^^^^^^^^^^^^
 #
 # Load with ``use_cache=False`` (this example recomputes over the full sequence
-# rather than using a KV cache, which keeps the export simple) and the ``sdpa``
-# attention implementation, then register the Gemma-3 SDPA lowering pass.
+# rather than using a KV cache, which keeps the export simple). The ``sdpa``
+# attention implementation makes HuggingFace emit
+# ``scaled_dot_product_attention``, which Torch-TensorRT converts to a single
+# TensorRT attention layer.
 def load_model():
     from transformers import AutoModelForCausalLM
 
@@ -91,9 +94,6 @@ def load_model():
             .cuda()
             .to(torch.float16)
         )
-    from torchtrt_ext import register_sdpa
-
-    register_sdpa.enable_sdpa_converter(MODEL_ID, model.config)
     return model
 
 
@@ -140,38 +140,33 @@ multi_profile_inputs = [
 ]
 
 # %%
-# Export Once, Compile Twice
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Export Once, Compile Once
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-# ``export_llm`` traces the model over a dynamic ``seq`` range. We reuse the
-# exported program for both the single-profile baseline (tuned at the prefill
-# length, the conventional choice) and the multi-profile engine.
+# ``export_llm`` traces the model over a dynamic ``seq`` range, and one compile
+# turns that into one engine holding both profiles. No separate single-profile
+# build is needed for the baseline: the prefill profile already accepts
+# ``seq == 1``, so running every call on it reproduces what a single-profile
+# engine does, without a second compile or a second set of weights to keep
+# honest.
 from utils import export_llm  # noqa: E402
 
 example_ids, _ = make_inputs(PREFILL_SEQ)
 with torch.inference_mode():
     exported = export_llm(model, example_ids, min_seq_len=1, max_seq_len=MAX_SEQ)
 
+print("Compiling multi-profile engine (decode + prefill) ...")
 # ``offload_module_to_cpu`` must stay False here: it is currently incompatible
 # with the multi-profile ``Input(profiles=...)`` path (CPU/CUDA device mismatch).
-common = dict(
+trt_model = torch_tensorrt.dynamo.compile(
+    exported,
+    arg_inputs=multi_profile_inputs,
     use_fp32_acc=True,
     disable_tf32=True,
     offload_module_to_cpu=False,
     min_block_size=1,
     require_full_compilation=True,
     device=DEVICE,
-)
-
-print("Compiling single-profile engine (tuned at prefill length) ...")
-bench_ids, bench_pos = make_inputs(PREFILL_SEQ)
-trt_single = torch_tensorrt.dynamo.compile(
-    exported, inputs=[bench_ids, bench_pos], **common
-)
-
-print("Compiling multi-profile engine (decode + prefill) ...")
-trt_multi = torch_tensorrt.dynamo.compile(
-    exported, arg_inputs=multi_profile_inputs, **common
 )
 
 
@@ -194,10 +189,10 @@ with torch.inference_mode():
     ref_decode = logits(model(decode_ids, position_ids=decode_pos))
     ref_prefill = logits(model(prefill_ids, position_ids=prefill_pos))
 
-    with optimization_profile(trt_multi, DECODE_IDX):
-        trt_decode = logits(trt_multi(decode_ids, decode_pos))
-    with optimization_profile(trt_multi, PREFILL_IDX):
-        trt_prefill = logits(trt_multi(prefill_ids, prefill_pos))
+    with optimization_profile(trt_model, DECODE_IDX):
+        trt_decode = logits(trt_model(decode_ids, decode_pos))
+    with optimization_profile(trt_model, PREFILL_IDX):
+        trt_prefill = logits(trt_model(prefill_ids, prefill_pos))
 
 
 def top1_match(a, b):
@@ -212,9 +207,10 @@ print(f"prefill top-1 token match vs eager: {top1_match(trt_prefill, ref_prefill
 # Latency Comparison
 # ^^^^^^^^^^^^^^^^^^^
 #
-# Time each regime on each engine. For the multi-profile engine we pin the
-# matching profile around the loop (the realistic serving pattern). We report the
-# min over several rounds to reduce noise.
+# Decode is timed twice against the one engine: once on the prefill profile and
+# once on its own. The profile is pinned around the whole loop rather than per
+# call, which is the realistic serving pattern and keeps profile switches out of
+# the measurement. We report the min over several rounds to reduce noise.
 def benchmark(run, iters: int = 50, warmup: int = 20, rounds: int = 3) -> float:
     for _ in range(warmup):
         run()
@@ -230,28 +226,27 @@ def benchmark(run, iters: int = 50, warmup: int = 20, rounds: int = 3) -> float:
 
 
 with torch.inference_mode():
-    single_decode = benchmark(lambda: trt_single(decode_ids, decode_pos))
-    single_prefill = benchmark(lambda: trt_single(prefill_ids, prefill_pos))
-    with optimization_profile(trt_multi, DECODE_IDX):
-        multi_decode = benchmark(lambda: trt_multi(decode_ids, decode_pos))
-    with optimization_profile(trt_multi, PREFILL_IDX):
-        multi_prefill = benchmark(lambda: trt_multi(prefill_ids, prefill_pos))
+    with optimization_profile(trt_model, PREFILL_IDX):
+        decode_on_prefill = benchmark(lambda: trt_model(decode_ids, decode_pos))
+        prefill_on_prefill = benchmark(lambda: trt_model(prefill_ids, prefill_pos))
+    with optimization_profile(trt_model, DECODE_IDX):
+        decode_on_decode = benchmark(lambda: trt_model(decode_ids, decode_pos))
 
 # %%
-# Results. Decode is the win: the multi-profile engine dedicates a *static*
-# profile (``seq`` pinned to 1) to decode, so TensorRT specializes that path
-# instead of serving it from kernels tuned for the long prefill length. Prefill
-# is unchanged (both engines tune it at the same ``opt``).
+# Results. Decode is the win: the decode profile pins ``seq`` to 1, so TensorRT
+# specializes that path instead of serving it from kernels tuned for the long
+# prefill length. Prefill appears once because the decode profile does not accept
+# a 128-token input at all -- prefill has only one profile it can run on, so it
+# is the same call in both scenarios.
 print("\nPer-call latency (ms), batch=1")
-print(f"{'regime':<20}{'single-profile':>16}{'multi-profile':>16}{'speedup':>10}")
-print("-" * 62)
+print(f"{'call':<24}{'active profile':>18}{'ms':>10}")
+print("-" * 52)
+print(f"{f'decode (seq={DECODE_SEQ})':<24}{'prefill':>18}{decode_on_prefill:>10.3f}")
+print(f"{f'decode (seq={DECODE_SEQ})':<24}{'decode':>18}{decode_on_decode:>10.3f}")
+print(f"{f'prefill (seq={PREFILL_SEQ})':<24}{'prefill':>18}{prefill_on_prefill:>10.3f}")
 print(
-    f"{f'decode (seq={DECODE_SEQ})':<20}{single_decode:>16.3f}"
-    f"{multi_decode:>16.3f}{single_decode / multi_decode:>9.2f}x"
-)
-print(
-    f"{f'prefill (seq={PREFILL_SEQ})':<20}{single_prefill:>16.3f}"
-    f"{multi_prefill:>16.3f}{single_prefill / multi_prefill:>9.2f}x"
+    f"\nGiving decode its own profile: {decode_on_prefill / decode_on_decode:.2f}x "
+    f"faster per token ({decode_on_prefill - decode_on_decode:+.3f} ms)"
 )
 
 # %%
@@ -262,6 +257,9 @@ print(
 #   ``profiles=[{min_shape, opt_shape, max_shape}, ...]``
 #   (one per dynamic model input -- here ``input_ids`` and ``position_ids``).
 # - One export + one engine; each profile gets its own TensorRT kernel tuning.
+# - A profile whose range covers the other regime doubles as the baseline:
+#   pinning every call to the prefill profile shows what a single-profile engine
+#   would do, with no second compile and no second set of weights.
 # - Select at runtime by **index** (``optimization_profile(m, i)``) or let
 #   ``"auto"`` pick the first profile that fits the input shapes.
 # - Dedicating a static ``seq == 1`` profile to decode lets TensorRT tune that

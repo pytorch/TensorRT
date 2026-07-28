@@ -1,7 +1,13 @@
 # Torch-TensorRT ExecuTorch Reference Runner
 
-This directory contains a minimal C++ reference runner for loading and executing
-Torch-TensorRT compiled models saved in ExecuTorch `.pte` format.
+This directory contains minimal C++ reference runners for loading and
+executing Torch-TensorRT compiled models saved in ExecuTorch `.pte` format:
+
+| Target | Shows |
+| ------ | ----- |
+| `example_executorch_runner` (`main.cpp`) | The low-level `Program` / `Method` loading sequence |
+| `example_executorch_multi_profile_runner` (`multi_profile_main.cpp`) | Selecting a TensorRT optimization profile per call through the high-level `Module` API |
+| `example_executorch_multi_profile_benchmark` (`multi_profile_benchmark.cpp`) | What per-call profile switching costs |
 
 The `.pte` file contains an ExecuTorch program with embedded TensorRT engine
 payloads. The runner links the TensorRT ExecuTorch backend, loads the `.pte`
@@ -17,6 +23,13 @@ You can also generate a sample `.pte` from the Torch-TensorRT source tree:
 
 ```bash
 python examples/torchtrt_executorch_example/export_static_shape.py --model_path=model.pte
+
+# Two-profile Gemma-3 engine for the multi-profile runner below. Defaults to a
+# mini Gemma-3 that needs no download and exports in about a minute, most of it
+# spent serializing the engine into the .pte. Add --weights google/gemma-3-1b-it
+# for the real 1B model -- but that .pte is 1.9 GB and serialization runs at
+# roughly 3.7 s/MB, so budget hours rather than minutes for it.
+python examples/torchtrt_executorch_example/export_multi_profile.py --model_path=model_gemma3_multi_profile.pte
 ```
 
 ## Build The Reference Runner
@@ -103,3 +116,97 @@ Loading the method initializes the TensorRT ExecuTorch backend for any
 Torch-TensorRT delegate subgraphs embedded in the `.pte`. The Python
 `torch_tensorrt` package is needed when exporting the `.pte`; it is not needed
 by this native runner at inference time.
+
+## Selecting An Optimization Profile
+
+A TensorRT engine can hold several optimization profiles: one weight set, one
+engine, several kernel tunings, each valid over a different input-shape range.
+Scope an `OptimizationProfileGuard` around the call to pick one:
+
+```cpp
+#include <torch_tensorrt/executorch/TensorRTBackend.h>
+
+using torch_tensorrt::executorch_backend::OptimizationProfileGuard;
+
+executorch::extension::Module module("model_gemma3_multi_profile.pte");
+{
+  OptimizationProfileGuard profile_guard(kPrefillProfile);
+  auto result = module.forward(prefill_inputs);
+}
+{
+  OptimizationProfileGuard profile_guard(kDecodeProfile);
+  auto result = module.forward(decode_inputs);
+}
+```
+
+The guard records an index for the calling thread and nothing else — it does not
+inspect the `Module`, `Method`, or delegate handles, and does not call TensorRT.
+Each TensorRT delegate reads it inside its own `execute()` and switches there.
+Construct it on the thread that calls `forward()`. Pass `kAutoSelectProfile`
+instead of an index to choose from the input shapes; with no guard in scope,
+every delegate runs profile 0.
+
+Build and run:
+
+```bash
+cmake --build build-executorch-reference-runner --target example_executorch_multi_profile_runner -j
+./build-executorch-reference-runner/example_executorch_multi_profile_runner \
+  --model_path=model_gemma3_multi_profile.pte
+```
+
+After the correctness walkthrough it times decode on each profile, the same
+comparison `examples/dynamo/multi_optimization_profiles.py` makes through the
+Python runtime:
+
+```
+Per-call latency (ms), batch=1
+call                        active profile        ms
+----------------------------------------------------
+decode (seq=1)                     prefill     6.415
+decode (seq=1)                      decode     4.981
+prefill (seq=128)                  prefill     8.438
+
+Giving decode its own profile: 1.29x faster per token (+1.434 ms)
+```
+
+The profile is pinned around each timing loop rather than per call, so profile
+switches stay out of the measurement. Prefill appears once because the decode
+profile does not accept a 128-token input at all — prefill has only one profile
+it can run on.
+
+### What Selecting A Profile Is Worth
+
+`multi_profile_benchmark.cpp` times the same prefill/decode loop twice against
+one engine: once with every call pinned to the prefill profile (it accepts
+`seq == 1` too, so decode runs on prefill-tuned kernels, which is what a
+single-profile engine gives you), and once with each phase pinned to its own
+profile.
+
+```bash
+cmake --build build-executorch-reference-runner --target example_executorch_multi_profile_benchmark -j
+./build-executorch-reference-runner/example_executorch_multi_profile_benchmark \
+  --model_path=model_gemma3_multi_profile.pte
+```
+
+On the real `google/gemma-3-1b-it` (exported with `--weights
+google/gemma-3-1b-it`) on an idle A40, decode is **1.29x faster** on its own
+profile (6.42 ms down to 4.97 ms per token) while a switch costs ~3.6 ms,
+charged to whichever call switches. That breaks even after about five decode
+steps. End to end, one prefill plus 16 decode steps drops from 112.0 ms to
+96.2 ms (14.1% faster), and a 64-step round from 420.6 ms to 336.2 ms (20.1%).
+
+Both numbers shrink with the model. The mini Gemma-3 exported by default is
+small enough that decode gains only 0.02 ms (1.12x) against a 0.48 ms switch, so
+it takes ~46 decode steps to break even and a 16-step round is actually 4-5%
+slower with switching. Use it to exercise the API, and `--weights` to see what
+the feature is worth.
+
+When comparing wall-clock rounds, keep blocks long (`--block_rounds=8`). With
+short blocks the prefill-only configuration inherits the decode profile from the
+preceding switching block and pays a switch it would never pay in production,
+which inflates switching's margin.
+
+Read the `min` and `p10` columns. The two configurations are interleaved in
+short blocks so that other tenants on the GPU perturb both equally, and since
+interference only ever adds time, the low percentiles are the signal; the median
+and `p90` tell you how busy the machine was, not what switching cost.
