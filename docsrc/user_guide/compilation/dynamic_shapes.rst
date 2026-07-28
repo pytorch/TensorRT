@@ -121,6 +121,44 @@ can be shared simultaneously with ``shared_dims={0: "B", 1: "S"}``.
 
 See the full runnable example: :ref:`shared_dynamic_dims`.
 
+Namedtuple Shorthand for Shared Dims
+-------------------------------------
+
+Passing a ``namedtuple`` as ``min_shape`` / ``opt_shape`` / ``max_shape`` is a
+shorthand for the ``shared_dims`` pattern above.  Field names become axis names
+automatically — no ``shared_dims`` kwarg required.  Dynamic axes (``min != max``)
+with the same field name across inputs are exported as one shared
+``torch.export.Dim``; static axes (``min == max``) are ignored.
+
+.. code-block:: python
+
+    from collections import namedtuple
+    import torch
+    import torch_tensorrt
+
+    model = MyHFEncoder().eval().cuda()
+
+    S = namedtuple("shape", ["batch", "seq"])
+
+    inputs = [
+        torch_tensorrt.Input(
+            min_shape=S(1, 16), opt_shape=S(4, 16), max_shape=S(8, 16),
+            dtype=torch.int64, name="input_ids",
+        ),
+        torch_tensorrt.Input(
+            min_shape=S(1, 16), opt_shape=S(4, 16), max_shape=S(8, 16),
+            dtype=torch.int64, name="attention_mask",
+        ),
+    ]
+    # "batch" is dynamic (1→8) on both inputs → one shared Dim("batch")
+    # "seq"   is static  (16==16)             → no Dim needed
+
+    trt_model = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
+
+This is equivalent to passing ``shared_dims={0: "batch"}`` on each input
+individually.  The two styles cannot be combined on the same ``Input`` — use
+one or the other.
+
 Dynamic shapes using torch.compile (JIT)
 ------------------------------------
 

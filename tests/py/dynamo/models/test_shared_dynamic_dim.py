@@ -17,6 +17,7 @@ call site.
 """
 
 import unittest
+from collections import namedtuple
 
 import pytest
 import torch
@@ -255,8 +256,6 @@ def test_default_path_unchanged_for_static_inputs():
 #   input_shape2 = namedtuple('S', ['c', 'seq'])
 #   Both have field 'c' → one shared Dim("c").
 
-from collections import namedtuple
-
 
 @pytest.mark.unit
 @pytest.mark.critical
@@ -303,6 +302,54 @@ def test_namedtuple_shared_batch_positional_inputs():
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
             f"namedtuple shared batch (positional) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_namedtuple_shared_batch_kwarg_inputs():
+    """Namedtuple field 'batch' shared across two kwarg inputs — exercises the
+    kwarg_inputs → build_dim_registry path end-to-end."""
+    model = _SharedBatchEncoder().eval().cuda()
+
+    S = namedtuple("shape", ["batch", "seq"])
+
+    kwarg_inputs = {
+        "input_ids": torchtrt.Input(
+            min_shape=S(1, 16),
+            opt_shape=S(4, 16),
+            max_shape=S(4, 16),
+            dtype=torch.int64,
+            name="input_ids",
+        ),
+        "attention_mask": torchtrt.Input(
+            min_shape=S(1, 16),
+            opt_shape=S(4, 16),
+            max_shape=S(4, 16),
+            dtype=torch.int64,
+            name="attention_mask",
+        ),
+    }
+
+    trt_mod = torchtrt.compile(
+        model,
+        ir="dynamo",
+        kwarg_inputs=kwarg_inputs,
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+
+    for bs in (4, 2):
+        ids = torch.randint(0, 1024, (bs, 16), dtype=torch.int64, device="cuda")
+        mask = torch.ones((bs, 16), dtype=torch.int64, device="cuda")
+        with torch.no_grad():
+            ref = model(input_ids=ids, attention_mask=mask)
+            out = trt_mod(input_ids=ids, attention_mask=mask)
+        cos_sim = cosine_similarity(ref, out)
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            f"namedtuple shared batch (kwargs) out-of-tolerance at bs={bs}: cos_sim={cos_sim}",
         )
 
 
