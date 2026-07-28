@@ -6,28 +6,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _LOGGER = logging.getLogger(__name__)
 
-# PTX ISA versions to probe, highest first. The driver accepts a version iff it
-# is <= the toolchain the driver ships with; we cap emitted PTX to the highest
-# version the running driver actually loads.
-_PTX_VERSION_CANDIDATES: Tuple[Tuple[int, int], ...] = (
-    (9, 5),
-    (9, 4),
-    (9, 3),
-    (9, 2),
-    (9, 1),
-    (9, 0),
-    (8, 8),
-    (8, 7),
-    (8, 5),
-)
-
 
 def _ptx_version_to_int(major: int, minor: int) -> int:
     """``(9, 1) -> 91`` — the integer form Triton's ``ptx_version`` option uses."""
     return major * 10 + minor
 
 
-_driver_max_ptx: Optional[Tuple[int, int]] = None
+_driver_max_ptx: Optional[int] = None
 _driver_max_ptx_probed = False
 
 
@@ -78,14 +63,15 @@ def _strip_trailing_scratch_params(ptx: str, kernel_name: str, keep: int) -> str
     )
 
 
-def _driver_max_ptx_version() -> Optional[Tuple[int, int]]:
-    """Probe the highest PTX ``.version`` the running CUDA driver will load.
+def _driver_max_ptx_version() -> Optional[int]:
+    """Highest PTX ISA the running CUDA driver can load, as a ``ptx_version`` int.
 
-    A driver older than the CUDA toolkit that produced the PTX rejects the
-    newer ISA with ``CUDA_ERROR_UNSUPPORTED_PTX_VERSION``. We load a trivial
-    module at descending ISA versions and return the first the driver accepts.
-    The result is memoized. Returns ``None`` if probing is unavailable, in which
-    case no capping is applied.
+    A driver supports PTX up to the ISA of the CUDA toolkit it ships with, so we
+    read the driver's CUDA version (``cuDriverGetVersion``) and map it with
+    Triton's own ``ptx_get_version`` — the exact mapping Triton uses to decide
+    which ISA to emit. This avoids both a hard-coded version table and trial
+    module loads. Memoized. Returns ``None`` if it can't be determined (e.g.
+    Triton internals moved), in which case no capping is applied.
     """
     global _driver_max_ptx, _driver_max_ptx_probed
     if _driver_max_ptx_probed:
@@ -93,26 +79,14 @@ def _driver_max_ptx_version() -> Optional[Tuple[int, int]]:
     _driver_max_ptx_probed = True
     try:
         from cuda.bindings import driver as cuda
+        from triton.backends.nvidia.compiler import ptx_get_version
 
         cuda.cuInit(0)
-        dev = cuda.cuDeviceGet(0)[1]
-        ctx = cuda.cuDevicePrimaryCtxRetain(dev)[1]
-        cuda.cuCtxSetCurrent(ctx)
-        probe = (
-            "//\n.version {maj}.{minr}\n.target sm_90\n.address_size 64\n"
-            ".visible .entry _ttk_probe(){{ret;}}\n"
-        )
-        for maj, minr in _PTX_VERSION_CANDIDATES:
-            res = cuda.cuModuleLoadData(probe.format(maj=maj, minr=minr).encode())
-            if int(res[0]) == 0:
-                try:
-                    cuda.cuModuleUnload(res[1])
-                except Exception:
-                    pass
-                _driver_max_ptx = (maj, minr)
-                break
+        raw = cuda.cuDriverGetVersion()[1]  # e.g. 13010 -> CUDA 13.1
+        cuda_version = f"{raw // 1000}.{(raw % 1000) // 10}"
+        _driver_max_ptx = int(ptx_get_version(cuda_version))
     except Exception as exc:  # pragma: no cover - environment dependent
-        _LOGGER.debug("Could not probe driver PTX version: %s", exc)
+        _LOGGER.debug("Could not determine driver PTX version: %s", exc)
         _driver_max_ptx = None
     return _driver_max_ptx
 
@@ -177,38 +151,30 @@ def compile_triton_to_ptx(
     compiled = _compile()
     ptx_text: str = compiled.asm["ptx"]
 
-    # Cap the emitted PTX ISA to what the running driver supports. Triton derives
-    # the ISA from its bundled ptxas, which can be newer than the installed
-    # driver; the driver then rejects the PTX at load time with
-    # CUDA_ERROR_UNSUPPORTED_PTX_VERSION (for AOT plugins this surfaces as a TRT
-    # ``onShapeChange`` failure at engine runtime). Ask Triton to emit a lower
-    # ISA directly via ``ptx_version`` rather than rewriting the PTX text. Only
-    # lower, never raise, so we never exceed what the toolchain can assemble.
+    # Triton derives the ISA from its bundled ptxas, which can be newer than the
+    # installed driver; the driver then rejects the PTX at load time with
+    # CUDA_ERROR_UNSUPPORTED_PTX_VERSION, surfacing for AOT plugins as a TRT
+    # ``onShapeChange`` failure at engine runtime. Only lower, never raise.
     driver_max = _driver_max_ptx_version()
     emitted = _parse_ptx_version(ptx_text)
-    if driver_max is not None and emitted is not None and emitted > driver_max:
-        target = _ptx_version_to_int(*driver_max)
+    emitted_int = _ptx_version_to_int(*emitted) if emitted is not None else None
+    if driver_max is not None and emitted_int is not None and emitted_int > driver_max:
         _LOGGER.debug(
-            "PTX ISA %d.%d exceeds driver max %d.%d; recompiling '%s' with "
-            "ptx_version=%d",
-            emitted[0],
-            emitted[1],
-            driver_max[0],
-            driver_max[1],
+            "PTX ISA %d exceeds driver max %d; recompiling '%s' with ptx_version=%d",
+            emitted_int,
+            driver_max,
             kernel.__name__ if hasattr(kernel, "__name__") else "<kernel>",
-            target,
+            driver_max,
         )
-        compiled = _compile(ptx_version=target)
+        compiled = _compile(ptx_version=driver_max)
         ptx_text = compiled.asm["ptx"]
 
     kernel_name = compiled.metadata.name
     num_warps = compiled.metadata.num_warps
     shared_mem = compiled.metadata.shared
 
-    # Triton appends trailing global/profile scratch pointer params that TRT's
-    # AOT launcher does not supply. If they are zero-sized we strip them so the
-    # kernel's parameter list matches exactly what TRT passes; otherwise the
-    # kernel genuinely needs scratch the AOT QDP path cannot provide.
+    # Zero-sized scratch params are unused and safe to strip; non-zero ones mean
+    # the kernel needs scratch the AOT QDP path cannot provide.
     global_scratch = int(getattr(compiled.metadata, "global_scratch_size", 0) or 0)
     profile_scratch = int(getattr(compiled.metadata, "profile_scratch_size", 0) or 0)
     _, params = _parse_entry_params(ptx_text, kernel_name)

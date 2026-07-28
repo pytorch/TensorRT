@@ -17,19 +17,22 @@ torch_tensorrt.kernels
 Overview
 --------
 
-The ``kernels`` module registers NVRTC-compiled CUDA C++ kernels as
-TensorRT Quick Deployable Plugins. Tensor-only declarative kernels use
-Ahead-of-Time (AOT) plugin launches when available; kernels with
-``ScalarInput`` compile through TensorRT's QDP JIT path because QDP AOT
-extra arguments currently support symbolic integer expressions, not
-arbitrary runtime floats.
+The ``kernels`` module registers custom kernels — CUDA C++ compiled with
+NVRTC, or Triton — as TensorRT Quick Deployable Plugins. Tensor-only
+declarative kernels use Ahead-of-Time (AOT) plugin launches when
+available; kernels with ``ScalarInput`` compile through TensorRT's QDP JIT
+path because QDP AOT extra arguments currently support symbolic integer
+expressions, not arbitrary runtime floats.
 
-A single function — :func:`cuda_kernel_op` — handles both the declarative
-case (drive everything from a :class:`KernelSpec` dataclass) and the
-override case (supply ``meta_fn`` / ``eager_fn`` / ``aot_fn`` / ``schema``
-keyword arguments when the declarative DSL doesn't cover your kernel).
-:func:`ptx_op` is a parallel entry point for kernels that are already
-compiled to PTX bytes.
+Three entry points share one registration funnel:
+
+* :func:`cuda_kernel_op` handles both the declarative case (drive
+  everything from a :class:`KernelSpec` dataclass) and the override case
+  (supply ``meta_fn`` / ``eager_fn`` / ``aot_fn`` / ``schema`` keyword
+  arguments when the declarative DSL doesn't cover your kernel).
+* :func:`ptx_op` registers kernels that are already compiled to PTX bytes.
+* :func:`triton_op` registers a ``@triton.jit`` kernel, compiling it to
+  PTX and deriving the AOT launch for you.
 
 Entry points
 ------------
@@ -117,18 +120,87 @@ Pre-compiled PTX entry point
 
 .. autofunction:: ptx_op
 
+Triton entry point
+------------------
+
+.. autofunction:: triton_op
+
+:func:`triton_op` is the Triton analogue of :func:`cuda_kernel_op`. It
+compiles the kernel once with ``triton.compile``, then registers the
+PyTorch custom op, the TRT plugin descriptor, the AOT impl embedding the
+PTX, and the Torch-TensorRT converter — replacing the hand-written
+``@trtp.aot_impl`` boilerplate in the :ref:`aot_plugin` example::
+
+    import tensorrt.plugin as trtp
+    import torch
+    import triton
+    import triton.language as tl
+    import torch_tensorrt.kernels as ttk
+
+    @triton.jit
+    def add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):
+        pid = tl.program_id(0)
+        offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
+        mask = offsets < n_elements
+        tl.store(y_ptr + offsets, tl.load(x_ptr + offsets, mask=mask) + 1, mask=mask)
+
+    def add_one_meta(X: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(X)
+
+    ttk.triton_op(
+        "my::add_one",
+        kernel=add_one_kernel,
+        signature={"x_ptr": "*fp32", "n_elements": "i32", "y_ptr": "*fp32"},
+        constexprs={"BLOCK_SIZE": 256},
+        grid=lambda inputs, outputs: (trtp.cdiv(inputs[0].shape_expr.numel(), 256),),
+        meta_fn=add_one_meta,
+        extra_args_fn=lambda inputs, outputs: [
+            trtp.SymInt32(inputs[0].shape_expr.numel())
+        ],
+    )
+
+``signature`` lists the kernel's non-constexpr parameters in declaration
+order (pointers as ``*<dtype>``, scalars as the bare dtype) and
+``constexprs`` supplies the ``tl.constexpr`` values baked into the PTX.
+``grid`` and ``extra_args_fn`` receive ``trtp.TensorDesc`` objects, so use
+``.shape_expr`` to stay symbolic and keep one engine valid across shapes.
+
+Because the launch is built from symbolic shape expressions, ``triton_op``
+supports dynamic shapes by default.  Pass ``eager_fn`` to also give the op
+a CUDA implementation outside TensorRT, or ``aot_fn`` to replace the
+derived launch entirely.
+
+.. note::
+
+   A ``triton_op`` registration compiles a single PTX for the given
+   ``signature`` and ``constexprs``, so runtime input dtypes must match
+   the compiled ones.  Multi-config autotuning and dtype specialization
+   are not yet supported.
+
+   Triton emits PTX at the ISA version of its own bundled ``ptxas``, which
+   can be newer than the installed CUDA driver accepts.  ``triton_op``
+   detects the driver's maximum ISA and recompiles at that version when
+   needed, so the embedded PTX always loads.  It also strips Triton's
+   trailing zero-sized scratch parameters, which TensorRT's AOT launcher
+   does not supply; a kernel needing non-zero scratch cannot use the AOT
+   QDP path and raises at registration time.
+
 Kernel signature convention
 ---------------------------
 
-All entry points assume the ``__global__`` kernel takes its arguments in
-the fixed order::
+All entry points assume the kernel takes its arguments in the fixed
+order::
 
     (input_ptrs..., extras..., output_ptrs...)
 
-Pointers are ``void*`` cast to the appropriate element type.  Extras
-follow the order declared in :attr:`KernelSpec.extras` for the
-declarative path, or the order your ``aot_fn`` builds for the override
-path.
+This matches the order TensorRT passes tensor pointers and AOT extra
+arguments, so no PTX rewriting is needed.  In a CUDA C++ ``__global__``
+kernel, pointers are ``void*`` cast to the appropriate element type; in a
+Triton kernel they are the ``*<dtype>`` parameters declared in
+``signature``.  Extras follow the order declared in
+:attr:`KernelSpec.extras` for the declarative path, the order
+``extra_args_fn`` returns for :func:`triton_op`, or the order your
+``aot_fn`` builds for the override path.
 
 Error behavior
 --------------

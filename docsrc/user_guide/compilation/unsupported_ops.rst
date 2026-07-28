@@ -271,9 +271,10 @@ FAQ
 
 **"I have a Triton kernel. Can I use it in a serialized TRT engine?"**
 
-    Triton kernels can be wrapped as TRT plugins via the AOT plugin path. See
-    :ref:`aot_plugin` for an end-to-end example of compiling a Triton kernel as a
-    TRT plugin for use in a serialized engine.
+    Triton kernels can be wrapped as TRT plugins via the AOT plugin path. The
+    shortest route is ``torch_tensorrt.kernels.triton_op``, which compiles the
+    kernel and registers the op, plugin, and converter in one call — see
+    :ref:`triton_op`. :ref:`aot_plugin` shows the same thing built by hand.
 
 **"Operator X is listed as supported but my model still falls back"**
 

@@ -11,10 +11,7 @@ from torch_tensorrt.dynamo.conversion.plugins import custom_op
 from torch_tensorrt.kernels._cuda_python_spec import CudaPythonSpec
 from torch_tensorrt.kernels._triton_spec import TritonSpec
 
-# Any kernel spec that carries a compiled entry name + AOT launch function and is
-# registered from precompiled PTX. Both the NVRTC/CUDA-C++ spec and the Triton
-# spec satisfy this; source-compilation fields are only read for CudaPythonSpec
-# when no precompiled PTX is supplied.
+# Any kernel spec carrying a compiled entry name + AOT launch function.
 AOTPluginSpec = Union[CudaPythonSpec, TritonSpec]
 
 _LOGGER = logging.getLogger(__name__)
@@ -263,8 +260,6 @@ def register_qdp_plugin(
     if precompiled_ptx is not None:
         ptx = precompiled_ptx
     else:
-        # Only CudaPythonSpec carries kernel source; TritonSpec always supplies
-        # precompiled PTX, so this branch is never reached for it.
         assert isinstance(spec, CudaPythonSpec), (
             "source compilation requires a CudaPythonSpec; "
             "TritonSpec must supply precompiled_ptx"

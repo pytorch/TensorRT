@@ -33,7 +33,7 @@ import torch_tensorrt.kernels as ttk
 
 # %%
 # Step 1: Define the Triton kernel (pure Triton, unchanged from aot_plugin.py)
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 
 @triton.jit
@@ -49,7 +49,7 @@ def add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):
 
 # %%
 # Step 2: Describe the op and register it with a single ``triton_op`` call
-# -----------------------------------------------------------------------
+# ------------------------------------------------------------------------
 #
 # * ``meta_fn`` — shape/dtype inference for FakeTensors (the schema is inferred
 #   from its type hints).
@@ -87,7 +87,7 @@ ttk.triton_op(
 
 # %%
 # Step 3: Use it — the op lowers to the AOT QDP plugin inside the engine
-# ---------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 
 class AddOne(torch.nn.Module):
@@ -115,10 +115,6 @@ if __name__ == "__main__":
     )
     print("engine compiled with the AOT QDP plugin")
 
-    # triton_op caps the embedded PTX to the driver's supported ISA, so the AOT
-    # plugin loads even when the CUDA toolkit is newer than the driver. A
-    # mismatch here would indicate the kernel uses instructions newer than the
-    # driver supports — report rather than crash so the example stays usable.
     trt_out = trt_model(x)
     if torch.allclose(trt_out, ref, atol=1e-5):
         print("triton_op AOT QDP plugin ran correctly under Torch-TensorRT")
