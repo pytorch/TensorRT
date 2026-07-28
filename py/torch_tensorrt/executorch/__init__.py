@@ -32,9 +32,11 @@ if not _has_executorch_exir():
         "get_edge_compile_config",
         "TensorRTPartitioner",
         "TensorRTBackend",
+        "export",
     ]
 else:
     from torch_tensorrt.executorch.backend import TensorRTBackend
+    from torch_tensorrt.executorch.export import export
     from torch_tensorrt.executorch.partitioner import TensorRTPartitioner
 
     def get_edge_compile_config() -> "EdgeCompileConfig":
@@ -47,4 +49,5 @@ else:
         "get_edge_compile_config",
         "TensorRTPartitioner",
         "TensorRTBackend",
+        "export",
     ]
