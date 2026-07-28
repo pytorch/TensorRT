@@ -17,6 +17,11 @@ Requirements:
 * ``transformers`` to load the ViT model
 * ``torch-tensorrt>=2.13.0`` which converts attention to TRT IAttention Layer
 
+notes:
+due to the issue in the modelopt 0.45.0, we need to install the modelopt from the github repo
+pip install "git+https://github.com/NVIDIA/Model-Optimizer.git@8813b7001e5e7f2167ea8ee6c30213a4cb955e8e"
+the fix will be released in the modelopt 0.46.0
+
 """
 
 # %%
@@ -186,6 +191,8 @@ def quantize_model(model: torch.nn.Module) -> torch.nn.Module:
             "*[qkv]_bmm_quantizer": {"num_bits": (4, 3), "axis": None},
             "*softmax_quantizer": {"num_bits": (4, 3), "axis": None},
             "*bmm2_output_quantizer": {"num_bits": (4, 3), "axis": None},
+            # disable patch_embed layer due to the issue in the modelopt
+            "*patch_embed*": {"enable": False},
         },
         "algorithm": "max",
     }
