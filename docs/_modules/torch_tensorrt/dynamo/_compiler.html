@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=ab492125"></script>
+    <script src="../../../_static/documentation_options.js?v=0655e512"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -481,6 +481,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">sympy</span>
@@ -1971,6 +1972,181 @@ document.write(`
     <span class="k">return</span> <span class="n">partitioned_module</span>
 
 
+<span class="k">class</span><span class="w"> </span><span class="nc">BindingNameMismatchError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when user-supplied ``input_binding_names`` / ``output_binding_names``</span>
+<span class="sd">    don&#39;t match the exported program&#39;s pytree spec.</span>
+
+<span class="sd">    The user provides names shaped like their original ``forward()`` would</span>
+<span class="sd">    receive (for inputs) or return (for outputs).  We flatten via</span>
+<span class="sd">    ``pytree.tree_flatten`` and compare the resulting ``TreeSpec`` against</span>
+<span class="sd">    the spec the exported program already carries — they must be equal,</span>
+<span class="sd">    which guarantees a 1:1 mapping between the user&#39;s structured names and</span>
+<span class="sd">    FX&#39;s flattened placeholder / output order.  No runtime queue, no</span>
+<span class="sd">    in-band validator: spec equality up front, single flat list passed</span>
+<span class="sd">    through to the interpreter.</span>
+
+<span class="sd">    The error message shows both specs side-by-side plus a per-leaf path</span>
+<span class="sd">    listing of what each binding slot expects, so the user can read the</span>
+<span class="sd">    correct shape off the error and re-run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">role</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">expected_spec</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">provided</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">provided_spec</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;spec_mismatch&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">role</span> <span class="o">=</span> <span class="n">role</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">expected_spec</span> <span class="o">=</span> <span class="n">expected_spec</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">provided</span> <span class="o">=</span> <span class="n">provided</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">provided_spec</span> <span class="o">=</span> <span class="n">provided_spec</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reason</span> <span class="o">=</span> <span class="n">reason</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_format_message</span><span class="p">())</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_expected_leaf_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch.utils._pytree</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pytree</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">expected_spec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="c1"># Reconstruct a dummy pytree from the spec so we can walk paths via</span>
+        <span class="c1"># tree_flatten_with_path.  Each leaf carries its position description.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dummy</span> <span class="o">=</span> <span class="n">pytree</span><span class="o">.</span><span class="n">tree_unflatten</span><span class="p">(</span>
+                <span class="p">[</span><span class="nb">object</span><span class="p">()]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">expected_spec</span><span class="o">.</span><span class="n">num_leaves</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">expected_spec</span>
+            <span class="p">)</span>
+            <span class="n">paths_leaves</span> <span class="o">=</span> <span class="n">pytree</span><span class="o">.</span><span class="n">tree_flatten_with_path</span><span class="p">(</span><span class="n">dummy</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">pytree</span><span class="o">.</span><span class="n">keystr</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&lt;root&gt;&quot;</span> <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">paths_leaves</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_format_message</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">role_kw</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">role</span><span class="si">}</span><span class="s2">_binding_names&quot;</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expected_leaf_paths</span><span class="p">()</span>
+        <span class="n">expected_section</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Expected structure (from exported program &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">role</span><span class="si">}</span><span class="s2">_spec):</span><span class="se">\n</span><span class="s2">  </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">expected_spec</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="n">expected_section</span> <span class="o">+=</span> <span class="p">(</span>
+                <span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">Expected leaf positions (in FX flattening order):</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  [</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">p</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">paths</span><span class="p">))</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">reason</span> <span class="o">==</span> <span class="s2">&quot;duplicate&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">role_kw</span><span class="si">}</span><span class="s2"> contains duplicate names. Each binding name &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;must be unique.</span><span class="se">\n\n</span><span class="s2">Provided structure:</span><span class="se">\n</span><span class="s2">  </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">provided</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">reason</span> <span class="o">==</span> <span class="s2">&quot;overlap&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="s2">&quot;Provided input_binding_names and output_binding_names &quot;</span>
+                <span class="s2">&quot;share one or more names. Engine binding names must be &quot;</span>
+                <span class="s2">&quot;globally unique.</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Overlap: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">provided</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">reason</span> <span class="o">==</span> <span class="s2">&quot;non_string_leaf&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">role_kw</span><span class="si">}</span><span class="s2"> pytree leaves must all be strings.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Provided structure:</span><span class="se">\n</span><span class="s2">  </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">provided</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># spec_mismatch</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">role_kw</span><span class="si">}</span><span class="s2"> structure does not match the exported program&#39;s &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">role</span><span class="si">}</span><span class="s2">_spec.</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Provided structure:</span><span class="se">\n</span><span class="s2">  </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">provided_spec</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">expected_section</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Hint: pass a pytree of strings whose structure matches the &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;exported program&#39;s &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;(args, kwargs)&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">role</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">&#39;input&#39;</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;forward() return value&#39;</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_binding_name_specs</span><span class="p">(</span>
+    <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract (args_spec, kwargs_spec, out_spec) from an exported program.</span>
+
+<span class="sd">    ``in_spec`` on an exported program is a 2-tuple TreeSpec of</span>
+<span class="sd">    ``(args_spec, kwargs_spec)`` that mirrors how the program was traced.</span>
+<span class="sd">    We return them split so the API can validate ``arg_input_binding_names``</span>
+<span class="sd">    against args_spec and ``kwarg_input_binding_names`` against kwargs_spec</span>
+<span class="sd">    independently — matching the shape of the existing ``arg_inputs`` /</span>
+<span class="sd">    ``kwarg_inputs`` kwargs.  ``out_spec`` is the return spec.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">args_spec</span> <span class="o">=</span> <span class="n">kwargs_spec</span> <span class="o">=</span> <span class="n">out_spec</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module_call_graph</span><span class="p">:</span>
+        <span class="n">sig</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module_call_graph</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">signature</span>
+        <span class="n">in_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">sig</span><span class="p">,</span> <span class="s2">&quot;in_spec&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">out_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">sig</span><span class="p">,</span> <span class="s2">&quot;out_spec&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">in_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">args_spec</span> <span class="o">=</span> <span class="n">in_spec</span><span class="o">.</span><span class="n">child</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="n">kwargs_spec</span> <span class="o">=</span> <span class="n">in_spec</span><span class="o">.</span><span class="n">child</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+                <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">args_spec</span><span class="p">,</span> <span class="n">kwargs_spec</span><span class="p">,</span> <span class="n">out_spec</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resolve_pytree_binding_names</span><span class="p">(</span>
+    <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">role</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">expected_spec</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flatten the user&#39;s pytree of names and verify spec equality.</span>
+
+<span class="sd">    Returns the flat list of names in FX flattening order, or ``None`` when</span>
+<span class="sd">    no override was provided.  Raises :class:`BindingNameMismatchError` on</span>
+<span class="sd">    any structural / typing / duplicate problem.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch.utils._pytree</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pytree</span>
+
+    <span class="k">if</span> <span class="n">expected_spec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Exported program doesn&#39;t carry a spec for this slot — fall back</span>
+        <span class="c1"># to a plain pytree flatten with no structural validation.</span>
+        <span class="n">leaves</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">pytree</span><span class="o">.</span><span class="n">tree_flatten</span><span class="p">(</span><span class="n">user</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">leaves</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">BindingNameMismatchError</span><span class="p">(</span>
+                <span class="n">role</span><span class="o">=</span><span class="n">role</span><span class="p">,</span>
+                <span class="n">expected_spec</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">provided</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;non_string_leaf&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">leaves</span><span class="p">)</span>
+
+    <span class="n">leaves</span><span class="p">,</span> <span class="n">user_spec</span> <span class="o">=</span> <span class="n">pytree</span><span class="o">.</span><span class="n">tree_flatten</span><span class="p">(</span><span class="n">user</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">leaves</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">BindingNameMismatchError</span><span class="p">(</span>
+            <span class="n">role</span><span class="o">=</span><span class="n">role</span><span class="p">,</span>
+            <span class="n">expected_spec</span><span class="o">=</span><span class="n">expected_spec</span><span class="p">,</span>
+            <span class="n">provided</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+            <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;non_string_leaf&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user_spec</span> <span class="o">!=</span> <span class="n">expected_spec</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">BindingNameMismatchError</span><span class="p">(</span>
+            <span class="n">role</span><span class="o">=</span><span class="n">role</span><span class="p">,</span>
+            <span class="n">expected_spec</span><span class="o">=</span><span class="n">expected_spec</span><span class="p">,</span>
+            <span class="n">provided</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+            <span class="n">provided_spec</span><span class="o">=</span><span class="n">user_spec</span><span class="p">,</span>
+            <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;spec_mismatch&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">leaves</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">leaves</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">BindingNameMismatchError</span><span class="p">(</span>
+            <span class="n">role</span><span class="o">=</span><span class="n">role</span><span class="p">,</span>
+            <span class="n">expected_spec</span><span class="o">=</span><span class="n">expected_spec</span><span class="p">,</span>
+            <span class="n">provided</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+            <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;duplicate&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">leaves</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="convert_exported_program_to_serialized_trt_engine">
 <a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
@@ -2022,6 +2198,9 @@ document.write(`
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
     <span class="n">lift_mutable_buffers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">arg_input_binding_names</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_input_binding_names</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an ExportedProgram to a serialized TensorRT engine</span>
@@ -2342,12 +2521,55 @@ document.write(`
         <span class="n">exported_program</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">trt_arg_inputs</span><span class="p">),</span> <span class="n">trt_kwarg_inputs</span>
     <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 
+    <span class="c1"># Validate user-provided pytree-shaped binding names against the</span>
+    <span class="c1"># exported program&#39;s args / kwargs / output specs.  The shape of these</span>
+    <span class="c1"># kwargs mirrors arg_inputs / kwarg_inputs: caller passes a pytree of</span>
+    <span class="c1"># strings in the same shape as the values it would pass at runtime.</span>
+    <span class="c1"># Spec / typing / duplicate errors fire here before any TRT work.</span>
+    <span class="n">args_spec</span><span class="p">,</span> <span class="n">kwargs_spec</span><span class="p">,</span> <span class="n">out_spec</span> <span class="o">=</span> <span class="n">_binding_name_specs</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
+    <span class="n">arg_names</span> <span class="o">=</span> <span class="n">_resolve_pytree_binding_names</span><span class="p">(</span>
+        <span class="n">arg_input_binding_names</span><span class="p">,</span> <span class="n">role</span><span class="o">=</span><span class="s2">&quot;arg_input&quot;</span><span class="p">,</span> <span class="n">expected_spec</span><span class="o">=</span><span class="n">args_spec</span>
+    <span class="p">)</span>
+    <span class="n">kwarg_names</span> <span class="o">=</span> <span class="n">_resolve_pytree_binding_names</span><span class="p">(</span>
+        <span class="n">kwarg_input_binding_names</span><span class="p">,</span> <span class="n">role</span><span class="o">=</span><span class="s2">&quot;kwarg_input&quot;</span><span class="p">,</span> <span class="n">expected_spec</span><span class="o">=</span><span class="n">kwargs_spec</span>
+    <span class="p">)</span>
+    <span class="c1"># FX flattens placeholders in (args, kwargs) order — concatenate the</span>
+    <span class="c1"># two resolved lists in the same order to get the positional input list.</span>
+    <span class="k">if</span> <span class="n">arg_names</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">kwarg_names</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">flat_input_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">flat_input_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">arg_names</span> <span class="ow">or</span> <span class="p">[])</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">kwarg_names</span> <span class="ow">or</span> <span class="p">[])</span>
+
+    <span class="n">flat_output_names</span> <span class="o">=</span> <span class="n">_resolve_pytree_binding_names</span><span class="p">(</span>
+        <span class="n">output_binding_names</span><span class="p">,</span> <span class="n">role</span><span class="o">=</span><span class="s2">&quot;output&quot;</span><span class="p">,</span> <span class="n">expected_spec</span><span class="o">=</span><span class="n">out_spec</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">flat_input_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">flat_input_names</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">flat_input_names</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">BindingNameMismatchError</span><span class="p">(</span>
+                <span class="n">role</span><span class="o">=</span><span class="s2">&quot;input&quot;</span><span class="p">,</span>
+                <span class="n">expected_spec</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">provided</span><span class="o">=</span><span class="n">flat_input_names</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;duplicate&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+    <span class="k">if</span> <span class="n">flat_input_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">flat_output_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">overlap</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">flat_input_names</span><span class="p">)</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="n">flat_output_names</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">overlap</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">BindingNameMismatchError</span><span class="p">(</span>
+                <span class="n">role</span><span class="o">=</span><span class="s2">&quot;input&quot;</span><span class="p">,</span>
+                <span class="n">expected_spec</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">provided</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">overlap</span><span class="p">),</span>
+                <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;overlap&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
     <span class="k">try</span><span class="p">:</span>
         <span class="n">interpreter_result</span> <span class="o">=</span> <span class="n">interpret_module_to_result</span><span class="p">(</span>
             <span class="n">gm</span><span class="p">,</span>
             <span class="n">inputs</span><span class="o">=</span><span class="n">flattened_input_list</span><span class="p">,</span>
             <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
             <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
+            <span class="n">input_binding_names</span><span class="o">=</span><span class="n">flat_input_names</span><span class="p">,</span>
+            <span class="n">output_binding_names</span><span class="o">=</span><span class="n">flat_output_names</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="k">except</span> <span class="n">UnsupportedOperatorException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>

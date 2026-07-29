@@ -13,7 +13,7 @@ backend. There are two methods to compile the model with Torch-TensorRT:
 Requirements:
 
 * NVIDIA GPU with FP8 support (Hopper or newer)
-* ``nvidia-modelopt>=0.45.0`` that supports the Hugging Face quantization recipes
+* ``nvidia-modelopt`` that supports the Hugging Face quantization recipes
 * ``transformers`` to load the ViT model
 * ``torch-tensorrt>=2.13.0`` which converts attention to TRT IAttention Layer
 
@@ -176,21 +176,22 @@ def quantize_model(model: torch.nn.Module) -> torch.nn.Module:
         for batch in calibration_dataloader:
             model(batch.cuda())
 
-    recipe = load_recipe("huggingface/vit/ptq/fp8")
-    quant_cfg = recipe.quantize.model_dump()
-    # You can also define your own quant_cfg to specify which layers to quantize, like this:
-    # quant_cfg = {
-    #     "quant_cfg": {
-    #         "*": {"enable": False},
-    #         "*weight_quantizer": {"num_bits": (4, 3), "axis": None},
-    #         "*input_quantizer": {"num_bits": (4, 3), "axis": None},
-    #         "*output_quantizer": {"enable": False},
-    #         "*[qkv]_bmm_quantizer": {"num_bits": (4, 3), "axis": None},
-    #         "*softmax_quantizer": {"num_bits": (4, 3), "axis": None},
-    #         "*bmm2_output_quantizer": {"num_bits": (4, 3), "axis": None},
-    #     },
-    #     "algorithm": "max",
-    # }
+    # Define quant_cfg to specify which layers to quantize.
+    quant_cfg = {
+        "quant_cfg": {
+            "*": {"enable": False},
+            "*weight_quantizer": {"num_bits": (4, 3), "axis": None},
+            "*input_quantizer": {"num_bits": (4, 3), "axis": None},
+            "*output_quantizer": {"enable": False},
+            "*[qkv]_bmm_quantizer": {"num_bits": (4, 3), "axis": None},
+            "*softmax_quantizer": {"num_bits": (4, 3), "axis": None},
+            "*bmm2_output_quantizer": {"num_bits": (4, 3), "axis": None},
+        },
+        "algorithm": "max",
+    }
+    # You can use the following recipe if you have nvidia-modelopt >= 0.46.0
+    # recipe = load_recipe("huggingface/vit/ptq/fp8")
+    # quant_cfg = recipe.quantize.model_dump()
 
     mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
     return model
