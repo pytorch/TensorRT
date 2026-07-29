@@ -57,6 +57,33 @@ class TestInputAsOutput(TestCase):
         )
         torch._dynamo.reset()
 
+    def test_folded_constant_as_output_is_cloned(self):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.lowering.passes.repair_input_as_output import (
+            repair_input_as_output,
+        )
+
+        root = torch.nn.Module()
+        root.register_parameter(
+            "_frozen_param0",
+            torch.nn.Parameter(torch.zeros(8), requires_grad=False),
+        )
+        graph = torch.fx.Graph()
+        folded_constant = graph.get_attr("_frozen_param0")
+        graph.output((folded_constant,))
+        graph_module = torch.fx.GraphModule(root, graph)
+
+        repaired_module = repair_input_as_output(
+            graph_module, CompilationSettings()
+        )
+        first_output = repaired_module()[0]
+        first_output.add_(1)
+        second_output = repaired_module()[0]
+
+        self.assertEqual(first_output, torch.ones(8))
+        self.assertEqual(second_output, torch.zeros(8))
+        self.assertEqual(repaired_module._frozen_param0, torch.zeros(8))
+
 
 class TestLoweringPassMembership(TestCase):
     def insert_at_end(self):

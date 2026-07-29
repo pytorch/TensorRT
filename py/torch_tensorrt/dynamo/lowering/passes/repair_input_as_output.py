@@ -19,29 +19,43 @@ def repair_input_as_output(
     """
     modified_graph = False
 
-    # Extract graph placeholder Tensors
+    # Extract graph placeholder Tensors. Constant folding also turns
+    # input-independent tensor factories (for example torch.zeros) into
+    # registered `_frozen_param*` attributes. When such a value is returned
+    # across a graph break, eager code may legally mutate it in-place. Return
+    # a clone so the registered constant itself remains immutable.
     placeholders = get_tensor_placeholders(gm)
+    folded_constants = [
+        node
+        for node in gm.graph.nodes
+        if node.op == "get_attr" and str(node.target).startswith("_frozen_param")
+    ]
 
-    for placeholder in placeholders:
-        # If any placeholder has any users which are direct graph outputs
-        if len(placeholder.users) >= 1 and any(
-            user.op == "output" for user in placeholder.users
+    for source in [*placeholders, *folded_constants]:
+        # If any source has any users which are direct graph outputs
+        if len(source.users) >= 1 and any(
+            user.op == "output" for user in source.users
         ):
             modified_graph = True
 
-            # Get direct graph outputs which are direct uses of placeholders
-            direct_outputs = [user for user in placeholder.users if user.op == "output"]
+            # Get graph outputs which directly use the source
+            direct_outputs = [
+                user for user in source.users if user.op == "output"
+            ]
 
-            # Insert clone node for placeholder to ensure placeholder is not a direct output
-            with gm.graph.inserting_after(placeholders[-1]):
-                cloned_placeholder = gm.graph.call_function(
+            # Insert a clone so the source is not returned directly
+            insertion_point = (
+                placeholders[-1] if source.op == "placeholder" else source
+            )
+            with gm.graph.inserting_after(insertion_point):
+                cloned_source = gm.graph.call_function(
                     torch.ops.aten.clone.default,
-                    args=(placeholder,),
+                    args=(source,),
                 )
 
-            # Replace placeholder as output with cloned version
+            # Replace the direct output with the cloned version
             for output in direct_outputs:
-                output.replace_input_with(placeholder, cloned_placeholder)
+                output.replace_input_with(source, cloned_source)
 
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
