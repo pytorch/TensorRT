@@ -21,7 +21,14 @@ def _get_runtime() -> _Runtime:
 
 
 class Program:
-    """A loaded ExecuTorch program backed by TensorRTBackend."""
+    """A loaded ExecuTorch program backed by TensorRTBackend.
+
+    The ExecuTorch Python portable runtime executes across a CPU tensor
+    boundary: CUDA inputs are copied to CPU before dispatch and outputs are
+    returned on CPU. TensorRT still executes the delegated graph on GPU, but
+    the device-resident input/output fast path is available only through the
+    ExecuTorch C++ runner.
+    """
 
     def __init__(self, program: Any, data: bytes) -> None:
         # ExecuTorch's BufferDataLoader references this memory without copying it.
@@ -33,6 +40,12 @@ class Program:
         return cast(Collection[str], self._program.method_names)
 
     def run(self, inputs: Sequence[Any], method: str = "forward") -> Sequence[Any]:
+        """Run a method using CPU inputs and return CPU outputs.
+
+        CUDA tensor inputs are copied to CPU before entering the portable
+        Python runtime. Use the C++ runner when inputs and outputs must remain
+        device-resident.
+        """
         import torch
 
         inputs = tuple(
@@ -53,7 +66,11 @@ class Program:
 
 
 def load(path: Union[str, Path]) -> Program:
-    """Load a `.pte` with the delegate-enabled ExecuTorch Python runtime."""
+    """Load a `.pte` with the delegate-enabled ExecuTorch Python runtime.
+
+    External `.pdf` weight files are not supported; weights must be embedded
+    in the `.pte` file.
+    """
     model_path = Path(path)
     if not model_path.is_file():
         raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")

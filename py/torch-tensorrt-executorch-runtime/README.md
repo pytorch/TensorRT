@@ -51,6 +51,17 @@ by the `executorch==1.3.1` wheel.
 The static ExecuTorch and delegate archives are intermediate build inputs;
 users receive the final native Python module and do not compile anything.
 
+## Python tensor placement
+
+The ExecuTorch Python portable runtime uses CPU tensors at its API boundary.
+CUDA tensor inputs passed to `Program.run()` or `Program.forward()` are copied
+to CPU before dispatch. TensorRT executes the delegated graph on GPU, but the
+runtime copies inputs to the device and returns outputs on CPU.
+
+Consequently, the Python API does not use the backend's device-resident
+input/output fast path. Applications that need to keep inputs and outputs on
+GPU should use the ExecuTorch C++ runner.
+
 ## Use
 
 ```bash
