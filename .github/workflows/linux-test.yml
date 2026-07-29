@@ -50,7 +50,7 @@ on:
         default: false
         type: boolean
       upload-artifact:
-        description: 'Name to give artifacts uploaded from ${RUNNER_ARTIFACT_DIR}'
+        description: 'Name to give wheel artifacts uploaded from the repository dist directory'
         default: ''
         type: string
       additional-artifact:
@@ -184,23 +184,10 @@ jobs:
           display-options: fEs
           fail-on-empty: ${{ inputs.fail-on-empty }}
 
-      - name: Prepare artifacts for upload
+      - name: Check documentation for upload
         working-directory: ${{ inputs.repository }}
         id: check-artifacts
-        env:
-          UPLOAD_ARTIFACT_NAME: ${{ inputs.upload-artifact }}
         run: |
-          # Only do these steps if we actually want to upload an artifact
-          if [[ -n "${UPLOAD_ARTIFACT_NAME}" ]]; then
-            # If the default execution path is followed then we should get a wheel in the dist/ folder
-            # attempt to just grab whatever is in there and scoop it all up
-            if find "dist/" -name "*.whl" >/dev/null 2>/dev/null; then
-              mv -v dist/*.whl "${RUNNER_ARTIFACT_DIR}/"
-            fi
-            # Set to fail upload step if there are no files for upload and expected files for upload
-            echo 'if-no-files-found=error' >> "${GITHUB_OUTPUT}"
-          fi
-
           upload_docs=0
           # Check if there are things in the documentation folder to upload
           if find "${RUNNER_DOCS_DIR}" -mindepth 1 -maxdepth 1 | read -r; then
@@ -215,8 +202,8 @@ jobs:
         if: ${{ inputs.upload-artifact != '' }}
         with:
           name: ${{ inputs.upload-artifact }}
-          path: ${{ runner.temp }}/artifacts/
-          if-no-files-found: ${{ steps.check-artifacts.outputs.if-no-files-found }}
+          path: ${{ inputs.repository }}/dist/
+          if-no-files-found: error
 
       - name: Upload documentation to S3 (if any)
         uses: seemethere/upload-artifact-s3@v5
