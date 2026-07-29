@@ -21,6 +21,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
+TENSORRT_DISTRIBUTION = "tensorrt-cu13"
+CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"
 
 
 def torchtrt_version() -> str:
@@ -31,6 +33,31 @@ def torchtrt_version() -> str:
         if m := re.search(r'__version__\s*=\s*["\']([^"\']+)', version_py.read_text()):
             return m.group(1)
     return (REPO_ROOT / "version.txt").read_text().strip()
+
+
+def public_version(version: str) -> str:
+    """Drop a PEP 440 local suffix that may not be present on package indexes."""
+    return version.partition("+")[0]
+
+
+def installed_version(distribution: str) -> str:
+    """Return the version of a dependency in the native build environment."""
+    try:
+        return importlib.metadata.version(distribution)
+    except importlib.metadata.PackageNotFoundError as error:
+        raise RuntimeError(
+            f"{distribution} must be installed to build the ExecuTorch runtime wheel"
+        ) from error
+
+
+def require_cuda_13() -> None:
+    """Reject builds whose native dependencies do not use supported CUDA 13."""
+    cuda_version = torch.version.cuda
+    if cuda_version is None or not cuda_version.startswith("13."):
+        raise RuntimeError(
+            "CUDA 13-enabled PyTorch is required to build this wheel "
+            f"(found CUDA {cuda_version or 'None'})"
+        )
 
 
 class BazelExtension(Extension):
@@ -102,7 +129,10 @@ class BazelBuild(build_ext):
         shutil.copy2(built, output)
 
 
-executorch_version = importlib.metadata.version("executorch")
+require_cuda_13()
+executorch_version = installed_version("executorch")
+tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
+cuda_runtime_version = installed_version(CUDA_RUNTIME_DISTRIBUTION)
 setup(
     name="torch-tensorrt-executorch-runtime",
     version=torchtrt_version(),
@@ -115,9 +145,11 @@ setup(
     cmdclass={"build_ext": BazelBuild},
     python_requires=">=3.10",
     install_requires=[
-        f"torch=={torch.__version__}",
+        f"torch=={public_version(torch.__version__)}",
         f"executorch=={executorch_version}",
         f"torch-tensorrt=={torchtrt_version()}",
+        f"{TENSORRT_DISTRIBUTION}=={tensorrt_version}",
+        f"{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}",
     ],
     zip_safe=False,
 )
