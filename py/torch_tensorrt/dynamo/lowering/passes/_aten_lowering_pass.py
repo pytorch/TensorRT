@@ -14,6 +14,7 @@ from .annotate_fp8_sdpa import annotate_fp8_sdpa
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .force_causal_efficient_attention import force_causal_efficient_attention
+from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
@@ -38,6 +39,7 @@ post_lowering_pass_list = [
     repair_input_as_output,
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
+    fuse_pad_into_convolution,
     remove_assert_nodes,
     remove_num_users_is_0_nodes,
     complex_graph_detection,
