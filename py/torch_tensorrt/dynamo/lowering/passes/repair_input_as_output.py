@@ -52,6 +52,7 @@ def repair_input_as_output(
                     torch.ops.aten.clone.default,
                     args=(source,),
                 )
+                cloned_source.meta = source.meta.copy()
 
             # Replace the direct output with the cloned version
             for output in direct_outputs:
