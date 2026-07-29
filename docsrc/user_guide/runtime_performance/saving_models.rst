@@ -277,6 +277,29 @@ must be pointed at those data files to load them.
     ``.pte`` into the same directory overwrites the blob and the first ``.pte``
     will fail to load. Save each coalesced model into its own directory.
 
+**Running a coalesced .pte: use a single CUDA stream**
+
+A coalesced ``.pte`` runs on more than one backend delegate (the TensorRT delegate
+plus the CUDA backend). By default each backend enqueues its GPU work on its *own*
+CUDA stream, and delegate execution is asynchronous -- a delegate returns after
+*enqueuing* its work, not after it completes. Because separate CUDA streams are not
+ordered relative to one another, at a delegate boundary the consuming delegate can
+begin before the producing delegate's writes have finished, reading incomplete
+data. This is a race: it is intermittent and can surface as wrong results or an
+illegal memory access.
+
+The runtime does not impose a shared stream across delegates, so it is the
+**runner's responsibility** to run all delegates on one CUDA stream. Create a
+single stream and, for the duration of execution, direct every backend to use it
+(each backend exposes a caller-stream hook). All GPU work is then enqueued in order
+and every cross-boundary dependency is satisfied, while execution stays
+asynchronous.
+
+If the runner reads a delegate's outputs between calls (for example, an
+autoregressive decode loop), synchronize the shared stream before reading: the
+work may still be in flight when ``execute()`` returns, and a host-side copy on
+the default stream will not wait for a non-blocking stream.
+
 
 Saving torch.compile models
 -----------------------------
