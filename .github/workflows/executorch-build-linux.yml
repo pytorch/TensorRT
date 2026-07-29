@@ -60,7 +60,7 @@ jobs:
     needs: select-matrix
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: executorch-delegate-build
+      job-name: executorch-runtime-build
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
@@ -68,7 +68,7 @@ jobs:
       build-matrix: ${{ needs.select-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       fail-on-empty: false
-      upload-artifact: torch-tensorrt-executorch-delegate
+      upload-artifact: torch-tensorrt-executorch-runtime
       script: |
         set -euo pipefail
         BAZELISK_VERSION="1.26.0"
@@ -95,7 +95,7 @@ jobs:
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         python -m pip install pyyaml executorch
-        export TORCH_TENSORRT_EXECUTORCH_DELEGATE_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
+        export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
 
-        # Build the no-compile-for-users Python runtime/delegate wheel.
-        python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-delegate
+        # Build the no-compile-for-users Python runtime wheel.
+        python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime

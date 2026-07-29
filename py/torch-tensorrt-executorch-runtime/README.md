@@ -1,11 +1,30 @@
-# Torch-TensorRT ExecuTorch Delegate Wheel
+# Torch-TensorRT ExecuTorch Runtime Wheel
 
-This directory builds `torch-tensorrt-executorch-delegate`. The Linux wheel
+This directory builds `torch-tensorrt-executorch-runtime`. The Linux wheel
 contains an ExecuTorch `_portable_lib` Python runtime with `TensorRTBackend`
 force-linked into the same native module that owns the backend registry.
 
 The wheel must use the same Python, PyTorch, ExecuTorch, CUDA, TensorRT, and
 C++ ABI as its matching Torch-TensorRT wheel.
+
+## Runtime libraries
+
+The wheel does not bundle PyTorch, c10, TensorRT, or CUDA shared libraries.
+Its `_portable_lib.so` has origin-relative runtime search paths for the
+TensorRT and CUDA library locations installed by their Python packages:
+
+- `tensorrt_libs`
+- `nvidia/cuda_runtime/lib` (CUDA 12)
+- `nvidia/cu13/lib` (CUDA 13)
+
+These packages are installed transitively with the matching `torch-tensorrt`
+wheel. For a system TensorRT or CUDA installation outside these standard
+locations, its `lib` directory must be available through the system dynamic
+loader configuration or `LD_LIBRARY_PATH`.
+
+The CI manylinux repair step changes the wheel platform tag; it does not
+bundle these external libraries. The origin-relative paths are therefore part
+of the wheel runtime contract.
 
 ## Build
 
@@ -23,7 +42,7 @@ export TensorRT_ROOT=/path/to/TensorRT
 
 python -m pip install executorch==1.3.1
 python -m pip wheel --no-build-isolation --no-deps \
-  --wheel-dir dist py/torch-tensorrt-executorch-delegate
+  --wheel-dir dist py/torch-tensorrt-executorch-runtime
 ```
 
 The ExecuTorch source commit pinned in `MODULE.bazel` is the revision recorded

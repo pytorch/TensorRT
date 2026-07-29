@@ -98,8 +98,8 @@ jobs:
       use-rtx: ${{ inputs.use-rtx }}
       pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
 
-  # Standard-TRT only: ExecuTorch delegate build is not part of the RTX matrix.
-  executorch-delegate-build:
+  # Standard-TRT only: ExecuTorch runtime build is not part of the RTX matrix.
+  executorch-runtime-build:
     needs: [filter-matrix, build]
     if: ${{ !inputs.use-rtx }}
     uses: ./.github/workflows/executorch-build-linux.yml
@@ -110,9 +110,9 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
 
-  executorch-delegate-test:
-    needs: [filter-matrix, executorch-delegate-build]
-    if: ${{ !inputs.use-rtx && needs.executorch-delegate-build.result == 'success' }}
+  executorch-runtime-test:
+    needs: [filter-matrix, executorch-runtime-build]
+    if: ${{ !inputs.use-rtx && needs.executorch-runtime-build.result == 'success' }}
     uses: ./.github/workflows/executorch-test-linux.yml
     with:
       repository: "pytorch/tensorrt"
@@ -650,8 +650,8 @@ jobs:
     needs:
       [
         build,
-        executorch-delegate-build,
-        executorch-delegate-test,
+        executorch-runtime-build,
+        executorch-runtime-test,
         L0-dynamo-converter-tests,
         L0-dynamo-core-tests,
         L0-py-core-tests,

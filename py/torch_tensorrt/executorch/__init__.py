@@ -1,7 +1,7 @@
 """ExecuTorch compilation and export integration.
 
 Runtime loading is provided by the optional
-``torch-tensorrt-executorch-delegate`` distribution and dispatched through
+``torch-tensorrt-executorch-runtime`` distribution and dispatched through
 ``torch_tensorrt.load(..., format="executorch")``.
 """
 

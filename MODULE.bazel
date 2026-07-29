@@ -32,8 +32,8 @@ git_override(
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(
     module_name = "hedron_compile_commands",
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
     commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
 )
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
@@ -43,7 +43,7 @@ new_git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl"
 local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 
 # Keep this pin synchronized with the ExecuTorch release installed in
-# py/torch-tensorrt-executorch-delegate/README.md.
+# py/torch-tensorrt-executorch-runtime/README.md.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",

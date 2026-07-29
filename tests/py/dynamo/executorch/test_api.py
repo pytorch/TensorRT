@@ -57,7 +57,7 @@ def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
 def test_load_executorch_error_when_delegate_missing(monkeypatch):
     from torch_tensorrt import _compile
 
-    monkeypatch.setattr(_compile, "_has_executorch_delegate", lambda: False)
+    monkeypatch.setattr(_compile, "_has_executorch_runtime", lambda: False)
 
     with pytest.raises(ImportError, match=r"torch-tensorrt\[executorch\]"):
         _compile.load("model.pte", format="executorch")
@@ -67,14 +67,14 @@ def test_load_executorch_error_when_delegate_missing(monkeypatch):
 def test_load_executorch_dispatches_to_delegate(monkeypatch):
     from torch_tensorrt import _compile
 
-    delegate = types.ModuleType("torch_tensorrt_executorch_delegate")
+    delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
     delegate.__path__ = []
-    runtime = types.ModuleType("torch_tensorrt_executorch_delegate.runtime")
+    runtime = types.ModuleType("torch_tensorrt_executorch_runtime.runtime")
     sentinel = object()
     runtime.load = lambda path: (sentinel, path)
     monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
     monkeypatch.setitem(sys.modules, runtime.__name__, runtime)
-    monkeypatch.setattr(_compile, "_has_executorch_delegate", lambda: True)
+    monkeypatch.setattr(_compile, "_has_executorch_runtime", lambda: True)
 
     assert _compile.load("model.pte", format="executorch") == (
         sentinel,
@@ -97,13 +97,24 @@ _SETUP_PY = _REPO_ROOT / "setup.py"
 
 
 @pytest.mark.unit
-def test_runtime_implementation_is_owned_by_delegate_package():
+def test_runtime_implementation_is_owned_by_runtime_package():
     assert not (_REPO_ROOT / "py/torch_tensorrt/executorch/runtime.py").exists()
     assert (
         _REPO_ROOT
-        / "py/torch-tensorrt-executorch-delegate"
-        / "torch_tensorrt_executorch_delegate/runtime.py"
+        / "py/torch-tensorrt-executorch-runtime"
+        / "torch_tensorrt_executorch_runtime/runtime.py"
     ).is_file()
+
+
+@pytest.mark.unit
+def test_runtime_extension_has_dependency_wheel_rpaths():
+    cmake = (
+        _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+    assert "BUILD_WITH_INSTALL_RPATH ON" in cmake
+    assert "$ORIGIN/../tensorrt_libs" in cmake
+    assert "$ORIGIN/../nvidia/cuda_runtime/lib" in cmake
+    assert "$ORIGIN/../nvidia/cu13/lib" in cmake
 
 
 def _setup_tree():
@@ -144,7 +155,7 @@ def test_packaging_declares_executorch_extra():
         assert isinstance(requirements, ast.List)
         for requirement_name in (
             "EXECUTORCH_REQUIREMENT",
-            "EXECUTORCH_DELEGATE_REQUIREMENT",
+            "EXECUTORCH_RUNTIME_REQUIREMENT",
         ):
             assert any(
                 isinstance(requirement, ast.Name) and requirement.id == requirement_name
@@ -182,7 +193,7 @@ def test_executorch_is_not_base_install_requirement():
             and node.id
             in {
                 "EXECUTORCH_REQUIREMENT",
-                "EXECUTORCH_DELEGATE_REQUIREMENT",
+                "EXECUTORCH_RUNTIME_REQUIREMENT",
             }
             for node in ast.walk(function)
         )

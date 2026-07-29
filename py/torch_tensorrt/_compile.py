@@ -18,6 +18,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 
 import torch
@@ -89,11 +90,9 @@ def _has_executorch_exir() -> bool:
         return False
 
 
-def _has_executorch_delegate() -> bool:
+def _has_executorch_runtime() -> bool:
     try:
-        return (
-            importlib.util.find_spec("torch_tensorrt_executorch_delegate") is not None
-        )
+        return importlib.util.find_spec("torch_tensorrt_executorch_runtime") is not None
     except ModuleNotFoundError:
         return False
 
@@ -325,7 +324,7 @@ def compile(
                 "'arg_inputs' and 'inputs' should not be used at the same time."
             )
         if inputs is not None:
-            arg_inputs = inputs  # type: ignore[assignment]
+            arg_inputs = inputs
 
         if kwarg_inputs is None:
             kwarg_inputs = {}
@@ -424,7 +423,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs  # type: ignore[assignment]
+    arg_inputs = inputs or arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -524,7 +523,7 @@ def convert_method_to_trt_engine(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = arg_inputs or inputs  # type: ignore[assignment]
+    arg_inputs = arg_inputs or inputs
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
@@ -568,11 +567,14 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(
-            exp_program,
-            arg_inputs=tuple(normalized_arg_inputs),
-            kwarg_inputs=torchtrt_kwarg_inputs,
-            **kwargs,
+        return cast(
+            bytes,
+            dynamo_convert_exported_program_to_serialized_trt_engine(
+                exp_program,
+                arg_inputs=tuple(normalized_arg_inputs),
+                kwarg_inputs=torchtrt_kwarg_inputs,
+                **kwargs,
+            ),
         )
     elif target_ir == _IRType.torch_compile:
         raise RuntimeError(
@@ -612,7 +614,7 @@ def load(
         file_path (str): Path to file on the disk
         extra_files (dict[str, Any]): Extra files to load with the model
         format (Optional[str]): Set to ``"executorch"`` to load a ``.pte`` file
-            using the separately installed ExecuTorch delegate package.
+            using the separately installed ExecuTorch runtime package.
 
     Example:
     # Load with extra files.
@@ -621,19 +623,17 @@ def load(
         print(extra_files["foo.txt"])
 
     Raises:
-        ImportError: If ExecuTorch format is requested without the delegate package
+        ImportError: If ExecuTorch format is requested without the runtime package
         ValueError: If the format is unsupported or the file is not a TorchScript or ExportedProgram file
     """
     if format == "executorch":
-        if not _has_executorch_delegate():
+        if not _has_executorch_runtime():
             raise ImportError(
                 "Loading an ExecuTorch program requires the prebuilt "
                 "Torch-TensorRT ExecuTorch delegate. Install it with: "
                 'pip install "torch-tensorrt[executorch]"'
             )
-        from torch_tensorrt_executorch_delegate.runtime import (
-            load as load_executorch,
-        )
+        from torch_tensorrt_executorch_runtime.runtime import load as load_executorch
 
         return load_executorch(file_path)
     if format is not None:
@@ -790,7 +790,7 @@ def save(
                 CUDA ``.pte``. See :ref:`the ExecuTorch save guide
                 <executorch_save>` for the ``CudaPartitioner`` recipe, its
                 export-time requirements (CUDA backend + nvcc), and the external
-                ``.ptd`` weight caveats.
+                ``.pdf`` weight caveats.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -1370,14 +1370,14 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
 
 
 def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None:
-    """Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.
+    """Write an ExecuTorch program's external named tensor data (``.pdf``) next to the ``.pte``.
 
     The CUDA (AOTInductor) backend emits its weights as external named data
     (``save_data_externally``), which ExecuTorch serializes only via
     ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not
     persist it. So a partition that carries external weights (e.g. a
     ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not
-    load. This writes the ``.ptd`` data file(s) into the ``.pte``'s directory when
+    load. This writes the ``.pdf`` data file(s) into the ``.pte``'s directory when
     the program has any; the runtime must then be given those data file(s) (e.g.
     via the ExecuTorch ``Module`` data-files argument) to load the weights.
     """
@@ -1386,7 +1386,7 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
         out_dir = os.path.dirname(os.path.abspath(file_path))
         executorch_program.write_tensor_data_to_file(out_dir)
         logger.info(
-            "Wrote external delegate weights (.ptd) to %s; point the runtime's "
+            "Wrote external delegate weights (.pdf) to %s; point the runtime's "
             "data-files at this directory to load them.",
             out_dir,
         )

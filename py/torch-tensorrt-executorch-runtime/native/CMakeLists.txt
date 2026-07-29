@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(torch_tensorrt_executorch_delegate LANGUAGES CXX)
+project(torch_tensorrt_executorch_runtime LANGUAGES CXX)
 
 if(NOT EXECUTORCH_SOURCE_DIR AND EXECUTORCH_CMAKE_FILE)
   get_filename_component(EXECUTORCH_SOURCE_DIR "${EXECUTORCH_CMAKE_FILE}" DIRECTORY)
@@ -74,7 +74,20 @@ target_link_libraries(portable_lib PRIVATE
   "$<LINK_LIBRARY:WHOLE_ARCHIVE,torch_tensorrt_executorch_backend>"
   extension_threadpool
   CUDA::cudart TensorRT::nvinfer Threads::Threads)
+
+# The runtime wheel intentionally does not bundle PyTorch, TensorRT, or CUDA.
+# TensorRT and CUDA pip packages install their shared libraries in sibling
+# directories under site-packages, relative to this extension package.
+# Preserve these paths in both the Bazel-collected build output and installed
+# extension so importing the wheel does not depend on LD_LIBRARY_PATH.
+set(_torch_tensorrt_executorch_runtime_rpath
+  "$ORIGIN"
+  "$ORIGIN/../tensorrt_libs"
+  "$ORIGIN/../nvidia/cuda_runtime/lib"
+  "$ORIGIN/../nvidia/cu13/lib")
 set_target_properties(portable_lib PROPERTIES
+  BUILD_WITH_INSTALL_RPATH ON
+  INSTALL_RPATH "${_torch_tensorrt_executorch_runtime_rpath}"
   OUTPUT_NAME "_portable_lib"
   SUFFIX ".so")
 set_target_properties(data_loader PROPERTIES SUFFIX ".so")

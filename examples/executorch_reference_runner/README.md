@@ -96,7 +96,7 @@ python examples/executorch_reference_runner/load_model.py \
 ```
 
 The extra installs `executorch` and the matching
-`torch-tensorrt-executorch-delegate` wheel. That wheel contains an ExecuTorch
+`torch-tensorrt-executorch-runtime` wheel. That wheel contains an ExecuTorch
 Python runtime with `TensorRTBackend` linked into its backend registry.
 
 ### C++

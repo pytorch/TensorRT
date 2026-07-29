@@ -60,14 +60,14 @@ jobs:
     needs: select-matrix
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: executorch-delegate-test
+      job-name: executorch-runtime-test
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.select-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
-      additional-artifact: torch-tensorrt-executorch-delegate
+      additional-artifact: torch-tensorrt-executorch-runtime
       script: |
         set -euo pipefail
         mkdir -p "${RUNNER_TEMP}/bin"
@@ -77,7 +77,7 @@ jobs:
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
         python -m pip install pyyaml executorch
-        python -c 'from torch_tensorrt_executorch_delegate import runtime; assert runtime().backend_registry.is_available("TensorRTBackend")'
+        python -c 'from torch_tensorrt_executorch_runtime import get_runtime; assert get_runtime().backend_registry.is_available("TensorRTBackend")'
 
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch

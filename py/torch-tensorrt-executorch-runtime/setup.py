@@ -19,12 +19,12 @@ from setuptools.command.build_ext import build_ext
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
-BAZEL_TARGET = "//py/torch-tensorrt-executorch-delegate/native:delegate_native"
+BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
 
 
 def torchtrt_version() -> str:
-    if value := os.getenv("TORCH_TENSORRT_EXECUTORCH_DELEGATE_VERSION"):
+    if value := os.getenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION"):
         return value
     version_py = REPO_ROOT / "py/torch_tensorrt/_version.py"
     if version_py.exists():
@@ -93,7 +93,7 @@ class BazelBuild(build_ext):
         )
         built = (
             bazel_bin
-            / "py/torch-tensorrt-executorch-delegate/native/delegate_native/lib"
+            / "py/torch-tensorrt-executorch-runtime/native/delegate_native/lib"
             / f"{library_stem}.so"
         )
         if not built.is_file():
@@ -104,13 +104,13 @@ class BazelBuild(build_ext):
 
 executorch_version = importlib.metadata.version("executorch")
 setup(
-    name="torch-tensorrt-executorch-delegate",
+    name="torch-tensorrt-executorch-runtime",
     version=torchtrt_version(),
     description="Torch-TensorRT delegate for the ExecuTorch Python runtime",
     packages=find_packages(),
     ext_modules=[
-        BazelExtension("torch_tensorrt_executorch_delegate._portable_lib"),
-        BazelExtension("torch_tensorrt_executorch_delegate.data_loader"),
+        BazelExtension("torch_tensorrt_executorch_runtime._portable_lib"),
+        BazelExtension("torch_tensorrt_executorch_runtime.data_loader"),
     ],
     cmdclass={"build_ext": BazelBuild},
     python_requires=">=3.10",

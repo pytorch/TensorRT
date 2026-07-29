@@ -184,12 +184,12 @@ else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
 EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
-EXECUTORCH_DELEGATE_REQUIREMENT = (
-    f"torch-tensorrt-executorch-delegate=={__version__}; " "platform_system == 'Linux'"
+EXECUTORCH_RUNTIME_REQUIREMENT = (
+    f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
 )
 EXTRAS_REQUIRE = {
-    "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_DELEGATE_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_DELEGATE_REQUIREMENT],
+    "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
 }
 
 if "--ci" in sys.argv:

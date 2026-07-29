@@ -7,11 +7,11 @@ import pytest
 
 RUNTIME_PATH = (
     Path(__file__).parents[4]
-    / "py/torch-tensorrt-executorch-delegate/torch_tensorrt_executorch_delegate/runtime.py"
+    / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/runtime.py"
 )
 DELEGATE_PATH = (
     Path(__file__).parents[4]
-    / "py/torch-tensorrt-executorch-delegate/torch_tensorrt_executorch_delegate/__init__.py"
+    / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/__init__.py"
 )
 
 
@@ -54,7 +54,7 @@ class FakeRuntime:
 
 
 def test_load_and_forward(monkeypatch, tmp_path):
-    delegate = types.ModuleType("torch_tensorrt_executorch_delegate")
+    delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
     fake_runtime = FakeRuntime()
     delegate.get_runtime = lambda: fake_runtime
     monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
@@ -68,7 +68,7 @@ def test_load_and_forward(monkeypatch, tmp_path):
 
 
 def test_unknown_method(monkeypatch, tmp_path):
-    delegate = types.ModuleType("torch_tensorrt_executorch_delegate")
+    delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
     delegate.get_runtime = FakeRuntime
     monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
     model = tmp_path / "model.pte"

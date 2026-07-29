@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Sequence, Union
+from typing import TYPE_CHECKING, Any, Collection, Sequence, Union, cast
+
+if TYPE_CHECKING:
+    from torch_tensorrt_executorch_runtime import _Runtime
 
 
-def _get_runtime():
+def _get_runtime() -> _Runtime:
     try:
-        from torch_tensorrt_executorch_delegate import get_runtime
+        from torch_tensorrt_executorch_runtime import get_runtime
     except ImportError as error:
         raise ImportError(
             "ExecuTorch Python inference requires the prebuilt delegate. "
@@ -26,8 +29,8 @@ class Program:
         self._program = program
 
     @property
-    def method_names(self):
-        return self._program.method_names
+    def method_names(self) -> Collection[str]:
+        return cast(Collection[str], self._program.method_names)
 
     def run(self, inputs: Sequence[Any], method: str = "forward") -> Sequence[Any]:
         import torch
@@ -43,7 +46,7 @@ class Program:
         loaded = self._program.load_method(method)
         if loaded is None:
             raise RuntimeError(f"ExecuTorch failed to load method {method!r}")
-        return loaded.execute(inputs)
+        return cast(Sequence[Any], loaded.execute(inputs))
 
     def forward(self, *inputs: Any) -> Sequence[Any]:
         return self.run(inputs, "forward")

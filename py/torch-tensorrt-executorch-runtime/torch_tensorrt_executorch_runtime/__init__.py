@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import sys
 from types import ModuleType
+from typing import Any, Protocol, cast
 
 BACKEND_NAME = "TensorRTBackend"
 _NATIVE_NAME = "executorch.extension.pybindings._portable_lib"
@@ -12,8 +13,18 @@ _WRAPPER_NAME = "executorch.extension.pybindings.portable_lib"
 _DATA_LOADER_NAME = "executorch.extension.pybindings.data_loader"
 
 
+class _BackendRegistry(Protocol):
+    def is_available(self, name: str) -> bool: ...
+
+
+class _Runtime(Protocol):
+    backend_registry: _BackendRegistry
+
+    def load_program(self, data: bytes) -> Any: ...
+
+
 class DelegateCompatibilityError(ImportError):
-    """The delegate wheel is incompatible with the active native runtime."""
+    """The runtime wheel is incompatible with the active native runtime."""
 
 
 def activate() -> ModuleType:
@@ -27,8 +38,7 @@ def activate() -> ModuleType:
             'torch_tensorrt.load(..., format="executorch") before importing '
             "executorch.runtime."
         )
-    missing = object()
-    previous_data_loader = sys.modules.get(_DATA_LOADER_NAME, missing)
+    previous_data_loader = sys.modules.get(_DATA_LOADER_NAME)
     try:
         data_loader = importlib.import_module(__name__ + ".data_loader")
         # _portable_lib imports this canonical name while its module initializer
@@ -37,13 +47,13 @@ def activate() -> ModuleType:
         sys.modules[_DATA_LOADER_NAME] = data_loader
         native = importlib.import_module(__name__ + "._portable_lib")
     except ImportError as error:
-        if previous_data_loader is missing:
+        if previous_data_loader is None:
             sys.modules.pop(_DATA_LOADER_NAME, None)
         else:
             sys.modules[_DATA_LOADER_NAME] = previous_data_loader
         raise DelegateCompatibilityError(
             "Could not load the prebuilt Torch-TensorRT ExecuTorch runtime. "
-            "Install torch, executorch, torch-tensorrt, and the delegate from "
+            "Install torch, executorch, torch-tensorrt, and the runtime package from "
             "the same release matrix."
         ) from error
     sys.modules[_NATIVE_NAME] = native
@@ -51,12 +61,12 @@ def activate() -> ModuleType:
     return native
 
 
-def get_runtime():
+def get_runtime() -> _Runtime:
     """Return the activated ExecuTorch Runtime singleton."""
     activate()
     from executorch.runtime import Runtime
 
-    value = Runtime.get()
+    value = cast(_Runtime, Runtime.get())
     if not value.backend_registry.is_available(BACKEND_NAME):
         raise DelegateCompatibilityError(f"{BACKEND_NAME} is not registered")
     return value
