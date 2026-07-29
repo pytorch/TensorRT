@@ -208,7 +208,9 @@ class TestFusePadIntoConvolutionPass(unittest.TestCase):
         bias = torch.randn(4)
         pre, post = [2, 1, 1], [0, 1, 1]
         expected = F.conv3d(F.pad(x, [1, 1, 1, 1, 2, 0]), weight, bias, 1, 0, 1, 1)
-        got = tensorrt_conv_asym_pad_op(x, weight, bias, [1, 1, 1], pre, post, [1, 1, 1], 1)
+        got = tensorrt_conv_asym_pad_op(
+            x, weight, bias, [1, 1, 1], pre, post, [1, 1, 1], 1
+        )
         torch.testing.assert_close(got, expected)
 
 
