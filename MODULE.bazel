@@ -188,20 +188,20 @@ http_archive(
 http_archive(
     name = "tensorrt_rtx",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    strip_prefix = "TensorRT-RTX-1.5.0.114",
+    strip_prefix = "TensorRT-RTX-1.6.1.120",
     type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Linux-x86_64-cuda-13.2-Release-external.tar.zst",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Linux-x86_64-cuda-13.4-Release-external.tar.zst",
     ],
 )
 
 http_archive(
     name = "tensorrt_rtx_sbsa",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    strip_prefix = "TensorRT-RTX-1.5.0.114",
+    strip_prefix = "TensorRT-RTX-1.6.1.120",
     type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Linux-aarch64-cuda-13.2-Release-external.tar.zst",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Linux-aarch64-cuda-13.4-Release-external.tar.zst",
     ],
 )
 
@@ -236,8 +236,8 @@ http_archive(
 http_archive(
     name = "tensorrt_rtx_win",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    strip_prefix = "TensorRT-RTX-1.5.0.114",
+    strip_prefix = "TensorRT-RTX-1.6.1.120",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.5/TensorRT-RTX-1.5.0.114-Windows-amd64-cuda-13.2-Release-external.zip",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-amd64-cuda-13.4-Release-external.zip",
     ],
 )

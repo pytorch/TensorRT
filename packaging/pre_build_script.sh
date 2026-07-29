@@ -72,15 +72,6 @@ if [[ ! -d "${TORCH_INSTALL_PATH}/include/c10" ]]; then
     exit 1
 fi
 
-# CU_UPPERBOUND eg:13.3 or 12.9
-# tensorrt tar for linux and windows are different across cuda version
-# for sbsa it is the same tar across cuda version
-if [[ ${CU_VERSION:2:2} == "13" ]]; then
-    export CU_UPPERBOUND="13.3"
-else
-    export CU_UPPERBOUND="12.9"
-fi
-
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
