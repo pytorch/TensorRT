@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=0655e512"></script>
+    <script src="../../../../_static/documentation_options.js?v=e5f0e026"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1163,6 +1163,34 @@ document.write(`
         <span class="n">engine</span><span class="o">.</span><span class="n">_auto_select_profiles</span> <span class="o">=</span> <span class="n">auto</span>
         <span class="n">engine</span><span class="o">.</span><span class="n">set_active_profile</span><span class="p">(</span><span class="n">active</span><span class="p">)</span></div>
 
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Exclude per-engine, in-memory state from the pickle stream.</span>
+
+<span class="sd">        Mirrors the ``set_extra_state`` reset so that</span>
+<span class="sd">        ``torch.save(module)`` / ``torch.load`` behaves the same way as</span>
+<span class="sd">        ``state_dict`` / ``load_state_dict`` w.r.t. ``RuntimeSettings``:</span>
+<span class="sd">        the caller must reapply any ``runtime_cache`` / strategy / cuda-graph</span>
+<span class="sd">        configuration after load. See ``_pack_engine_info`` for the matching</span>
+<span class="sd">        cpp-side exclusion (engine bytes never carry these fields).</span>
+
+<span class="sd">        ``_implicit_cache_handle`` is dropped alongside ``_runtime_settings``</span>
+<span class="sd">        because it aliases the same ``RuntimeCache`` instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">get_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">&quot;__getstate__&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="p">(</span><span class="n">get_state</span><span class="p">()</span> <span class="k">if</span> <span class="n">get_state</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;_runtime_settings&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;_implicit_cache_handle&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">state</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;_runtime_settings&quot;</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">())</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;_implicit_cache_handle&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">set_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">&quot;__setstate__&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">set_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">set_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">set_pre_allocated_outputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">get_engine</span><span class="p">()</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span> <span class="o">=</span> <span class="n">enable</span>
