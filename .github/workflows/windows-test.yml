@@ -153,6 +153,15 @@ jobs:
           summary: true
           display-options: fEs
           fail-on-empty: true
+      # Upload raw JUnit so the consolidated report (junit_summary.py) can
+      # aggregate Windows results alongside Linux. Additive.
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: junit-${{ inputs.job-name }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
+          path: ${{ env.RUNNER_TEST_RESULTS_DIR }}/*.xml
+          if-no-files-found: ignore
       - name: Teardown Windows
         if: ${{ always() }}
         uses: ./test-infra/.github/actions/teardown-windows
