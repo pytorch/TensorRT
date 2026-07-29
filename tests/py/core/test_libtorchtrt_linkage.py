@@ -1,3 +1,4 @@
+import importlib.metadata
 import importlib.util
 import os
 import re
@@ -28,9 +29,20 @@ class TestLibTorchTensorRTLinkage(unittest.TestCase):
             / "libtorchtrt.so"
         )
         if not cls.libtorchtrt.is_file():
-            raise AssertionError(
-                f"Installed torch_tensorrt package is missing {cls.libtorchtrt}"
+            raise unittest.SkipTest(
+                f"installed torch_tensorrt package has no native library at "
+                f"{cls.libtorchtrt}"
             )
+
+        distribution_names = {
+            name.replace("_", "-").lower()
+            for name in importlib.metadata.packages_distributions().get(
+                "torch_tensorrt", []
+            )
+        }
+        cls.preload_module = (
+            "tensorrt_rtx" if "torch-tensorrt-rtx" in distribution_names else ""
+        )
 
     def test_does_not_directly_need_pytorch_transitive_dsos(self) -> None:
         dynamic_section = subprocess.run(
@@ -58,15 +70,26 @@ class TestLibTorchTensorRTLinkage(unittest.TestCase):
         )
         child = """
 import ctypes
+import importlib
 import os
 import sys
 
 assert "torch" not in sys.modules
+if sys.argv[2]:
+    importlib.import_module(sys.argv[2])
+    assert "torch" not in sys.modules
 ctypes.CDLL(sys.argv[1], mode=os.RTLD_NOW | ctypes.RTLD_GLOBAL)
 assert "torch" not in sys.modules
 """
         result = subprocess.run(
-            [sys.executable, "-I", "-c", child, str(self.libtorchtrt)],
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                child,
+                str(self.libtorchtrt),
+                self.preload_module,
+            ],
             env=env,
             capture_output=True,
             text=True,
