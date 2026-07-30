@@ -48,6 +48,7 @@ def complex_lowering_pass(
         return complex_decomposition_adapter(gm, settings)
     return complex_graph_detection(gm, settings)
 
+
 post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
