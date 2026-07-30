@@ -1,5 +1,6 @@
 # This workflow is used to build the wheels for the Windows platform
 # it should be periodically synced with https://github.com/pytorch/test-infra/blob/main/.github/workflows/build_wheels_windows.yml
+# commit: f163b0391bea64ed18dcd577a02d78e74367fa70
 name: Build Windows Wheels
 
 on:
