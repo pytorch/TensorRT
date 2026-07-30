@@ -12,6 +12,9 @@ if not "%TORCHTRT_TARGET_PLATFORM%"=="windows-arm64" (
   echo TORCHTRT_TARGET_PLATFORM is not windows-arm64
   exit /b 1
 )
+rem Reuse the amd64_arm64 environment initialized by vcvarsall.bat. Without
+rem this, torch.utils.cpp_extension rejects the already-active VC environment.
+set DISTUTILS_USE_SDK=1
 python -m pip install --upgrade setuptools==72.1.0 wheel
 if errorlevel 1 exit /b %errorlevel%
 python setup.py bdist_wheel --use-rtx
