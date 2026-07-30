@@ -73,6 +73,8 @@ new_local_repository(
     path = "${CUDA_HOME}",
 )
 
+# ARM64 target sysroot; this must contain lib/arm64/cudart.lib and must not
+# point at the x86_64 host CUDA installation above.
 new_local_repository(
     name = "cuda_win_arm64",
     build_file = "@//third_party/cuda:BUILD",
