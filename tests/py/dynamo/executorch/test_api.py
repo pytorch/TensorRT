@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 import torch
 from torch._library.fake_class_registry import FakeScriptObject
-
-from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
+from torch._subclasses.fake_tensor import FakeTensor
+from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
 
 
 @pytest.mark.unit
@@ -266,3 +266,70 @@ def test_per_partition_distinct_target_devices(monkeypatch):
     assert d0 == b"cuda:0"
     assert d1 == b"cuda:1"
     assert d0 != d1
+
+
+# --- lift() preserves constant dtype/device ----------------------------------
+# lift() replaces get_attr constants with placeholders and copies a fake meta
+# "val". It must fakify the source constant through the graph's own fake_mode
+# (fake_mode.from_tensor), preserving dtype, device and stride; otherwise a
+# non-fp32 or non-CPU lifted constant silently gets fp32/cpu meta.
+
+
+def _traced_gm_with_parameter(dtype, device):
+    """A symbolically-traced GraphModule with one get_attr parameter (`c`) of the
+    given dtype/device, plus a stub graph_signature lift() can mutate."""
+    from torch._subclasses.fake_tensor import FakeTensorMode
+
+    class M(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.c = torch.nn.Parameter(
+                torch.zeros(3, 3, dtype=dtype, device=device), requires_grad=False
+            )
+
+        def forward(self, x):
+            return x + self.c
+
+    gm = torch.fx.symbolic_trace(M())
+    # lift() calls detect_fake_mode over the placeholder "val" metas, so the user
+    # input needs a FakeTensor meta.
+    fake_mode = FakeTensorMode()
+    with fake_mode:
+        fake_x = torch.empty(3, 3)
+    for node in gm.graph.nodes:
+        if node.op == "placeholder":
+            node.meta["val"] = fake_x
+    sig = types.SimpleNamespace(input_specs=[], output_specs=[], user_inputs=["x"])
+    return gm, sig
+
+
+def _lifted_constant_meta(gm, sig):
+    lifted_gm, _, _, _ = lift(gm, sig)
+    lifted = [
+        n for n in lifted_gm.graph.nodes if n.op == "placeholder" and n.name != "x"
+    ]
+    assert len(lifted) == 1, f"expected 1 lifted constant, got {len(lifted)}"
+    return lifted[0].meta["val"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "dtype, device",
+    [
+        (torch.bfloat16, "cpu"),
+        (torch.float32, "cuda"),
+    ],
+)
+def test_lift_preserves_constant_dtype_device(dtype, device):
+    # Runtime gate (not a module-level skipif, which resolves at collection time
+    # and is fragile on remote-GPU runners): skip the CUDA case only when no GPU.
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA required")
+    gm, sig = _traced_gm_with_parameter(dtype, device)
+    val = _lifted_constant_meta(gm, sig)
+    assert isinstance(val, FakeTensor)
+    assert val.dtype == dtype
+    assert val.device.type == device
+    # The source constant is a contiguous 3x3, so from_tensor must carry its real
+    # (3, 1) stride onto the meta, not the old all-ones synthetic stride.
+    assert val.stride() == torch.zeros(3, 3).stride()

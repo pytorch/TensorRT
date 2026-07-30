@@ -466,6 +466,32 @@ class TestRuntimeCacheAutosave(TestCase):
             "loaded handle must own its own atexit token (fresh weakref)",
         )
 
+    def test_python_handle_pickle_preserves_pending_warm_bytes(self):
+        """A python ``_RuntimeCacheHandle`` that has bytes loaded but
+        hasn't materialized them yet must round-trip those bytes through
+        pickle. Matches the cpp ``def_pickle`` contract (path + bytes).
+
+        The test instantiates ``_RuntimeCacheHandle`` directly rather than
+        going through ``RuntimeCache`` (which would pick the torchbind
+        backing on cpp rt), so the python class is exercisable regardless
+        of which runtime is active.
+        """
+        import pickle
+
+        from torch_tensorrt.runtime._runtime_cache import _RuntimeCacheHandle
+
+        handle = _RuntimeCacheHandle(path="/tmp/test_cache.bin")
+        warm = b"\x01\x02\x03\x04\x05\x06\x07\x08"
+        handle.deserialize(torch.frombuffer(bytearray(warm), dtype=torch.uint8))
+        self.assertEqual(handle._pending_warm_bytes, warm)
+
+        loaded = pickle.loads(pickle.dumps(handle))
+
+        self.assertEqual(loaded.path, "/tmp/test_cache.bin")
+        self.assertEqual(loaded._pending_warm_bytes, warm)
+        self.assertIsNone(loaded._cache, "live cache is never persisted")
+        self.assertIsNotNone(loaded._lock, "lock must be a fresh Lock instance")
+
 
 @unittest.skipIf(
     not ENABLED_FEATURES.tensorrt_rtx,

@@ -75,6 +75,13 @@ def _fused_nccl_all_to_all_impl(
     input_splits: list[int] | None,
     group_name: str,
 ) -> torch.Tensor:
+    # Symbolic splits are dropped to None by the fuse pass; native ALL_TO_ALL does
+    # a uniform split, so rebuild one for the eager path when splits are absent.
+    if output_splits is None or input_splits is None:
+        world_size = torch.distributed.get_world_size()
+        uniform = [inp.shape[0] // world_size] * world_size
+        output_splits = uniform if output_splits is None else output_splits
+        input_splits = uniform if input_splits is None else input_splits
     return torch.ops._c10d_functional.wait_tensor.default(
         torch.ops._c10d_functional.all_to_all_single.default(
             inp, output_splits, input_splits, group_name
@@ -149,6 +156,14 @@ tensorrt_fused_nccl_scatter_op = torch.ops.tensorrt.fused_nccl_scatter.default
 tensorrt_fused_nccl_gather_op = torch.ops.tensorrt.fused_nccl_gather.default
 
 
+def _static_split_or_none(splits: object) -> object:
+    # Keep static (all-int) all_to_all splits; drop symbolic ones (elements are
+    # fx Nodes) to None so they don't leak into the engine as unused shape inputs.
+    if isinstance(splits, (list, tuple)) and all(isinstance(s, int) for s in splits):
+        return splits
+    return None
+
+
 def fuse_distributed_ops(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
@@ -188,7 +203,12 @@ def fuse_distributed_ops(
                     fused_node = gm.graph.create_node(
                         op="call_function",
                         target=tensorrt_fused_nccl_all_to_all_op,
-                        args=(node.args[0], node.args[1], node.args[2], node.args[3]),
+                        args=(
+                            node.args[0],
+                            _static_split_or_none(node.args[1]),
+                            _static_split_or_none(node.args[2]),
+                            node.args[3],
+                        ),
                     )
             else:
                 with gm.graph.inserting_after(wait_tensor_node):

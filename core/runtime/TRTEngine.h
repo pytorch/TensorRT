@@ -259,7 +259,11 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<std::string> serialize();
 
   // CUDAGraph-Related Functionality
-  at::cuda::CUDAGraph cudagraph = {};
+  // Keep the captured graph so its executable can be instantiated explicitly.
+  // PyTorch builds differ on whether capture_end() instantiates automatically;
+  // explicit ownership makes capture/replay behavior consistent across x86-64
+  // and AArch64.
+  at::cuda::CUDAGraph cudagraph = {true};
   at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream default_stream = c10::cuda::getDefaultCUDAStream();
