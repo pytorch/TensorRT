@@ -90,8 +90,15 @@ load_dep_info()
 dir_path = os.path.join(str(get_root_dir()), "py")
 
 IS_AARCH64 = platform.machine() == "aarch64"
+WINDOWS_ON_ARM = "--windows-on-arm" in sys.argv
+if WINDOWS_ON_ARM:
+    # setuptools does not know this project-specific option, so consume it
+    # before command-line processing. The environment variable remains
+    # supported for CI and scripted builds.
+    sys.argv.remove("--windows-on-arm")
 TARGET_WINDOWS_ARM64 = (
-    os.environ.get("TORCHTRT_TARGET_PLATFORM", "").lower() == "windows-arm64"
+    WINDOWS_ON_ARM
+    or os.environ.get("TORCHTRT_TARGET_PLATFORM", "").lower() == "windows-arm64"
 )
 WINDOWS_CROSS_COMPILE = (
     TARGET_WINDOWS_ARM64
