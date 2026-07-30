@@ -14,7 +14,7 @@ config_setting(
 config_setting(
     name = "rtx_win_arm64",
     constraint_values = [
-        "@platforms//cpu:aarch64",
+        "@platforms//cpu:arm64",
         "@platforms//os:windows",
     ],
     flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
