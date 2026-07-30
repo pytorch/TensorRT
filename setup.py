@@ -90,6 +90,13 @@ load_dep_info()
 dir_path = os.path.join(str(get_root_dir()), "py")
 
 IS_AARCH64 = platform.machine() == "aarch64"
+TARGET_WINDOWS_ARM64 = (
+    os.environ.get("TORCHTRT_TARGET_PLATFORM", "").lower() == "windows-arm64"
+)
+WINDOWS_CROSS_COMPILE = (
+    TARGET_WINDOWS_ARM64
+    and os.environ.get("TORCHTRT_BUILD_MODE", "cross").lower() == "cross"
+)
 IS_JETPACK = False
 
 PY_ONLY = False
@@ -245,6 +252,8 @@ def build_libtorchtrt_cxx11_abi(
 
     if IS_WINDOWS:
         cmd.append("--config=windows")
+        if TARGET_WINDOWS_ARM64:
+            cmd.append("--platforms=//toolchains:windows_arm64")
     else:
         cmd.append("--config=linux")
 
@@ -415,6 +424,14 @@ class InstallCommand(install):
         install.run(self)
 
 
+class TorchTRTBuildExtension(BuildExtension):
+    def get_ext_filename(self, ext_name):
+        filename = super().get_ext_filename(ext_name)
+        if TARGET_WINDOWS_ARM64:
+            filename = filename.replace("win_amd64", "win_arm64")
+        return filename
+
+
 class BdistCommand(bdist_wheel):
     description = "Builds the package"
 
@@ -423,8 +440,18 @@ class BdistCommand(bdist_wheel):
 
     def finalize_options(self):
         bdist_wheel.finalize_options(self)
+        if TARGET_WINDOWS_ARM64:
+            # Cross-builds run under x64 Python, so the target platform cannot be
+            # inferred from the build interpreter.
+            self.plat_name = "win_arm64"
         if NO_TS or PY_ONLY:
             self.root_is_pure = False
+
+    def get_tag(self):
+        python_tag, abi_tag, platform_tag = bdist_wheel.get_tag(self)
+        if TARGET_WINDOWS_ARM64:
+            platform_tag = "win_arm64"
+        return python_tag, abi_tag, platform_tag
 
     def run(self):
         # Ensure wheel metadata/project name reflects RTX vs standard build,
@@ -684,12 +711,15 @@ if not (PY_ONLY or NO_TS):
             tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
 
     if USE_TRT_RTX:
-        tensorrt_windows_external_dir = (
-            lambda: subprocess.check_output(
+        tensorrt_windows_repo = (
+            "@tensorrt_rtx_win_arm64" if TARGET_WINDOWS_ARM64 else "@tensorrt_rtx_win"
+        )
+        tensorrt_windows_external_dir = lambda: (
+            subprocess.check_output(
                 [
                     BAZEL_EXE,
                     "query",
-                    "@tensorrt_rtx_win//:nvinfer",
+                    f"{tensorrt_windows_repo}//:nvinfer",
                     "--output",
                     "location",
                 ]
@@ -708,8 +738,37 @@ if not (PY_ONLY or NO_TS):
             .split("/BUILD.bazel")[0]
         )
 
+    extension_type = setuptools.Extension if WINDOWS_CROSS_COMPILE else CUDAExtension
+    target_torch_root = os.environ.get("TORCHTRT_TARGET_TORCH_ROOT")
+    target_cuda_root = os.environ.get("TORCHTRT_TARGET_CUDA_ROOT")
+    if WINDOWS_CROSS_COMPILE and not (target_torch_root and target_cuda_root):
+        raise RuntimeError(
+            "Windows ARM64 cross-compilation requires "
+            "TORCHTRT_TARGET_TORCH_ROOT and TORCHTRT_TARGET_CUDA_ROOT"
+        )
+
+    extension_kwargs = {}
+    if WINDOWS_CROSS_COMPILE:
+        extension_kwargs = {
+            "library_dirs": [
+                dir_path + "/torch_tensorrt/lib/",
+                os.path.join(target_torch_root, "lib"),
+                os.path.join(target_cuda_root, "lib", "arm64"),
+            ],
+            "libraries": [
+                "torchtrt",
+                "c10",
+                "torch",
+                "torch_cpu",
+                "torch_python",
+                "c10_cuda",
+                "torch_cuda",
+                "cudart",
+            ],
+        }
+
     ext_modules += [
-        CUDAExtension(
+        extension_type(
             "torch_tensorrt._C",
             [
                 "py/" + f
@@ -720,11 +779,14 @@ if not (PY_ONLY or NO_TS):
                     "torch_tensorrt/csrc/register_tensorrt_classes.cpp",
                 ]
             ],
-            library_dirs=[
-                (dir_path + "/torch_tensorrt/lib/"),
-                "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu",
-            ],
-            libraries=["torchtrt"],
+            library_dirs=extension_kwargs.get(
+                "library_dirs",
+                [
+                    (dir_path + "/torch_tensorrt/lib/"),
+                    "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu",
+                ],
+            ),
+            libraries=extension_kwargs.get("libraries", ["torchtrt"]),
             include_dirs=(
                 [
                     dir_path + "torch_tensorrt/csrc",
@@ -733,6 +795,22 @@ if not (PY_ONLY or NO_TS):
                     dir_path + "/../cpp/include",
                     "/usr/local/cuda",
                 ]
+                + (
+                    [
+                        os.path.join(target_torch_root, "include"),
+                        os.path.join(
+                            target_torch_root,
+                            "include",
+                            "torch",
+                            "csrc",
+                            "api",
+                            "include",
+                        ),
+                        os.path.join(target_cuda_root, "include"),
+                    ]
+                    if WINDOWS_CROSS_COMPILE
+                    else []
+                )
                 + (
                     [
                         dir_path + "/../bazel-TRTorch/external/tensorrt_win/include",
@@ -939,7 +1017,7 @@ setup(
         "install": InstallCommand,
         "clean": CleanCommand,
         "develop": DevelopCommand,
-        "build_ext": BuildExtension,
+        "build_ext": TorchTRTBuildExtension,
         "bdist_wheel": BdistCommand,
         "editable_wheel": EditableWheelCommand,
     },
