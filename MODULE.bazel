@@ -94,10 +94,12 @@ new_local_repository(
     path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.2/",
 )
 
+# ARM64 target sysroot copied from the Windows ARM64 machine. Keep this
+# separate from the x86_64 host CUDA installation above.
 new_local_repository(
     name = "cuda_win_arm64",
     build_file = "@//third_party/cuda:BUILD",
-    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.2/",
+    path = "C:/torchtrt-arm64-artifacts/cuda-v13.2-arm64/",
 )
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
