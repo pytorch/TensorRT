@@ -10,7 +10,10 @@ import torch
 import torch_tensorrt as torch_trt
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
-from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
+from torch_tensorrt.dynamo._engine_cache import (
+    BaseEngineCache,
+    _canonicalize_setting_value,
+)
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
@@ -60,6 +63,22 @@ class MyEngineCache(BaseEngineCache):
 
 
 class TestHashFunction(TestCase):
+    def test_unordered_settings_are_hashed_in_a_stable_order(self):
+        """Engine-invariant settings that are sets must not depend on hash order.
+
+        str() of a set lays elements out by hash, and string hashing is
+        randomized per process, so hashing one directly would give the same
+        settings a different cache key on every run.
+        """
+        self.assertEqual(
+            _canonicalize_setting_value({"b", "a", "c"}), "['a', 'b', 'c']"
+        )
+        self.assertEqual(
+            _canonicalize_setting_value(frozenset({"b", "a"})),
+            _canonicalize_setting_value({"a", "b"}),
+        )
+        self.assertEqual(_canonicalize_setting_value(True), "True")
+
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )

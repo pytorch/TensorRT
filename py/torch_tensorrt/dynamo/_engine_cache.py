@@ -29,6 +29,19 @@ UnpackedCacheHit = Tuple[
 ]
 
 
+def _canonicalize_setting_value(value: Any) -> str:
+    """Stringify a setting so the result does not depend on iteration order.
+
+    ``str()`` of a set lays elements out in hash order, and Python randomizes
+    string hashing per process unless PYTHONHASHSEED is pinned. Hashing that
+    directly would give the same compilation settings a different cache key on
+    every run, so unordered collections are sorted first.
+    """
+    if isinstance(value, (set, frozenset)):
+        return str(sorted(str(element) for element in value))
+    return str(value)
+
+
 class BaseEngineCache(ABC):
     @abstractmethod
     def __init__(
@@ -88,7 +101,7 @@ class BaseEngineCache(ABC):
         input_specs_hash = sha256_hash(input_specs_data)
 
         invariant_engine_specs = [
-            str(getattr(settings, field))
+            _canonicalize_setting_value(getattr(settings, field))
             for field in sorted(_SETTINGS_TO_BE_ENGINE_INVARIANT)
         ]
         with io.BytesIO() as stream:
