@@ -102,6 +102,9 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ env.ARCH }}
+      - name: Update NVIDIA driver
+        if: inputs.architecture == 'x64' && matrix.gpu_arch_type == 'cuda'
+        uses: ./test-infra/.github/actions/setup-nvidia-windows
       - name: Shorten Conda environment path
         if: inputs.architecture == 'x64'
         run: |

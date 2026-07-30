@@ -1,7 +1,7 @@
 name: Python-only build and test Linux x86_64 wheels
 
 on:
-    pull_request:
+    #pull_request:
     push:
         branches:
             - main

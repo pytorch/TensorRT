@@ -105,7 +105,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -132,7 +131,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -161,7 +159,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -188,7 +185,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -219,7 +215,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -248,7 +243,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -275,7 +269,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -303,7 +296,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -334,7 +326,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -362,7 +353,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -390,7 +380,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -417,7 +406,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .
@@ -444,7 +432,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         pushd .

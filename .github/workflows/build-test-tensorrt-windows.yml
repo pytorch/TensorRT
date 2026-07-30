@@ -99,7 +99,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -132,7 +131,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -160,7 +158,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -188,7 +185,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -216,7 +212,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -246,7 +241,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -276,7 +270,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -305,7 +298,6 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-      pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1

@@ -6,7 +6,7 @@ name: RTX - Build Linux aarch64 wheels
 # manifest-based wiring lives in the CI redesign (test-dx) on top of this.
 
 on:
-  pull_request:
+  #pull_request:
   push:
     branches:
       - main

@@ -57,7 +57,7 @@ on:
       build-command:
         description: The build command to use if build-platform is python-build-package
         required: false
-        default: "python -m build --wheel"
+        default: "python -m build --wheel --no-isolation"
         type: string
       trigger-event:
         description: "Trigger Event in caller that determines whether or not to upload"
@@ -99,6 +99,16 @@ on:
         required: false
         default: false
         type: boolean
+    secrets:
+      R2_ACCOUNT_ID:
+        description: Cloudflare R2 account ID
+        required: false
+      R2_ACCESS_KEY_ID:
+        description: Cloudflare R2 access key ID
+        required: false
+      R2_SECRET_ACCESS_KEY:
+        description: Cloudflare R2 secret access key
+        required: false
 
 permissions:
   id-token: write
@@ -119,6 +129,7 @@ jobs:
       USE_TRT_RTX: ${{ inputs.use-rtx }}
     name: build-${{ matrix.build_name }}
     runs-on: ${{ matrix.validation_runner }}
+    environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
     defaults:
       run:
         shell: bash -l {0}
@@ -150,6 +161,9 @@ jobs:
         with:
           architecture: aarch64
           path: "${{env.DEPENDENCIES_DIR}}\\git"
+      - uses: ./test-infra/.github/actions/setup-windows
+        with:
+          cuda-version: ${{ env.CU_VERSION }}
       - uses: ./test-infra/.github/actions/set-channel
       - name: Set PYTORCH_VERSION
         if: env.CHANNEL == 'test'
@@ -174,9 +188,13 @@ jobs:
       - name: Install XPU support package
         if: ${{ matrix.gpu_arch_type == 'xpu' }}
         env:
-          XPU_VERSION: '2025.1'
+          XPU_VERSION: '2026.1'
         run: |
           cmd //c .\\test-infra\\.github\\scripts\\install_xpu.bat
+      - name: Update NVIDIA driver
+        if: inputs.architecture == 'x64' && matrix.gpu_arch_type == 'cuda'
+        run: |
+          cmd //c .\\test-infra\\.github\\scripts\\driver_update.bat
       - name: Checkout Target Repository (${{ env.REPOSITORY }})
         if: inputs.architecture == 'arm64'
         uses: actions/checkout@v6
@@ -191,6 +209,18 @@ jobs:
         with:
           python-version: ${{ matrix.python_version }}
           architecture: arm64
+      - name: Set BUILD_VERSION for Arm64 RC build
+        # Arm64 does not run setup-binary-builds (x64-only), so pytorch_pkg_helpers
+        # never sets BUILD_VERSION. Without it setup.py appends the git sha
+        # (e.g. torchvision-0.28.0+5a5dd12). For RC (test channel) set BUILD_VERSION
+        # to "<version.txt>+<arch>" to match what pytorch_pkg_helpers produces for
+        # x64 (e.g. torchvision-0.28.0+cpu) and torch's own win_arm64 wheels.
+        if: ${{ inputs.architecture == 'arm64' && env.CHANNEL == 'test' }}
+        working-directory: ${{ inputs.repository }}
+        run: |
+          if [[ -f version.txt ]]; then
+            echo "BUILD_VERSION=$(cat version.txt)+${CU_VERSION}" >> "${GITHUB_ENV}"
+          fi
       - name: Install torch dependency
         if: inputs.architecture == 'x64'
         run: |
@@ -240,7 +270,9 @@ jobs:
           echo SSL_CERT_FILE=%CERT_PATH% >> %GITHUB_ENV%
           echo REQUESTS_CA_BUNDLE=%CERT_PATH% >> %GITHUB_ENV%
       - name: Build clean
-        if: inputs.architecture == 'x64'
+        # Only relevant for setup-py builds; python-build-package projects may
+        # not have a setup.py (e.g. scikit-build-core based builds).
+        if: inputs.build-platform == 'setup-py' && inputs.architecture == 'x64'
         working-directory: ${{ inputs.repository }}
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
@@ -320,8 +352,26 @@ jobs:
           else
             ${CONDA_RUN} ${ENV_SCRIPT} python setup.py bdist_wheel ${BUILD_PARAMS}
           fi
-      - name: Build the wheel (bdist_wheel) Arm64
-        if: inputs.architecture == 'arm64'
+      - name: Build the wheel (python-build-package) Arm64
+        if: ${{ inputs.build-platform == 'python-build-package' && inputs.architecture == 'arm64' }}
+        env:
+          SRC_DIR: ${{ inputs.repository }}
+          DEPENDENCIES_DIR: c:\temp\dependencies\
+        shell: cmd
+        run: |
+          set CONDA_PREFIX=%DEPENDENCIES_DIR%
+          set PATH=%PATH%;%DEPENDENCIES_DIR%\Library\bin
+          set DISTUTILS_USE_SDK=1
+          set VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat
+
+          call "%VS_PATH%" arm64
+          cd %SRC_DIR%
+          call .venv\Scripts\activate.bat
+
+          pip install --upgrade setuptools==72.1.0 build==1.2.2 wheel
+          ${{ inputs.build-command }}
+      - name: Build the wheel (setup-py) Arm64
+        if: ${{ inputs.build-platform == 'setup-py' && inputs.architecture == 'arm64' }}
         env:
           SRC_DIR: ${{ inputs.repository }}
           DEPENDENCIES_DIR: c:\temp\dependencies\
@@ -439,6 +489,10 @@ jobs:
       build-matrix: ${{ inputs.build-matrix }}
       trigger-event: ${{ inputs.trigger-event }}
       architecture: ${{ inputs.architecture }}
+    secrets:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ inputs.is-release-wheel }}-${{ inputs.is-release-tarball }}-${{ github.event_name == 'workflow_dispatch' }}-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'no-tag' }}-${{ inputs.use-rtx }}
