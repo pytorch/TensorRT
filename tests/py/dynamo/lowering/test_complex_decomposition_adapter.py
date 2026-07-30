@@ -71,9 +71,7 @@ def test_normalize_packs_surviving_complex_to_interleaved():
     assert aten.unsqueeze.default in targets
 
     # the packed cat node must carry the complex-layout tag
-    cat_nodes = [
-        n for n in gm.graph.nodes if n.target == aten.cat.default
-    ]
+    cat_nodes = [n for n in gm.graph.nodes if n.target == aten.cat.default]
     assert cat_nodes and cat_nodes[0].meta.get("is_complex_layout") is True
 
     # numerically: output is the [...,2] interleaved layout of re/im

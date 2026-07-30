@@ -90,7 +90,7 @@ def _graph_has_complex(gm: GraphModule) -> bool:
     return False
 
 
-def _fake_flat_args(gm: GraphModule) -> list:
+def _fake_flat_args(gm: GraphModule) -> list[torch.Tensor]:
     """Build the example inputs the upstream retrace (make_fx) needs.
 
     We reuse the placeholders' existing fake tensors so the export ShapeEnv /

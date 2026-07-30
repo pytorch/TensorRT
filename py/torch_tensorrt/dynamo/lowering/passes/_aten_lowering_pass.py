@@ -18,6 +18,7 @@ from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .normalize_negative_slice_stop import normalize_negative_slice_stop
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
@@ -27,7 +28,6 @@ from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .rule_based_autocast import rule_based_autocast
-from .normalize_negative_slice_stop import normalize_negative_slice_stop
 
 pre_lowering_pass_list = [
     remove_detach,
@@ -47,6 +47,7 @@ def complex_lowering_pass(
     if getattr(settings, "use_complex_decomposition", False):
         return complex_decomposition_adapter(gm, settings)
     return complex_graph_detection(gm, settings)
+
 
 post_lowering_pass_list = [
     replace_fused_rms_norm,
