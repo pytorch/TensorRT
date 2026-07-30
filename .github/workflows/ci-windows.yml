@@ -69,6 +69,7 @@ jobs:
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
+      build-flavor: standard
       use-rtx: false
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
@@ -78,6 +79,7 @@ jobs:
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
+      build-flavor: rtx
       use-rtx: true
       name-prefix: "RTX - "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
@@ -88,6 +90,7 @@ jobs:
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: python-only
+      build-flavor: python-only
       name-prefix: "Python-only "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
@@ -98,6 +101,7 @@ jobs:
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: python-only
+      build-flavor: python-only-rtx
       use-rtx: true
       name-prefix: "Python-only RTX "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}

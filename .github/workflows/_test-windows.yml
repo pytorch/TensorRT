@@ -17,6 +17,10 @@ on:
         description: "Test against TensorRT-RTX"
         type: boolean
         default: false
+      build-flavor:
+        description: "Unique build flavor used to isolate workflow concurrency"
+        required: true
+        type: string
       name-prefix:
         description: "Display-name prefix (e.g. 'RTX - ')"
         type: string
@@ -97,6 +101,7 @@ jobs:
       # Build the RTX wheel when requested (matches the original RTX-windows
       # entry); empty params + use-rtx=false for the standard build.
       use-rtx: ${{ inputs.use-rtx }}
+      build-flavor: ${{ inputs.build-flavor }}
       wheel-build-params: ${{ inputs.use-rtx && '--use-rtx' || '' }}
       timeout: 120
 
