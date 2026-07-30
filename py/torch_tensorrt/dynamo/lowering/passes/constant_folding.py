@@ -4,6 +4,9 @@ from typing import Any, Set
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
+    CONSTANT_FOLD_EXCLUSION_META_KEY,
+)
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
@@ -125,4 +128,6 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
 
         if node.target in self.quantization_ops:
             return True
-        return False
+        # The meta value holds the IDs of the rules that marked this node; it is
+        # empty once every rule that claimed it has been disabled.
+        return bool(node.meta.get(CONSTANT_FOLD_EXCLUSION_META_KEY))
