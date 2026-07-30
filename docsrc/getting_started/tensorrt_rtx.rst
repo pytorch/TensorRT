@@ -176,7 +176,7 @@ RTX-Specific Dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Download the TensorRT-RTX tarball from https://developer.nvidia.com/tensorrt-rtx.
-Torch-TensorRT currently uses TensorRT-RTX version **1.5.0.114**.
+Torch-TensorRT currently uses TensorRT-RTX version **1.6.1.120**.
 
 Once downloaded:
 
@@ -184,15 +184,15 @@ Once downloaded:
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is extracted in /your_local_download_path/TensorRT-RTX-1.5.0.114
-    export LD_LIBRARY_PATH=/your_local_download_path/TensorRT-RTX-1.5.0.114/lib:$LD_LIBRARY_PATH
+    # If TensorRT-RTX is extracted in /your_local_download_path/TensorRT-RTX-1.6.1.120
+    export LD_LIBRARY_PATH=/your_local_download_path/TensorRT-RTX-1.6.1.120/lib:$LD_LIBRARY_PATH
 
 **On Windows**, add the tarball ``lib`` directory to the system ``PATH``:
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.5.0.114
-    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.5.0.114\lib"
+    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.6.1.120
+    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.6.1.120\lib"
     echo %PATH% | findstr TensorRT-RTX
 
 Install TensorRT-RTX Wheel

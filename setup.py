@@ -852,12 +852,13 @@ def get_sbsa_requirements(base_requirements):
         if USE_TRT_RTX:
             # TensorRT-RTX ships an aarch64 (SBSA) wheel; mirror get_x86_64_requirements.
             return requirements + [
-                "tensorrt_rtx>=1.5.0.114,<1.6.0.0",
+                "tensorrt_rtx>=1.6.1.120,<1.7.0.0",
             ]
         # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
         # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
         return requirements + [
-            "tensorrt>=11.0.0,<11.1.0",
+            "torch>=2.14.0.dev,<2.15.0",
+            "tensorrt>=11.1.0,<11.2.0",
         ]
 
 
@@ -872,11 +873,11 @@ def get_x86_64_requirements(base_requirements):
         ]
         if USE_TRT_RTX:
             return requirements + [
-                "tensorrt_rtx>=1.5.0.114,<1.6.0.0",
+                "tensorrt_rtx>=1.6.1.120,<1.7.0.0",
             ]
         else:
             requirements = requirements + [
-                "tensorrt>=11.0.0,<11.1.0",
+                "tensorrt>=11.1.0,<11.2.0",
             ]
             cuda_version = torch.version.cuda
             if cuda_version.startswith("12"):
@@ -884,16 +885,16 @@ def get_x86_64_requirements(base_requirements):
                 # TensorRT dependency path is not pulled in as well.
                 tensorrt_prefix = "tensorrt-cu12"
                 requirements = requirements + [
-                    f"{tensorrt_prefix}>=11.0.0,<11.1.0",
-                    f"{tensorrt_prefix}-bindings>=11.0.0,<11.1.0",
-                    f"{tensorrt_prefix}-libs>=11.0.0,<11.1.0",
+                    f"{tensorrt_prefix}>=11.1.0,<11.2.0",
+                    f"{tensorrt_prefix}-bindings>=11.1.0,<11.2.0",
+                    f"{tensorrt_prefix}-libs>=11.1.0,<11.2.0",
                 ]
             elif cuda_version.startswith("13"):
                 tensorrt_prefix = "tensorrt-cu13"
                 requirements = requirements + [
-                    f"{tensorrt_prefix}>=11.0.0,<11.1.0",
-                    f"{tensorrt_prefix}-bindings>=11.0.0,<11.1.0",
-                    f"{tensorrt_prefix}-libs>=11.0.0,<11.1.0",
+                    f"{tensorrt_prefix}>=11.1.0,<11.2.0",
+                    f"{tensorrt_prefix}-bindings>=11.1.0,<11.2.0",
+                    f"{tensorrt_prefix}-libs>=11.1.0,<11.2.0",
                 ]
             else:
                 raise ValueError(f"Unsupported CUDA version: {cuda_version}")
