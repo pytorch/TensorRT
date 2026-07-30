@@ -12,7 +12,7 @@ platform(
     name = "windows_arm64",
     constraint_values = [
         "@platforms//os:windows",
-        "@platforms//cpu:aarch64",
+        "@platforms//cpu:arm64",
     ],
 )
 
