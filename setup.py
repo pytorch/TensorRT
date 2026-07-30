@@ -261,6 +261,9 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=windows")
         if TARGET_WINDOWS_ARM64:
             cmd.append("--platforms=//toolchains:windows_arm64")
+            cmd.append(
+                "--extra_toolchains=@local_config_cc//:cc-toolchain-arm64_windows"
+            )
     else:
         cmd.append("--config=linux")
 
@@ -748,21 +751,24 @@ if not (PY_ONLY or NO_TS):
     extension_type = setuptools.Extension if WINDOWS_CROSS_COMPILE else CUDAExtension
     target_torch_root = os.environ.get("TORCHTRT_TARGET_TORCH_ROOT")
     target_cuda_root = os.environ.get("TORCHTRT_TARGET_CUDA_ROOT")
-    if WINDOWS_CROSS_COMPILE and not (target_torch_root and target_cuda_root):
+    target_python_root = os.environ.get("TORCHTRT_TARGET_PYTHON_ROOT")
+    if WINDOWS_CROSS_COMPILE and not (target_torch_root and target_cuda_root and target_python_root):
         raise RuntimeError(
             "Windows ARM64 cross-compilation requires "
-            "TORCHTRT_TARGET_TORCH_ROOT and TORCHTRT_TARGET_CUDA_ROOT"
+            "TORCHTRT_TARGET_TORCH_ROOT and TORCHTRT_TARGET_CUDA_ROOT and TORCHTRT_TARGET_PYTHON_ROOT"
         )
 
     extension_kwargs = {}
     if WINDOWS_CROSS_COMPILE:
         extension_kwargs = {
             "library_dirs": [
+                os.path.join(target_python_root, "libs"),
                 dir_path + "/torch_tensorrt/lib/",
                 os.path.join(target_torch_root, "lib"),
                 os.path.join(target_cuda_root, "lib", "arm64"),
             ],
             "libraries": [
+                f"python{sys.version_info.major}{sys.version_info.minor}",
                 "torchtrt",
                 "c10",
                 "torch",
@@ -804,6 +810,7 @@ if not (PY_ONLY or NO_TS):
                 ]
                 + (
                     [
+                        os.path.join(target_python_root, "include"),
                         os.path.join(target_torch_root, "include"),
                         os.path.join(
                             target_torch_root,

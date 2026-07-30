@@ -11,6 +11,9 @@ bazel_dep(name = "rules_python", version = "1.3.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
+cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
+use_repo(cc_configure, "local_config_cc")
+
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     ignore_root_user_error = True,
@@ -94,12 +97,11 @@ new_local_repository(
     path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.2/",
 )
 
-# ARM64 target sysroot copied from the Windows ARM64 machine. Keep this
-# separate from the x86_64 host CUDA installation above.
+# supposedly cuda 13.4 on windows x86 preview has everything required for cross compile for windows on arm
 new_local_repository(
     name = "cuda_win_arm64",
     build_file = "@//third_party/cuda:BUILD",
-    path = "C:/torchtrt-arm64-artifacts/cuda-v13.2-arm64/",
+    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/",
 )
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
@@ -174,7 +176,7 @@ http_archive(
 new_local_repository(
     name = "libtorch_win_arm64",
     build_file = "@//third_party/libtorch:BUILD",
-    path = "C:/torchtrt-arm64-artifacts/pytorch",
+    path = "C:/torchtrt-arm64-artifacts/pytorch/torch",
 )
 
 http_archive(
