@@ -34,8 +34,20 @@ config_setting(
 )
 
 config_setting(
-    name = "rtx_win",
+    name = "rtx_win_x86_64",
     constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "rtx_win_arm64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
         "@platforms//os:windows",
     ],
     flag_values = {
@@ -78,9 +90,10 @@ cc_library(
             "impl/normalize_plugin.cpp",
             "register_plugins.cpp",
         ],
-        ":rtx_win": [],
-        ":rtx_x86_64": [],
         ":rtx_sbsa": [],
+        ":rtx_win_arm64": [],
+        ":rtx_win_x86_64": [],
+        ":rtx_x86_64": [],
         "//conditions:default": [
             "impl/interpolate_plugin.cpp",
             "impl/normalize_plugin.cpp",
@@ -94,9 +107,10 @@ cc_library(
             "impl/normalize_plugin.h",
             "plugins.h",
         ],
-        ":rtx_win": [],
-        ":rtx_x86_64": [],
         ":rtx_sbsa": [],
+        ":rtx_win_arm64": [],
+        ":rtx_win_x86_64": [],
+        ":rtx_x86_64": [],
         "//conditions:default": [
             "impl/interpolate_plugin.h",
             "impl/normalize_plugin.h",
@@ -126,9 +140,10 @@ cc_library(
             "@tensorrt_l4t//:nvinfer",
             "@tensorrt_l4t//:nvinferplugin",
         ],
-        ":rtx_win": [],
-        ":rtx_x86_64": [],
         ":rtx_sbsa": [],
+        ":rtx_win_arm64": [],
+        ":rtx_win_x86_64": [],
+        ":rtx_x86_64": [],
         ":sbsa": [
             "@tensorrt_sbsa//:nvinfer",
             "@tensorrt_sbsa//:nvinferplugin",
@@ -143,7 +158,8 @@ cc_library(
         ],
     }) + select({
         ":jetpack": ["@torch_l4t//:libtorch"],
-        ":rtx_win": ["@libtorch_win//:libtorch"],
+        ":rtx_win_arm64": ["@libtorch_win_arm64//:libtorch"],
+        ":rtx_win_x86_64": ["@libtorch_win//:libtorch"],
         ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],

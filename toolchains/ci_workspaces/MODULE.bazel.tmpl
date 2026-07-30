@@ -73,6 +73,12 @@ new_local_repository(
     path = "${CUDA_HOME}",
 )
 
+new_local_repository(
+    name = "cuda_win_arm64",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "${TORCHTRT_TARGET_CUDA_ROOT}",
+)
+
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -158,6 +164,12 @@ http_archive(
     ],
 )
 
+new_local_repository(
+    name = "tensorrt_rtx_win_arm64",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    path = "${TORCHTRT_TARGET_TRT_ROOT}",
+)
+
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
@@ -173,6 +185,12 @@ new_local_repository(
 new_local_repository(
     name = "libtorch_win",
     path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+new_local_repository(
+    name = "libtorch_win_arm64",
+    path = "${TORCHTRT_TARGET_TORCH_ROOT}",
     build_file = "third_party/libtorch/BUILD"
 )
 

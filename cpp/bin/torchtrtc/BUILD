@@ -27,8 +27,20 @@ config_setting(
 )
 
 config_setting(
-    name = "rtx_win",
+    name = "rtx_win_x86_64",
     constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "rtx_win_arm64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
         "@platforms//os:windows",
     ],
     flag_values = {
@@ -59,7 +71,11 @@ cc_binary(
             "@torch_l4t//:caffe2",
             "@torch_l4t//:libtorch",
         ],
-        ":rtx_win": [
+        ":rtx_win_arm64": [
+            "@libtorch_win_arm64//:caffe2",
+            "@libtorch_win_arm64//:libtorch",
+        ],
+        ":rtx_win_x86_64": [
             "@libtorch_win//:caffe2",
             "@libtorch_win//:libtorch",
         ],

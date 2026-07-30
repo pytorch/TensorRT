@@ -94,6 +94,12 @@ new_local_repository(
     path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.2/",
 )
 
+new_local_repository(
+    name = "cuda_win_arm64",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.2/",
+)
+
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 ####################################################################################
@@ -161,6 +167,12 @@ http_archive(
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
     urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-win-shared-with-deps-latest.zip"],
+)
+
+new_local_repository(
+    name = "libtorch_win_arm64",
+    build_file = "@//third_party/libtorch:BUILD",
+    path = "C:/torchtrt-arm64-artifacts/pytorch",
 )
 
 http_archive(
@@ -239,5 +251,14 @@ http_archive(
     strip_prefix = "TensorRT-RTX-1.6.1.120",
     urls = [
         "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-amd64-cuda-13.4-Release-external.zip",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_rtx_win_arm64",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.6.1.120",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-arm64-cuda-13.4-Release-external.zip",
     ],
 )

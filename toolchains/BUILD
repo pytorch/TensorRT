@@ -9,6 +9,14 @@ platform(
 )
 
 platform(
+    name = "windows_arm64",
+    constraint_values = [
+        "@platforms//os:windows",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+platform(
     name = "jetpack_4.5",
     constraint_values = [
         "@platforms//os:linux",
