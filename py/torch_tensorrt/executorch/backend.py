@@ -12,6 +12,7 @@ from executorch.exir.backend.backend_details import (
 from torch.export.exported_program import ExportedProgram
 from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+    ALIASED_IO_IDX,
     DEVICE_IDX,
     ENGINE_IDX,
     HW_COMPATIBLE_IDX,
@@ -20,6 +21,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     REQUIRES_OUTPUT_ALLOCATOR_IDX,
     SERIALIZED_METADATA_IDX,
     TARGET_PLATFORM_IDX,
+    deserialize_aliased_io,
 )
 from torch_tensorrt.executorch.serialization import (
     TensorRTBlobMetadata,
@@ -306,8 +308,14 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             TensorRTIOBinding(name=name, is_input=True) for name in input_names
         ] + [TensorRTIOBinding(name=name, is_input=False) for name in output_names]
 
+        # Carry the KV-cache / user aliasing (out->in, kind) into the blob so the
+        # C++ backend binds each aliased output to its aliased input's tensor
+        # (in-place) and reflects the update back into the delegate output.
+        aliased_io = deserialize_aliased_io(_get_str(engine_info, ALIASED_IO_IDX))
+
         metadata = TensorRTBlobMetadata(
             io_bindings=io_bindings,
+            aliased_io=aliased_io,
             hardware_compatible=_get_str(engine_info, HW_COMPATIBLE_IDX) == "1",
             device_id=_parse_device_id(engine_info[DEVICE_IDX]),
             serialized_metadata=_get_str(engine_info, SERIALIZED_METADATA_IDX),

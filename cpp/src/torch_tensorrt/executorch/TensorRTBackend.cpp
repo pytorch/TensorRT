@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -289,6 +290,93 @@ Result<DelegateHandle*> TensorRTBackend::init(
     return err;
   }
 
+  // Map each aliased output binding to the index of the input it aliases so
+  // execute() can bind it to that input's device pointer (in-place).
+  // Non-aliased models have an empty header.aliased_io -> all -1, unchanged path.
+  handle->output_aliased_input_idx.assign(handle->num_outputs, -1);
+  handle->input_is_alias_target.assign(handle->num_inputs, false);
+  for (const auto& ab : header.aliased_io) {
+    int oi = -1;
+    for (size_t k = 0; k < handle->output_binding_names.size(); ++k) {
+      if (handle->output_binding_names[k] == ab.output) {
+        oi = static_cast<int>(k);
+        break;
+      }
+    }
+    int ii = -1;
+    for (size_t k = 0; k < handle->input_binding_names.size(); ++k) {
+      if (handle->input_binding_names[k] == ab.input) {
+        ii = static_cast<int>(k);
+        break;
+      }
+    }
+    if (oi < 0 || ii < 0) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: aliased_io names not found (output='%s', input='%s')",
+          ab.output.c_str(),
+          ab.input.c_str());
+      return Error::InvalidProgram;
+    }
+    // Validate the alias kind against the two we understand. The blob parser
+    // defaults a missing "kind" to "kv_cache_update"; any other value is a
+    // corrupt or newer-than-us wire format we can't safely bind, so fail loudly
+    // rather than fall through and treat it as a KV alias (which would bind two
+    // tensors to the same storage). Mirrors the Python _reconcile_aliased_io.
+    if (ab.kind != "kv_cache_update" && ab.kind != "user") {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: aliased_io entry (output='%s') has unknown kind '%s'",
+          ab.output.c_str(),
+          ab.kind.c_str());
+      return Error::InvalidProgram;
+    }
+    if (ab.kind == "kv_cache_update") {
+      // TensorRT's IKVCacheUpdateLayer aliasing is the source of truth for
+      // kv_cache_update; the persisted map must agree with what the engine
+      // reports, else the blob is inconsistent with its own engine.
+      const char* trt_alias = handle->engine->getAliasedInputTensor(ab.output.c_str());
+      if (trt_alias == nullptr || ab.input != trt_alias) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::init: kv_cache_update alias for output '%s' disagrees with the "
+            "engine (persisted input='%s', engine input='%s')",
+            ab.output.c_str(),
+            ab.input.c_str(),
+            trt_alias == nullptr ? "<none>" : trt_alias);
+        return Error::InvalidProgram;
+      }
+    } else {
+      // AliasKind::USER aliases are declared by Torch-TensorRT and not tracked
+      // by TensorRT, so it can't validate them; confirm the aliased output and
+      // input share a shape before binding them to the same storage.
+      const nvinfer1::Dims od = handle->engine->getTensorShape(ab.output.c_str());
+      const nvinfer1::Dims id = handle->engine->getTensorShape(ab.input.c_str());
+      bool compatible = od.nbDims == id.nbDims;
+      for (int d = 0; compatible && d < od.nbDims; ++d) {
+        compatible = od.d[d] == id.d[d];
+      }
+      if (!compatible) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::init: user alias output '%s' shape is incompatible with input '%s'",
+            ab.output.c_str(),
+            ab.input.c_str());
+        return Error::InvalidProgram;
+      }
+    }
+    handle->output_aliased_input_idx[static_cast<size_t>(oi)] = ii;
+    handle->input_is_alias_target[static_cast<size_t>(ii)] = true;
+    ++handle->num_aliased_outputs;
+  }
+
+  if (handle->num_aliased_outputs > 0) {
+    ET_LOG(
+        Info,
+        "TensorRTBackend::init: %zu aliased output(s) bound in-place to caller-owned inputs",
+        handle->num_aliased_outputs);
+  }
+
   err = initialize_input_profiles(*handle);
   if (err != Error::Ok) {
     return err;
@@ -325,9 +413,17 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
   const size_t num_inputs = engine->num_inputs;
   const size_t num_outputs = engine->num_outputs;
-  if (args.size() < num_inputs + num_outputs) {
+  // Caller-owned KV: every input is a delegate arg, and each aliased output is
+  // threaded as a delegate output arg (the caller-owned mutable buffer's mutation
+  // slot), so all engine bindings map 1:1 to delegate args.
+  const size_t num_delegate_outputs = num_outputs;
+  const size_t num_delegate_inputs = num_inputs;
+  if (args.size() < num_delegate_inputs + num_delegate_outputs) {
     ET_LOG(
-        Error, "TensorRTBackend::execute: expected at least %zu args, got %zu", num_inputs + num_outputs, args.size());
+        Error,
+        "TensorRTBackend::execute: expected at least %zu args, got %zu",
+        num_delegate_inputs + num_delegate_outputs,
+        args.size());
     return Error::InvalidArgument;
   }
 
@@ -395,16 +491,22 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // 1. Bind input shapes and addresses
   // ------------------------------------------------------------------
+  // Device pointer each input binding was bound to; aliased outputs reuse the
+  // pointer of the input they alias so their update lands in-place.
+  std::vector<void*> input_bind_ptrs(num_inputs, nullptr);
+  size_t arg_idx = 0; // running index into delegate args
   for (size_t i = 0; i < num_inputs; ++i) {
-    EValue* arg = args[i];
-    TORCHTRT_ET_CHECK_NOT_NULL(arg, Error::InvalidArgument, "TensorRTBackend::execute: input %zu is not a tensor", i);
+    const std::string& name = engine->input_binding_names[i];
+
+    EValue* arg = args[arg_idx++];
+    TORCHTRT_ET_CHECK_NOT_NULL(
+        arg, Error::InvalidArgument, "TensorRTBackend::execute: input arg %zu is not a tensor", i);
     if (!arg->isTensor()) {
       ET_LOG(Error, "TensorRTBackend::execute: input %zu is not a tensor", i);
       return Error::InvalidArgument;
     }
 
     exec_aten::Tensor et_in = arg->toTensor();
-    const std::string& name = engine->input_binding_names[i];
     nvinfer1::Dims dims = to_trt_dims(et_in);
     if (dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
       ET_LOG(Error, "TensorRTBackend::execute: input '%s' rank exceeds TensorRT limit", name.c_str());
@@ -431,6 +533,26 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (!ctx->setInputShape(name.c_str(), dims)) {
       ET_LOG(Error, "TensorRTBackend::execute: setInputShape failed for '%s'", name.c_str());
       return Error::InvalidState;
+    }
+
+    // Caller-owned aliased input: an aliased output binds in-place to this
+    // input's device pointer, so its update must land in the caller's storage.
+    // If it isn't device-resident the branches below would stage it through
+    // delegate scratch, and the in-place update (bound to that scratch) would be
+    // silently lost on the next execute() when the staging copy re-reads the
+    // caller's unchanged buffer. Fail loudly instead.
+    if (engine->input_is_alias_target[i]) {
+      const bool device_resident =
+          et_in.nbytes() > 0 && (engine->unified_memory || is_cuda_accessible_ptr(et_in.const_data_ptr()));
+      if (!device_resident) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: aliased input '%s' must be device-resident (non-empty and "
+            "CUDA-accessible or unified memory); its caller-owned in-place update cannot be staged "
+            "through host scratch",
+            name.c_str());
+        return Error::InvalidArgument;
+      }
     }
 
     void* bind_ptr = nullptr;
@@ -472,6 +594,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
     }
 
+    input_bind_ptrs[i] = bind_ptr;
     if (!ctx->setTensorAddress(name.c_str(), bind_ptr)) {
       ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for input '%s'", name.c_str());
       return Error::InvalidState;
@@ -499,9 +622,58 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // nbytes() and before the Python binding reads back the shape.
   // If the buffer is CPU, stage through a temporary CUDA allocation.
   // ------------------------------------------------------------------
+  // (arg index, device_src ptr) for outputs staged through a device buffer.
   std::vector<std::pair<size_t, void*>> outputs_needing_copy;
+  // Caller-owned KV: (dst = delegate output EValue ptr, src = aliased input ptr,
+  // nbytes). The engine updates the aliased input in place; reflect that into the
+  // delegate output EValue after enqueue so ExecuTorch's write-back copy_ sees the
+  // updated cache. Skipped when dst == src (memory planner aliased them: zero-copy).
+  std::vector<std::tuple<void*, void*, size_t>> aliased_reflects;
   for (size_t o = 0; o < num_outputs; ++o) {
-    EValue* arg = args[num_inputs + o];
+    const std::string& name = engine->output_binding_names[o];
+
+    // Aliased output (KV-cache / user): the engine updates the aliased input in
+    // place, so bind this output binding to the aliased input's device pointer.
+    const int alias_in = engine->output_aliased_input_idx[o];
+    if (alias_in >= 0) {
+      void* bind_ptr = input_bind_ptrs[static_cast<size_t>(alias_in)];
+      if (bind_ptr == nullptr) {
+        ET_LOG(Error, "TensorRTBackend::execute: aliased output '%s' has no bound input pointer", name.c_str());
+        return Error::InvalidState;
+      }
+      if (!ctx->setTensorAddress(name.c_str(), bind_ptr)) {
+        ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for aliased output '%s'", name.c_str());
+        return Error::InvalidState;
+      }
+      // The aliased output IS a delegate output arg (the caller-owned mutable
+      // buffer's mutation slot). Consume it and record a reflect so ExecuTorch's
+      // write-back copy_ sees the engine's in-place update.
+      const size_t arg_i = arg_idx++;
+      EValue* out_arg = args[arg_i];
+      TORCHTRT_ET_CHECK_NOT_NULL(
+          out_arg, Error::InvalidArgument, "TensorRTBackend::execute: aliased output %zu is not a tensor", o);
+      if (!out_arg->isTensor()) {
+        ET_LOG(Error, "TensorRTBackend::execute: aliased output %zu is not a tensor", o);
+        return Error::InvalidArgument;
+      }
+      exec_aten::Tensor et_alias_out = out_arg->toTensor();
+      nvinfer1::Dims a_dims = ctx->getTensorShape(name.c_str());
+      if (a_dims.nbDims >= 0 && a_dims.nbDims <= nvinfer1::Dims::MAX_DIMS) {
+        SizesType a_sizes[nvinfer1::Dims::MAX_DIMS];
+        for (int d = 0; d < a_dims.nbDims; ++d) {
+          a_sizes[d] = static_cast<SizesType>(a_dims.d[d]);
+        }
+        (void)executorch::runtime::resize_tensor(et_alias_out, {a_sizes, static_cast<size_t>(a_dims.nbDims)});
+      }
+      void* dst = et_alias_out.nbytes() > 0 ? et_alias_out.mutable_data_ptr() : nullptr;
+      if (dst != nullptr && dst != bind_ptr) {
+        aliased_reflects.emplace_back(dst, bind_ptr, et_alias_out.nbytes());
+      }
+      continue;
+    }
+
+    const size_t arg_i = arg_idx++; // continue the shared running arg index after the inputs
+    EValue* arg = args[arg_i];
     TORCHTRT_ET_CHECK_NOT_NULL(arg, Error::InvalidArgument, "TensorRTBackend::execute: output %zu is not a tensor", o);
     if (!arg->isTensor()) {
       ET_LOG(Error, "TensorRTBackend::execute: output %zu is not a tensor", o);
@@ -509,7 +681,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     exec_aten::Tensor et_out = arg->toTensor();
-    const std::string& name = engine->output_binding_names[o];
 
     // Update the ExecuTorch tensor shape to the actual TRT output shape.
     // getTensorShape() is valid after inferShapes() has been called.
@@ -556,7 +727,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
       bind_ptr = engine->cached_output_ptrs[o];
       output_staged_to_host = true;
-      outputs_needing_copy.push_back({o, bind_ptr});
+      outputs_needing_copy.push_back({arg_i, bind_ptr});
     }
 
     if (!ctx->setTensorAddress(name.c_str(), bind_ptr)) {
@@ -577,6 +748,18 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     return Error::InvalidState;
   }
 
+  // Caller-owned KV: reflect each engine in-place update into its delegate output
+  // EValue (D2D on the same stream, after the engine work). No-op list under
+  // zero-copy (dst == src filtered out at bind time).
+  for (const auto& r : aliased_reflects) {
+    cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDeviceToDevice, stream);
+    if (cuda_err != cudaSuccess) {
+      ET_LOG(
+          Error, "TensorRTBackend::execute: aliased-output reflect D2D copy failed: %s", cudaGetErrorString(cuda_err));
+      return Error::InvalidProgram;
+    }
+  }
+
   // The engine work is now in flight on `stream`. Decide whether to wait for it:
   //   must_sync = an output is staged to host (the caller reads the D2H result on
   //   return), an input was staged from host (its async H2D read the caller's host
@@ -587,10 +770,17 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
   // copies live in the must_sync branch: an output staged to host always sets
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
-  const bool must_sync = output_staged_to_host || input_staged_from_host || !g_user_stream_set;
+  // A non-zero-copy aliased reflect enqueues the engine's in-place update into
+  // the delegate output EValue on `stream`; ExecuTorch's buffer-mutation copy_
+  // reads that EValue after execute() returns, so the reflect must complete
+  // first. Zero-copy aliases (dst == src) record no reflect, so the common
+  // caller-owned KV fast path is untouched.
+  const bool aliased_reflect_pending = !aliased_reflects.empty();
+  const bool must_sync =
+      output_staged_to_host || input_staged_from_host || aliased_reflect_pending || !g_user_stream_set;
   if (must_sync) {
     for (auto& output : outputs_needing_copy) {
-      exec_aten::Tensor et_out = args[num_inputs + output.first]->toTensor();
+      exec_aten::Tensor et_out = args[output.first]->toTensor();
       cuda_err =
           cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
       if (cuda_err != cudaSuccess) {

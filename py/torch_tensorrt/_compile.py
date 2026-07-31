@@ -1134,6 +1134,13 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
+                    from torch_tensorrt.dynamo._exporter import (
+                        _declare_aliased_kv_mutations_on_ep,
+                    )
+
+                    # retrace=True: torch.export truncates the engines' aliased KV
+                    # outputs, so declare them as buffer mutations before lowering.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
                         file_path,

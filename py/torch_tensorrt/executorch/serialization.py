@@ -10,7 +10,7 @@ import dataclasses
 import json
 import struct
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 TENSORRT_MAGIC = b"TR01"
 HEADER_FORMAT = "<4sIIIQ8s"
@@ -32,6 +32,11 @@ class TensorRTIOBinding:
 @dataclass
 class TensorRTBlobMetadata:
     io_bindings: List[TensorRTIOBinding] = field(default_factory=list)
+    # Aliased output->input bindings: out_name -> (in_name, kind). "kind" is an
+    # AliasKind value ("kv_cache_update" or "user"); the C++ backend binds each
+    # aliased engine output to its aliased input's tensor (in-place) so the
+    # update lands in the caller-owned buffer.
+    aliased_io: Dict[str, Tuple[str, str]] = field(default_factory=dict)
     hardware_compatible: bool = False
     device_id: int = 0
     serialized_metadata: str = ""
@@ -50,6 +55,12 @@ class TensorRTBlobMetadata:
                 }
                 for binding in self.io_bindings
             ],
+            # List form (not a dict) so the small C++ parser can walk it like
+            # io_bindings. Emitted right after io_bindings, before the scalars.
+            "aliased_io": [
+                {"output": out, "input": inp, "kind": kind}
+                for out, (inp, kind) in self.aliased_io.items()
+            ],
             "hardware_compatible": self.hardware_compatible,
             "device_id": self.device_id,
             "serialized_metadata": self.serialized_metadata,
@@ -67,8 +78,13 @@ class TensorRTBlobMetadata:
             )
             for binding in parsed.get("io_bindings", [])
         ]
+        aliased_io = {
+            b["output"]: (b["input"], b.get("kind", "kv_cache_update"))
+            for b in parsed.get("aliased_io", [])
+        }
         return cls(
             io_bindings=io_bindings,
+            aliased_io=aliased_io,
             hardware_compatible=parsed.get("hardware_compatible", False),
             device_id=parsed.get("device_id", 0),
             serialized_metadata=parsed.get("serialized_metadata", ""),

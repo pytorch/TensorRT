@@ -45,6 +45,7 @@ def _engine_node(device_id):
 def _edge_program(*nodes):
     return SimpleNamespace(
         graph_module=SimpleNamespace(graph=SimpleNamespace(nodes=list(nodes))),
+        graph_signature=SimpleNamespace(buffers_to_mutate={}, inputs_to_buffers={}),
         constants={},
     )
 
