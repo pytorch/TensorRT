@@ -233,6 +233,10 @@ TORCH_LIBRARY(tensorrt, m) {
     auto it = get_platform_name_map().find(Platform::PlatformEnum::kWIN_X86_64);
     return it->second;
   });
+  m.def("_platform_win_arm64", []() -> std::string {
+    auto it = get_platform_name_map().find(Platform::PlatformEnum::kWIN_ARM64);
+    return it->second;
+  });
   m.def("_platform_unknown", []() -> std::string {
     auto it = get_platform_name_map().find(Platform::PlatformEnum::kUNKNOWN);
     return it->second;

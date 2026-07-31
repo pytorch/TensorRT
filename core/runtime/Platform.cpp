@@ -12,6 +12,7 @@ const std::unordered_map<std::string, Platform::PlatformEnum>& get_name_to_platf
       {"linux_aarch64", Platform::PlatformEnum::kLINUX_AARCH64},
       {"linux_x86_64", Platform::PlatformEnum::kLINUX_X86_64},
       {"windows_x86_64", Platform::PlatformEnum::kWIN_X86_64},
+      {"windows_arm64", Platform::PlatformEnum::kWIN_ARM64},
       {"unknown", Platform::PlatformEnum::kUNKNOWN},
   };
   return name_to_platform_map;
@@ -22,6 +23,7 @@ const std::unordered_map<Platform::PlatformEnum, std::string>& _get_platform_nam
       {Platform::PlatformEnum::kLINUX_AARCH64, "linux_aarch64"},
       {Platform::PlatformEnum::kLINUX_X86_64, "linux_x86_64"},
       {Platform::PlatformEnum::kWIN_X86_64, "windows_x86_64"},
+      {Platform::PlatformEnum::kWIN_ARM64, "windows_arm64"},
       {Platform::PlatformEnum::kUNKNOWN, "unknown"}};
   return platform_name_map;
 }
@@ -83,6 +85,8 @@ Platform get_current_platform() {
 #elif defined(_WIN32) || defined(_WIN64)
 #if defined(_M_AMD64) || defined(_M_X64)
   return Platform(Platform::PlatformEnum::kWIN_X86_64);
+#elif defined(_M_ARM64)
+  return Platform(Platform::PlatformEnum::kWIN_ARM64);
 #else
   return Platform(Platform::PlatformEnum::kUNKNOWN);
 #endif
