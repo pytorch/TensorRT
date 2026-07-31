@@ -21,6 +21,7 @@ $targetLibraries = @(
     Join-Path $env:TORCHTRT_TARGET_TORCH_ROOT "lib\c10.lib"
     Join-Path $env:TORCHTRT_TARGET_TORCH_ROOT "lib\torch_cpu.lib"
     Join-Path $env:TORCHTRT_TARGET_CUDA_ROOT "lib\arm64\cudart.lib"
+    Join-Path $env:TORCHTRT_TARGET_PYTHON_ROOT "libs\python313.lib"
 )
 $nativeFiles += @($targetLibraries | Get-Item)
 $nativeFiles += @(Get-ChildItem -LiteralPath (Join-Path $env:TORCHTRT_TARGET_TRT_ROOT "lib") -Filter "tensorrt_rtx*.lib" | Select-Object -First 1)

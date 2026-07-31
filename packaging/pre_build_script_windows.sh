@@ -18,7 +18,8 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
 fi
 
 TORCH=$(grep "^torch>" py/requirements.txt)
-INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
+TORCH_INDEX_CU_VERSION=${TORCH_INDEX_CU_VERSION:-${CU_VERSION}}
+INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${TORCH_INDEX_CU_VERSION}
 
 # The workflow installs torch before this script runs. Avoid uninstalling and
 # force-reinstalling it here: with the shortened Windows conda prefix, pip can

@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)] [string] $PyTorchArtifact,
     [Parameter(Mandatory = $true)] [string] $TensorRTArtifact,
     [Parameter(Mandatory = $true)] [string] $TargetRoot,
-    [Parameter(Mandatory = $true)] [string] $CudaRoot
+    [Parameter(Mandatory = $true)] [string] $CudaRoot,
+    [Parameter(Mandatory = $true)] [string] $PythonRoot
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,8 +33,8 @@ function Find-Root {
     throw "Could not locate the normalized $Name root under $SearchRoot"
 }
 
-if ($env:CU_VERSION -notin @('cu130', 'cu132')) {
-    throw "Windows ARM64 RTX supports only cu130 and cu132; got '$env:CU_VERSION'"
+if ($env:PYTHON_VERSION -ne '3.13') {
+    throw "Windows ARM64 RTX supports only Python 3.13; got '$env:PYTHON_VERSION'"
 }
 if (Test-Path -LiteralPath $TargetRoot) {
     Remove-Item -LiteralPath $TargetRoot -Recurse -Force
@@ -51,6 +52,21 @@ $cudaArm64Lib = Join-Path $CudaRoot "lib\arm64\cudart.lib"
 if (-not (Test-Path -LiteralPath $cudaArm64Lib)) {
     throw "CUDA target library is missing: $cudaArm64Lib"
 }
+$cudaVersionFile = Join-Path $CudaRoot "version.json"
+if (-not (Test-Path -LiteralPath $cudaVersionFile -PathType Leaf)) {
+    throw "CUDA version file is missing: $cudaVersionFile"
+}
+$cudaVersion = (Get-Content -LiteralPath $cudaVersionFile -Raw | ConvertFrom-Json).cuda.version
+if ($cudaVersion -notlike '13.4*') {
+    throw "Windows ARM64 builds require CUDA 13.4 Preview; got '$cudaVersion'"
+}
+$pythonHeader = Join-Path $PythonRoot "include\Python.h"
+$pythonImportLibrary = Join-Path $PythonRoot "libs\python313.lib"
+foreach ($pythonFile in @($pythonHeader, $pythonImportLibrary)) {
+    if (-not (Test-Path -LiteralPath $pythonFile -PathType Leaf)) {
+        throw "ARM64 Python 3.13 development file is missing: $pythonFile"
+    }
+}
 foreach ($library in @('c10.lib', 'torch.lib', 'torch_cpu.lib', 'torch_python.lib')) {
     if (-not (Test-Path -LiteralPath (Join-Path $torchRoot "lib\$library"))) {
         throw "ARM64 PyTorch artifact is missing lib\$library"
@@ -64,8 +80,8 @@ function Export-GitHubEnvironment([string] $Name, [string] $Value) {
     "$Name=$($Value -replace '\\', '/')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 }
 Export-GitHubEnvironment "TORCHTRT_TARGET_PLATFORM" "windows-arm64"
-Export-GitHubEnvironment "TORCHTRT_BUILD_MODE" "cross"
 Export-GitHubEnvironment "TORCHTRT_TARGET_TORCH_ROOT" $torchRoot
 Export-GitHubEnvironment "TORCHTRT_TARGET_TRT_ROOT" $trtRoot
 Export-GitHubEnvironment "TORCHTRT_TARGET_CUDA_ROOT" $CudaRoot
-Write-Host "Prepared Windows ARM64 target sysroot: PyTorch=$torchRoot TensorRT-RTX=$trtRoot CUDA=$CudaRoot"
+Export-GitHubEnvironment "TORCHTRT_TARGET_PYTHON_ROOT" $PythonRoot
+Write-Host "Prepared Windows ARM64 target sysroot: PyTorch=$torchRoot TensorRT-RTX=$trtRoot CUDA=$CudaRoot Python=$PythonRoot"

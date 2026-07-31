@@ -11,11 +11,19 @@ on:
         required: true
         type: string
       desired-cuda:
-        description: cu130 or cu132
+        description: CUDA version for the Windows ARM64 target build
         required: true
         type: string
       pytorch-arm64-artifact:
         description: Absolute runner-local path to the Windows ARM64 PyTorch wheel or zip
+        required: true
+        type: string
+      python-arm64-root:
+        description: ARM64 Python 3.13 root containing include/Python.h and libs/python313.lib
+        required: true
+        type: string
+      cuda-arm64-root:
+        description: CUDA 13.4 Preview root containing ARM64 target libraries
         required: true
         type: string
       tensorrt-rtx-arm64-artifact:
@@ -31,6 +39,8 @@ jobs:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 120
     env:
+      # The current PyTorch WoA image only supports cu134; keep this configurable
+      # so future images can build against all supported CUDA versions.
       CU_VERSION: ${{ inputs.desired-cuda }}
       CHANNEL: nightly
       USE_TRT_RTX: "1"
@@ -66,7 +76,8 @@ jobs:
             -PyTorchArtifact '${{ inputs.pytorch-arm64-artifact }}' `
             -TensorRTArtifact '${{ inputs.tensorrt-rtx-arm64-artifact }}' `
             -TargetRoot '${{ runner.temp }}\torchtrt-windows-arm64' `
-            -CudaRoot "$env:CUDA_PATH"
+            -CudaRoot '${{ inputs.cuda-arm64-root }}' `
+            -PythonRoot '${{ inputs.python-arm64-root }}'
       - name: Prepare Torch-TensorRT dependencies
         run: bash packaging/pre_build_script_windows.sh
       - name: Cross-compile Windows ARM64 wheel
