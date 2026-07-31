@@ -13,6 +13,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Literal,
     Optional,
     Sequence,
     Set,
@@ -655,7 +656,9 @@ def save(
     file_path: str = "",
     *,
     extra_files: Optional[dict[str, str]] = None,
-    output_format: str = "exported_program",
+    output_format: Literal[
+        "exported_program", "torchscript", "aot_inductor"
+    ] = "exported_program",
     inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     kwarg_inputs: Optional[Dict[str, Any]] = None,
@@ -931,7 +934,7 @@ def save(
             "Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.jit.ScriptModule | torch.fx.GraphModule | torch.export.ExportedProgram."
         )
     elif module_type == _ModuleType.ts:
-        if not all(output_format == f for f in ["exported_program", "aot_inductor"]):
+        if output_format != "torchscript":
             raise ValueError(
                 "Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported"
             )
