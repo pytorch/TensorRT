@@ -92,6 +92,27 @@ jobs:
 
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
+        # Run the ExecuTorch backend C++ unit tests, which are otherwise only
+        # built, never executed. These tests link TensorRT and CUDA, but Bazel's
+        # cc_import ships the unversioned libnvinfer.so and libcudart.so while the
+        # loader asks for the versioned sonames, so add the directories holding
+        # those to LD_LIBRARY_PATH. Append rather than replace: the toolchain
+        # entries already present are still needed.
+        bazel_external="$(bazel info output_base)/external"
+        for _soname in libnvinfer.so libcudart.so; do
+          _dir="$(
+            find -L "${bazel_external}" -path "*/lib*/${_soname}.*" -printf '%h\n' 2>/dev/null |
+              sort -u | head -n1
+          )"
+          if [[ -z "${_dir}" ]]; then
+            echo "Could not locate a versioned ${_soname} under ${bazel_external}" >&2
+            exit 1
+          fi
+          export LD_LIBRARY_PATH="${_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+        done
+        bazel test //tests/cpp/executorch:executorch_backend_tests \
+          --compilation_mode opt --config=linux --test_output=errors \
+          --test_env=LD_LIBRARY_PATH
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"

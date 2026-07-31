@@ -21,6 +21,8 @@
 #include <memory>
 #include <vector>
 
+#include <cuda_runtime.h>
+#include <executorch/extension/cuda/caller_stream.h>
 #include <executorch/extension/data_loader/file_data_loader.h>
 #include <executorch/runtime/core/error.h>
 #include <executorch/runtime/core/evalue.h>
@@ -159,16 +161,28 @@ int main(int argc, char** argv) {
         input_strides[i].data());
   }
 
-  for (int run = 0; run < num_runs; ++run) {
-    for (size_t i = 0; i < num_inputs; ++i) {
-      exec_aten::Tensor input_tensor(&input_impls[i]);
-      EValue input_evalue(input_tensor);
-      Error err = method->set_input(input_evalue, i);
-      ET_CHECK_MSG(err == Error::Ok, "set_input(%zu) failed: 0x%" PRIx32, i, static_cast<uint32_t>(err));
-    }
+  cudaStream_t caller_stream = nullptr;
+  cudaError_t cuda_status = cudaStreamCreate(&caller_stream);
+  ET_CHECK_MSG(cuda_status == cudaSuccess, "cudaStreamCreate failed: %s", cudaGetErrorString(cuda_status));
+  {
+    executorch::extension::cuda::CallerStreamGuard caller_stream_guard(caller_stream);
+    for (int run = 0; run < num_runs; ++run) {
+      for (size_t i = 0; i < num_inputs; ++i) {
+        exec_aten::Tensor input_tensor(&input_impls[i]);
+        EValue input_evalue(input_tensor);
+        Error err = method->set_input(input_evalue, i);
+        ET_CHECK_MSG(err == Error::Ok, "set_input(%zu) failed: 0x%" PRIx32, i, static_cast<uint32_t>(err));
+      }
 
-    Error status = method->execute();
-    ET_CHECK_MSG(status == Error::Ok, "execute() failed on run %d: 0x%" PRIx32, run, static_cast<uint32_t>(status));
+      Error status = method->execute();
+      ET_CHECK_MSG(status == Error::Ok, "execute() failed on run %d: 0x%" PRIx32, run, static_cast<uint32_t>(status));
+    }
+  }
+  cuda_status = cudaStreamSynchronize(caller_stream);
+  ET_CHECK_MSG(cuda_status == cudaSuccess, "cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_status));
+  cuda_status = cudaStreamDestroy(caller_stream);
+  if (cuda_status != cudaSuccess) {
+    ET_LOG(Error, "cudaStreamDestroy failed: %s", cudaGetErrorString(cuda_status));
   }
   ET_LOG(Info, "Inference completed (%d run(s)).", num_runs);
 
