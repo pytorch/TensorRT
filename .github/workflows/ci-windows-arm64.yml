@@ -2,8 +2,8 @@ name: CI Windows ARM64
 
 # RTX-only build channel. Until Windows ARM64 PyTorch is published remotely,
 # this is manually dispatched onto an x86_64 Windows runner that can access the
-# two runner-local PyTorch artifacts. Runtime tests begin when a native ARM64
-# runner is available; cross-builds perform PE/header validation only.
+# runner-local PyTorch artifact and ARM64 Python development files. Runtime
+# tests begin when a native ARM64 runner is available; cross-builds perform PE/header validation only.
 on:
   workflow_dispatch:
     inputs:
@@ -12,22 +12,23 @@ on:
         required: true
         type: string
       python-version:
-        description: Target CPython version matching both ARM64 PyTorch wheels
-        default: "3.12"
+        description: Host and target CPython version (Windows ARM64 currently supports 3.13 only)
+        default: "3.13"
+        required: true
+        type: choice
+        options: ["3.13"]
+      pytorch-arm64-artifact:
+        description: Absolute runner-local path to the Windows ARM64 PyTorch wheel or zip
         required: true
         type: string
-      cuda:
-        description: CUDA variants to build
-        default: both
-        type: choice
-        options: [both, cu130, cu132]
-      pytorch-cu130-artifact:
-        description: Absolute runner-local path to the cu130 Windows ARM64 PyTorch artifact
-        required: false
+      python-arm64-root:
+        description: Absolute runner-local ARM64 Python 3.13 root containing include/Python.h and libs/python313.lib
+        required: true
         type: string
-      pytorch-cu132-artifact:
-        description: Absolute runner-local path to the cu132 Windows ARM64 PyTorch artifact
-        required: false
+      cuda-arm64-root:
+        description: Absolute runner-local CUDA 13.4 Preview root containing lib/arm64/cudart.lib
+        default: 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4'
+        required: true
         type: string
       tensorrt-rtx-artifact:
         description: Optional local TensorRT-RTX ARM64 zip; blank uses the NVIDIA URL
@@ -43,57 +44,43 @@ jobs:
     steps:
       - name: Validate selected artifacts
         env:
-          CUDA_SELECTION: ${{ inputs.cuda }}
-          PYTORCH_CU130: ${{ inputs.pytorch-cu130-artifact }}
-          PYTORCH_CU132: ${{ inputs.pytorch-cu132-artifact }}
+          PYTHON_VERSION: ${{ inputs.python-version }}
+          PYTORCH_ARM64: ${{ inputs.pytorch-arm64-artifact }}
+          PYTHON_ARM64_ROOT: ${{ inputs.python-arm64-root }}
+          CUDA_ARM64_ROOT: ${{ inputs.cuda-arm64-root }}
         run: |
           set -euo pipefail
-          if [[ "${CUDA_SELECTION}" != "cu132" && -z "${PYTORCH_CU130}" ]]; then
-            echo "::error::pytorch-cu130-artifact is required for ${CUDA_SELECTION}"
+          if [[ "${PYTHON_VERSION}" != "3.13" ]]; then
+            echo "::error::Windows ARM64 builds currently require Python 3.13"
             exit 1
           fi
-          if [[ "${CUDA_SELECTION}" != "cu130" && -z "${PYTORCH_CU132}" ]]; then
-            echo "::error::pytorch-cu132-artifact is required for ${CUDA_SELECTION}"
-            exit 1
-          fi
+          for value in "${PYTORCH_ARM64}" "${PYTHON_ARM64_ROOT}" "${CUDA_ARM64_ROOT}"; do
+            [[ -n "${value}" ]] || { echo "::error::ARM64 PyTorch, Python, and CUDA inputs are required"; exit 1; }
+          done
 
-  cu130:
+  build:
     needs: validate-inputs
-    if: inputs.cuda == 'both' || inputs.cuda == 'cu130'
     uses: ./.github/workflows/build_windows_arm64.yml
     with:
       runner: ${{ inputs.runner }}
       python-version: ${{ inputs.python-version }}
-      desired-cuda: cu130
-      pytorch-arm64-artifact: ${{ inputs.pytorch-cu130-artifact }}
-      tensorrt-rtx-arm64-artifact: ${{ inputs.tensorrt-rtx-artifact || 'https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-arm64-cuda-13.4-Release-external.zip' }}
-
-  cu132:
-    needs: validate-inputs
-    if: inputs.cuda == 'both' || inputs.cuda == 'cu132'
-    uses: ./.github/workflows/build_windows_arm64.yml
-    with:
-      runner: ${{ inputs.runner }}
-      python-version: ${{ inputs.python-version }}
-      desired-cuda: cu132
-      pytorch-arm64-artifact: ${{ inputs.pytorch-cu132-artifact }}
+      pytorch-arm64-artifact: ${{ inputs.pytorch-arm64-artifact }}
+      python-arm64-root: ${{ inputs.python-arm64-root }}
+      cuda-arm64-root: ${{ inputs.cuda-arm64-root }}
       tensorrt-rtx-arm64-artifact: ${{ inputs.tensorrt-rtx-artifact || 'https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-arm64-cuda-13.4-Release-external.zip' }}
 
   gate:
-    needs: [validate-inputs, cu130, cu132]
+    needs: [validate-inputs, build]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Gate Windows ARM64 builds
         env:
           VALIDATE_RESULT: ${{ needs.validate-inputs.result }}
-          CU130_RESULT: ${{ needs.cu130.result }}
-          CU132_RESULT: ${{ needs.cu132.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
         run: |
           set -euo pipefail
-          for result in "${VALIDATE_RESULT}" "${CU130_RESULT}" "${CU132_RESULT}"; do
-            if [[ "${result}" == "failure" || "${result}" == "cancelled" ]]; then
-              exit 1
-            fi
-          done
+          if [[ "${VALIDATE_RESULT}" != "success" || "${BUILD_RESULT}" != "success" ]]; then
+            exit 1
+          fi
           echo "Windows ARM64 RTX cross-build gate passed."

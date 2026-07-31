@@ -17,5 +17,5 @@ rem this, torch.utils.cpp_extension rejects the already-active VC environment.
 set DISTUTILS_USE_SDK=1
 python -m pip install --upgrade setuptools==72.1.0 wheel
 if errorlevel 1 exit /b %errorlevel%
-python setup.py bdist_wheel --use-rtx
+python setup.py bdist_wheel --use-rtx --windows-on-arm
 exit /b %errorlevel%
