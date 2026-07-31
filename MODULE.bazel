@@ -173,11 +173,9 @@ http_archive(
     urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-win-shared-with-deps-latest.zip"],
 )
 
-new_local_repository(
-    name = "libtorch_win_arm64",
-    build_file = "@//third_party/libtorch:BUILD",
-    path = "C:/torchtrt-arm64-artifacts/pytorch/torch",
-)
+# Native Windows ARM64 builds use the Torch package installed in the active
+# Python environment. Cross-builds override discovery through TORCH_PATH.
+local_torch(name = "libtorch_win_arm64")
 
 http_archive(
     name = "torch_l4t",

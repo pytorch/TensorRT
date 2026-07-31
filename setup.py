@@ -89,21 +89,25 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-IS_AARCH64 = platform.machine() == "aarch64"
+MACHINE_ARCH = platform.machine().lower()
+NATIVE_WINDOWS_ARM64 = IS_WINDOWS and MACHINE_ARCH in ("arm64", "aarch64")
+IS_AARCH64 = not IS_WINDOWS and MACHINE_ARCH == "aarch64"
 WINDOWS_ON_ARM = "--windows-on-arm" in sys.argv
 if WINDOWS_ON_ARM:
     # setuptools does not know this project-specific option, so consume it
     # before command-line processing. The environment variable remains
     # supported for CI and scripted builds.
     sys.argv.remove("--windows-on-arm")
-TARGET_WINDOWS_ARM64 = (
+FORCED_WINDOWS_ARM64 = (
     WINDOWS_ON_ARM
     or os.environ.get("TORCHTRT_TARGET_PLATFORM", "").lower() == "windows-arm64"
 )
-WINDOWS_CROSS_COMPILE = (
-    TARGET_WINDOWS_ARM64
-    and os.environ.get("TORCHTRT_BUILD_MODE", "cross").lower() == "cross"
-)
+if FORCED_WINDOWS_ARM64 and not IS_WINDOWS:
+    raise RuntimeError("Windows ARM64 builds are supported only on Windows")
+TARGET_WINDOWS_ARM64 = NATIVE_WINDOWS_ARM64 or FORCED_WINDOWS_ARM64
+# An ARM64 Python process builds natively. An x64 Python process must opt in to
+# the ARM64 target via --windows-on-arm or TORCHTRT_TARGET_PLATFORM.
+WINDOWS_CROSS_COMPILE = TARGET_WINDOWS_ARM64 and not NATIVE_WINDOWS_ARM64
 IS_JETPACK = False
 
 PY_ONLY = False
@@ -248,7 +252,7 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--compilation_mode=dbg")
     else:
         cmd.append("--compilation_mode=opt")
-    if use_dist_dir:
+    if use_dist_dir and not IS_WINDOWS:
         if IS_AARCH64:
             cmd.append("--distdir=third_party/dist_dir/aarch64-linux-gnu")
         else:
@@ -261,6 +265,7 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=windows")
         if TARGET_WINDOWS_ARM64:
             cmd.append("--platforms=//toolchains:windows_arm64")
+        if WINDOWS_CROSS_COMPILE:
             cmd.append(
                 "--extra_toolchains=@local_config_cc//:cc-toolchain-arm64_windows"
             )
@@ -300,7 +305,11 @@ def build_libtorchtrt_cxx11_abi(
         print(f"Using bazel --disk_cache={disk_cache}")
 
     env = os.environ.copy()
-    if "TORCH_PATH" not in env:
+    target_torch_path = env.get("TORCHTRT_TARGET_TORCH_ROOT")
+    if TARGET_WINDOWS_ARM64 and target_torch_path:
+        env["TORCH_PATH"] = target_torch_path
+        print(f"Using target TORCH_PATH={target_torch_path}")
+    elif "TORCH_PATH" not in env:
         stable_torch_path = resolve_torch_path()
         if stable_torch_path is not None:
             env["TORCH_PATH"] = stable_torch_path
@@ -748,18 +757,29 @@ if not (PY_ONLY or NO_TS):
             .split("/BUILD.bazel")[0]
         )
 
-    extension_type = setuptools.Extension if WINDOWS_CROSS_COMPILE else CUDAExtension
+    extension_type = setuptools.Extension if TARGET_WINDOWS_ARM64 else CUDAExtension
     target_torch_root = os.environ.get("TORCHTRT_TARGET_TORCH_ROOT")
     target_cuda_root = os.environ.get("TORCHTRT_TARGET_CUDA_ROOT")
     target_python_root = os.environ.get("TORCHTRT_TARGET_PYTHON_ROOT")
-    if WINDOWS_CROSS_COMPILE and not (target_torch_root and target_cuda_root and target_python_root):
+    if NATIVE_WINDOWS_ARM64:
+        target_torch_root = target_torch_root or os.path.dirname(torch.__file__)
+        target_cuda_root = (
+            target_cuda_root
+            or os.environ.get("CUDA_PATH")
+            or os.environ.get("CUDA_HOME")
+        )
+        target_python_root = target_python_root or sys.base_prefix
+    if TARGET_WINDOWS_ARM64 and not (
+        target_torch_root and target_cuda_root and target_python_root
+    ):
         raise RuntimeError(
-            "Windows ARM64 cross-compilation requires "
-            "TORCHTRT_TARGET_TORCH_ROOT and TORCHTRT_TARGET_CUDA_ROOT and TORCHTRT_TARGET_PYTHON_ROOT"
+            "Windows ARM64 builds require Torch, CUDA, and Python roots; set "
+            "TORCHTRT_TARGET_TORCH_ROOT, TORCHTRT_TARGET_CUDA_ROOT, and "
+            "TORCHTRT_TARGET_PYTHON_ROOT"
         )
 
     extension_kwargs = {}
-    if WINDOWS_CROSS_COMPILE:
+    if TARGET_WINDOWS_ARM64:
         extension_kwargs = {
             "library_dirs": [
                 os.path.join(target_python_root, "libs"),
@@ -822,7 +842,7 @@ if not (PY_ONLY or NO_TS):
                         ),
                         os.path.join(target_cuda_root, "include"),
                     ]
-                    if WINDOWS_CROSS_COMPILE
+                    if TARGET_WINDOWS_ARM64
                     else []
                 )
                 + (
