@@ -10,10 +10,19 @@ user_runner_project/
   torch_tensorrt/
 ```
 
-The normal integration path is to add both ExecuTorch and this package from
-your runner CMake. Linking `torchtrt::executorch_backend` makes the backend
-archive a dependency of your runner target, so you do not need a separate
-backend build step.
+This backend requires ExecuTorch 1.4 or a source commit containing
+`pytorch/executorch#20158` and `pytorch/executorch#20498`. The normal integration
+path for a runner that already enables ExecuTorch's CUDA backend is to add both
+ExecuTorch (with `EXECUTORCH_BUILD_CUDA=ON`) and this package, so the TensorRT
+backend links ExecuTorch's shared `extension_cuda` target directly. A libtorch-free
+runner should leave the full CUDA/AOTI backend disabled; this package then builds
+only the minimal shared `extension_cuda` caller-stream library from the ExecuTorch
+source checkout. Consumers on ELF platforms may instead set
+`EXECUTORCH_EXTENSION_CUDA_LIBRARY` to a prebuilt shared library; the value is
+checked to be a shared object, because a static copy would give each delegate its
+own caller-stream state. Linking `torchtrt::executorch_backend`
+makes the backend archive a dependency of your runner target, so you do not need a
+separate backend build step.
 
 ```cmake
 add_subdirectory("executorch")
@@ -31,6 +40,58 @@ target_link_libraries(
 
 The backend archive is available as the `executorch_trt_backend` CMake target
 and is written to `${CMAKE_BINARY_DIR}/lib/libexecutorch_trt_backend.a`.
+`libextension_cuda` remains a shared runtime dependency so every CUDA-capable
+delegate in the process observes the same caller-stream TLS instance.
+
+## Caller Stream API Migration
+
+`torch_tensorrt::executorch_backend::CudaStreamGuard` has been removed. Use
+ExecuTorch's backend-neutral guard instead:
+
+```cpp
+#include <executorch/extension/cuda/caller_stream.h>
+
+executorch::extension::cuda::CallerStreamGuard guard(stream);
+module.forward(inputs);
+```
+
+The old class is intentionally not kept as a deprecated alias: the goal is one
+backend-neutral primitive and one shared TLS definition, so all CUDA-capable
+delegates read the same caller-stream selection. (A deprecated `using` alias to
+`executorch::extension::cuda::CallerStreamGuard` would have shared that same TLS,
+so this removal is an API-simplification choice, not a correctness requirement.)
+This is a source-breaking C++ change; downstream callers must switch to the new
+type.
+
+### Caller-stream contract for the TensorRT backend
+
+The upstream `CallerStreamGuard` documents the generic contract (per-thread,
+nested scoping; the caller owns the stream for the guard's lifetime; the caller
+manages host-data lifetime for async work). The TensorRT backend adds these
+requirements, which previously lived on
+the removed `CudaStreamGuard`:
+
+- The selected stream must be on the TensorRT engine's device.
+- Calls using one delegate handle must not overlap, and must not overlap with
+  its destruction; the backend serializes `execute()` calls with an internal
+  mutex, but destruction is not mutex-guarded.
+- With a guard active and when no host staging is required (all inputs and
+  outputs are directly bindable — device, managed, or unified memory),
+  `execute()` may return with the TensorRT enqueue still in flight on the
+  stream (no end-of-execute sync). The backend orders the next `execute()` and
+  the handle's destruction after that work via an internal completion event, but
+  that event only protects backend-owned state. The caller must therefore keep
+  all directly bound input/output storage alive and unmodified until the work is
+  complete, order any cross-stream producers/consumers with their own events,
+  and synchronize the stream before reading outputs on the host.
+- With no guard active, the backend falls back to `cudaStreamPerThread`.
+- The reference-runner smoke test runs inference inside a caller-stream guard on
+  the discrete-GPU CI configuration, where all inputs and outputs are host-backed
+  and therefore take the synchronized staging path. CI separately asserts that the
+  runner resolves one shared `libextension_cuda.so`. Device-resident asynchronous
+  return is not covered end to end.
+- CUDA green-context streams require context-aware completion-event handling and
+  are not yet part of this integration's validated support matrix.
 
 ## Standalone Backend Archive
 
@@ -62,5 +123,6 @@ cmake -S torch_tensorrt/src/torch_tensorrt/executorch -B build-torchtrt-executor
   -DEXECUTORCH_ROOT="${EXECUTORCH_ROOT}" \
   -DTensorRT_ROOT="${TensorRT_ROOT}"
 
-cmake --build build-torchtrt-executorch --target executorch_trt_backend -j
+cmake --build build-torchtrt-executorch \
+  --target executorch_trt_backend -j
 ```

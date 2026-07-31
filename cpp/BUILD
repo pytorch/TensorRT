@@ -152,11 +152,15 @@ cc_library(
         ":tensorrt_executorch_blob_header",
     ] + select({
         ":linux_x86_64": [
+            "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
             "@cuda//:cudart",
             "@executorch//:executorch_headers",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
+            "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
             "@cuda//:cudart",
             "@executorch//:executorch_headers",
             "@tensorrt_sbsa//:nvinfer",
