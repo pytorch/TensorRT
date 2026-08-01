@@ -4018,6 +4018,7 @@ def aten_ops_arange_start_step(
         start=args[0],
         end=args[1],
         step=args_bounds_check(args, 2, 1),
+        dtype=kwargs.get("dtype", None),
     )
 
 
