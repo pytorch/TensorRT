@@ -108,6 +108,41 @@ TEST(ExecuTorchOptimizationProfileSelection, AutoRescansOnceTheActiveProfileStop
   EXPECT_EQ(selected, 1);
 }
 
+// A profile has to fit *every* input, not just the first one it is asked about.
+// Here profile 0 accepts the one-token input_ids but not the longer second input,
+// so auto has to keep looking rather than stop at the first partial match.
+TEST(ExecuTorchOptimizationProfileSelection, AutoSkipsAProfileThatFitsOnlySomeInputs) {
+  ProfileTable table;
+  table.bounds = {
+      {bounds({1, 1}, {1, 1}), bounds({1, 1}, {1, 1})}, // profile 0: second input too narrow
+      {bounds({1, 1}, {1, 1}), bounds({1, 1}, {1, 128})}, // profile 1: fits both
+  };
+  table.all_inputs_static = false;
+  const std::vector<nvinfer1::Dims> inputs{dims({1, 1}), dims({1, 64})};
+  int32_t selected = -1;
+
+  EXPECT_EQ(select_profile(table, ProfileRequest::kAuto, 0, inputs, selected), ProfileSelection::kOk);
+  EXPECT_EQ(selected, 1);
+}
+
+// The rescan is a first-fit from 0, so when the active profile stops fitting and
+// several others would serve, the lowest matching index wins.
+TEST(ExecuTorchOptimizationProfileSelection, RescanTakesTheLowestOfSeveralMatchingProfiles) {
+  ProfileTable table;
+  table.bounds = {
+      {bounds({1, 1}, {1, 64})}, // profile 0: fits
+      {bounds({1, 1}, {1, 256})}, // profile 1: fits too
+      {bounds({1, 512}, {1, 2048})}, // profile 2: active, no longer fits
+  };
+  table.all_inputs_static = false;
+  table.active = 2;
+  const std::vector<nvinfer1::Dims> short_input{dims({1, 32})};
+  int32_t selected = -1;
+
+  EXPECT_EQ(select_profile(table, ProfileRequest::kAuto, 0, short_input, selected), ProfileSelection::kOk);
+  EXPECT_EQ(selected, 0);
+}
+
 // A shape no profile covers is an input error, not a silent clamp.
 TEST(ExecuTorchOptimizationProfileSelection, AutoRejectsShapeNoProfileCovers) {
   ProfileTable table = decode_and_prefill();

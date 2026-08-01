@@ -90,12 +90,12 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 
 EngineHandle::~EngineHandle() {
   cudaSetDevice(device_id);
-  // A fast-path execute() may have returned with its enqueue still in flight on the
-  // caller's stream, still using exec_ctx and the cached staging buffers. Wait on
+  // An execute() may have returned with GPU work still in flight on the caller's
+  // stream, still using exec_ctx and the cached staging buffers. Wait on
   // the recorded completion event before destroying the context or freeing the
   // buffers. We wait on the event, not the stream, so this stays valid even if the
-  // caller already destroyed the stream. Non-skip executes synchronized inline, so
-  // inflight_pending is false there. Fall back to a device sync if no event exists.
+  // caller already destroyed the stream. Executes that synchronized inline cleared
+  // inflight_pending. Fall back to a device sync if no event exists.
   if (inflight_event != nullptr) {
     if (inflight_pending) {
       cudaError_t err = cudaEventSynchronize(inflight_event);
@@ -276,6 +276,20 @@ bool is_cuda_accessible_ptr(const void* ptr) {
   return attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
 }
 
+// Marks the work just enqueued on `stream` as still in flight, so the next execute()
+// and ~EngineHandle wait for it before they reconfigure or free exec_ctx. Recording
+// over an already-recorded event just moves the marker forward, so callers can mark
+// repeatedly as they enqueue more. If the event cannot be armed, drain instead: the
+// caller has no other way to know the work is outstanding.
+void mark_inflight(EngineHandle& engine, cudaStream_t stream) {
+  const cudaError_t err = cudaEventRecord(engine.inflight_event, stream);
+  if (err != cudaSuccess) {
+    ET_LOG(Error, "TensorRTBackend::execute: cudaEventRecord failed: %s", cudaGetErrorString(err));
+    (void)cudaStreamSynchronize(stream);
+  }
+  engine.inflight_pending = (err == cudaSuccess);
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -330,8 +344,8 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
 
   // Created while device_id is current so the event belongs to the engine's device.
-  // It orders a later execute()/teardown after a skip-sync enqueue (see execute()
-  // and ~EngineHandle). Blocking-sync so the host yields instead of busy-spinning.
+  // It orders a later execute()/teardown after whatever execute() left running on the
+  // stream (see mark_inflight). Blocking-sync so the host yields, not busy-spins.
   cuda_err = cudaEventCreateWithFlags(&handle->inflight_event, cudaEventDisableTiming | cudaEventBlockingSync);
   if (cuda_err != cudaSuccess) {
     ET_LOG(Error, "TensorRTBackend::init: cudaEventCreateWithFlags failed: %s", cudaGetErrorString(cuda_err));
@@ -519,6 +533,11 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       ET_LOG(Error, "TensorRTBackend::execute: setOptimizationProfileAsync(%d) failed", profile);
       return Error::InvalidState;
     }
+    // The switch enqueues copies of the new profile's weights/scratch, and TensorRT
+    // forbids reconfiguring or destroying a context while they run. The binding loop
+    // below can still fail and return, so mark them now instead of relying on the
+    // enqueue at the tail to do it.
+    mark_inflight(*engine, stream);
     engine->profiles.active = profile;
     ET_LOG(Info, "TensorRTBackend::execute: switched to optimization profile %d", profile);
   }
@@ -679,15 +698,17 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         "cudaStreamPerThread is invalid while a green context is current.");
     return Error::InvalidState;
   }
+  mark_inflight(*engine, stream);
 
-  // The engine work is now in flight on `stream`. Decide whether to wait for it:
+  // The engine work is now in flight on `stream` and marked as such. Decide whether
+  // to wait for it here:
   //   must_sync = an output is staged to host (the caller reads the D2H result on
   //   return), an input was staged from host (its async H2D read the caller's host
   //   buffer, which the caller may reuse once we return), or no caller stream is
   //   active (preserve the historical "results ready on return" behavior).
-  // Otherwise (caller stream + all I/O device-resident) leave the work enqueued so
-  // it composes with the caller's later GPU work, and record inflight_event so the
-  // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
+  // Otherwise (caller stream + all I/O device-resident) leave the work enqueued so it
+  // composes with the caller's later GPU work; the marker already tells the next
+  // execute() and the destructor to wait before reusing/freeing exec_ctx. The D2H
   // copies live in the must_sync branch: an output staged to host always sets
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
   const bool must_sync = output_staged_to_host || input_staged_from_host || !g_user_stream_set;
@@ -702,6 +723,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
             "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
             output.first,
             cudaGetErrorString(cuda_err));
+        // Earlier iterations are still copying into the caller's output tensors.
+        (void)cudaStreamSynchronize(stream);
+        engine->inflight_pending = false;
         return Error::InvalidProgram;
       }
     }
@@ -711,17 +735,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
       return Error::InvalidProgram;
     }
-  } else {
-    cuda_err = cudaEventRecord(engine->inflight_event, stream);
-    if (cuda_err != cudaSuccess) {
-      // Could not arm the completion marker; drain now so a later execute() or the
-      // destructor never reconfigures or frees exec_ctx while this enqueue runs.
-      ET_LOG(Error, "TensorRTBackend::execute: cudaEventRecord failed: %s", cudaGetErrorString(cuda_err));
-      (void)cudaStreamSynchronize(stream);
-      engine->inflight_pending = false;
-      return Error::InvalidProgram;
-    }
-    engine->inflight_pending = true;
   }
   return Error::Ok;
 }

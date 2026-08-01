@@ -89,7 +89,12 @@ class CudaStreamGuard {
 inline constexpr int32_t kAutoSelectProfile = -1;
 
 // Selects, for the calling thread, which TensorRT optimization profile the
-// delegate runs; scope it around Module::forward() / Module::execute():
+// delegate runs; scope it around Module::forward() / Module::execute(). A
+// profile is identified by its index in the export-time profile list, so name
+// them to match whatever the exporter declared:
+//
+//   constexpr int32_t kDecodeProfile = 0;  // export order: decode first,
+//   constexpr int32_t kPrefillProfile = 1; // then prefill
 //
 //   executorch::extension::Module module("model.pte");
 //   {

@@ -123,10 +123,18 @@ A TensorRT engine can hold several optimization profiles: one weight set, one
 engine, several kernel tunings, each valid over a different input-shape range.
 Scope an `OptimizationProfileGuard` around the call to pick one:
 
+A profile is identified by its index in the list declared at export time. Only
+`kAutoSelectProfile` is a library constant; name the indices yourself to match
+the exporter, as `export_multi_profile.py` declares decode first and prefill
+second:
+
 ```cpp
 #include <torch_tensorrt/executorch/TensorRTBackend.h>
 
 using torch_tensorrt::executorch_backend::OptimizationProfileGuard;
+
+constexpr int32_t kDecodeProfile = 0;
+constexpr int32_t kPrefillProfile = 1;
 
 executorch::extension::Module module("model_gemma3_multi_profile.pte");
 {
