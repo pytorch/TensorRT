@@ -11,7 +11,7 @@ user_runner_project/
 ```
 
 The normal integration path is to add both ExecuTorch and this package from
-your runner CMake. Linking `torchtrt::executorch_backend` makes the backend
+your runner CMake. Linking `torchtrt::backend_tensorrt` makes the backend
 archive a dependency of your runner target, so you do not need a separate
 backend build step.
 
@@ -26,15 +26,15 @@ target_link_libraries(
     executorch::backends
     executorch::extensions
     executorch::kernels
-    torchtrt::executorch_backend)
+    torchtrt::backend_tensorrt)
 ```
 
-The backend archive is available as the `executorch_trt_backend` CMake target
-and is written to `${CMAKE_BINARY_DIR}/lib/libexecutorch_trt_backend.a`.
+The backend archive is available as the `executorch_backend_tensorrt` CMake target
+and is written to `${CMAKE_BINARY_DIR}/lib/libexecutorch_backend_tensorrt.a`.
 
 ## Standalone Backend Archive
 
-Use this path only when you need `libexecutorch_trt_backend.a` without building
+Use this path only when you need `libexecutorch_backend_tensorrt.a` without building
 a runner that adds ExecuTorch with `add_subdirectory`. In that standalone mode,
 build the ExecuTorch core runtime first:
 
@@ -62,5 +62,5 @@ cmake -S torch_tensorrt/src/torch_tensorrt/executorch -B build-torchtrt-executor
   -DEXECUTORCH_ROOT="${EXECUTORCH_ROOT}" \
   -DTensorRT_ROOT="${TensorRT_ROOT}"
 
-cmake --build build-torchtrt-executorch --target executorch_trt_backend -j
+cmake --build build-torchtrt-executorch --target executorch_backend_tensorrt -j
 ```

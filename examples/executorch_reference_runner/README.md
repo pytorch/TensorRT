@@ -22,9 +22,9 @@ python examples/torchtrt_executorch_example/export_static_shape.py --model_path=
 ## Build The Reference Runner
 
 A normal reference runner build does not need separate steps for
-`libexecutorch_core.a` and `libexecutorch_trt_backend.a`. The runner CMake adds
+`libexecutorch_core.a` and `libexecutorch_backend_tensorrt.a`. The runner CMake adds
 both ExecuTorch and the Torch-TensorRT ExecuTorch source package, and linking
-`torchtrt::executorch_backend` makes the backend archive a dependency of
+`torchtrt::backend_tensorrt` makes the backend archive a dependency of
 `example_executorch_runner`.
 
 The `libtorchtrt.tar.gz` package also includes a prebuilt reference runner:
@@ -74,7 +74,7 @@ The build also creates the executorch core and tensorrt backend archive as a dep
 
 ```text
 build-executorch-reference-runner/executorch/libexecutorch_core.a
-build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
+build-executorch-reference-runner/lib/libexecutorch_backend_tensorrt.a
 ```
 
 ## Load And Run A `.pte` Model

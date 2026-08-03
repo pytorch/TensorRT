@@ -98,3 +98,7 @@ jobs:
         # this is to verify the end user's workflow
         python -m pip install pyyaml "executorch>=1.3.1"
         .github/scripts/verify-executorch-reference-runner.sh
+        # The check above builds ExecuTorch from source. This one verifies the other
+        # half: that an application can consume the delegate from an installed
+        # package, with no source checkout.
+        .github/scripts/verify-executorch-wheel-consumer.sh

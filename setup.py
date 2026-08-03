@@ -24,7 +24,7 @@ from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from setuptools.command.editable_wheel import editable_wheel
 from setuptools.command.install import install
-from torch.utils.cpp_extension import IS_WINDOWS, BuildExtension, CUDAExtension
+from torch.utils.cpp_extension import BuildExtension, CUDAExtension, IS_WINDOWS
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
@@ -98,17 +98,86 @@ LEGACY = False
 RELEASE = False
 CI_BUILD = False
 USE_TRT_RTX = False
+# Off by default. What a wheel contains should not depend on what happens to be
+# installed on the build machine, so the delegate is built only when asked for, and
+# then its prerequisites are mandatory.
+BUILD_EXECUTORCH_DELEGATE = False
 
-EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
-EXTRAS_REQUIRE = {
-    "executorch": [EXECUTORCH_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT],
-}
+
+# The ExecuTorch release this project's delegate is built and tested against. Written
+# here rather than read from the build machine, so the published metadata is a property
+# of the source: two builds of the same commit declare the same dependency. Update it
+# together with the delegate.
+#
+# The delegate links the shared runtime through the executorch::runtime target, which
+# earlier releases do not provide, so it has to name the release that introduces it. That
+# release is still a pre-release, and it is spelled out here because PEP 440 excludes
+# pre-releases from == and >= unless the version string says one explicitly. Naming a
+# final version that is not published yet would produce metadata no consumer can resolve.
+EXECUTORCH_DELEGATE_VERSION = "1.4.0a0"
+
+# The lowest release that works for a wheel with no delegate. Such a wheel is not bound
+# to the newer runtime at all, so it keeps a bound that resolves against what is
+# published rather than inheriting the delegate's pre-release pin.
+EXECUTORCH_MINIMUM_VERSION = "1.3.1"
+
+
+def _verify_executorch_version() -> None:
+    """Fail if the installed ExecuTorch is not the pinned one.
+
+    Only called when the delegate is actually being built, since that is what binds the
+    wheel to one runtime version. There is no promise of a stable C++ ABI across
+    releases, so a delegate built against a different version than the metadata names
+    would install cleanly and then fail to load.
+    """
+    try:
+        from importlib.metadata import version
+
+        installed = version("executorch")
+    except ModuleNotFoundError:
+        raise RuntimeError(
+            "--executorch-delegate needs executorch installed to build against"
+        )
+    # Compare the full public version, including any pre-release marker. Comparing only
+    # the numeric part would accept 1.4.0a1 or the final 1.4.0 against a 1.4.0a0 pin, and
+    # those are different binaries from the one the delegate was built against. A local
+    # build suffix is dropped, since a local build of the pinned release is still that
+    # release.
+    installed_release = installed.split("+", 1)[0]
+    pinned_release = EXECUTORCH_DELEGATE_VERSION.split("+", 1)[0]
+    if installed_release != pinned_release:
+        raise RuntimeError(
+            f"this project pins executorch=={EXECUTORCH_DELEGATE_VERSION} but "
+            f"{installed} is installed; update EXECUTORCH_DELEGATE_VERSION together "
+            "with the delegate, or build against the pinned release"
+        )
+
+
+def _executorch_requirement(exact: bool) -> str:
+    """The ExecuTorch requirement for the [executorch] extra.
+
+    Exact only when this wheel carries the delegate, because that is what binds it to one
+    runtime version. A wheel without the delegate has no such binding, so it keeps a lower
+    bound against the published releases.
+    """
+    if exact:
+        return f"executorch=={EXECUTORCH_DELEGATE_VERSION}"
+    return f"executorch>={EXECUTORCH_MINIMUM_VERSION}"
 
 
 if "--use-rtx" in sys.argv:
     USE_TRT_RTX = True
     sys.argv.remove("--use-rtx")
+
+if "--executorch-delegate" in sys.argv:
+    BUILD_EXECUTORCH_DELEGATE = True
+    sys.argv.remove("--executorch-delegate")
+
+EXECUTORCH_REQUIREMENT = _executorch_requirement(BUILD_EXECUTORCH_DELEGATE)
+EXTRAS_REQUIRE = {
+    "executorch": [EXECUTORCH_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT],
+}
 
 if "--fx-only" in sys.argv:
     PY_ONLY = True
@@ -146,6 +215,18 @@ if (use_rtx_env_var := os.environ.get("USE_TRT_RTX")) is not None:
     if use_rtx_env_var == "1" or use_rtx_env_var.lower() == "true":
         USE_TRT_RTX = True
 
+if BUILD_EXECUTORCH_DELEGATE:
+    _verify_executorch_version()
+
+if BUILD_EXECUTORCH_DELEGATE and (PY_ONLY or NO_TS):
+    # The package_data that carries the delegate is only assembled for a full build, so
+    # these combinations would compile it and then ship nothing. Fail rather than
+    # produce a wheel that quietly lacks what was asked for.
+    raise RuntimeError(
+        "--executorch-delegate cannot be combined with a Python-only or "
+        "no-TorchScript build, because those do not package the delegate"
+    )
+
 # Distribution name: keep import package as `torch_tensorrt`, but vary project
 # name so wheels for RTX vs standard TensorRT are distinct.
 PROJECT_NAME = "torch_tensorrt_rtx" if USE_TRT_RTX else "torch_tensorrt"
@@ -178,7 +259,7 @@ if (release_env_var := os.environ.get("RELEASE")) is not None:
         RELEASE = True
 
 if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
-    gpu_arch_version = f"cu{__cuda_version__.replace('.','')}"
+    gpu_arch_version = f"cu{__cuda_version__.replace('.', '')}"
 
 if IS_AARCH64 and (jetpack := os.environ.get("JETPACK_BUILD")) is not None:
     if jetpack == "1":
@@ -323,6 +404,84 @@ def gen_version_file():
         f.write('__tensorrt_llm_version__ = "' + __tensorrt_llm_version__ + '"\n')
 
 
+def build_executorch_delegate():
+    """Build and install the ExecuTorch TensorRT delegate into the package.
+
+    This is a CMake project, so it is not part of the Bazel tarball the other
+    libraries come from. Installing it into the package directory puts the library
+    under lib/ and its CMake package under lib/cmake, both of which package_data
+    already collects.
+
+    Skipped when ExecuTorch is not importable, so a build without the optional
+    dependency keeps working and simply produces a wheel with no delegate.
+    """
+    try:
+        import executorch
+    except ImportError:
+        raise RuntimeError(
+            "--executorch-delegate needs executorch installed to build against"
+        )
+
+    executorch_cmake = (
+        Path(executorch.__path__[0]) / "share" / "cmake" / "executorch-config.cmake"
+    )
+    # The file alone is not enough. Released ExecuTorch wheels ship a config that
+    # only locates the Python extension, with no runtime target to link, so the
+    # delegate cannot be built against them. Skipping here keeps the wheel
+    # buildable today and starts producing a delegate once a wheel with the shared
+    # runtime is available, with no further change needed.
+    if (
+        not executorch_cmake.is_file()
+        or "executorch::runtime" not in executorch_cmake.read_text()
+    ):
+        raise RuntimeError(
+            "the installed executorch ships no shared runtime target, so the "
+            "delegate cannot be built against it; a wheel with the C++ runtime is "
+            "required"
+        )
+
+    source = Path(dir_path) / ".." / "cpp" / "src" / "torch_tensorrt" / "executorch"
+    if not (source / "CMakeLists.txt").is_file():
+        raise RuntimeError(f"delegate sources are missing from {source}")
+
+    build = Path(dir_path) / "build" / "executorch_delegate"
+    prefix = Path(dir_path) / "torch_tensorrt"
+    configure = [
+        "cmake",
+        "-S",
+        str(source.resolve()),
+        "-B",
+        str(build),
+        "-DTORCHTRT_EXECUTORCH_BUILD_SHARED_DELEGATE=ON",
+        f"-DCMAKE_PREFIX_PATH={executorch_cmake.parent}",
+        f"-DCMAKE_INSTALL_PREFIX={prefix}",
+        # Pinned so the library lands where package_data looks, rather than in a
+        # lib64 directory on distributions that default to it.
+        "-DCMAKE_INSTALL_LIBDIR=lib",
+    ]
+    if os.environ.get("TensorRT_ROOT"):
+        configure.append(f"-DTensorRT_ROOT={os.environ['TensorRT_ROOT']}")
+
+    print("building the ExecuTorch TensorRT delegate")
+    if subprocess.run(configure).returncode != 0:
+        raise RuntimeError("the ExecuTorch TensorRT delegate failed to configure")
+    subprocess.run(["cmake", "--build", str(build), "-j"], check=True)
+    subprocess.run(["cmake", "--install", str(build)], check=True)
+
+    # Assert what the wheel will actually carry. Without this a configuration that
+    # produces nothing still reports success, and the wheel ships without the
+    # delegate it advertises.
+    library = sorted((prefix / "lib").glob("libexecutorch_backend_tensorrt.so*"))
+    if not library:
+        raise RuntimeError(f"the delegate library was not installed into {prefix}")
+    exported = prefix / "lib" / "cmake" / "torch_tensorrt_executorch"
+    if not list(exported.glob("*.cmake")):
+        raise RuntimeError(
+            f"the delegate CMake package was not installed into {exported}"
+        )
+    print(f"packaged the ExecuTorch TensorRT delegate: {library[0].name}")
+
+
 def copy_libtorchtrt(multilinux=False, rt_only=False):
     if not os.path.exists(dir_path + "/torch_tensorrt/lib"):
         os.makedirs(dir_path + "/torch_tensorrt/lib")
@@ -377,6 +536,9 @@ class DevelopCommand(develop):
             self.root_is_pure = False
 
     def run(self):
+        # Independent of the Bazel build: this needs only an installed ExecuTorch.
+        if BUILD_EXECUTORCH_DELEGATE:
+            build_executorch_delegate()
         if not PY_ONLY:
             build_libtorchtrt_cxx11_abi(develop=True, rt_only=NO_TS)
             copy_libtorchtrt(rt_only=NO_TS)
@@ -397,6 +559,9 @@ class InstallCommand(install):
             self.root_is_pure = False
 
     def run(self):
+        # Independent of the Bazel build: this needs only an installed ExecuTorch.
+        if BUILD_EXECUTORCH_DELEGATE:
+            build_executorch_delegate()
         if not PY_ONLY:
             build_libtorchtrt_cxx11_abi(develop=False, rt_only=NO_TS)
             copy_libtorchtrt(rt_only=NO_TS)
@@ -423,6 +588,9 @@ class BdistCommand(bdist_wheel):
             self.distribution.metadata.name = PROJECT_NAME
         except Exception:
             pass
+        # Independent of the Bazel build: this needs only an installed ExecuTorch.
+        if BUILD_EXECUTORCH_DELEGATE:
+            build_executorch_delegate()
         if not PY_ONLY:
             build_libtorchtrt_cxx11_abi(develop=False, rt_only=NO_TS)
             copy_libtorchtrt(rt_only=NO_TS)
@@ -613,6 +781,12 @@ if _FX_FE_AVAIL:
 
 package_data = {}
 executorch_header_package_data = ["include/torch_tensorrt/executorch/*.h"]
+# The delegate is built by CMake rather than Bazel, so it is copied into the
+# package separately. Its CMake package has to ship too, otherwise a C++
+# application can find the library but not the target that knows how to link it.
+executorch_delegate_package_data = [
+    "lib/cmake/torch_tensorrt_executorch/*.cmake",
+]
 
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (
@@ -792,6 +966,7 @@ if not (PY_ONLY or NO_TS):
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
                 *executorch_header_package_data,
+                *executorch_delegate_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/conversion/*.h",
                 "include/torch_tensorrt/core/conversion/conversionctx/*.h",
@@ -822,6 +997,7 @@ elif NO_TS:
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
                 *executorch_header_package_data,
+                *executorch_delegate_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/runtime/*.h",
                 "lib/*",
