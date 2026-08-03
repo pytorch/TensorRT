@@ -10,7 +10,11 @@ import torch
 from torch.export import Dim, export
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import default_device
-from torch_tensorrt.dynamo.utils import get_torch_inputs, to_torch_device
+from torch_tensorrt.dynamo.utils import (
+    get_torch_inputs,
+    is_quantized_by_modelopt,
+    to_torch_device,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +72,7 @@ def trace(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
     arg_inputs = inputs if inputs is not None else arg_inputs
+    assert arg_inputs is not None
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -83,11 +88,16 @@ def trace(
     dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry))
 
     export_context = nullcontext()
-    if importlib.util.find_spec("modelopt") is not None:
-        from modelopt.torch.quantization.utils import export_torch_mode, is_quantized
 
-        if is_quantized(mod):
-            export_context = export_torch_mode()
+    if is_quantized_by_modelopt(mod):
+        if importlib.util.find_spec("modelopt") is None:
+            raise ImportError(
+                "The provided model is quantized by ModelOpt, but ModelOpt is not installed."
+            )
+
+        from modelopt.torch.quantization.utils import export_torch_mode
+
+        export_context = export_torch_mode()
 
     with export_context:
         exp_program = export(
