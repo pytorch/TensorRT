@@ -41,6 +41,14 @@ class TestEmbeddingConverter(DispatchTestCase):
                 weights_tensor=torch.randn((5, 10), dtype=torch.float32),
                 sparse=True,
             ),
+            param(
+                test_name="3d_indices_int64",
+                indices_tensor=torch.tensor(
+                    [[[0, 1], [2, 3]], [[3, 4], [4, 0]]], dtype=torch.int64
+                ),
+                weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=True,
+            ),
         ]
     )
     def test_embedding(
