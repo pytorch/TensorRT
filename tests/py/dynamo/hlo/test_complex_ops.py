@@ -65,7 +65,7 @@ _COMPILE = dict(ir="dynamo", min_block_size=1, pass_through_build_failures=True)
 
 # Extra compile kwargs for the "explicit compile" tests (dynamic-shape and
 # truncate cases) that do NOT spread **_COMPILE.  The autouse fixture below
-# fills this with {"use_complex_decomposition": True} on the decomp param.
+# fills this with the use_complex_decomposition value for the current param.
 _DECOMP: dict = {}
 
 
@@ -77,16 +77,20 @@ def _complex_path(request):
     The flag is toggled on the shared _COMPILE dict (picked up by the ~28 tests
     that spread **_COMPILE) and mirrored into _DECOMP (spread by the handful of
     explicit torchtrt.dynamo.compile / truncate tests).
+
+    Both params set the flag EXPLICITLY.  Relying on the default for the legacy
+    param would be wrong: USE_COMPLEX_DECOMPOSITION defaults to
+    has_complex_decomposition(), so on torch>=2.14 an absent key would silently
+    select the decomposition path and the [legacy] variant would stop testing
+    the legacy rewriter.
     """
-    use_decomp = request.param
+    use_decomp = bool(request.param)
     if use_decomp and not has_complex_decomposition():
         pytest.skip("decompose_complex_in_graph requires torch>=2.14.dev")
 
-    _COMPILE.pop("use_complex_decomposition", None)
+    _COMPILE["use_complex_decomposition"] = use_decomp
     _DECOMP.clear()
-    if use_decomp:
-        _COMPILE["use_complex_decomposition"] = True
-        _DECOMP["use_complex_decomposition"] = True
+    _DECOMP["use_complex_decomposition"] = use_decomp
     yield
     _COMPILE.pop("use_complex_decomposition", None)
     _DECOMP.clear()

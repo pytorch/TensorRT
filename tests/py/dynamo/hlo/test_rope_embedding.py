@@ -21,8 +21,8 @@ from torch_tensorrt._features import has_complex_decomposition
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 # Extra compile kwargs injected into every test's compile_spec by the autouse
-# fixture below: {} on the legacy path, {"use_complex_decomposition": True} on
-# the decomp path (issue #4390).
+# fixture below: {"use_complex_decomposition": False} on the legacy path,
+# {"use_complex_decomposition": True} on the decomp path (issue #4390).
 _DECOMP: dict = {}
 
 
@@ -30,13 +30,19 @@ _DECOMP: dict = {}
 def _complex_path(request):
     """Run every RoPE test on both the legacy rewriter and PyTorch's upstream
     complex decomposition. The dynamic cases here are the acceptance bar for
-    dynamic-shape survival through the upstream make_fx retrace."""
-    use_decomp = request.param
+    dynamic-shape survival through the upstream make_fx retrace.
+
+    Both params set the flag EXPLICITLY.  Relying on the default for the legacy
+    param would be wrong: USE_COMPLEX_DECOMPOSITION defaults to
+    has_complex_decomposition(), so on torch>=2.14 an absent key would silently
+    select the decomposition path and the [legacy] variant would stop testing
+    the legacy rewriter.
+    """
+    use_decomp = bool(request.param)
     if use_decomp and not has_complex_decomposition():
         pytest.skip("decompose_complex_in_graph requires torch>=2.14.dev")
     _DECOMP.clear()
-    if use_decomp:
-        _DECOMP["use_complex_decomposition"] = True
+    _DECOMP["use_complex_decomposition"] = use_decomp
     yield
     _DECOMP.clear()
 

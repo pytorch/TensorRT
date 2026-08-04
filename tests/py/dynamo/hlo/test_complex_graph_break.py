@@ -28,11 +28,29 @@ import pytest
 import torch
 import torch.nn as nn
 import torch_tensorrt as torchtrt
+from torch_tensorrt._features import has_complex_decomposition
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.complex_graph_rewrite import (
     complex_graph_detection,
 )
-from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+# The structural tests below assert the LEGACY rewriter's graph-break mechanism
+# (wrapping an unhandled complex op with view_as_complex/view_as_real).  The
+# upstream decomposition path (use_complex_decomposition=True) may instead cover
+# the op outright, so it breaks on fewer ops and the structural shape differs --
+# those checks are therefore legacy-specific.  End-to-end numerical correctness,
+# however, must hold on BOTH paths, so that test is parametrized.
+_DECOMP_PARAMS = [
+    False,
+    pytest.param(
+        True,
+        marks=pytest.mark.skipif(
+            not has_complex_decomposition(),
+            reason="decompose_complex_in_graph requires torch>=2.14.dev",
+        ),
+    ),
+]
 
 try:
     from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
@@ -103,6 +121,11 @@ class ComplexMulThenCumsum(nn.Module):
 @pytest.mark.unit
 def test_unsupported_op_gets_complexify_wrap() -> None:
     """The rewriter wraps cumsum with view_as_complex/view_as_real.
+
+    LEGACY-path specific: this asserts the hand-rolled rewriter's fallback
+    mechanism.  The upstream decomposition path may cover cumsum outright (no
+    wrap / no graph break), so this structural shape does not apply there; the
+    decomp path is exercised via end-to-end correctness instead.
 
     Structural check (no TRT required):
       - After lowering, the graph contains ``view_as_complex`` immediately
@@ -200,35 +223,40 @@ class ComplexTwoTRTBlocksAroundCumsum(nn.Module):
 
 
 @pytest.mark.unit
-def test_complex_partial_lowering_with_graph_break() -> None:
-    """Lowerable complex ops compile to TRT; cumsum runs in PyTorch on complex input.
+@pytest.mark.parametrize("use_decomp", _DECOMP_PARAMS, ids=["legacy", "decomp"])
+def test_complex_partial_lowering_with_graph_break(use_decomp: bool) -> None:
+    """Lowerable complex ops compile to TRT; end-to-end result is correct.
 
-    Asserts:
-      1. The compiled model is numerically correct (cosine sim > threshold).
-      2. At least one ``PythonTorchTensorRTModule`` submodule exists — confirming
-         the lowerable complex ops were compiled to TRT, not all relegated to
-         PyTorch fallback.
-      3. After lowering, cumsum receives a complex-dtype tensor (the
-         view_as_complex wrapper was inserted correctly).
+    Runs on both paths:
+      1. The compiled model is numerically correct (cosine sim > threshold) —
+         holds regardless of whether cumsum graph-breaks (legacy) or is lowered
+         outright (decomp).
+      2. At least one ``PythonTorchTensorRTModule`` submodule exists — the
+         lowerable complex ops compile to TRT, not all relegated to fallback.
+      3. LEGACY only: cumsum receives a complex-dtype tensor (the view_as_complex
+         wrapper was inserted).  Skipped on the decomp path, whose graph-break
+         behavior differs.
     """
     model = ComplexTwoTRTBlocksAroundCumsum().eval().cuda()
     z = _make_freqs(8, 64)
     freqs = _make_freqs(8, 64)
     inputs = (z, freqs)
 
-    # Structural check: verify cumsum gets a complex input after lowering
-    gm = _export_and_lower(model, inputs)
-    for n in gm.graph.nodes:
-        if n.target == torch.ops.aten.cumsum.default:
-            vc_val = n.args[0].meta.get("val")
-            if vc_val is not None:
-                assert vc_val.dtype in (
-                    torch.complex64,
-                    torch.complex128,
-                ), f"cumsum should receive a complex tensor, got {vc_val.dtype}"
-            break
+    # (3) Structural check is legacy-mechanism-specific: verify cumsum gets a
+    # complex input after the legacy lowering.  The decomp path may not wrap it.
+    if not use_decomp:
+        gm = _export_and_lower(model, inputs)
+        for n in gm.graph.nodes:
+            if n.target == torch.ops.aten.cumsum.default:
+                vc_val = n.args[0].meta.get("val")
+                if vc_val is not None:
+                    assert vc_val.dtype in (
+                        torch.complex64,
+                        torch.complex128,
+                    ), f"cumsum should receive a complex tensor, got {vc_val.dtype}"
+                break
 
-    # End-to-end: compile and verify numerical correctness
+    # End-to-end: compile and verify numerical correctness on the selected path
     ep = torch.export.export(model, inputs)
     trt_model = torchtrt.dynamo.compile(
         ep,
@@ -236,6 +264,7 @@ def test_complex_partial_lowering_with_graph_break() -> None:
         min_block_size=1,
         pass_through_build_failures=True,
         use_python_runtime=True,
+        use_complex_decomposition=use_decomp,
     )
     py_out = model(*inputs)
     trt_out = trt_model(*inputs)

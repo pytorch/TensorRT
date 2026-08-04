@@ -5,6 +5,7 @@ import tempfile
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
+from torch_tensorrt._features import has_complex_decomposition
 
 DEVICE = None
 DISABLE_TF32 = False
@@ -24,9 +25,14 @@ SPARSE_WEIGHTS = False
 TRUNCATE_DOUBLE = False
 # When True, use PyTorch's upstream complex decomposition (pytorch/pytorch#169832)
 # via complex_decomposition_adapter instead of the legacy hand-rolled
-# complex_graph_detection pass.  Default False until the new path is validated
-# against the complex/RoPE test suites (issue #4390).
-USE_COMPLEX_DECOMPOSITION = False
+# complex_graph_detection pass (issue #4390).
+#
+# Defaults to whether upstream supports it (torch>=2.14.dev): on a supported
+# torch the new path is used automatically, otherwise the legacy pass runs.
+# Users can always override explicitly -- passing use_complex_decomposition to
+# compile() wins over this default -- and the adapter re-checks the feature gate
+# and falls back to the legacy pass if upstream is unavailable.
+USE_COMPLEX_DECOMPOSITION = has_complex_decomposition()
 USE_FAST_PARTITIONER = True
 ENABLE_EXPERIMENTAL_DECOMPOSITIONS = False
 REQUIRE_FULL_COMPILATION = False

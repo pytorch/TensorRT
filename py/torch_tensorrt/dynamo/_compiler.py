@@ -5,7 +5,6 @@ import logging
 import os
 import platform
 import warnings
-
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
@@ -84,6 +83,7 @@ def cross_compile_for_windows(
     dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    use_complex_decomposition: bool = _defaults.USE_COMPLEX_DECOMPOSITION,
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
@@ -163,6 +163,7 @@ def cross_compile_for_windows(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_double (bool): Truncate weights provided in double (float64) to float32
+        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch>=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
@@ -329,6 +330,7 @@ def cross_compile_for_windows(
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "truncate_double": truncate_double,
+        "use_complex_decomposition": use_complex_decomposition,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
         "enable_experimental_decompositions": enable_experimental_decompositions,
@@ -436,6 +438,7 @@ def compile(
     dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    use_complex_decomposition: bool = _defaults.USE_COMPLEX_DECOMPOSITION,
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
@@ -530,6 +533,7 @@ def compile(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_double (bool): Truncate weights provided in double (float64) to float32
+        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch>=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
@@ -728,6 +732,7 @@ def compile(
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "truncate_double": truncate_double,
+        "use_complex_decomposition": use_complex_decomposition,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
         "enable_experimental_decompositions": enable_experimental_decompositions,
@@ -1685,6 +1690,7 @@ def convert_exported_program_to_serialized_trt_engine(
     dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    use_complex_decomposition: bool = _defaults.USE_COMPLEX_DECOMPOSITION,
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
@@ -1777,6 +1783,7 @@ def convert_exported_program_to_serialized_trt_engine(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_double (bool): Truncate weights provided in double (float64) to float32
+        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch>=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
@@ -1951,6 +1958,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "truncate_double": truncate_double,
+        "use_complex_decomposition": use_complex_decomposition,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
         "enable_experimental_decompositions": enable_experimental_decompositions,
