@@ -385,10 +385,8 @@ jobs:
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.post-script }}
       - name: Smoke Test
-        # Skip the smoke test for Python 3.15 / 3.15t: the wheel builds fine, but
-        # required runtime dependencies do not have compatible wheels yet.
         # Release tarball builds do not produce a wheel.
-        if: ${{ inputs.run-smoke-test && ! startsWith(matrix.python_version, '3.15') && inputs.is-release-tarball == false }}
+        if: ${{ inputs.run-smoke-test && inputs.is-release-tarball == false }}
         shell: bash -l {0}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
