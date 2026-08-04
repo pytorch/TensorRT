@@ -17,6 +17,8 @@
 
 #include <executorch/runtime/backend/interface.h>
 
+#include "torch_tensorrt/executorch/OptimizationProfileSelection.h"
+
 #include <cstdint>
 #include <memory>
 
@@ -84,10 +86,6 @@ class CudaStreamGuard {
   bool prev_set_;
 };
 
-// Pass instead of an index to have each delegate pick a profile from the runtime
-// input shapes rather than being told one.
-inline constexpr int32_t kAutoSelectProfile = -1;
-
 // Selects, for the calling thread, which TensorRT optimization profile the
 // delegate runs; scope it around Module::forward() / Module::execute(). A
 // profile is identified by its index in the export-time profile list, so name
@@ -121,17 +119,43 @@ inline constexpr int32_t kAutoSelectProfile = -1;
 // switch, so if a later engine rejects the request (a pinned index it does not
 // have, or no profile matching its inputs) it returns an error with earlier
 // engines already switched.
+//
+// The index is delivered to every TensorRT delegate in the method, and each one
+// resolves it against its own profile list. Nothing makes index 1 mean the same
+// thing in two engines: if a .pte contains two engines compiled from different
+// profile lists, one index can select prefill in one and decode in the other.
+// Pin by index only when the engines were built from a single profile list, or
+// when the .pte holds one TensorRT engine. An engine with a single profile is
+// the benign case -- it runs profile 0 and logs that the pin did nothing --
+// while a multi-profile engine that lacks the index fails the execution.
 class OptimizationProfileGuard {
  public:
-  // profile_index: an exact profile to pin, or kAutoSelectProfile.
+  // Pin an exact profile by its export-time index. An index this engine does not
+  // have is reported by execute(), not here, since the guard never sees the
+  // engine; that is deliberate, so a computed index (say -1 from a failed
+  // lookup) surfaces as an error rather than quietly meaning something else.
   explicit OptimizationProfileGuard(int32_t profile_index);
+
+  // Reject bool so that OptimizationProfileGuard(true) cannot become index 1.
+  OptimizationProfileGuard(bool) = delete;
+
+  // Have each delegate choose from the runtime input shapes instead of being
+  // told an index. Named rather than a sentinel index so it cannot collide with
+  // a computed one:
+  //
+  //   auto profile_guard = OptimizationProfileGuard::automatic();
+  static OptimizationProfileGuard automatic();
+
   ~OptimizationProfileGuard();
   OptimizationProfileGuard(const OptimizationProfileGuard&) = delete;
   OptimizationProfileGuard& operator=(const OptimizationProfileGuard&) = delete;
 
  private:
+  struct AutoTag {};
+  explicit OptimizationProfileGuard(AutoTag);
+
+  ProfileRequest prev_request_;
   int32_t prev_index_;
-  bool prev_set_;
 };
 
 } // namespace executorch_backend

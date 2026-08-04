@@ -42,7 +42,6 @@
 using executorch::extension::Module;
 using executorch::runtime::Error;
 using executorch::runtime::EValue;
-using torch_tensorrt::executorch_backend::kAutoSelectProfile;
 using torch_tensorrt::executorch_backend::OptimizationProfileGuard;
 
 namespace {
@@ -126,12 +125,26 @@ void print_prediction(const char* label, const std::vector<EValue>& outputs) {
     return;
   }
   exec_aten::Tensor t = outputs[0].toTensor();
+  // const_data_ptr<T>() is an unchecked cast, so reading a dtype we did not plan
+  // for walks the buffer at the wrong stride and runs off the end. Name the ones
+  // handled and skip anything else rather than printing corrupt numbers.
+  const exec_aten::ScalarType dtype = t.scalar_type();
+  if (dtype != exec_aten::ScalarType::Float && dtype != exec_aten::ScalarType::Half &&
+      dtype != exec_aten::ScalarType::BFloat16) {
+    ET_LOG(Info, "%s: logits dtype %d not handled by this example; skipping", label, static_cast<int>(dtype));
+    return;
+  }
   double best = -1e30;
   int64_t best_idx = -1;
   for (int64_t i = 0; i < t.numel(); ++i) {
-    const double v = t.scalar_type() == exec_aten::ScalarType::Half
-        ? static_cast<double>(t.const_data_ptr<exec_aten::Half>()[i])
-        : static_cast<double>(t.const_data_ptr<float>()[i]);
+    double v = 0.0;
+    if (dtype == exec_aten::ScalarType::Half) {
+      v = static_cast<double>(t.const_data_ptr<exec_aten::Half>()[i]);
+    } else if (dtype == exec_aten::ScalarType::BFloat16) {
+      v = static_cast<double>(t.const_data_ptr<exec_aten::BFloat16>()[i]);
+    } else {
+      v = static_cast<double>(t.const_data_ptr<float>()[i]);
+    }
     if (v > best) {
       best = v;
       best_idx = i;
@@ -144,13 +157,8 @@ void print_prediction(const char* label, const std::vector<EValue>& outputs) {
   fprintf(stderr, "] next_token=%" PRId64 "\n", best_idx);
 }
 
-// Runs one forward under `profile`, which is either an exact index to pin or
-// kAutoSelectProfile.
-bool run(Module& module, const char* label, int32_t profile, const Step& step) {
-  // The guard applies to every TensorRT delegate this thread executes while it
-  // is in scope. It stores the request only; each delegate switches inside its
-  // own execute(), on the stream that execute() already selected.
-  OptimizationProfileGuard profile_guard(profile);
+// Runs one forward with whatever profile guard the caller has in scope.
+bool run_guarded(Module& module, const char* label, const Step& step) {
   auto result = module.forward(step.args());
 
   if (!result.ok()) {
@@ -159,6 +167,21 @@ bool run(Module& module, const char* label, int32_t profile, const Step& step) {
   }
   print_prediction(label, result.get());
   return true;
+}
+
+// Runs one forward with `profile` pinned. The guard applies to every TensorRT
+// delegate this thread executes while it is in scope. It stores the request
+// only; each delegate switches inside its own execute(), on the stream that
+// execute() already selected.
+bool run(Module& module, const char* label, int32_t profile, const Step& step) {
+  OptimizationProfileGuard profile_guard(profile);
+  return run_guarded(module, label, step);
+}
+
+// Same, but lets each delegate choose from the input shapes.
+bool run_auto(Module& module, const char* label, const Step& step) {
+  auto profile_guard = OptimizationProfileGuard::automatic();
+  return run_guarded(module, label, step);
 }
 
 // Mean milliseconds per forward, best of kRounds. The profile is pinned around
@@ -259,7 +282,7 @@ int main(int argc, char** argv) {
   // Auto-selection reads the input shapes instead. It is sticky: once the
   // prefill profile is loaded a seq == 1 input still fits it, so this stays on
   // profile 1 rather than dropping back to decode. Pin when that matters.
-  ok = ok && run(module, "auto (seq=1)", kAutoSelectProfile, decode);
+  ok = ok && run_auto(module, "auto (seq=1)", decode);
 
   // With no guard in scope every delegate runs profile 0, which here accepts
   // seq == 1 only.

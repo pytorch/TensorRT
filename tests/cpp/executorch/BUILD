@@ -30,10 +30,16 @@ cc_test(
 )
 
 # Asserts against the profile-selection policy only, so unlike the runtime tests
-# it needs neither a GPU nor a TensorRT engine.
+# it needs neither a GPU nor a TensorRT engine. It does need TensorRT headers,
+# hence the same platform gate the backend carries.
 cc_test(
     name = "test_optimization_profile_selection",
     srcs = ["test_optimization_profile_selection.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [
         "//cpp:tensorrt_executorch_optimization_profile_selection",
         "@googletest//:gtest_main",

@@ -52,11 +52,10 @@ using ::executorch::runtime::Span;
 namespace {
 thread_local cudaStream_t g_user_stream = nullptr;
 thread_local bool g_user_stream_set = false;
-// The profile request in effect for this thread: an exact index to pin,
-// kAutoSelectProfile, or unset (profile 0). Read by execute(), never by the
-// guard itself.
-thread_local int32_t g_profile_request = 0;
-thread_local bool g_profile_request_set = false;
+// The profile request in effect for this thread. `g_profile_index` is read only
+// when the request is kPinned. Read by execute(), never by the guard itself.
+thread_local ProfileRequest g_profile_request = ProfileRequest::kUnset;
+thread_local int32_t g_profile_index = 0;
 } // namespace
 
 CudaStreamGuard::CudaStreamGuard(cudaStream_t stream) : prev_stream_(g_user_stream), prev_set_(g_user_stream_set) {
@@ -70,14 +69,23 @@ CudaStreamGuard::~CudaStreamGuard() {
 }
 
 OptimizationProfileGuard::OptimizationProfileGuard(int32_t profile_index)
-    : prev_index_(g_profile_request), prev_set_(g_profile_request_set) {
-  g_profile_request = profile_index;
-  g_profile_request_set = true;
+    : prev_request_(g_profile_request), prev_index_(g_profile_index) {
+  g_profile_request = ProfileRequest::kPinned;
+  g_profile_index = profile_index;
+}
+
+OptimizationProfileGuard::OptimizationProfileGuard(AutoTag)
+    : prev_request_(g_profile_request), prev_index_(g_profile_index) {
+  g_profile_request = ProfileRequest::kAuto;
+}
+
+OptimizationProfileGuard OptimizationProfileGuard::automatic() {
+  return OptimizationProfileGuard(AutoTag{});
 }
 
 OptimizationProfileGuard::~OptimizationProfileGuard() {
-  g_profile_request = prev_index_;
-  g_profile_request_set = prev_set_;
+  g_profile_request = prev_request_;
+  g_profile_index = prev_index_;
 }
 
 void TRTLogger::log(Severity severity, const char* msg) noexcept {
@@ -210,11 +218,6 @@ Error initialize_input_profiles(EngineHandle& handle) {
         ET_LOG(Error, "TensorRTBackend::init: getProfileShape failed for input '%s' in profile %d", name.c_str(), p);
         return Error::InvalidProgram;
       }
-      for (int d = 0; d < bounds.min.nbDims; ++d) {
-        if (bounds.min.d[d] != bounds.max.d[d]) {
-          handle.profiles.all_inputs_static = false;
-        }
-      }
       bounds_for_profile.push_back(bounds);
     }
   }
@@ -222,14 +225,45 @@ Error initialize_input_profiles(EngineHandle& handle) {
   return Error::Ok;
 }
 
-// Turns this thread's guard state into the request the policy understands.
-ProfileRequest current_profile_request() {
-  if (!g_profile_request_set) {
-    return ProfileRequest::kUnset;
+std::string dims_to_string(const nvinfer1::Dims& dims) {
+  std::string out = "(";
+  for (int d = 0; d < dims.nbDims; ++d) {
+    if (d > 0) {
+      out += ", ";
+    }
+    out += std::to_string(dims.d[d]);
   }
-  return g_profile_request == kAutoSelectProfile ? ProfileRequest::kAuto : ProfileRequest::kPinned;
+  return out + ")";
 }
 
+// Auto-selection failing says nothing on its own about which input is out of
+// range, and the offending shapes and every profile's envelope are already in
+// hand. Print them so the fix does not need a rebuild with extra logging.
+void log_no_profile_matches(const EngineHandle& handle, const std::vector<nvinfer1::Dims>& input_dims) {
+  ET_LOG(
+      Error,
+      "TensorRTBackend::execute: none of the engine's %d optimization profiles accept the input shapes; "
+      "fix the shapes or pin a profile with OptimizationProfileGuard",
+      handle.profiles.size());
+  for (size_t i = 0; i < input_dims.size(); ++i) {
+    std::string ranges;
+    for (int32_t p = 0; p < handle.profiles.size(); ++p) {
+      const auto& bounds = handle.profiles.bounds[static_cast<size_t>(p)][i];
+      ranges += "  profile " + std::to_string(p) + ": [" + dims_to_string(bounds.min) + ", " +
+          dims_to_string(bounds.max) + "]";
+    }
+    ET_LOG(
+        Error,
+        "  input '%s' is %s;%s",
+        handle.input_binding_names[i].c_str(),
+        dims_to_string(input_dims[i]).c_str(),
+        ranges.c_str());
+  }
+}
+
+// Redundant with profile_fits() on the auto path, which already established the
+// selected profile accepts these shapes. It is the only bounds check on the
+// pinned and unset paths, where select_profile() never tests fit.
 Error validate_input_dims(const EngineHandle& handle, int32_t profile, const std::vector<nvinfer1::Dims>& input_dims) {
   const auto& bounds = handle.profiles.bounds[static_cast<size_t>(profile)];
   for (size_t i = 0; i < input_dims.size(); ++i) {
@@ -281,13 +315,26 @@ bool is_cuda_accessible_ptr(const void* ptr) {
 // over an already-recorded event just moves the marker forward, so callers can mark
 // repeatedly as they enqueue more. If the event cannot be armed, drain instead: the
 // caller has no other way to know the work is outstanding.
-void mark_inflight(EngineHandle& engine, cudaStream_t stream) {
+//
+// A failure here usually means the enqueue itself faulted and left a sticky async
+// error, so the result is propagated rather than logged and dropped: reporting Ok
+// would blame the fault on some later, unrelated operator.
+Error mark_inflight(EngineHandle& engine, cudaStream_t stream) {
   const cudaError_t err = cudaEventRecord(engine.inflight_event, stream);
-  if (err != cudaSuccess) {
-    ET_LOG(Error, "TensorRTBackend::execute: cudaEventRecord failed: %s", cudaGetErrorString(err));
-    (void)cudaStreamSynchronize(stream);
-  }
   engine.inflight_pending = (err == cudaSuccess);
+  if (err == cudaSuccess) {
+    return Error::Ok;
+  }
+  ET_LOG(Error, "TensorRTBackend::execute: cudaEventRecord failed: %s", cudaGetErrorString(err));
+  // A sticky fault surfaces again here, which is what turns this into a reported
+  // failure. A clean drain means the work really did finish, so the record failing
+  // cost us the marker but not the result.
+  const cudaError_t drain = cudaStreamSynchronize(stream);
+  if (drain == cudaSuccess) {
+    return Error::Ok;
+  }
+  ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(drain));
+  return Error::InvalidProgram;
 }
 
 } // namespace
@@ -504,23 +551,31 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
   }
 
+  // Snapshot the thread-local once: reading it again below would tie the log
+  // messages to the fact that only kPinned can reach them.
+  const ProfileRequest request = g_profile_request;
+  const int32_t requested_index = g_profile_index;
+
   int32_t profile = 0;
-  switch (select_profile(engine->profiles, current_profile_request(), g_profile_request, input_dims, profile)) {
+  switch (select_profile(engine->profiles, request, requested_index, input_dims, profile)) {
     case ProfileSelection::kOk:
+      break;
+    case ProfileSelection::kPinIgnoredSingleProfile:
+      ET_LOG(
+          Info,
+          "TensorRTBackend::execute: ignoring the pin on profile %d; this engine has one profile, "
+          "so it runs profile 0",
+          requested_index);
       break;
     case ProfileSelection::kRequestedProfileUnavailable:
       ET_LOG(
           Error,
           "TensorRTBackend::execute: OptimizationProfileGuard requested profile %d but this engine has %d profile(s)",
-          g_profile_request,
+          requested_index,
           engine->profiles.size());
       return Error::InvalidArgument;
     case ProfileSelection::kNoProfileMatchesInputs:
-      ET_LOG(
-          Error,
-          "TensorRTBackend::execute: none of the engine's %d optimization profiles accept the input shapes; "
-          "fix the shapes or pin a profile with OptimizationProfileGuard",
-          engine->profiles.size());
+      log_no_profile_matches(*engine, input_dims);
       return Error::InvalidArgument;
   }
 
@@ -537,8 +592,11 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // forbids reconfiguring or destroying a context while they run. The binding loop
     // below can still fail and return, so mark them now instead of relying on the
     // enqueue at the tail to do it.
-    mark_inflight(*engine, stream);
+    const Error mark_err = mark_inflight(*engine, stream);
     engine->profiles.active = profile;
+    if (mark_err != Error::Ok) {
+      return mark_err;
+    }
     ET_LOG(Info, "TensorRTBackend::execute: switched to optimization profile %d", profile);
   }
 
@@ -698,7 +756,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         "cudaStreamPerThread is invalid while a green context is current.");
     return Error::InvalidState;
   }
-  mark_inflight(*engine, stream);
+  const Error mark_err = mark_inflight(*engine, stream);
+  if (mark_err != Error::Ok) {
+    return mark_err;
+  }
 
   // The engine work is now in flight on `stream` and marked as such. Decide whether
   // to wait for it here:

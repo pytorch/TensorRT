@@ -13,7 +13,7 @@
  */
 #pragma once
 
-#include "OptimizationProfileSelection.h"
+#include "torch_tensorrt/executorch/OptimizationProfileSelection.h"
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 
 #include <NvInfer.h>

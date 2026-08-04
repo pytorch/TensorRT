@@ -110,9 +110,16 @@ cc_library(
 cc_library(
     name = "tensorrt_executorch_optimization_profile_selection",
     hdrs = [
-        "src/torch_tensorrt/executorch/OptimizationProfileSelection.h",
+        "include/torch_tensorrt/executorch/OptimizationProfileSelection.h",
     ],
-    strip_include_prefix = "src/torch_tensorrt/executorch",
+    strip_include_prefix = "include",
+    # The header includes <NvInfer.h>, so it cannot build where the deps below
+    # resolve to an empty list.
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = select({
         ":linux_x86_64": ["@tensorrt//:nvinfer"],
         ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
@@ -123,6 +130,9 @@ cc_library(
 cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
+        # Private, deliberately not in hdrs: EngineHandle grows fields as the
+        # backend gains features and is never installed, so nothing outside this
+        # library may depend on its layout.
         "src/torch_tensorrt/executorch/EngineHandle.h",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
     ],
@@ -163,7 +173,6 @@ filegroup(
     srcs = [
         "src/torch_tensorrt/executorch/CMakeLists.txt",
         "src/torch_tensorrt/executorch/EngineHandle.h",
-        "src/torch_tensorrt/executorch/OptimizationProfileSelection.h",
         "src/torch_tensorrt/executorch/README.md",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
@@ -183,6 +192,7 @@ filegroup(
 filegroup(
     name = "executorch_api_headers",
     srcs = [
+        "include/torch_tensorrt/executorch/OptimizationProfileSelection.h",
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",

@@ -36,7 +36,7 @@ optimization profiles, and the weights never leave the engine.
 Pass ``--weights google/gemma-3-1b-it`` for the real 1B model. That is the
 configuration the latency numbers in the runner README were measured on, and it
 takes considerably longer: the ``.pte`` serialization step costs roughly 3.6
-seconds per megabyte of engine, so a ~2 GB engine is a couple of hours.
+seconds per megabyte of engine, so its ~2 GB engine is a couple of hours.
 
 .. note::
 

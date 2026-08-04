@@ -71,9 +71,17 @@ const char* get_flag(int argc, char** argv, const char* flag, const char* def) {
   return def;
 }
 
-int get_int_flag(int argc, char** argv, const char* flag, int def) {
+// atoi() returns 0 for garbage, so an unusable value would otherwise pass for a
+// deliberate 0 and surface much later as an empty sample set or a nan in the
+// summary. Reject anything below `min` here, where the flag name is still known.
+bool get_int_flag(int argc, char** argv, const char* flag, int def, int min, int& out) {
   const char* raw = get_flag(argc, argv, flag, nullptr);
-  return raw == nullptr ? def : atoi(raw);
+  out = raw == nullptr ? def : atoi(raw);
+  if (out < min) {
+    ET_LOG(Error, "%s must be at least %d, got '%s'", flag, min, raw == nullptr ? "" : raw);
+    return false;
+  }
+  return true;
 }
 
 // One [1, seq] index tensor. The dtype comes from the .pte's method signature
@@ -240,11 +248,20 @@ int main(int argc, char** argv) {
   executorch::runtime::runtime_init();
 
   const char* model_path = get_flag(argc, argv, "--model_path", "model_gemma3_multi_profile.pte");
-  const int prefill_seq = get_int_flag(argc, argv, "--prefill_seq", 128);
-  const int blocks = get_int_flag(argc, argv, "--blocks", 10);
-  const int block_rounds = get_int_flag(argc, argv, "--block_rounds", 3);
-  const int decode_steps = get_int_flag(argc, argv, "--decode_steps", 16);
-  const int warmup = get_int_flag(argc, argv, "--warmup", 20);
+  int prefill_seq = 0;
+  int blocks = 0;
+  int block_rounds = 0;
+  int decode_steps = 0;
+  int warmup = 0;
+  if (!get_int_flag(argc, argv, "--prefill_seq", 128, 1, prefill_seq) ||
+      !get_int_flag(argc, argv, "--blocks", 10, 1, blocks) ||
+      // run_block() discards the first round of each block as warm-in, so a
+      // single round would leave prefill with no samples at all.
+      !get_int_flag(argc, argv, "--block_rounds", 3, 2, block_rounds) ||
+      !get_int_flag(argc, argv, "--decode_steps", 16, 1, decode_steps) ||
+      !get_int_flag(argc, argv, "--warmup", 20, 0, warmup)) {
+    return 1;
+  }
 
   Module module(model_path);
 

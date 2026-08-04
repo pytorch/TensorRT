@@ -27,8 +27,9 @@ python examples/torchtrt_executorch_example/export_static_shape.py --model_path=
 # Two-profile Gemma-3 engine for the multi-profile runner below. Defaults to a
 # mini Gemma-3 that needs no download and exports in about a minute, most of it
 # spent serializing the engine into the .pte. Add --weights google/gemma-3-1b-it
-# for the real 1B model -- but that .pte is 1.9 GB and serialization runs at
-# roughly 3.7 s/MB, so budget hours rather than minutes for it.
+# for the real 1B model -- but that .pte is about 2 GB and serialization scales
+# with engine size, so budget hours rather than minutes for it. The export
+# script documents the measured rate.
 python examples/torchtrt_executorch_example/export_multi_profile.py --model_path=model_gemma3_multi_profile.pte
 ```
 
@@ -121,12 +122,11 @@ by this native runner at inference time.
 
 A TensorRT engine can hold several optimization profiles: one weight set, one
 engine, several kernel tunings, each valid over a different input-shape range.
-Scope an `OptimizationProfileGuard` around the call to pick one:
+Scope an `OptimizationProfileGuard` around the call to pick one.
 
-A profile is identified by its index in the list declared at export time. Only
-`kAutoSelectProfile` is a library constant; name the indices yourself to match
-the exporter, as `export_multi_profile.py` declares decode first and prefill
-second:
+A profile is identified by its index in the list declared at export time. The
+library defines no index constants; name them yourself to match the exporter, as
+`export_multi_profile.py` declares decode first and prefill second:
 
 ```cpp
 #include <torch_tensorrt/executorch/TensorRTBackend.h>
@@ -150,9 +150,22 @@ executorch::extension::Module module("model_gemma3_multi_profile.pte");
 The guard records an index for the calling thread and nothing else — it does not
 inspect the `Module`, `Method`, or delegate handles, and does not call TensorRT.
 Each TensorRT delegate reads it inside its own `execute()` and switches there.
-Construct it on the thread that calls `forward()`. Pass `kAutoSelectProfile`
-instead of an index to choose from the input shapes; with no guard in scope,
-every delegate runs profile 0.
+Construct it on the thread that calls `forward()`. With no guard in scope, every
+delegate runs profile 0.
+
+To have each delegate choose from the input shapes instead of being told an
+index, use the named constructor:
+
+```cpp
+auto profile_guard = OptimizationProfileGuard::automatic();
+```
+
+The index reaches every TensorRT delegate in the method, and each resolves it
+against its own profile list. Nothing makes index 1 mean the same thing in two
+engines, so pin by index only when the `.pte` holds one TensorRT engine or when
+its engines were compiled from a single profile list. An engine with just one
+profile runs profile 0 and logs that the pin did nothing; a multi-profile engine
+that lacks the index fails the execution.
 
 Build and run:
 

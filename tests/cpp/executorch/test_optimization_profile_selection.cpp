@@ -8,9 +8,14 @@
  * only non-obvious part of multi-profile support and depends on nothing but the
  * profile bounds table, so it runs here without a GPU, a TensorRT engine, or an
  * ExecuTorch method.
+ *
+ * Deliberately out of scope, because all of it needs a live engine: applying the
+ * decision (setOptimizationProfileAsync), writing profiles.active back, the
+ * ordering that puts the switch before setInputShape, and mark_inflight. Those
+ * belong to the end-to-end ExecuTorch tests.
  */
 
-#include "OptimizationProfileSelection.h"
+#include "torch_tensorrt/executorch/OptimizationProfileSelection.h"
 
 #include "gtest/gtest.h"
 
@@ -45,7 +50,6 @@ ProfileTable decode_and_prefill() {
       {bounds({1, 1}, {1, 1})}, // profile 0: decode
       {bounds({1, 1}, {1, 2048})}, // profile 1: prefill
   };
-  table.all_inputs_static = false;
   return table;
 }
 
@@ -117,7 +121,6 @@ TEST(ExecuTorchOptimizationProfileSelection, AutoSkipsAProfileThatFitsOnlySomeIn
       {bounds({1, 1}, {1, 1}), bounds({1, 1}, {1, 1})}, // profile 0: second input too narrow
       {bounds({1, 1}, {1, 1}), bounds({1, 1}, {1, 128})}, // profile 1: fits both
   };
-  table.all_inputs_static = false;
   const std::vector<nvinfer1::Dims> inputs{dims({1, 1}), dims({1, 64})};
   int32_t selected = -1;
 
@@ -134,7 +137,6 @@ TEST(ExecuTorchOptimizationProfileSelection, RescanTakesTheLowestOfSeveralMatchi
       {bounds({1, 1}, {1, 256})}, // profile 1: fits too
       {bounds({1, 512}, {1, 2048})}, // profile 2: active, no longer fits
   };
-  table.all_inputs_static = false;
   table.active = 2;
   const std::vector<nvinfer1::Dims> short_input{dims({1, 32})};
   int32_t selected = -1;
@@ -174,31 +176,93 @@ TEST(ExecuTorchOptimizationProfileSelection, PinningPastTheEndOfAMultiProfileEng
       ProfileSelection::kRequestedProfileUnavailable);
 }
 
-// A .pte may mix a multi-profile engine with a static one. Pinning a nonzero
-// profile for the former must not fail the latter, which has one shape and so
-// nothing to switch.
-TEST(ExecuTorchOptimizationProfileSelection, StaticEngineToleratesAPinItCannotHonor) {
+// A .pte may mix a multi-profile engine with a single-profile one. Pinning a
+// nonzero profile for the former must not fail the latter, which has profile 0
+// and nothing to switch to. Reported as kPinIgnoredSingleProfile rather than
+// kOk so execute() can say the pin did nothing here.
+TEST(ExecuTorchOptimizationProfileSelection, SingleProfileEngineToleratesAPinItCannotHonor) {
   ProfileTable static_engine;
   static_engine.bounds = {{bounds({1, 16}, {1, 16})}};
-  static_engine.all_inputs_static = true;
   const std::vector<nvinfer1::Dims> fixed_input{dims({1, 16})};
   int32_t selected = -1;
 
-  EXPECT_EQ(select_profile(static_engine, ProfileRequest::kPinned, 1, fixed_input, selected), ProfileSelection::kOk);
+  EXPECT_EQ(
+      select_profile(static_engine, ProfileRequest::kPinned, 1, fixed_input, selected),
+      ProfileSelection::kPinIgnoredSingleProfile);
   EXPECT_EQ(selected, 0);
 }
 
-// A single-profile *dynamic* engine genuinely cannot honor a nonzero pin, so it
-// reports instead of quietly running the wrong regime.
-TEST(ExecuTorchOptimizationProfileSelection, SingleProfileDynamicEngineRejectsANonzeroPin) {
+// Whether the single profile's shapes are dynamic makes no difference: profile 0
+// is still the only thing the engine can run, so it is tolerated the same way.
+TEST(ExecuTorchOptimizationProfileSelection, SingleProfileToleranceDoesNotDependOnDynamicShapes) {
   ProfileTable dynamic_engine;
   dynamic_engine.bounds = {{bounds({1, 1}, {1, 2048})}};
-  dynamic_engine.all_inputs_static = false;
   int32_t selected = -1;
 
   EXPECT_EQ(
       select_profile(dynamic_engine, ProfileRequest::kPinned, 1, decode_input(), selected),
+      ProfileSelection::kPinIgnoredSingleProfile);
+  EXPECT_EQ(selected, 0);
+}
+
+// The tolerance covers indices the engine merely lacks, not nonsense ones. A
+// negative index is the shape a failed lookup returns, so it has to be reported
+// even here, where profile 0 would otherwise be a tempting substitute. This is
+// what the removed kAutoSelectProfile == -1 sentinel used to swallow.
+TEST(ExecuTorchOptimizationProfileSelection, SingleProfileEngineStillRejectsANegativeIndex) {
+  ProfileTable table;
+  table.bounds = {{bounds({1, 16}, {1, 16})}};
+  const std::vector<nvinfer1::Dims> fixed_input{dims({1, 16})};
+  int32_t selected = -1;
+
+  EXPECT_EQ(
+      select_profile(table, ProfileRequest::kPinned, -1, fixed_input, selected),
       ProfileSelection::kRequestedProfileUnavailable);
+}
+
+// The tolerance stops at one profile. With several, substituting profile 0 would
+// be a guess about which regime the caller wanted, so this stays an error.
+TEST(ExecuTorchOptimizationProfileSelection, MultiProfileEngineDoesNotSubstituteForAMissingIndex) {
+  ProfileTable table;
+  table.bounds = {
+      {bounds({1, 1}, {1, 1})},
+      {bounds({1, 1}, {1, 128})},
+  };
+  int32_t selected = -1;
+
+  EXPECT_EQ(
+      select_profile(table, ProfileRequest::kPinned, 2, decode_input(), selected),
+      ProfileSelection::kRequestedProfileUnavailable);
+}
+
+// An engine with no inputs has nothing to constrain the choice, so every profile
+// trivially fits and auto keeps the loaded one.
+TEST(ExecuTorchOptimizationProfileSelection, AutoHandlesAnEngineWithNoInputs) {
+  ProfileTable table;
+  table.bounds = {{}, {}};
+  table.active = 1;
+  int32_t selected = -1;
+
+  EXPECT_EQ(select_profile(table, ProfileRequest::kAuto, 0, {}, selected), ProfileSelection::kOk);
+  EXPECT_EQ(selected, 1);
+}
+
+// A table with no profiles at all is malformed; init() rejects such an engine
+// before execute() ever runs. Guarded here anyway so the policy never indexes an
+// empty bounds vector on the strength of a check in another translation unit.
+TEST(ExecuTorchOptimizationProfileSelection, EmptyTableIsRejectedRatherThanIndexed) {
+  ProfileTable empty;
+  int32_t selected = -1;
+
+  EXPECT_EQ(
+      select_profile(empty, ProfileRequest::kUnset, 0, decode_input(), selected),
+      ProfileSelection::kNoProfileMatchesInputs);
+  EXPECT_EQ(
+      select_profile(empty, ProfileRequest::kAuto, 0, decode_input(), selected),
+      ProfileSelection::kNoProfileMatchesInputs);
+  EXPECT_EQ(
+      select_profile(empty, ProfileRequest::kPinned, 0, decode_input(), selected),
+      ProfileSelection::kNoProfileMatchesInputs);
 }
 
 } // namespace

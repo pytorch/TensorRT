@@ -291,6 +291,12 @@ require_tar_entry() {
 require_tar_entry "torch_tensorrt/src/torch_tensorrt/executorch/CMakeLists.txt"
 require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt"
 require_tar_entry "torch_tensorrt/BUILD"
+# Every source the packaged CMakeLists.txt names must ship. A missing one aborts
+# the configure step below for all targets, not just the one that needs it, so
+# check them here to fail at packaging with a clear message instead.
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/main.cpp"
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/multi_profile_main.cpp"
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/multi_profile_benchmark.cpp"
 
 export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
 export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
@@ -311,8 +317,13 @@ fi
 
 cmake "${cmake_args[@]}"
 
+# The multi-profile targets are built but not run: they need a Gemma-3 .pte and a
+# GPU. Compiling them here is what keeps the packaged sources from rotting, since
+# nothing else in CI touches them.
 cmake --build "${verify_root}/build-executorch-reference-runner" \
   --target example_executorch_runner \
+  example_executorch_multi_profile_runner \
+  example_executorch_multi_profile_benchmark \
   -j"${MAX_JOBS:-$(nproc)}"
 
 runner_log="${verify_root}/my_runner.log"
