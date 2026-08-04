@@ -24,12 +24,12 @@ def arange(
     step: Union[int, TRTTensor],
 ) -> TRTTensor:
     """
-    Creates a sequence of values (arange) either dynamically or statically,
-    then outputs a TensorRT tensor.
+    Creates a sequence of values (arange) with a TensorRT Fill layer.
 
-    If any of (start, end, step) is a TRT tensor, it sets up a dynamic arange
-    using a Fill layer. Otherwise, it creates a static NumPy array and converts
-    it into a TensorRT constant tensor.
+    If any of (start, end, step) is a TRT tensor, the Fill output length is
+    computed dynamically. Otherwise, NumPy is used only to determine the static
+    output length. Keeping static ranges as Fill layers preserves their sequence
+    provenance for downstream TensorRT graph-pattern recognition.
     """
     # If any argument is a TRT tensor, use dynamic arange with a Fill layer
     if any(isinstance(x, TRTTensor) for x in (start, end, step)):
@@ -68,9 +68,20 @@ def arange(
         return fill_layer.get_output(0)
 
     else:
-        # All arguments are static, so use NumPy arange and create a TRT constant
-        arr = np.arange(start, end, step, dtype=np.int32)
-        weights = trt.Weights(arr)
-        const_layer = ctx.net.add_constant(arr.shape, weights)
-        set_layer_name(const_layer, target, f"{name}_arange_const", source_ir)
-        return const_layer.get_output(0)
+        # Keep a static arange as LINSPACE rather than materializing its values in
+        # a Constant. TensorRT uses this producer provenance when recognizing
+        # compact causal attention masks.
+        output_shape = np.arange(start, end, step, dtype=np.int32).shape
+        start_tensor = get_trt_tensor(
+            ctx, start, name + "_start", dtype=trt.int32, min_rank=0
+        )
+        step_tensor = get_trt_tensor(
+            ctx, step, name + "_step", dtype=trt.int32, min_rank=1
+        )
+        fill_layer = ctx.net.add_fill(
+            output_shape, trt.FillOperation.LINSPACE, trt.int32
+        )
+        fill_layer.set_input(1, start_tensor)
+        fill_layer.set_input(2, step_tensor)
+        set_layer_name(fill_layer, target, f"{name}_arange_fill", source_ir)
+        return fill_layer.get_output(0)
