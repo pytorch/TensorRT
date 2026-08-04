@@ -6,8 +6,8 @@ import os
 import sys
 from typing import Any, Dict, List
 
-# currently we don't support python 3.13t, 3.14t due to tensorrt does not support 3.13t, 3.14t
-disabled_python_versions: List[str] = ["3.13t", "3.14t"]
+# TensorRT does not yet support free-threaded Python 3.13+ or Python 3.15.
+disabled_python_versions: List[str] = ["3.13t", "3.14t", "3.15", "3.15t"]
 disabled_cuda_versions: List[str] = []
 
 # jetpack 6.2 only officially supports python 3.10 and cu126

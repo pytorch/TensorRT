@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Torch-TensorRT CI · {{BRANCH}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>torch-tensorrt <span class="dim">// ci</span><span class="cursor"></span></h1>
+    <form class="controls" onsubmit="event.preventDefault(); loadBranch(document.getElementById('branch').value, true);">
+      <div class="branch-wrap">
+        <input type="text" id="branch" name="branch" value="{{BRANCH}}" spellcheck="false" autocomplete="off"
+               placeholder="branch or #PR…" title="fuzzy-search visited branches · #<num> to search by PR · Enter to load · / to focus">
+        <div id="branch-ac" class="branch-ac" hidden></div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="failonly"
+             onchange="document.getElementById('content').classList.toggle('filter-fail', this.checked)"> failing only</label>
+      <button type="button" class="btn" title="refresh (r)"
+              hx-get="/ui/board" hx-include="#branch" hx-vals='{"refresh":"1"}'
+              hx-target="#content" hx-swap="innerHTML">↻ Refresh</button>
+      <button type="submit" class="btn primary" id="load">Load</button>
+    </form>
+  </header>
+
+  <main>
+    <div class="legend" id="legend">
+      <span><span class="dot pass"></span> passed</span>
+      <span><span class="dot fail"></span> test failed</span>
+      <span><span class="leg-infra"></span> infra / runner</span>
+      <span><span class="dot run"></span> running</span>
+      <span><span class="dot queue"></span> queued</span>
+      <span><span class="dot skip"></span> didn’t run</span>
+      <span class="muted">· open a platform for its python×cuda×tier grid · click a red cell for failing tests + code</span>
+    </div>
+    <details class="cmds" id="cmds">
+      <summary>PR commands <span class="muted">— comment reference; the plan panel has live buttons for these (write access)</span></summary>
+      <div class="cmd-list">
+        <div class="cmd"><code>/rerun</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">re-run only the failed / cancelled jobs (current commit)</span></div>
+        <div class="cmd"><code>/rerun all</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">re-run every job from scratch (current commit)</span></div>
+        <div class="cmd"><code>/cancel</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">cancel stale “zombie” runs still in-flight on old commits</span></div>
+        <div class="cmd"><code>/cancel all</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">cancel every in-flight run for the PR (full stop)</span></div>
+        <div class="cmd"><code>/test full</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">run the full suite (all tiers, both engines)</span></div>
+        <div class="cmd"><code>/test full rtx</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">full suite, RTX engine only (also <code>standard</code>)</span></div>
+        <div class="cmd"><code>/test nightly</code><button class="copy" onclick="copyPre(this)">copy</button><span class="lbl">everything incl. llm / kernels / distributed</span></div>
+      </div>
+    </details>
+    <div id="content" hx-get="/ui/board?branch={{BRANCH}}" hx-trigger="load" hx-swap="innerHTML">
+      <div class="empty-state"><span class="spinner"></span> loading {{BRANCH}}…</div>
+    </div>
+  </main>
+
+  <div class="drawer-bg" id="drawer-bg" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-head">
+      <div class="t"><div class="title" id="drawer-title">Failures</div><div class="sub" id="drawer-sub"></div></div>
+      <button class="x" id="drawer-x" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    function openDrawer() {
+      document.getElementById('drawer-body').innerHTML =
+        '<div class="muted" style="padding:24px 4px"><span class="spinner"></span> loading failures…</div>';
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawer-bg').classList.add('open');
+    }
+    function closeDrawer() {
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawer-bg').classList.remove('open');
+    }
+    // Clipboard with a fallback: navigator.clipboard needs a secure context
+    // (HTTPS or localhost); over plain HTTP on a LAN/tailnet IP it's absent, so
+    // fall back to a temp-textarea + execCommand('copy').
+    function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise((resolve, reject) => {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        ok ? resolve() : reject(new Error('copy blocked'));
+      });
+    }
+    function copyPre(btn) {
+      const code = btn.parentElement.querySelector('code');
+      copyText(code.innerText).then(() => toast('copied')).catch(() => toast('copy blocked — select + ⌘/Ctrl-C'));
+    }
+    // Toggle a CI label live (add/remove on the PR) — two-step: click arms, click confirms.
+    function disarmLabel(btn) {
+      if (btn._t) clearTimeout(btn._t);
+      btn.dataset.armed = '';
+      btn.classList.remove('arming');
+      if (btn._orig != null) { btn.innerHTML = btn._orig; btn._orig = null; }
+    }
+    function toggleLabel(btn) {
+      if (btn.dataset.armed !== '1') {                 // arm
+        document.querySelectorAll('.cilabel.arming').forEach(disarmLabel);
+        btn.dataset.armed = '1';
+        btn._orig = btn.innerHTML;
+        btn.classList.add('arming');
+        btn.textContent = (btn.dataset.add === '1' ? 'confirm add ' : 'confirm remove ') + btn.dataset.label;
+        btn._t = setTimeout(() => disarmLabel(btn), 5000);
+        return;
+      }
+      disarmLabel(btn);                                 // confirmed → apply
+      const pr = btn.dataset.pr, label = btn.dataset.label, add = btn.dataset.add;
+      btn.disabled = true;
+      fetch('/api/pr-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ pr: pr, label: label, add: add }),
+      }).then(r => r.json())
+        .then(d => {
+          btn.disabled = false;
+          if (!d.ok) { toast('failed: ' + (d.error || '?')); return; }
+          toast((add === '1' ? 'added ' : 'removed ') + label);
+          const b = document.getElementById('branch').value;    // refresh plan with new labels
+          htmx.ajax('GET', '/ui/board?branch=' + encodeURIComponent(b) + '&refresh=1',
+                    { target: '#content', swap: 'innerHTML' });
+        })
+        .catch(err => { btn.disabled = false; toast('failed: ' + err); });
+    }
+    // Post a CI command as a PR comment — two-step: first click arms, second confirms.
+    function disarmCiact(btn) {
+      if (btn._t) clearTimeout(btn._t);
+      btn.dataset.armed = '';
+      btn.classList.remove('armed');
+      if (btn._orig != null) { btn.textContent = btn._orig; btn._orig = null; }
+    }
+    function postCmd(btn) {
+      if (btn.dataset.armed !== '1') {                 // arm
+        document.querySelectorAll('.ciact.armed').forEach(disarmCiact);
+        btn.dataset.armed = '1';
+        btn._orig = btn.textContent;
+        btn.classList.add('armed');
+        btn.textContent = 'confirm: ' + btn.dataset.cmd;
+        btn._t = setTimeout(() => disarmCiact(btn), 5000);
+        return;
+      }
+      disarmCiact(btn);                                 // confirmed → post
+      const cmd = btn.dataset.cmd, pr = btn.dataset.pr, label = btn.textContent;
+      btn.disabled = true; btn.textContent = 'posting…';
+      fetch('/api/pr-comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ pr: pr, cmd: cmd }),
+      }).then(r => r.json())
+        .then(d => toast(d.ok ? ('posted ' + cmd + ' to #' + pr) : ('failed: ' + (d.error || '?'))))
+        .catch(err => toast('failed: ' + err))
+        .finally(() => { btn.disabled = false; btn.textContent = label; });
+    }
+    // ── branch navigation with real browser history (back/forward) ──
+    function loadBranch(branch, push) {
+      branch = (branch || '').trim();
+      if (!branch) return;
+      const c = document.getElementById('content');
+      const m = branch.match(/^#(\d+)$/);               // a PR number → resolve its head branch
+      if (m) {
+        c.innerHTML = '<div class="empty-state"><span class="spinner"></span> resolving PR #' + m[1] + '…</div>';
+        fetch('/api/resolve-pr?pr=' + m[1]).then(r => r.json()).then(d => {
+          if (d && d.branch) loadBranch(d.branch, push);
+          else c.innerHTML = '<div class="empty-state">No branch found for PR #' + m[1] + '.</div>';
+        }).catch(() => { c.innerHTML = '<div class="empty-state">PR lookup failed.</div>'; });
+        return;
+      }
+      document.getElementById('branch').value = branch;
+      if (push) history.pushState({ branch: branch }, '', '/?branch=' + encodeURIComponent(branch));
+      c.innerHTML = '<div class="empty-state"><span class="spinner"></span> loading…</div>';
+      htmx.ajax('GET', '/ui/board?branch=' + encodeURIComponent(branch), { target: '#content', swap: 'innerHTML' });
+    }
+    window.addEventListener('popstate', function (e) {
+      const b = (e.state && e.state.branch) ||
+                new URLSearchParams(location.search).get('branch') ||
+                document.getElementById('branch').value;
+      loadBranch(b, false);   // back/forward: restore, don't push a new entry
+    });
+    // Seed a state for the branch the page booted with, so the first Back has a target.
+    history.replaceState({ branch: document.getElementById('branch').value }, '',
+                         location.pathname + location.search);
+
+    // ── client-side branch history + fuzzy autocomplete (with #PR search) ──
+    const AC = { items: [], index: -1 };
+    function escHtml(s) {
+      return (s + '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function loadHistory() {
+      try { return JSON.parse(localStorage.getItem('branchHistory') || '[]'); } catch (e) { return []; }
+    }
+    function recordBranch(rec) {
+      const branch = (rec.branch || '').trim();
+      if (!branch) return;
+      const h = loadHistory().filter(x => x.branch !== branch);
+      h.unshift({ branch: branch, pr: rec.pr || null, base: rec.base || null,
+                  head: rec.head || '', msg: rec.msg || '', ts: Date.now() });
+      localStorage.setItem('branchHistory', JSON.stringify(h.slice(0, 50)));
+    }
+    function fuzzy(q, s) {                                 // subsequence match, contiguity-weighted
+      s = (s || '').toLowerCase();
+      let qi = 0, score = 0, streak = 0;
+      for (let i = 0; i < s.length && qi < q.length; i++) {
+        if (s[i] === q[qi]) { qi++; streak++; score += streak * 2; } else streak = 0;
+      }
+      return qi === q.length ? score : -1;
+    }
+    function acSearch(query) {
+      const h = loadHistory();
+      query = query.trim().toLowerCase();
+      if (!query) return h.slice(0, 8);                   // recent
+      if (query[0] === '#') {                             // by PR number
+        const n = query.slice(1);
+        return h.filter(x => x.pr != null && String(x.pr).includes(n)).slice(0, 8);
+      }
+      return h.map(x => ({ x: x, s: Math.max(fuzzy(query, x.branch), fuzzy(query, x.msg || x.title) - 1) }))
+              .filter(r => r.s >= 0).sort((a, b) => b.s - a.s).slice(0, 8).map(r => r.x);
+    }
+    function acRender() {
+      const box = document.getElementById('branch-ac');
+      if (!AC.items.length) { box.hidden = true; return; }
+      box.innerHTML = AC.items.map((it, i) => {
+        const msg = it.msg || it.title || '';           // format: branch  #PR  →base  HEAD  msg
+        return '<div class="ac-row' + (i === AC.index ? ' sel' : '') + '" onmousedown="acPick(event,' + i + ')">' +
+          '<span class="ac-branch">' + escHtml(it.branch) + '</span>' +
+          (it.pr ? '<span class="ac-pr">#' + escHtml(String(it.pr)) + '</span>' : '') +
+          (it.base ? '<span class="ac-base">→ ' + escHtml(it.base) + '</span>' : '') +
+          (it.head ? '<span class="ac-head">' + escHtml(String(it.head).slice(0, 7)) + '</span>' : '') +
+          (msg ? '<span class="ac-title">' + escHtml(msg) + '</span>' : '') +
+        '</div>';
+      }).join('');
+      box.hidden = false;
+    }
+    function acOpen() { AC.items = acSearch(document.getElementById('branch').value); AC.index = -1; acRender(); }
+    function acClose() { document.getElementById('branch-ac').hidden = true; AC.index = -1; }
+    function acPick(e, i) {
+      if (e) e.preventDefault();
+      const it = AC.items[i];
+      if (!it) return;
+      acClose();
+      loadBranch(it.branch, true);
+    }
+    (function () {
+      const bi = document.getElementById('branch');
+      bi.addEventListener('input', acOpen);
+      bi.addEventListener('focus', acOpen);
+      bi.addEventListener('blur', () => setTimeout(acClose, 120));   // let a row mousedown land first
+      bi.addEventListener('keydown', e => {
+        const box = document.getElementById('branch-ac');
+        const open = box && !box.hidden;
+        if (e.key === 'ArrowDown') {
+          if (!open) acOpen();
+          AC.index = Math.min(AC.index + 1, AC.items.length - 1); acRender(); e.preventDefault();
+        } else if (e.key === 'ArrowUp') {
+          AC.index = Math.max(AC.index - 1, 0); acRender(); e.preventDefault();
+        } else if (e.key === 'Enter' && open && AC.index >= 0) {
+          e.preventDefault(); e.stopPropagation(); acPick(e, AC.index);
+        } else if (e.key === 'Escape' && open) {
+          acClose(); e.stopPropagation();
+        }
+      });
+      // Record every branch that actually loaded a board (skip empty/error states),
+      // capturing its PR number + title from the rendered banner.
+      document.body.addEventListener('htmx:afterSwap', e => {
+        if (!e.target || e.target.id !== 'content' || !e.target.querySelector('#board')) return;
+        const banner = e.target.querySelector('.pr-banner');
+        const commit = e.target.querySelector('.commit');
+        recordBranch({
+          branch: document.getElementById('branch').value,
+          pr: banner ? banner.dataset.pr : null,
+          base: banner ? banner.dataset.base : null,
+          head: commit ? (commit.dataset.sha || '') : '',
+          msg: commit ? (commit.dataset.msg || '') : '',
+        });
+      });
+    })();
+
+    // ── log fishing: search / filter / jump within the drawer's log section ──
+    function logSearch(inp) {
+      const q = inp.value.trim().toLowerCase();
+      const sec = inp.closest('.logsec');
+      let n = 0, first = null;
+      sec.querySelectorAll('.logtext .ll').forEach(ll => {
+        const hit = q && ll.textContent.toLowerCase().includes(q);
+        ll.classList.toggle('match', hit);
+        if (hit) { n++; if (!first) first = ll; }
+      });
+      const c = sec.querySelector('.logcount');
+      if (c) c.textContent = q ? (n + (n === 1 ? ' match' : ' matches')) : '';
+      if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    function logFilter(cb) {
+      cb.closest('.logsec').querySelectorAll('.logtext')
+        .forEach(p => p.classList.toggle('filtered', cb.checked));
+    }
+    function jumpLine(btn) {
+      const pre = btn.closest('.logblock').querySelector('.logtext');
+      const t = pre.querySelectorAll('.ll')[+btn.dataset.line];
+      if (!t) return;
+      t.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash');
+    }
+    function toast(m) {
+      const t = document.getElementById('toast');
+      t.textContent = m; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1400);
+    }
+    // PR commands: shown by default, but remember if the user closes it.
+    (function () {
+      const c = document.getElementById('cmds');
+      if (!c) return;
+      const saved = localStorage.getItem('cmdsOpen');
+      if (saved !== null) c.open = saved === '1';
+      c.addEventListener('toggle', () => localStorage.setItem('cmdsOpen', c.open ? '1' : '0'));
+    })();
+    document.addEventListener('keydown', e => {
+      const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+      if (e.key === 'Escape') closeDrawer();
+      if (e.key === '/' && !typing) { e.preventDefault(); document.getElementById('branch').focus(); }
+      if (e.key === 'r' && !typing) { e.preventDefault(); document.querySelector('[title="refresh (r)"]').click(); }
+    });
+  </script>
+</body>
+</html>
