@@ -1140,7 +1140,10 @@ def save(
 
                     # retrace=True: torch.export truncates the engines' aliased KV
                     # outputs, so declare them as buffer mutations before lowering.
-                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
+                    _copyback_bufs = module.meta.get("_copyback_mutation_buffers", [])
+                    exp_program = _declare_aliased_kv_mutations_on_ep(
+                        exp_program, copyback_buffers=_copyback_bufs
+                    )
                     _save_as_executorch(
                         exp_program,
                         file_path,

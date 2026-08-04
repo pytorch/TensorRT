@@ -155,3 +155,111 @@ def test_declare_aliased_kv_mutations_declares_buffer_mutation(monkeypatch):
 
     # The engine's meta['val'] is extended to cover the previously-dropped output.
     assert len(eng.meta["val"]) == 2
+
+
+@pytest.mark.unit
+def test_declare_aliased_kv_mutations_declares_copyback(monkeypatch):
+    """retrace=True: a trailing copy-back output (a non-KV mutable buffer with no
+    engine aliasing) is reclassified from USER_OUTPUT to BUFFER_MUTATION of its
+    buffer and ordered ahead of the user outputs."""
+    pytest.importorskip("executorch.exir")
+
+    # No execute_engine node -> the pure copy-back case (num_copyback drives the
+    # pass). ``user_out`` is a real return; ``state_new`` is the copy-back new value
+    # that lift_mutated_buffers appended as the trailing output.
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.placeholder("state_in")
+    user_out = g.call_function(torch.add, (x, x))
+    state_new = g.call_function(torch.add, (state_in, x))
+    g.output((user_out, state_new))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    sig = SimpleNamespace(
+        inputs_to_buffers={"state_in": "state_0"},
+        input_specs=[
+            InputSpec(
+                InputKind.BUFFER, TensorArgument(name="state_in"), "state_0", True
+            ),
+            InputSpec(InputKind.USER_INPUT, TensorArgument(name="x"), None),
+        ],
+        output_specs=[
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="user_out"), None),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="state_new"), None),
+        ],
+    )
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=sig,
+        state_dict={},
+        range_constraints={},
+        module_call_graph=[],
+        constants={},
+    )
+
+    captured = {}
+
+    class _CapturingEP:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
+
+    E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
+
+    new_specs = captured["graph_signature"].output_specs
+    # The trailing copy-back output becomes a BUFFER_MUTATION of state_0, first.
+    assert len(new_specs) == 2
+    assert new_specs[0].kind == OutputKind.BUFFER_MUTATION
+    assert new_specs[0].target == "state_0"
+    assert new_specs[0].arg.name == state_new.name
+    assert new_specs[1].kind == OutputKind.USER_OUTPUT
+
+    # Mutation is prepended to the graph output; the user output follows.
+    out_node = next(n for n in gm.graph.nodes if n.op == "output")
+    assert out_node.args[0][0] is state_new
+    assert out_node.args[0][1] is user_out
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_declares_copyback(monkeypatch):
+    """retrace=False: create_trt_exp_program reads
+    gm.meta['_copyback_mutation_buffers'], tags the trailing outputs with their
+    buffer target, and emits them as BUFFER_MUTATION specs ahead of the user
+    outputs."""
+    pytest.importorskip("executorch.exir")
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.placeholder("state_in")
+    user_out = g.call_function(torch.add, (x, x))
+    state_new = g.call_function(torch.add, (state_in, x))
+    g.output((user_out, state_new))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+    gm.recompile()
+    gm.meta["_copyback_mutation_buffers"] = ["state_0"]
+
+    captured = {}
+
+    class _CapturingEP:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    # Stub the heavy tail: lift() (param/buffer lifting) and the real EP ctor.
+    monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
+    monkeypatch.setattr(E, "lift", lambda gm_, sig_: (gm_, sig_, {}, {}))
+
+    E.create_trt_exp_program(gm)
+
+    specs = captured["graph_signature"].output_specs
+    assert len(specs) == 2
+    assert specs[0].kind == OutputKind.BUFFER_MUTATION
+    assert specs[0].target == "state_0"
+    assert specs[0].arg.name == state_new.name
+    assert specs[1].kind == OutputKind.USER_OUTPUT
+
+    # The trailing output is tagged with its buffer and reordered mutation-first.
+    assert state_new.meta["_kv_mutation_target"] == "state_0"
+    out_node = next(n for n in gm.graph.nodes if n.op == "output")
+    assert out_node.args[0][0] is state_new
+    assert out_node.args[0][1] is user_out

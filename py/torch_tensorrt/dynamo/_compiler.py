@@ -5,7 +5,6 @@ import logging
 import os
 import platform
 import warnings
-
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
@@ -45,6 +44,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+    assert_predicted_kv_aliased,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
 )
@@ -792,6 +792,8 @@ def compile(
     # module-held cache). Returns a fresh GraphModule whose forward signature
     # reflects the new placeholders.
     gm, lifted_buffers = lift_mutated_buffers(gm)
+    _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
+    _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
     if lifted_buffers:
         # Append each lifted buffer as an engine input AFTER the user inputs.
         # Buffer tensors live on the gm's state; prepare an Input spec for
@@ -832,6 +834,12 @@ def compile(
         engine_cache,
         graph_signature=exported_program.graph_signature,
     )
+    if _copyback_mutation_buffers:
+        trt_gm.meta["_copyback_mutation_buffers"] = _copyback_mutation_buffers
+    # Ground-truth check: every write lift classified as KV (engine-aliased, so its
+    # copy_ was dropped) must actually appear in a compiled engine's aliased_io,
+    # else its write-back would be silently lost -- fail loudly instead.
+    assert_predicted_kv_aliased(trt_gm, _predicted_kv_bindings)
     if lifted_buffers:
         # Inline buffers into the compiled gm as get_attr nodes + registered
         # buffers. The resulting gm's forward takes only user inputs; buffers

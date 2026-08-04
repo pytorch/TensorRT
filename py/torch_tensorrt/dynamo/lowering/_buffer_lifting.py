@@ -35,6 +35,92 @@ import torch
 logger = logging.getLogger(__name__)
 
 
+def _kv_write_will_alias(value_node: object, cache_shape: Tuple[int, ...]) -> bool:
+    """Whether the converter will emit an ``IKVCacheUpdateLayer`` (with in-place
+    aliased I/O) for this mutated buffer's new-value node.
+
+    Eligibility depends on the write dim, static shapes, and the cache being a
+    direct network input, so this reuses the converters' own eligibility
+    predicates. A ``slice_scatter`` / ``index_copy`` that is not eligible is
+    lowered to a non-aliasing scatter, so its write-back is kept as a
+    BUFFER_MUTATION output (copy-back) rather than dropped. Imports are local to
+    avoid a lowering<->conversion import cycle.
+    """
+    if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
+        return False
+    args = value_node.args
+    # The KV layer aliases the cache only if it is a direct network input; after
+    # lifting, the mutated buffer is a placeholder the write op reads from.
+    if not (
+        args and isinstance(args[0], torch.fx.Node) and args[0].op == "placeholder"
+    ):
+        return False
+
+    if value_node.target is torch.ops.aten.index_copy.default:
+        from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+            _index_copy_kv_eligible,
+        )
+
+        return _index_copy_kv_eligible(value_node)
+
+    if value_node.target is torch.ops.aten.slice_scatter.default:
+        from torch_tensorrt.dynamo.conversion.impl.slice_scatter import _kv_eligible
+
+        dim = args[2] if len(args) > 2 and isinstance(args[2], int) else 0
+        start = args[3] if len(args) > 3 and isinstance(args[3], int) else 0
+        # Prefer the source's extent along `dim` for the write length; fall back
+        # to end-start from the slice bounds.
+        update_len = None
+        src = args[1] if len(args) > 1 else None
+        if isinstance(src, torch.fx.Node):
+            src_val = src.meta.get("val")
+            if src_val is not None and dim < len(src_val.shape):
+                s = src_val.shape[dim]
+                update_len = s if isinstance(s, int) else None
+        if update_len is None:
+            end = (
+                args[4]
+                if len(args) > 4 and isinstance(args[4], int)
+                else (cache_shape[dim] if dim < len(cache_shape) else 0)
+            )
+            update_len = max(end - start, 0)
+        eligible, _reason = _kv_eligible(tuple(cache_shape), dim, start, update_len)
+        return eligible
+
+    return False
+
+
+def assert_predicted_kv_aliased(
+    gm: torch.fx.GraphModule, predicted_kv_bindings: List[str]
+) -> None:
+    """Ground-truth check for the KV predictions :func:`_kv_write_will_alias` made.
+
+    Each write ``lift_mutated_buffers`` classified as KV-aliased had its ``copy_``
+    dropped in the expectation that the engine would alias it in place. If the
+    converter did not actually emit an ``IKVCacheUpdateLayer`` for it, that
+    write-back is silently lost. So assert every predicted-KV input binding
+    appears in a compiled engine's ``aliased_io``, and raise loudly otherwise.
+    Keyed on the ``buf_*`` binding name, which is stable across the later buffer
+    rename and is what ``aliased_io`` records on the input side.
+    """
+    if not predicted_kv_bindings:
+        return
+    aliased_in: set = set()
+    for _name, sub in gm.named_children():
+        amap = getattr(sub, "aliased_io", None)
+        if amap:
+            for v in amap.values():
+                aliased_in.add(v[0] if isinstance(v, (tuple, list)) else v)
+    missing = [b for b in predicted_kv_bindings if b not in aliased_in]
+    if missing:
+        raise RuntimeError(
+            "lift_mutated_buffers classified these buffer writes as KV-cache "
+            "(engine-aliased) and dropped their copy_, but the compiled engine "
+            f"did not alias them (absent from aliased_io): {missing}. Their "
+            "write-back would be silently dropped."
+        )
+
+
 def lift_mutated_buffers(
     gm: torch.fx.GraphModule,
 ) -> Tuple[torch.fx.GraphModule, List[Tuple[str, str, torch.Tensor]]]:
@@ -55,6 +141,19 @@ def lift_mutated_buffers(
       tuples, in the order placeholders were appended (which matches the
       order they appear in the new gm's forward signature, after the
       original user inputs).
+
+    Side effects: the trailing ``copy_`` of each mutated buffer is erased. A write
+    the converter will lower to an ``IKVCacheUpdateLayer`` with in-place aliased
+    I/O (an eligible ``slice_scatter`` / ``index_copy``, per
+    :func:`_kv_write_will_alias`) relies on that engine aliasing for its
+    write-back, so nothing further is added. Every other mutation -- a non-KV
+    buffer, or a ``slice_scatter`` / ``index_copy`` that fails eligibility and is
+    lowered to a non-aliasing scatter -- has no engine aliasing, so its new value
+    is re-appended as a graph output ("copy-back") and its buffer name recorded,
+    in output order, in ``gm.meta['_copyback_mutation_buffers']`` -- the
+    downstream exporters (``create_trt_exp_program`` /
+    ``_declare_aliased_kv_mutations_on_ep``) read that list to reclassify those
+    outputs as BUFFER_MUTATIONs.
     """
     # Find all aten.copy_(get_attr_X, _) calls. The first arg's target is
     # the buffer name. Some EPs emit copy_.default, others copy_.
@@ -81,6 +180,27 @@ def lift_mutated_buffers(
 
     lifted: List[Tuple[str, str, torch.Tensor]] = []
     seen_buffers: Dict[str, torch.fx.Node] = {}  # buffer name -> new placeholder node
+
+    # Each mutated buffer's write-back is handled one of two ways downstream:
+    #   - Engine-level aliasing (zero-copy): the slice_scatter / index_copy
+    #     converters emit an IKVCacheUpdateLayer whose output is aliased in-place
+    #     to the cache input. We drop the copy_ and rely on that aliasing.
+    #   - Copy-back: any other mutation (a non-KV buffer such as a convolution-
+    #     state ring-buffer, OR a slice_scatter / index_copy the converter cannot
+    #     turn into an IKVCacheUpdateLayer) has no aliasing, so its new value is
+    #     re-attached as an ordinary BUFFER_MUTATION output that ExecuTorch copies
+    #     back after the delegate runs.
+    # `_kv_write_will_alias` decides between them by reusing the converters' own
+    # eligibility predicates (not the op target alone), so a non-aliasable
+    # slice_scatter / index_copy falls to copy-back rather than being dropped.
+    # index_put has no aliasing converter, so it always falls to copy-back too.
+    copyback: List[Tuple[torch.fx.Node, str]] = []  # (new_value_node, buffer_name)
+    # Input-binding names of writes predicted to alias (KV). compile() asserts each
+    # actually appears in the engine's aliased_io, turning a mis-prediction into a
+    # loud error instead of a silently dropped write-back. The binding name (buf_*)
+    # is the stable key: it survives the buffer renaming inline does later, and it
+    # is exactly what aliased_io records on the input side.
+    predicted_kv_bindings: set[str] = set()
 
     for copy_node, get_attr_node in mutation_pairs:
         buffer_name = get_attr_node.target
@@ -133,17 +253,39 @@ def lift_mutated_buffers(
         # to the new placeholder.
         get_attr_node.replace_all_uses_with(replacement)
 
-        # Drop the trailing copy_ (it's now redundant — the mutation lands on the
-        # placeholder's storage via engine-level aliasing).
+        # KV writes rely on engine-level aliasing, so the trailing copy_ is
+        # redundant and dropped. Other (non-KV) mutations have no aliasing:
+        # record their new value so we can re-attach it as a copy-back
+        # BUFFER_MUTATION output below, then drop the (now input-target) copy_.
+        new_value = copy_node.args[1] if len(copy_node.args) > 1 else None
+        if isinstance(new_value, torch.fx.Node):
+            if _kv_write_will_alias(new_value, tuple(buffer_tensor.shape)):
+                predicted_kv_bindings.add(replacement.name)
+            else:
+                copyback.append((new_value, buffer_name))
         gm.graph.erase_node(copy_node)
 
         # Erase the now-unused get_attr.
         if not get_attr_node.users:
             gm.graph.erase_node(get_attr_node)
 
+    # Re-attach non-KV mutation new-values as graph outputs so they survive
+    # compilation (otherwise, with the copy_ gone, they are dead and eliminated).
+    # Appended in order; recorded so create_trt_exp_program / _declare can tag the
+    # corresponding engine outputs as BUFFER_MUTATION (copy-back) downstream.
+    copyback_buffers: List[str] = []
+    if copyback:
+        output_node = next(n for n in gm.graph.nodes if n.op == "output")
+        out_args = list(output_node.args[0])
+        out_args.extend(nv for nv, _ in copyback)
+        output_node.args = (tuple(out_args),)
+        copyback_buffers = [buf for _, buf in copyback]
+
     gm.graph.lint()
 
     if not lifted:
+        gm.meta["_copyback_mutation_buffers"] = copyback_buffers
+        gm.meta["_predicted_kv_bindings"] = sorted(predicted_kv_bindings)
         return gm, []
 
     # ExportedProgram.module() produces a GraphModule whose forward is
@@ -174,11 +316,14 @@ def lift_mutated_buffers(
             except AttributeError:
                 pass
     new_gm.recompile()
+    new_gm.meta["_copyback_mutation_buffers"] = copyback_buffers
+    new_gm.meta["_predicted_kv_bindings"] = sorted(predicted_kv_bindings)
 
     logger.debug(
-        "Lifted %d mutated buffer(s) to placeholders: %s",
+        "Lifted %d mutated buffer(s) to placeholders: %s; copy-back buffers: %s",
         len(lifted),
         [(p, b) for p, b, _ in lifted],
+        copyback_buffers,
     )
 
     return new_gm, lifted
