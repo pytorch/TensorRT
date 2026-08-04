@@ -1,5 +1,3 @@
-import unittest
-
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -9,10 +7,6 @@ from torch.testing._internal.common_utils import run_tests
 from .harness import DispatchTestCase
 
 
-@unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-    "cumsum is not supported on TensorRT-RTX (build_serialized_network returns None on Linux as well as Windows)",
-)
 class TestCumsumConverter(DispatchTestCase):
     @parameterized.expand(
         [
