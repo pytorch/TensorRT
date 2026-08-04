@@ -53,12 +53,17 @@ def complex_decomposition_adapter(
         return complex_graph_detection(gm, settings)
 
     # (1) Capture the complex I/O signature BEFORE any rewrite mutates the graph.
-    #     Identical contract to the legacy pass so _insert_complex_io_adapters
-    #     keeps working unchanged.
-    gm.meta["complex_output_indices"] = _get_complex_output_indices(gm)
-    gm.meta["complex_input_names"] = _get_complex_input_names(gm)
-    gm.meta["complex_input_dtypes"] = _get_complex_input_dtypes(gm)
-    if not gm.meta["complex_input_names"] and not gm.meta["complex_output_indices"]:
+    #     We stash it in LOCALS (not gm.meta) because decompose_complex_in_graph is
+    #     functional -- it returns a NEW GraphModule via make_fx -- so anything we
+    #     wrote on this instance's module-level .meta would not ride along.  We
+    #     re-attach onto the returned module in step (4).  These three keys are the
+    #     contract _insert_complex_io_adapters reads post-partition to reinsert the
+    #     complex I/O boundary; losing them silently drops the boundary adapters and
+    #     the model returns real [...,2] instead of complex.
+    complex_output_indices = _get_complex_output_indices(gm)
+    complex_input_names = _get_complex_input_names(gm)
+    complex_input_dtypes = _get_complex_input_dtypes(gm)
+    if not complex_input_names and not complex_output_indices:
         # No complex I/O and no interior complex work -> nothing to do.  (Interior-
         # only complex still shows up via inputs/outputs of the complex region, so
         # this early-out matches the legacy pass's behavior.)
@@ -72,11 +77,17 @@ def complex_decomposition_adapter(
 
     flat_args = _fake_flat_args(gm)
     logger.debug("complex_decomposition_adapter: retracing under ComplexTensor")
-    gm = decompose_complex_in_graph(gm, flat_args)
+    gm = decompose_complex_in_graph(gm, flat_args)  # NOTE: returns a new module
 
     # (3) Normalize SoA seams into the interleaved [..., 2] layout used by TRT.
     gm = _normalize_complex_boundary_for_trt(gm)
     gm = clean_up_graph_after_modifications(gm)
+
+    # (4) Re-attach the captured I/O signature onto the RETURNED module so
+    #     _insert_complex_io_adapters can restore the complex boundary.
+    gm.meta["complex_output_indices"] = complex_output_indices
+    gm.meta["complex_input_names"] = complex_input_names
+    gm.meta["complex_input_dtypes"] = complex_input_dtypes
     return gm
 
 
