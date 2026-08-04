@@ -22,14 +22,29 @@
 #include "core/runtime/TensorRTBindingNames.h"
 #include "core/util/prelude.h"
 
-// TensorRT 10.16+ has native NCCL collective support via IExecutionContext::setCommunicator()
-#if NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 16)
+// Native NCCL collective support is exposed via IExecutionContext::setCommunicator()
+// together with IDistCollectiveLayer. Two independent release lines ship that API:
+//
+//   * TensorRT-RTX 1.5+ -- NvInferVersion.h defines TRT_MAJOR_RTX/TRT_MINOR_RTX and
+//     then aliases NV_TENSORRT_MAJOR/MINOR to them, so NV_TENSORRT_MAJOR is 1 on RTX
+//     and the mainline ">= 10.16" comparison below can never match. Detect the RTX
+//     package first and version-check against its own numbering.
+//   * TensorRT 10.16+   -- mainline.
+//
+// Do not collapse these into a single NV_TENSORRT_MAJOR/MINOR test: the two lines use
+// incompatible numbering schemes. See is_tensorrt_version_supported() in
+// py/torch_tensorrt/_utils.py for the Python-side equivalent of the same problem.
+#if defined(TRT_MAJOR_RTX)
+#if TRT_MAJOR_RTX > 1 || (TRT_MAJOR_RTX == 1 && TRT_MINOR_RTX >= 5)
+#define TRT_HAS_NATIVE_NCCL 1
+#endif
+#elif NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 16)
 #define TRT_HAS_NATIVE_NCCL 1
 #endif
 
 // Full TRT NCCL collectives support requires both:
 // 1. PyTorch built with NCCL (USE_C10D_NCCL defined via Bazel)
-// 2. TensorRT 10.16+ (TRT_HAS_NATIVE_NCCL defined above)
+// 2. A TensorRT exposing the native collectives API (TRT_HAS_NATIVE_NCCL above)
 #if defined(USE_C10D_NCCL) && defined(TRT_HAS_NATIVE_NCCL)
 #define ENABLE_TRT_NCCL_COLLECTIVES 1
 #endif
