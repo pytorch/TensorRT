@@ -17,6 +17,7 @@ from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .normalize_negative_slice_stop import normalize_negative_slice_stop
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
@@ -26,7 +27,6 @@ from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .rule_based_autocast import rule_based_autocast
-from .normalize_negative_slice_stop import normalize_negative_slice_stop
 
 pre_lowering_pass_list = [
     remove_detach,
@@ -138,7 +138,7 @@ def get_lowering_pass_config(lowering_pass: LoweringPassSignature) -> dict[str, 
 def post_lowering(
     gm: torch.fx.GraphModule, settings: CompilationSettings = CompilationSettings()
 ) -> torch.fx.GraphModule:
-    """Applies the lowering passes to a graph module after torch.export/ torch.compile and their decompositions, returns the modified GraphModule"""
+    """Applies the lowering passes to a graph module after torch.export/torch.compile and their decompositions, returns the modified GraphModule"""
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
@@ -154,8 +154,8 @@ def post_lowering(
 def pre_export_lowering(
     ep: torch.export.ExportedProgram,
     settings: CompilationSettings = CompilationSettings(),
-) -> torch.fx.GraphModule:
-    """Applies the lowering passes to a graph module after torch.export/ torch.compile and their decompositions, returns the modified GraphModule"""
+) -> torch.export.ExportedProgram:
+    """Applies the lowering passes to an ExportedProgram after torch.export/torch.compile but before run_decompositions, returns the modified ExportedProgram."""
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
