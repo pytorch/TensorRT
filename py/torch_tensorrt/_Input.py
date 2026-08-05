@@ -74,18 +74,41 @@ class Input(object):
 
         Keyword Arguments:
             shape (Tuple or List, optional): Static shape of input tensor
-            min_shape (Tuple or List, optional): Min size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
-            opt_shape (Tuple or List, optional): Opt size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
-            max_shape (Tuple or List, optional): Max size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
+            min_shape (Tuple, List, torch.Size, or NamedTuple, optional): Min size of input tensor's shape range.
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.
+                If a namedtuple is provided, its field names are used as axis names — see the namedtuple shape spec note below.
+            opt_shape (Tuple, List, torch.Size, or NamedTuple, optional): Opt size of input tensor's shape range.
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.
+                Must be a namedtuple with identical fields to min_shape if min_shape is a namedtuple.
+            max_shape (Tuple, List, torch.Size, or NamedTuple, optional): Max size of input tensor's shape range.
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.
+                Must be a namedtuple with identical fields to min_shape if min_shape is a namedtuple.
             dtype (torch.dtype or torch_tensorrt.dtype): Expected data type for input tensor (default: torch_tensorrt.dtype.float32)
             format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
             tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
                 Note: Entering "None" (or not specifying) will set the bound to [0, 2)
             torch_tensor (torch.Tensor): Holds a corresponding torch tensor with this Input.
             name (str, optional): Name of this input in the input nn.Module's forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.
+            shared_dims (Dict[int, str], optional): Maps axis indices to names. Axes with the same name across multiple inputs are exported as a single shared ``torch.export.Dim``. Cannot be combined with a namedtuple min_shape.
+
+        Note — namedtuple shape spec (shorthand for ``shared_dims``):
+            Passing a namedtuple as ``min_shape``/``opt_shape``/``max_shape`` is a shorthand
+            for declaring shared dynamic axes without writing ``shared_dims`` explicitly.
+            Each field name becomes the axis name; dynamic axes (min != max) with the same
+            name across inputs are automatically exported as one shared ``torch.export.Dim``.
+            Static axes (min == max) are ignored. Cannot be combined with ``shared_dims``::
+
+                from collections import namedtuple
+                S = namedtuple("shape", ["batch", "seq"])
+                inputs = [
+                    torch_tensorrt.Input(min_shape=S(1, 16), opt_shape=S(4, 16), max_shape=S(4, 16),
+                                         dtype=torch.int64, name="input_ids"),
+                    torch_tensorrt.Input(min_shape=S(1, 16), opt_shape=S(4, 16), max_shape=S(4, 16),
+                                         dtype=torch.int64, name="attention_mask"),
+                ]
+                # "batch" is dynamic (1→4) on both inputs → one shared Dim("batch")
+                # "seq" is static (16==16) → no shared dim needed
+
         Examples:
             - Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)
             - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)
@@ -183,7 +206,42 @@ class Input(object):
                         "if you try to run inference with empty tensor inputs."
                     )
 
+                # Namedtuple shape API: field names encode per-axis dimension names.
+                # Convert to shared_dims so _tracer.py needs no changes — axes with the
+                # same name across inputs become one shared torch.export.Dim.
+                if hasattr(kwargs["min_shape"], "_fields"):
+                    fields = kwargs["min_shape"]._fields
+                    if not (
+                        hasattr(kwargs["opt_shape"], "_fields")
+                        and hasattr(kwargs["max_shape"], "_fields")
+                    ):
+                        raise TypeError(
+                            "If min_shape is a namedtuple, opt_shape and max_shape must also be namedtuples"
+                        )
+                    if not (
+                        kwargs["opt_shape"]._fields == fields
+                        and kwargs["max_shape"]._fields == fields
+                    ):
+                        raise ValueError(
+                            "min_shape, opt_shape, max_shape namedtuples must have identical field names"
+                        )
+                    # Only tag dynamic axes (min != max); static axes need no shared Dim.
+                    self.shared_dims = {
+                        i: name
+                        for i, name in enumerate(fields)
+                        if self.shape["min_shape"][i] != self.shape["max_shape"][i]
+                    }
+
                 if "shared_dims" in kwargs and kwargs["shared_dims"]:
+                    if hasattr(kwargs["min_shape"], "_fields"):
+                        # Not allowed:
+                        #   S = namedtuple('S', ['b', 'c'])
+                        #   Input(min_shape=S(1,2), opt_shape=S(4,2), max_shape=S(8,2),
+                        #         shared_dims={0: "b"})   # ← redundant and ambiguous
+                        raise ValueError(
+                            "Cannot specify both a namedtuple min_shape and shared_dims; "
+                            "use one or the other to name dynamic axes."
+                        )
                     self.shared_dims = Input._parse_shared_dims(
                         kwargs["shared_dims"], self.shape
                     )
