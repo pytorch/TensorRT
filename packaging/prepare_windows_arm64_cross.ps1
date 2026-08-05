@@ -1,14 +1,17 @@
 param(
-    [Parameter(Mandatory = $true)] [string] $PyTorchArtifact,
+    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.14.0.dev20260728%2Bcu134-cp313-cp313-win_arm64.whl",
+    [string] $PythonArtifact = "https://api.nuget.org/v3-flatcontainer/pythonarm64/3.13.0/pythonarm64.3.13.0.nupkg",
     [Parameter(Mandatory = $true)] [string] $TargetRoot,
-    [Parameter(Mandatory = $true)] [string] $CudaRoot,
-    [Parameter(Mandatory = $true)] [string] $PythonRoot
+    [Parameter(Mandatory = $true)] [string] $CudaRoot
 )
 
 $ErrorActionPreference = "Stop"
 
+$PyTorchArtifactSha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200"
+$PythonArtifactSha256 = "f44428dc94e6f9c72cd69ad6436280784e6f9eed46a149641fee71866d3081f3"
+
 function Expand-ZipArtifact {
-    param([string] $Artifact, [string] $Destination, [string] $Name)
+    param([string] $Artifact, [string] $Destination, [string] $Name, [string] $ExpectedSha256 = "")
     $source = $Artifact
     if ($Artifact -match '^https?://') {
         $source = Join-Path $env:RUNNER_TEMP "$Name.zip"
@@ -16,6 +19,12 @@ function Expand-ZipArtifact {
     }
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
         throw "$Name artifact was not found: $source"
+    }
+    if ($ExpectedSha256) {
+        $actualSha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualSha256 -ne $ExpectedSha256) {
+            throw "$Name artifact SHA256 mismatch: expected $ExpectedSha256, got $actualSha256"
+        }
     }
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
     python -m zipfile -e $source $Destination
@@ -41,10 +50,13 @@ if (Test-Path -LiteralPath $TargetRoot) {
 New-Item -ItemType Directory -Force -Path $TargetRoot | Out-Null
 
 $torchExtract = Join-Path $TargetRoot "pytorch"
-Expand-ZipArtifact -Artifact $PyTorchArtifact -Destination $torchExtract -Name "pytorch-arm64"
+Expand-ZipArtifact -Artifact $PyTorchArtifact -Destination $torchExtract -Name "pytorch-arm64" -ExpectedSha256 $PyTorchArtifactSha256
 
 $torchRoot = Find-Root -SearchRoot $torchExtract -IncludePath "include" -LibraryPath "lib" -Name "PyTorch"
 $cudaArm64Lib = Join-Path $CudaRoot "lib\arm64\cudart.lib"
+$pythonExtract = Join-Path $TargetRoot "pythonarm64"
+Expand-ZipArtifact -Artifact $PythonArtifact -Destination $pythonExtract -Name "pythonarm64" -ExpectedSha256 $PythonArtifactSha256
+$pythonRoot = Find-Root -SearchRoot $pythonExtract -IncludePath "include\Python.h" -LibraryPath "libs\python313.lib" -Name "Python ARM64"
 if (-not (Test-Path -LiteralPath $cudaArm64Lib)) {
     throw "CUDA target library is missing: $cudaArm64Lib"
 }
@@ -56,8 +68,8 @@ $cudaVersion = (Get-Content -LiteralPath $cudaVersionFile -Raw | ConvertFrom-Jso
 if ($cudaVersion -notlike '13.4*') {
     throw "Windows ARM64 builds require CUDA 13.4 Preview; got '$cudaVersion'"
 }
-$pythonHeader = Join-Path $PythonRoot "include\Python.h"
-$pythonImportLibrary = Join-Path $PythonRoot "libs\python313.lib"
+$pythonHeader = Join-Path $pythonRoot "include\Python.h"
+$pythonImportLibrary = Join-Path $pythonRoot "libs\python313.lib"
 foreach ($pythonFile in @($pythonHeader, $pythonImportLibrary)) {
     if (-not (Test-Path -LiteralPath $pythonFile -PathType Leaf)) {
         throw "ARM64 Python 3.13 development file is missing: $pythonFile"
@@ -74,5 +86,5 @@ function Export-GitHubEnvironment([string] $Name, [string] $Value) {
 Export-GitHubEnvironment "TORCHTRT_TARGET_PLATFORM" "windows-arm64"
 Export-GitHubEnvironment "TORCHTRT_TARGET_TORCH_ROOT" $torchRoot
 Export-GitHubEnvironment "TORCHTRT_TARGET_CUDA_ROOT" $CudaRoot
-Export-GitHubEnvironment "TORCHTRT_TARGET_PYTHON_ROOT" $PythonRoot
-Write-Host "Prepared Windows ARM64 target sysroot: PyTorch=$torchRoot CUDA=$CudaRoot Python=$PythonRoot"
+Export-GitHubEnvironment "TORCHTRT_TARGET_PYTHON_ROOT" $pythonRoot
+Write-Host "Prepared Windows ARM64 target sysroot: PyTorch=$torchRoot CUDA=$CudaRoot Python=$pythonRoot"

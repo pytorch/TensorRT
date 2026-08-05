@@ -193,10 +193,13 @@ new_local_repository(
     build_file = "third_party/libtorch/BUILD"
 )
 
-new_local_repository(
+http_archive(
     name = "libtorch_win_arm64",
-    path = "${TORCHTRT_TARGET_TORCH_ROOT}",
-    build_file = "third_party/libtorch/BUILD"
+    build_file = "third_party/libtorch/BUILD",
+    sha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200",
+    strip_prefix = "torch",
+    type = "zip",
+    urls = ["https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.14.0.dev20260728%2Bcu134-cp313-cp313-win_arm64.whl"],
 )
 
 new_local_repository(

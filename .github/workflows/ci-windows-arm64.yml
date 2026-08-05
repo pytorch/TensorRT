@@ -1,81 +1,45 @@
 name: CI Windows ARM64
 
-# RTX-only build channel. This is manually dispatched onto an x86_64 Windows
-# runner that can access the Windows ARM64 PyTorch artifact (including a direct
-# NVIDIA download URL) and ARM64 Python development files. Runtime
-# tests begin when a native ARM64 runner is available; cross-builds perform PE/header validation only.
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *"
   workflow_dispatch:
-    inputs:
-      runner:
-        description: Windows x86_64 runner label with access to the local artifacts
-        required: true
-        type: string
-      python-version:
-        description: Host and target CPython version (Windows ARM64 currently supports 3.13 only)
-        default: "3.13"
-        required: true
-        type: choice
-        options: ["3.13"]
-      pytorch-arm64-artifact:
-        description: Runner-local path or direct NVIDIA download URL for the Windows ARM64 PyTorch 2.14 wheel or zip
-        required: true
-        type: string
-      python-arm64-root:
-        description: Absolute runner-local ARM64 Python 3.13 root containing include/Python.h and libs/python313.lib
-        required: true
-        type: string
-      cuda-arm64-root:
-        description: Absolute runner-local CUDA 13.4 Preview root containing lib/arm64/cudart.lib
-        default: 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4'
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 jobs:
-  validate-inputs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Validate selected artifacts
-        env:
-          PYTHON_VERSION: ${{ inputs.python-version }}
-          PYTORCH_ARM64: ${{ inputs.pytorch-arm64-artifact }}
-          PYTHON_ARM64_ROOT: ${{ inputs.python-arm64-root }}
-          CUDA_ARM64_ROOT: ${{ inputs.cuda-arm64-root }}
-        run: |
-          set -euo pipefail
-          if [[ "${PYTHON_VERSION}" != "3.13" ]]; then
-            echo "::error::Windows ARM64 builds currently require Python 3.13"
-            exit 1
-          fi
-          for value in "${PYTORCH_ARM64}" "${PYTHON_ARM64_ROOT}" "${CUDA_ARM64_ROOT}"; do
-            [[ -n "${value}" ]] || { echo "::error::ARM64 PyTorch, Python, and CUDA inputs are required"; exit 1; }
-          done
 
   build:
-    needs: validate-inputs
-    uses: ./.github/workflows/build_windows_arm64.yml
+    uses: ./.github/workflows/build_windows.yml
     with:
-      runner: ${{ inputs.runner }}
-      python-version: ${{ inputs.python-version }}
-      pytorch-arm64-artifact: ${{ inputs.pytorch-arm64-artifact }}
-      python-arm64-root: ${{ inputs.python-arm64-root }}
-      cuda-arm64-root: ${{ inputs.cuda-arm64-root }}
+      repository: ${{ github.repository }}
+      ref: ${{ github.sha }}
+      build-matrix: >-
+        {"include":[{"build_name":"windows-arm64-cross","python_version":"3.13","desired_cuda":"cu134","validation_runner":"windows.g5.4xlarge.nvidia.gpu"}]}
+      architecture: x64
+      cross-compile: true
+      use-rtx: true
+      timeout: 120
+      skip-binary-upload: true
 
   gate:
-    needs: [validate-inputs, build]
+    needs: [build]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Gate Windows ARM64 builds
         env:
-          VALIDATE_RESULT: ${{ needs.validate-inputs.result }}
           BUILD_RESULT: ${{ needs.build.result }}
         run: |
           set -euo pipefail
-          if [[ "${VALIDATE_RESULT}" != "success" || "${BUILD_RESULT}" != "success" ]]; then
+          if [[ "${BUILD_RESULT}" != "success" ]]; then
             exit 1
           fi
           echo "Windows ARM64 RTX cross-build gate passed."
