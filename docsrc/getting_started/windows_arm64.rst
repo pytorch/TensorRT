@@ -150,12 +150,19 @@ and the resulting Torch-TensorRT wheel target CPython 3.13.
    Set the target roots and reuse the active cross-tools environment:
 
    .. code-block:: bat
-
+      # this is the target root for the pytorch windows on arm64 artifacts
       set "TORCHTRT_TARGET_TORCH_ROOT=C:/torchtrt-arm64-artifacts/pytorch/torch"
+
+      # this is the cuda root for the cuda toolkit installed on windows x86 host machine
       set "TORCHTRT_TARGET_CUDA_ROOT=C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/"
+
+      # this is the python root for the python 3.13 on windows for arm64
       set "TORCHTRT_TARGET_PYTHON_ROOT=C:\torchtrt-arm64-artifacts\python313-arm64"
+
+      # set the cuda path and home path
       set "CUDA_PATH=%TORCHTRT_TARGET_CUDA_ROOT%"
       set "CUDA_HOME=%TORCHTRT_TARGET_CUDA_ROOT%"
+      
       set DISTUTILS_USE_SDK=1
 
 4. Cross-build the ARM64 TensorRT-RTX wheel:

@@ -10,11 +10,15 @@ $ErrorActionPreference = "Stop"
 $PyTorchArtifactSha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200"
 $PythonArtifactSha256 = "f44428dc94e6f9c72cd69ad6436280784e6f9eed46a149641fee71866d3081f3"
 
+$ArtifactTempRoot = $env:RUNNER_TEMP
+if (-not $ArtifactTempRoot) {
+    $ArtifactTempRoot = [System.IO.Path]::GetTempPath()
+}
 function Expand-ZipArtifact {
     param([string] $Artifact, [string] $Destination, [string] $Name, [string] $ExpectedSha256 = "")
     $source = $Artifact
     if ($Artifact -match '^https?://') {
-        $source = Join-Path $env:RUNNER_TEMP "$Name.zip"
+        $source = Join-Path $ArtifactTempRoot "$Name.zip"
         Invoke-WebRequest -Uri $Artifact -OutFile $source
     }
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
@@ -41,18 +45,19 @@ function Find-Root {
     throw "Could not locate the normalized $Name root under $SearchRoot"
 }
 
-if (Test-Path -LiteralPath $TargetRoot) {
-    Remove-Item -LiteralPath $TargetRoot -Recurse -Force
-}
 New-Item -ItemType Directory -Force -Path $TargetRoot | Out-Null
 
 $torchExtract = Join-Path $TargetRoot "pytorch"
-Expand-ZipArtifact -Artifact $PyTorchArtifact -Destination $torchExtract -Name "pytorch-arm64" -ExpectedSha256 $PyTorchArtifactSha256
+if (-not (Test-Path -LiteralPath $torchExtract -PathType Container)) {
+    Expand-ZipArtifact -Artifact $PyTorchArtifact -Destination $torchExtract -Name "pytorch-arm64" -ExpectedSha256 $PyTorchArtifactSha256
+}
 
 $torchRoot = Find-Root -SearchRoot $torchExtract -IncludePath "include" -LibraryPath "lib" -Name "PyTorch"
 $cudaArm64Lib = Join-Path $CudaRoot "lib\arm64\cudart.lib"
 $pythonExtract = Join-Path $TargetRoot "pythonarm64"
-Expand-ZipArtifact -Artifact $PythonArtifact -Destination $pythonExtract -Name "pythonarm64" -ExpectedSha256 $PythonArtifactSha256
+if (-not (Test-Path -LiteralPath $pythonExtract -PathType Container)) {
+    Expand-ZipArtifact -Artifact $PythonArtifact -Destination $pythonExtract -Name "pythonarm64" -ExpectedSha256 $PythonArtifactSha256
+}
 $pythonRoot = Find-Root -SearchRoot $pythonExtract -IncludePath "include\Python.h" -LibraryPath "libs\python313.lib" -Name "Python ARM64"
 if (-not (Test-Path -LiteralPath $cudaArm64Lib)) {
     throw "CUDA target library is missing: $cudaArm64Lib"
