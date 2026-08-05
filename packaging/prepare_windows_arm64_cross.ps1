@@ -2,7 +2,8 @@ param(
     [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.14.0.dev20260728%2Bcu134-cp313-cp313-win_arm64.whl",
     [string] $PythonArtifact = "https://api.nuget.org/v3-flatcontainer/pythonarm64/3.13.0/pythonarm64.3.13.0.nupkg",
     [Parameter(Mandatory = $true)] [string] $TargetRoot,
-    [Parameter(Mandatory = $true)] [string] $CudaRoot
+    [Parameter(Mandatory = $true)] [string] $CudaRoot,
+    [string] $PythonExecutable = "python"
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,7 +32,10 @@ function Expand-ZipArtifact {
         }
     }
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
-    python -m zipfile -e $source $Destination
+    & $PythonExecutable -m zipfile -e $source $Destination
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to extract $Name artifact"
+    }
 }
 
 function Find-Root {

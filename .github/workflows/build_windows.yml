@@ -164,7 +164,7 @@ jobs:
           activate-with-label: false
           instructions: "SSH with rdesktop using ssh -L 3389:localhost:3389 %%username%%@%%hostname%%"
       - name: Add Conda scripts to GitHub path
-        if: inputs.architecture == 'x64' && inputs.cross-compile == false
+        if: inputs.architecture == 'x64'
         run: |
           echo "C:/Jenkins/Miniconda3/Scripts" >> $GITHUB_PATH
       - name: Setup Git for Windows' minimal SDK
@@ -177,10 +177,10 @@ jobs:
           path: "${{env.DEPENDENCIES_DIR}}\\git"
       - uses: ./test-infra/.github/actions/setup-windows
         with:
-          cuda-version: ${{ inputs.cross-compile && 'cpu' || env.CU_VERSION }}
+          cuda-version: ${{ env.CU_VERSION }}
       - name: Install CUDA 13.4 toolkit with ARM64 target libraries
         if: inputs.cross-compile
-        shell: pwsh
+        shell: powershell
         env:
           CUDA_INSTALLER_URL: https://packages.nvidia.com/prerelease/cuda/13.4.0/local_installers/cuda_13.4.0_windows_x86_64.exe
           CUDA_ROOT: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4
@@ -194,18 +194,6 @@ jobs:
           "CUDA_PATH=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           (Join-Path $env:CUDA_ROOT "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - uses: actions/setup-python@v6
-        if: inputs.cross-compile
-        with:
-          python-version: ${{ matrix.python_version }}
-          architecture: x64
-      - name: Install x64 host build dependencies for ARM64 cross-compile
-        if: inputs.cross-compile
-        shell: pwsh
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install --pre torch --index-url "https://download.pytorch.org/whl/nightly/${{ env.CU_VERSION }}"
-          python -m pip install numpy packaging pyyaml setuptools wheel fmt
       - uses: ./test-infra/.github/actions/set-channel
       - name: Set PYTORCH_VERSION
         if: env.CHANNEL == 'test'
@@ -214,7 +202,7 @@ jobs:
           # otherwise, leave it alone so nightly will pick up the latest
           echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
       - uses: ./test-infra/.github/actions/setup-binary-builds
-        if: inputs.architecture == 'x64' && inputs.cross-compile == false
+        if: inputs.architecture == 'x64'
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
@@ -222,9 +210,9 @@ jobs:
           setup-miniconda: false
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
-          arch: ${{ inputs.architecture }}
+          arch: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
       - name: Shorten Conda environment path
-        if: inputs.architecture == 'x64' && inputs.cross-compile == false
+        if: inputs.architecture == 'x64'
         run: |
           bash "${REPOSITORY}/.github/scripts/shorten-conda-env-windows.sh"
       - name: Install XPU support package
@@ -238,7 +226,7 @@ jobs:
         run: |
           cmd //c .\\test-infra\\.github\\scripts\\driver_update.bat
       - name: Checkout Target Repository (${{ env.REPOSITORY }})
-        if: inputs.architecture == 'arm64' || inputs.cross-compile
+        if: inputs.architecture == 'arm64'
         uses: actions/checkout@v4
         with:
             repository: ${{ env.REPOSITORY }}
@@ -247,22 +235,24 @@ jobs:
             submodules: recursive
       - name: Prepare ARM64 target sysroot
         if: inputs.cross-compile
-        shell: pwsh
+        working-directory: ${{ inputs.repository }}
+        shell: powershell
         run: |
           ./packaging/prepare_windows_arm64_cross.ps1 `
             -TargetRoot '${{ runner.temp }}\torchtrt-windows-arm64' `
-            -CudaRoot $env:CUDA_PATH
+            -CudaRoot $env:CUDA_PATH `
+            -PythonExecutable (Join-Path $env:CONDA_ENV 'python.exe')
       - name: Prepare Torch-TensorRT dependencies for ARM64 cross-compile
         if: inputs.cross-compile
         working-directory: ${{ inputs.repository }}
-        run: bash packaging/pre_build_script_windows.sh
+        run: ${CONDA_RUN} bash packaging/pre_build_script_windows.sh
       - name: Cross-compile Windows ARM64 wheel
         if: inputs.cross-compile
         working-directory: ${{ inputs.repository }}
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" amd64_arm64
-          call packaging\build_windows_arm64_cross.bat
+          %CONDA_RUN% cmd /c packaging\build_windows_arm64_cross.bat
       - name: Validate Windows ARM64 wheel
         if: inputs.cross-compile
         working-directory: ${{ inputs.repository }}
