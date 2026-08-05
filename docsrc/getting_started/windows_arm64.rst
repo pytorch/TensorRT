@@ -37,12 +37,12 @@ CUDA root for ``CUDA_PATH``, ``CUDA_HOME``, and
 Native build on Windows ARM64
 -----------------------------
 
-1. Open an ARM64-native Visual Studio 2022 developer command prompt. You can
+1. Open a command prompt. You can
    also initialize one from ``cmd.exe``:
 
    .. code-block:: bat
-
-      call "%ProgramFiles%\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" arm64
+      # confirm your visual studio version and path
+      call "%ProgramFiles%\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" arm64
       echo %VSCMD_ARG_HOST_ARCH%
       echo %VSCMD_ARG_TGT_ARCH%
       where cl.exe

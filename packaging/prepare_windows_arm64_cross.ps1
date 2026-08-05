@@ -41,9 +41,6 @@ function Find-Root {
     throw "Could not locate the normalized $Name root under $SearchRoot"
 }
 
-if ($env:PYTHON_VERSION -ne '3.13') {
-    throw "Windows ARM64 RTX supports only Python 3.13; got '$env:PYTHON_VERSION'"
-}
 if (Test-Path -LiteralPath $TargetRoot) {
     Remove-Item -LiteralPath $TargetRoot -Recurse -Force
 }
