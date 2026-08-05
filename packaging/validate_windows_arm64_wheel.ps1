@@ -24,8 +24,6 @@ $targetLibraries = @(
     Join-Path $env:TORCHTRT_TARGET_PYTHON_ROOT "libs\python313.lib"
 )
 $nativeFiles += @($targetLibraries | Get-Item)
-$nativeFiles += @(Get-ChildItem -LiteralPath (Join-Path $env:TORCHTRT_TARGET_TRT_ROOT "lib") -Filter "tensorrt_rtx*.lib" | Select-Object -First 1)
-
 if (-not $nativeFiles) {
     throw "No native outputs or target import libraries were found"
 }

@@ -1,8 +1,8 @@
 name: CI Windows ARM64
 
-# RTX-only build channel. Until Windows ARM64 PyTorch is published remotely,
-# this is manually dispatched onto an x86_64 Windows runner that can access the
-# runner-local PyTorch artifact and ARM64 Python development files. Runtime
+# RTX-only build channel. This is manually dispatched onto an x86_64 Windows
+# runner that can access the Windows ARM64 PyTorch artifact (including a direct
+# NVIDIA download URL) and ARM64 Python development files. Runtime
 # tests begin when a native ARM64 runner is available; cross-builds perform PE/header validation only.
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ on:
         type: choice
         options: ["3.13"]
       pytorch-arm64-artifact:
-        description: Absolute runner-local path to the Windows ARM64 PyTorch wheel or zip
+        description: Runner-local path or direct NVIDIA download URL for the Windows ARM64 PyTorch 2.14 wheel or zip
         required: true
         type: string
       python-arm64-root:
@@ -29,10 +29,6 @@ on:
         description: Absolute runner-local CUDA 13.4 Preview root containing lib/arm64/cudart.lib
         default: 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4'
         required: true
-        type: string
-      tensorrt-rtx-artifact:
-        description: Optional local TensorRT-RTX ARM64 zip; blank uses the NVIDIA URL
-        required: false
         type: string
 
 permissions:
@@ -67,7 +63,6 @@ jobs:
       pytorch-arm64-artifact: ${{ inputs.pytorch-arm64-artifact }}
       python-arm64-root: ${{ inputs.python-arm64-root }}
       cuda-arm64-root: ${{ inputs.cuda-arm64-root }}
-      tensorrt-rtx-arm64-artifact: ${{ inputs.tensorrt-rtx-artifact || 'https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-arm64-cuda-13.4-Release-external.zip' }}
 
   gate:
     needs: [validate-inputs, build]

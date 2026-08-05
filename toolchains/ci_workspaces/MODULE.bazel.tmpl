@@ -166,10 +166,13 @@ http_archive(
     ],
 )
 
-new_local_repository(
+http_archive(
     name = "tensorrt_rtx_win_arm64",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    path = "${TORCHTRT_TARGET_TRT_ROOT}",
+    strip_prefix = "TensorRT-RTX-1.6.1.120",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-arm64-cuda-13.4-Release-external.zip",
+    ],
 )
 
 ####################################################################################

@@ -21,8 +21,10 @@ Both build types require:
 * CUDA Toolkit 13.4 Preview. The Windows x86 installation contains the
   headers and ARM64 libraries required to cross-compile for Windows ARM64.
   Native Windows ARM64 builds also use CUDA 13.4;
-* a compatible Windows ARM64 PyTorch package containing the C++ headers and
-  libraries under ``torch\include`` and ``torch\lib``;
+* a compatible Windows ARM64 PyTorch 2.14 package containing the C++ headers
+  and libraries under ``torch\include`` and ``torch\lib``. Nightly wheels are
+  available from NVIDIA's ``nvtorch_oot_nightly`` index at
+  ``https://pypi.nvidia.com/nvtorch_oot_nightly/torch/``;
 * Python packages required by Torch-TensorRT-RTX. The currently available
   Windows ARM64 PyTorch wheel targets CPython 3.13, so native and cross-builds
   are currently supported only with Python 3.13.
@@ -80,8 +82,8 @@ Native build on Windows ARM64
       python -m pip install --upgrade pip
       python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
 
-      # only for run the setup.py, not use this torch wheelto build windows on arm
-      python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu130
+      # Install the Windows ARM64 PyTorch 2.14 nightly.
+      python -m pip install --pre "torch>=2.14.0.dev,<2.15.0" --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
 
       # build the native windows on arm TensorRT-RTX wheel
       python setup.py bdist_wheel --use-rtx
@@ -135,7 +137,9 @@ and the resulting Torch-TensorRT wheel target CPython 3.13.
 3. Prepare the ARM64 target dependencies:
 
    * ``TORCHTRT_TARGET_TORCH_ROOT`` must contain ``include`` and ``lib``
-     directories from an ARM64 PyTorch installation.
+     directories from an ARM64 PyTorch 2.14 installation. Download the ARM64
+     wheel from ``https://pypi.nvidia.com/nvtorch_oot_nightly/torch/`` and
+     install or extract it to create this target root.
    * ``TORCHTRT_TARGET_CUDA_ROOT`` must contain the CUDA headers and
      ``lib\arm64\cudart.lib``.
    * ``TORCHTRT_TARGET_PYTHON_ROOT`` must point to an ARM64 Python 3.13
@@ -161,7 +165,7 @@ and the resulting Torch-TensorRT wheel target CPython 3.13.
 
       python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
 
-      #only for run the setup.py, not use this torch wheelto build windows on arm
+      # only for run the setup.py, not use this torch wheelto build windows on arm
       python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu130
       
       # cross-build the ARM64 TensorRT-RTX wheel

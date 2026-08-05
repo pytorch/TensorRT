@@ -15,7 +15,7 @@ on:
         required: true
         type: string
       pytorch-arm64-artifact:
-        description: Absolute runner-local path to the Windows ARM64 PyTorch wheel or zip
+        description: Runner-local path or direct download URL for the Windows ARM64 PyTorch 2.14 wheel or zip
         required: true
         type: string
       python-arm64-root:
@@ -25,10 +25,6 @@ on:
       cuda-arm64-root:
         description: CUDA 13.4 Preview root containing ARM64 target libraries
         required: true
-        type: string
-      tensorrt-rtx-arm64-artifact:
-        description: Runner-local path or URL for the Windows ARM64 TensorRT-RTX SDK zip
-        default: https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-arm64-cuda-13.4-Release-external.zip
         type: string
 
 permissions:
@@ -74,7 +70,6 @@ jobs:
         run: |
           ./packaging/prepare_windows_arm64_cross.ps1 `
             -PyTorchArtifact '${{ inputs.pytorch-arm64-artifact }}' `
-            -TensorRTArtifact '${{ inputs.tensorrt-rtx-arm64-artifact }}' `
             -TargetRoot '${{ runner.temp }}\torchtrt-windows-arm64' `
             -CudaRoot '${{ inputs.cuda-arm64-root }}' `
             -PythonRoot '${{ inputs.python-arm64-root }}'
