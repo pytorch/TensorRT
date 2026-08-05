@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=61144a8f"></script>
+    <script src="../../../_static/documentation_options.js?v=a00d1821"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -476,7 +476,9 @@ document.write(`
   <h1>Source code for torch_tensorrt.dynamo._tracer</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">nullcontext</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">inspect</span><span class="w"> </span><span class="kn">import</span> <span class="n">signature</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
@@ -484,7 +486,11 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dim</span><span class="p">,</span> <span class="n">export</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_device</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_torch_inputs</span><span class="p">,</span> <span class="n">to_torch_device</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">get_torch_inputs</span><span class="p">,</span>
+    <span class="n">is_quantized_by_modelopt</span><span class="p">,</span>
+    <span class="n">to_torch_device</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -544,6 +550,7 @@ document.write(`
             <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
         <span class="p">)</span>
     <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">arg_inputs</span>
+    <span class="k">assert</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -557,13 +564,27 @@ document.write(`
     <span class="n">dim_registry</span> <span class="o">=</span> <span class="n">build_dim_registry</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="p">)</span>
     <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_args</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">)</span>
     <span class="n">dynamic_shapes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">))</span>
-    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
-        <span class="n">mod</span><span class="p">,</span>
-        <span class="nb">tuple</span><span class="p">(</span><span class="n">torch_arg_inputs</span><span class="p">),</span>
-        <span class="n">kwargs</span><span class="o">=</span><span class="n">torch_kwarg_inputs</span><span class="p">,</span>
-        <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
-        <span class="n">strict</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;strict&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
-    <span class="p">)</span>
+
+    <span class="n">export_context</span> <span class="o">=</span> <span class="n">nullcontext</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">is_quantized_by_modelopt</span><span class="p">(</span><span class="n">mod</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">&quot;modelopt&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+                <span class="s2">&quot;The provided model is quantized by ModelOpt, but ModelOpt is not installed.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">modelopt.torch.quantization.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_torch_mode</span>
+
+        <span class="n">export_context</span> <span class="o">=</span> <span class="n">export_torch_mode</span><span class="p">()</span>
+
+    <span class="k">with</span> <span class="n">export_context</span><span class="p">:</span>
+        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
+            <span class="n">mod</span><span class="p">,</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="n">torch_arg_inputs</span><span class="p">),</span>
+            <span class="n">kwargs</span><span class="o">=</span><span class="n">torch_kwarg_inputs</span><span class="p">,</span>
+            <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
+            <span class="n">strict</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;strict&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+        <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">exp_program</span></div>
 
