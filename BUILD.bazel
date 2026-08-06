@@ -1,5 +1,5 @@
-load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 
@@ -234,9 +234,9 @@ pkg_tar(
     srcs = ["//cpp/bin/torchtrtc"] + select({
         ":jetpack": [],
         ":no_package_executorch": [],
+        ":rtx_sbsa": [],
         ":rtx_win": [],
         ":rtx_x86_64": [],
-        ":rtx_sbsa": [],
         ":windows": [],
         "//conditions:default": [
             "//examples/executorch_reference_runner:example_executorch_runner",
@@ -278,9 +278,9 @@ pkg_tar(
     ] + select({
         ":jetpack": [],
         ":no_package_executorch": [],
+        ":rtx_sbsa": [],
         ":rtx_win": [],
         ":rtx_x86_64": [],
-        ":rtx_sbsa": [],
         ":windows": [],
         "//conditions:default": [
             ":executorch_source_package",
