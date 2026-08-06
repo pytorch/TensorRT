@@ -178,35 +178,6 @@ jobs:
       - uses: ./test-infra/.github/actions/setup-windows
         with:
           cuda-version: ${{ env.CU_VERSION }}
-      - name: Ensure MSVC ARM64 cross tools
-        if: inputs.cross-compile
-        shell: powershell
-        run: |
-          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
-          if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) { throw "Visual Studio locator not found: $vswhere" }
-          $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1).Trim()
-          if ([string]::IsNullOrWhiteSpace($vsInstall)) { throw "No Visual Studio instance with x64 MSVC tools was found" }
-          $vcvarsall = [IO.Path]::Combine($vsInstall, "VC", "Auxiliary", "Build", "vcvarsall.bat")
-          if (-not (Test-Path -LiteralPath $vcvarsall -PathType Leaf)) { throw "vcvarsall.bat not found: $vcvarsall" }
-          $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $arm64Compiler) {
-            $installStopwatch = [Diagnostics.Stopwatch]::StartNew()
-            $setup = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/setup.exe"
-            if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw "Visual Studio Installer not found: $setup" }
-            & $setup modify --installPath $vsInstall --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --passive --norestart
-            if ($LASTEXITCODE -ne 0) { throw "Installing the MSVC ARM64 component failed with exit code $LASTEXITCODE" }
-            $deadline = (Get-Date).AddMinutes(20)
-            while (-not $arm64Compiler -and (Get-Date) -lt $deadline) {
-              Write-Host "Waiting for the MSVC ARM64 compiler to be installed ($([Math]::Floor($installStopwatch.Elapsed.TotalSeconds)) seconds elapsed; next check in 30 seconds)..."
-              Start-Sleep -Seconds 30
-              $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
-            }
-            $installStopwatch.Stop()
-            if ($arm64Compiler) { Write-Host "MSVC ARM64 compiler became available after $([Math]::Round($installStopwatch.Elapsed.TotalSeconds, 1)) seconds" }
-            $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
-          }
-          if (-not $arm64Compiler) { throw "MSVC ARM64 compiler was not installed after $([Math]::Round($installStopwatch.Elapsed.TotalSeconds, 1)) seconds" }
-          "TORCHTRT_VCVARSALL=$vcvarsall" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - uses: ./test-infra/.github/actions/set-channel
       - name: Set PYTORCH_VERSION
         if: env.CHANNEL == 'test'
@@ -304,6 +275,35 @@ jobs:
             -TargetRoot '${{ runner.temp }}\torchtrt-windows-arm64' `
             -CudaRoot $env:CUDA_PATH `
             -PythonExecutable (Join-Path $env:CONDA_ENV 'python.exe')
+      - name: Ensure MSVC ARM64 cross tools
+        if: inputs.cross-compile
+        shell: powershell
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+          if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) { throw "Visual Studio locator not found: $vswhere" }
+          $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1).Trim()
+          if ([string]::IsNullOrWhiteSpace($vsInstall)) { throw "No Visual Studio instance with x64 MSVC tools was found" }
+          $vcvarsall = [IO.Path]::Combine($vsInstall, "VC", "Auxiliary", "Build", "vcvarsall.bat")
+          if (-not (Test-Path -LiteralPath $vcvarsall -PathType Leaf)) { throw "vcvarsall.bat not found: $vcvarsall" }
+          $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $arm64Compiler) {
+            $installStopwatch = [Diagnostics.Stopwatch]::StartNew()
+            $setup = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/setup.exe"
+            if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw "Visual Studio Installer not found: $setup" }
+            & $setup modify --installPath $vsInstall --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --passive --norestart
+            if ($LASTEXITCODE -ne 0) { throw "Installing the MSVC ARM64 component failed with exit code $LASTEXITCODE" }
+            $deadline = (Get-Date).AddMinutes(20)
+            while (-not $arm64Compiler -and (Get-Date) -lt $deadline) {
+              Write-Host "Waiting for the MSVC ARM64 compiler to be installed ($([Math]::Floor($installStopwatch.Elapsed.TotalSeconds)) seconds elapsed; next check in 30 seconds)..."
+              Start-Sleep -Seconds 30
+              $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
+            }
+            $installStopwatch.Stop()
+            if ($arm64Compiler) { Write-Host "MSVC ARM64 compiler became available after $([Math]::Round($installStopwatch.Elapsed.TotalSeconds, 1)) seconds" }
+            $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $arm64Compiler) { throw "MSVC ARM64 compiler was not installed after $([Math]::Round($installStopwatch.Elapsed.TotalSeconds, 1)) seconds" }
+          "TORCHTRT_VCVARSALL=$vcvarsall" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Cross-compile Windows ARM64 wheel
         if: inputs.cross-compile
         working-directory: ${{ inputs.repository }}
