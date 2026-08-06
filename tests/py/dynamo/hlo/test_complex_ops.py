@@ -22,6 +22,7 @@ import torch
 import torch.nn as nn
 import torch_tensorrt as torchtrt
 from torch.export import Dim
+from torch_tensorrt._features import has_complex_decomposition
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 # ---------------------------------------------------------------------------
@@ -61,6 +62,34 @@ def _cossim_real(py_out: torch.Tensor, trt_out: torch.Tensor, tag: str) -> None:
 
 
 _COMPILE = dict(ir="dynamo", min_block_size=1, pass_through_build_failures=True)
+
+# Extra compile kwargs for the "explicit compile" tests (dynamic-shape and
+# truncate cases) that do NOT spread **_COMPILE.  The autouse fixture below
+# fills this with {"use_complex_decomposition": True} on the decomp param.
+_DECOMP: dict = {}
+
+
+@pytest.fixture(autouse=True, params=[False, True], ids=["legacy", "decomp"])
+def _complex_path(request):
+    """Run every complex test twice: once on the legacy hand-rolled rewriter and
+    once on PyTorch's upstream complex decomposition (issue #4390).
+
+    The flag is toggled on the shared _COMPILE dict (picked up by the ~28 tests
+    that spread **_COMPILE) and mirrored into _DECOMP (spread by the handful of
+    explicit torchtrt.dynamo.compile / truncate tests).
+    """
+    use_decomp = request.param
+    if use_decomp and not has_complex_decomposition():
+        pytest.skip("decompose_complex_in_graph requires torch>=2.14.dev")
+
+    _COMPILE.pop("use_complex_decomposition", None)
+    _DECOMP.clear()
+    if use_decomp:
+        _COMPILE["use_complex_decomposition"] = True
+        _DECOMP["use_complex_decomposition"] = True
+    yield
+    _COMPILE.pop("use_complex_decomposition", None)
+    _DECOMP.clear()
 
 
 # ===========================================================================
@@ -789,7 +818,11 @@ def test_complex_mul_dynamic_seqlen():
     dynamic_shapes = ({1: seq}, {0: seq})
     ep = torch.export.export(model, inputs, dynamic_shapes=dynamic_shapes)
     trt_model = torchtrt.dynamo.compile(
-        ep, inputs=inputs, min_block_size=1, pass_through_build_failures=True
+        ep,
+        inputs=inputs,
+        min_block_size=1,
+        pass_through_build_failures=True,
+        **_DECOMP,
     )
     py_out = model(*inputs)
     trt_out = trt_model(*inputs)
@@ -816,7 +849,11 @@ def test_complex_output_dynamic_batch():
     dynamic_shapes = ({0: batch}, {})
     ep = torch.export.export(model, inputs, dynamic_shapes=dynamic_shapes)
     trt_model = torchtrt.dynamo.compile(
-        ep, inputs=inputs, min_block_size=1, pass_through_build_failures=True
+        ep,
+        inputs=inputs,
+        min_block_size=1,
+        pass_through_build_failures=True,
+        **_DECOMP,
     )
     py_out = model(*inputs)
     trt_out = trt_model(*inputs)
@@ -856,6 +893,7 @@ def test_complex128_truncated_to_float32():
         min_block_size=1,
         pass_through_build_failures=True,
         truncate_double=True,
+        **_DECOMP,
     )
     py_out = model(*inputs).float()  # cast reference to float32 for comparison
     trt_out = trt_model(*inputs)

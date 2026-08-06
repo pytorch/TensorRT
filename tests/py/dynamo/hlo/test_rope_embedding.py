@@ -17,7 +17,29 @@ import torch
 import torch.nn as nn
 import torch_tensorrt as torchtrt
 from torch.export import Dim
+from torch_tensorrt._features import has_complex_decomposition
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+# Extra compile kwargs injected into every test's compile_spec by the autouse
+# fixture below: {} on the legacy path, {"use_complex_decomposition": True} on
+# the decomp path (issue #4390).
+_DECOMP: dict = {}
+
+
+@pytest.fixture(autouse=True, params=[False, True], ids=["legacy", "decomp"])
+def _complex_path(request):
+    """Run every RoPE test on both the legacy rewriter and PyTorch's upstream
+    complex decomposition. The dynamic cases here are the acceptance bar for
+    dynamic-shape survival through the upstream make_fx retrace."""
+    use_decomp = request.param
+    if use_decomp and not has_complex_decomposition():
+        pytest.skip("decompose_complex_in_graph requires torch>=2.14.dev")
+    _DECOMP.clear()
+    if use_decomp:
+        _DECOMP["use_complex_decomposition"] = True
+    yield
+    _DECOMP.clear()
+
 
 # ---------------------------------------------------------------------------
 # Shared helper modules
@@ -101,6 +123,7 @@ def test_rope_hf_style_static():
         "ir": "dynamo",
         "min_block_size": 1,
         "pass_through_build_failures": True,
+        **_DECOMP,
     }
     trt_model = torchtrt.compile(model, **compile_spec)
 
@@ -151,6 +174,7 @@ def test_rope_hf_style_dynamic():
         "inputs": inputs,
         "min_block_size": 1,
         "pass_through_build_failures": True,
+        **_DECOMP,
     }
     trt_model = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
@@ -190,6 +214,7 @@ def test_rope_complex_form_static():
         "ir": "dynamo",
         "min_block_size": 1,
         "pass_through_build_failures": True,
+        **_DECOMP,
     }
     trt_model = torchtrt.compile(model, **compile_spec)
 
@@ -233,6 +258,7 @@ def test_rope_complex_form_dynamic():
         "inputs": inputs,
         "min_block_size": 1,
         "pass_through_build_failures": True,
+        **_DECOMP,
     }
     trt_model = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
@@ -337,6 +363,7 @@ def test_rope_in_attention_block_static():
         "ir": "dynamo",
         "min_block_size": 1,
         "pass_through_build_failures": True,
+        **_DECOMP,
     }
     trt_model = torchtrt.compile(model, **compile_spec)
 
@@ -383,6 +410,7 @@ def test_rope_in_attention_block_dynamic():
         "inputs": inputs,
         "min_block_size": 1,
         "pass_through_build_failures": True,
+        **_DECOMP,
     }
     trt_model = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
@@ -424,6 +452,7 @@ def test_rope_complex_form_serialization_retrace(tmp_path):
         "ir": "dynamo",
         "min_block_size": 1,
         "pass_through_build_failures": True,
+        **_DECOMP,
     }
     trt_model = torchtrt.compile(model, **compile_spec)
 
@@ -502,6 +531,7 @@ def test_complex_output_static():
         "ir": "dynamo",
         "min_block_size": 1,
         "pass_through_build_failures": True,
+        **_DECOMP,
     }
     trt_model = torchtrt.compile(model, **compile_spec)
 

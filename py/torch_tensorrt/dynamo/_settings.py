@@ -49,6 +49,7 @@ from torch_tensorrt.dynamo._defaults import (
     TILING_OPTIMIZATION_LEVEL,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
+    USE_COMPLEX_DECOMPOSITION,
     USE_DISTRIBUTED_MODE_TRACE,
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
@@ -131,6 +132,7 @@ class CompilationSettings:
     version_compatible: bool = VERSION_COMPATIBLE
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL
     truncate_double: bool = TRUNCATE_DOUBLE
+    use_complex_decomposition: bool = USE_COMPLEX_DECOMPOSITION
     use_fast_partitioner: bool = USE_FAST_PARTITIONER
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS
     device: Device = field(default_factory=default_device)
