@@ -376,6 +376,11 @@ void TRTEngine::disable_profiling() {
   // Drop the profiler-attached context; next execute lazily creates a fresh
   // one with no profiler.
   invalidate_exec_ctx();
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  // The communicator was bound onto the IExecutionContext we just dropped, so
+  // the next ``execute_engine`` must re-bind via ``bind_nccl_comm()``.
+  nccl_initialized = false;
+#endif
 }
 
 void TRTEngine::dump_engine_layer_info_to_file(const std::string& path) {
@@ -789,6 +794,11 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
         << (this->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic ? "dynamic"
                                                                                                   : "static"));
     invalidate_exec_ctx();
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+    // The communicator was bound onto the IExecutionContext we just dropped, so
+    // the next ``execute_engine`` must re-bind via ``bind_nccl_comm()``.
+    nccl_initialized = false;
+#endif
   }
 }
 

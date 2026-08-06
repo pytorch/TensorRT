@@ -2188,6 +2188,125 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
     print(f"[Rank {rank}] PASS _multirank_pg_migration", flush=True)
 
 
+def _find_trt_module(mod: nn.Module) -> Any:
+    """Return the first ``TorchTensorRTModule`` in a compiled module, or None."""
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+
+    if isinstance(mod, TorchTensorRTModule):
+        return mod
+    for child in mod.children() if isinstance(mod, nn.Module) else []:
+        found = _find_trt_module(child)
+        if found is not None:
+            return found
+    return None
+
+
+def _multirank_comm_survives_invalidation(
+    rank: int, world_size: int, device: torch.device, trigger: str
+) -> None:
+    """The NCCL communicator must survive an IExecutionContext invalidation.
+
+    ``bind_nccl_comm()`` attaches the communicator to the *IExecutionContext*.
+    Several C++ entry points drop that context and rely on the lazy re-bind in
+    ``execute_engine.cpp`` -- which only fires when ``nccl_initialized`` is
+    false.  ``TRTEngine::runtime_settings()`` and ``set_device_memory_budget()``
+    clear/re-bind correctly; ``disable_profiling()`` (TRTEngine.cpp:378) and
+    ``set_resource_allocation_strategy()`` (TRTEngine.cpp:791) do not, so the
+    replacement context runs collectives with no communicator attached.
+    """
+    import torch_tensorrt
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+    group_name = dist.distributed_c10d._get_default_group().group_name
+
+    class _RowParallelLinear(nn.Module):
+        """Row-parallel Linear: local matmul followed by an all-reduce."""
+
+        def __init__(self, lin: nn.Linear, group_name: str) -> None:
+            super().__init__()
+            self.lin = lin
+            self.group_name = group_name
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            out = self.lin(x)
+            out = torch.ops._c10d_functional.all_reduce.default(
+                out, "sum", self.group_name
+            )
+            return torch.ops._c10d_functional.wait_tensor.default(out)
+
+    class TinyMLP(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fc1 = nn.Linear(16, 64)
+            self.relu = nn.ReLU()
+            self.fc2 = nn.Linear(64, 16, bias=False)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.fc2(self.relu(self.fc1(x)))
+
+    # Manually shard: fc1 column-parallel, fc2 row-parallel + all-reduce. Mirrors
+    # build_exportable_model() in test_export_save_load.py -- DTensor-based
+    # parallelize_module does not survive torch.export cleanly.
+    torch.manual_seed(42)
+    model = TinyMLP().to(device)
+    w = model.fc1.weight.data
+    chunk = w.shape[0] // world_size
+    model.fc1.weight = nn.Parameter(w[rank * chunk : (rank + 1) * chunk].contiguous())
+    b = model.fc1.bias.data
+    model.fc1.bias = nn.Parameter(b[rank * chunk : (rank + 1) * chunk].contiguous())
+    w2 = model.fc2.weight.data
+    chunk2 = w2.shape[1] // world_size
+    model.fc2.weight = nn.Parameter(
+        w2[:, rank * chunk2 : (rank + 1) * chunk2].contiguous()
+    )
+    model.fc2 = _RowParallelLinear(model.fc2, group_name)
+
+    torch.manual_seed(0)
+    inp = torch.randn(4, 16, device=device)
+
+    # Export, not torch.compile: torch.compile returns an OptimizedModule that
+    # wraps the ORIGINAL module, so the TRT submodules are not reachable via
+    # children()/named_modules(). dynamo.compile returns a real GraphModule.
+    ep = torch.export.export(model, args=(inp,), strict=False)
+    trt_model = torch_tensorrt.dynamo.compile(
+        ep,
+        inputs=[inp],
+        device=device,
+        disable_tf32=True,
+        use_python_runtime=False,
+        min_block_size=1,
+        use_distributed_mode_trace=True,
+    )
+
+    with torch.no_grad():
+        expected = trt_model(inp)
+
+    trt_mod = _find_trt_module(trt_model)
+    if trt_mod is None:
+        raise AssertionError("Could not locate a TorchTensorRTModule")
+
+    # Drop the IExecutionContext the communicator was bound to.
+    if trigger == "resource_allocation":
+        trt_mod.use_dynamically_allocated_resources(True)
+    elif trigger == "disable_profiling":
+        trt_mod.disable_profiling()
+    else:
+        raise ValueError(f"unknown trigger {trigger!r}")
+
+    dist.barrier()  # keep ranks in step before the next collective
+
+    with torch.no_grad():
+        out = trt_model(inp)
+
+    _check_close(out, expected, f"output after {trigger} invalidation rank={rank}")
+
+    print(
+        f"[Rank {rank}] PASS _multirank_comm_survives_invalidation[{trigger}]",
+        flush=True,
+    )
+
+
 # ============================================================================
 # Section 8 — Multi-rank pytest tests (MultiProcessTestCase, requires 2 GPUs)
 # ============================================================================
@@ -2318,6 +2437,26 @@ class TestMultirankNccl(MultiProcessTestCase):
         """Compile with world group, migrate to subgroup via distributed_context API."""
         device = self._init_dist()
         _multirank_pg_migration(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_comm_survives_resource_allocation_change(self) -> None:
+        """set_resource_allocation_strategy() invalidates the context; comm must survive."""
+        device = self._init_dist()
+        _multirank_comm_survives_invalidation(
+            self.rank, self.world_size, device, "resource_allocation"
+        )
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_comm_survives_disable_profiling(self) -> None:
+        """disable_profiling() invalidates the context; comm must survive."""
+        device = self._init_dist()
+        _multirank_comm_survives_invalidation(
+            self.rank, self.world_size, device, "disable_profiling"
+        )
 
 
 # ============================================================================
