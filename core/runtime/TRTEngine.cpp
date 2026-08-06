@@ -695,15 +695,23 @@ void TRTEngine::set_active_profile(int64_t profile_index) {
 }
 
 void TRTEngine::set_active_profile_with_stream(int64_t profile_index, const c10::cuda::CUDAStream& stream) {
-  if (num_optimization_profiles <= 1) {
+  // An index this engine does not have is a request that cannot be honored, so
+  // say so rather than no-op quietly. Covers the single-profile engine too, where
+  // 0 is the only valid index. Reachable only by driving the engine directly; the
+  // Python wrapper validates the index against the profile count first.
+  if (profile_index < 0 || profile_index >= num_optimization_profiles) {
+    LOG_WARNING(
+        "Ignoring optimization profile index " << profile_index << ": this engine has " << num_optimization_profiles
+                                               << " optimization profile(s), so it stays on profile "
+                                               << active_profile_index << ".");
     return;
   }
   if (profile_index == active_profile_index) {
     return;
   }
 
-  // setOptimizationProfileAsync returns false for an out-of-range index; the
-  // index is validated upstream in TorchTensorRTModule.resolve_profile_index.
+  // The index is in range by the check above, so a false return here is TensorRT
+  // refusing the switch for some other reason.
   TORCHTRT_CHECK(
       exec_ctx()->setOptimizationProfileAsync(static_cast<int32_t>(profile_index), stream.stream()),
       "Failed to switch to optimization profile index " << profile_index);

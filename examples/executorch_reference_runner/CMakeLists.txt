@@ -61,3 +61,25 @@ target_link_libraries(
     executorch::extensions
     executorch::kernels
     torchtrt::executorch_backend)
+
+add_executable(example_executorch_multi_profile_runner multi_profile_main.cpp)
+target_link_libraries(
+  example_executorch_multi_profile_runner
+  PRIVATE
+    executorch
+    executorch::backends
+    executorch::extensions
+    executorch::kernels
+    torchtrt::executorch_backend)
+
+add_executable(
+  example_executorch_multi_profile_benchmark multi_profile_benchmark.cpp
+)
+target_link_libraries(
+  example_executorch_multi_profile_benchmark
+  PRIVATE
+    executorch
+    executorch::backends
+    executorch::extensions
+    executorch::kernels
+    torchtrt::executorch_backend)
