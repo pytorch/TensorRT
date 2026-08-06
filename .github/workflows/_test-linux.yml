@@ -142,6 +142,8 @@ jobs:
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       use-rtx: ${{ inputs.use-rtx }}
+      # Per-suite runner from the manifest; "" falls back to matrix.validation_runner.
+      runner: ${{ matrix.runner }}
       fail-on-empty: true
       script: |
         set -euo pipefail

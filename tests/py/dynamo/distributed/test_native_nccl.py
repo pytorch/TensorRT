@@ -1236,6 +1236,7 @@ class TestNcclOpsSingleRank(unittest.TestCase):
     def _run(self, model: nn.Module, inputs: list[torch.Tensor]) -> None:
         """Compile with torch_tensorrt and verify output matches PyTorch."""
         import torch_tensorrt
+        from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
         model = model.cuda().eval()
         inputs_cuda = [t.cuda() for t in inputs]
@@ -1254,7 +1255,12 @@ class TestNcclOpsSingleRank(unittest.TestCase):
             )
             out = trt_model(*inputs_cuda)
 
-        torch.testing.assert_close(ref, out, atol=1e-4, rtol=1e-4)
+        # Project-standard tolerance (torch_tensorrt.dynamo.utils), the same one
+        # every converter test uses via tests/py/dynamo/conversion/harness.py.
+        # TensorRT selects tensor-core kernels for batched matmuls, giving ~2^-11
+        # (~4.9e-4) rounding versus PyTorch's FP32 reference -- well inside 5e-3
+        # but over the 1e-4 this file previously hard-coded.
+        torch.testing.assert_close(ref, out, atol=ATOL, rtol=RTOL)
 
     def test_all_reduce_single_rank(self) -> None:
         """all_reduce compiles and produces correct output on a single rank."""
@@ -1315,6 +1321,7 @@ class TestNcclOpsSingleRank(unittest.TestCase):
     ) -> None:
         """Mark a dim dynamic (min/max), compile at the opt shape, verify at other shapes."""
         import torch_tensorrt  # noqa: F401
+        from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
         model = model.cuda().eval()
         opt_cuda = [t.cuda() for t in opt_inputs]
@@ -1338,7 +1345,10 @@ class TestNcclOpsSingleRank(unittest.TestCase):
                 check_cuda = [t.cuda() for t in check]
                 ref = model(*check_cuda)
                 out = trt_model(*check_cuda)
-                torch.testing.assert_close(ref, out, atol=1e-4, rtol=1e-4)
+                # See _run: project-standard tolerance. These checks run at
+                # batch > 1, where TensorRT picks a tensor-core kernel, so the
+                # error is ~4.9e-4 rather than the ~1e-6 seen at batch 1.
+                torch.testing.assert_close(ref, out, atol=ATOL, rtol=RTOL)
 
     def test_all_reduce_single_rank_dynamic(self) -> None:
         """all_reduce compiles with a dynamic seq dim and is correct at other shapes."""
