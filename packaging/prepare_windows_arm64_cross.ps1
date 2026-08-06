@@ -93,4 +93,4 @@ Export-GitHubEnvironment "TORCHTRT_TARGET_PLATFORM" "windows-arm64"
 Export-GitHubEnvironment "TORCHTRT_TARGET_TORCH_ROOT" $torchRoot
 Export-GitHubEnvironment "TORCHTRT_TARGET_CUDA_ROOT" $CudaRoot
 Export-GitHubEnvironment "TORCHTRT_TARGET_PYTHON_ROOT" $pythonRoot
-Write-Host "Prepared Windows ARM64 target sysroot: PyTorch=$torchRoot CUDA=$CudaRoot Python=$pythonRoot"
+Write-Host "Prepared Windows ARM64 target sysroot: TORCHTRT_TARGET_TORCH_ROOT=$torchRoot TORCHTRT_TARGET_CUDA_ROOT=$CudaRoot TORCHTRT_TARGET_PYTHON_ROOT=$pythonRoot"

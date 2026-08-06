@@ -29,11 +29,12 @@ jobs:
       repository: ${{ github.repository }}
       ref: ${{ github.sha }}
       build-matrix: >-
-        {"include":[{"build_name":"windows-arm64-cross","python_version":"3.13","desired_cuda":"cu134","validation_runner":"windows.g5.4xlarge.nvidia.gpu"}]}
+        {"include":[{"build_name":"windows-arm64-cross","python_version":"3.13","desired_cuda":"cu132","validation_runner":"windows.g5.4xlarge.nvidia.gpu"}]}
       architecture: x64
       cross-compile: true
+      pre-script: packaging/pre_build_script_windows.sh
       use-rtx: true
-      timeout: 120
+      timeout: 180
       skip-binary-upload: true
 
   gate:
