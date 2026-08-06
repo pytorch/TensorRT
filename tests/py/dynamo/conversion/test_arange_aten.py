@@ -22,6 +22,13 @@ class TestArangeConverter(DispatchTestCase):
             (-5, -2, 2),
             (-5, -3, 1),
             (-2, -5, -1),
+            (1.2, 5, 1.3),
+            (1.2, 5.0, 1.3),
+            (1, 5.0, 1.3),
+            (-1.2, -5.0, -1.3),
+            (-5.0, -1.2, 1.3),
+            (-5, 1.2, 1.3),
+            (-5.0, 1, 1.3),
         ]
     )
     def test_arange(self, start, end, step):
@@ -36,7 +43,32 @@ class TestArangeConverter(DispatchTestCase):
             use_dynamo_tracer=True,
         )
 
-    def test_arange_dynamic(self):
+    def test_arange_dynamic_int32(self):
+        class Arange(nn.Module):
+            def forward(self, end_tensor):
+                return torch.ops.aten.arange.start_step(0, end_tensor, 1)
+
+        pyt_input = 7
+        inputs = [
+            torch_tensorrt.Input(
+                min_shape=(5,),
+                opt_shape=(7,),
+                max_shape=(10,),
+                dtype=torch.int32,
+                torch_tensor=torch.tensor(pyt_input, dtype=torch.int32).cuda(),
+                is_shape_tensor=True,
+            )
+        ]
+        self.run_test_with_dynamic_shape(
+            Arange(),
+            inputs,
+            use_example_tensors=False,
+            check_dtype=False,
+            pyt_inputs=[pyt_input],
+            use_dynamo_tracer=False,
+        )
+
+    def test_arange_dynamic_int64(self):
         class Arange(nn.Module):
             def forward(self, end_tensor):
                 return torch.ops.aten.arange.start_step(0, end_tensor, 1)
