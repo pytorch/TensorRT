@@ -9,6 +9,7 @@ pytest.importorskip("executorch.exir")
 
 import torch  # noqa: E402
 import torch_tensorrt  # noqa: E402
+from torch._subclasses.fake_tensor import is_fake  # noqa: E402
 from torch.export.graph_signature import (  # noqa: E402
     CustomObjArgument,
     ExportGraphSignature,
@@ -353,19 +354,63 @@ def test_stage_exported_program_supports_dynamic_shapes():
 
     # Symbolic metadata stays bound to the original ShapeEnv, so it must be shared
     # rather than copied for the staged program to remain consistent.
+    # Symbolic leaves stay bound to the original ShapeEnv, so they must be shared
+    # rather than copied for the staged program to remain consistent. The container
+    # holding them is still copied so the caller's metadata cannot be mutated.
     source_nodes = {node.name: node for node in program.graph.nodes}
     symbolic_shared = 0
     for node in staged.graph.nodes:
         source_node = source_nodes[node.name]
         for key, source_value in source_node.meta.items():
-            if not export_utils._is_graph_bound_metadata(source_value):
+            source_leaves = [
+                leaf
+                for leaf in torch.utils._pytree.tree_leaves(source_value)
+                if isinstance(leaf, (torch.SymInt, torch.SymFloat, torch.SymBool))
+                or (isinstance(leaf, torch.Tensor) and is_fake(leaf))
+            ]
+            if not source_leaves:
                 continue
-            assert node.meta[key] is source_value
+            staged_leaves = torch.utils._pytree.tree_leaves(node.meta[key])
+            for leaf in source_leaves:
+                assert any(leaf is staged_leaf for staged_leaf in staged_leaves)
             symbolic_shared += 1
     assert symbolic_shared
 
     assert staged.graph_module is not program.graph_module
     assert staged.state_dict["lin.weight"] is program.state_dict["lin.weight"]
+
+
+@pytest.mark.unit
+def test_stage_exported_program_copies_containers_holding_symbolic_leaves():
+    """A container in node.meta must not be shared just because it holds a leaf.
+
+    A multi-output op stores a list of fake tensors in meta["val"]. Sharing that
+    list wholesale would let an Edge transform mutate the caller's program.
+    """
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            first, second = torch.chunk(x, 2, dim=1)
+            return first + second
+
+    program = torch.export.export(Model(), (torch.randn(8, 4),))
+    container_nodes = [
+        node
+        for node in program.graph.nodes
+        if isinstance(node.meta.get("val"), (list, tuple))
+    ]
+    assert container_nodes, "expected a multi-output op with a list-valued meta"
+
+    staged = export_utils.stage_exported_program(program)
+    staged_nodes = {node.name: node for node in staged.graph.nodes}
+
+    for source_node in container_nodes:
+        source_value = source_node.meta["val"]
+        staged_value = staged_nodes[source_node.name].meta["val"]
+        assert staged_value is not source_value
+        for source_leaf, staged_leaf in zip(source_value, staged_value):
+            assert staged_leaf is source_leaf
 
 
 @pytest.mark.unit
@@ -686,10 +731,25 @@ def test_export_rejects_shared_partitioners_across_methods(monkeypatch):
     """
     export_module, lower = _patch_lowering(monkeypatch)
 
-    with pytest.raises(ValueError, match="must be a mapping of method name"):
+    with pytest.raises(ValueError, match="reuses the same"):
         export_module.export(
             {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
             partitioners=[object()],
+        )
+
+    lower.assert_not_called()
+
+
+@pytest.mark.unit
+def test_export_rejects_shared_partitioner_inside_mapping(monkeypatch):
+    """The same instance listed under two method keys is rejected too."""
+    export_module, lower = _patch_lowering(monkeypatch)
+    shared = object()
+
+    with pytest.raises(ValueError, match="reuses the same"):
+        export_module.export(
+            {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
+            partitioners={"prefill": [shared], "decode": [shared]},
         )
 
     lower.assert_not_called()
@@ -725,6 +785,41 @@ def test_export_accepts_per_method_partitioner_instances(monkeypatch):
     pipelines = lower.call_args.kwargs["partitioner"]
     assert pipelines["prefill"][-1] is prefill_partitioner
     assert pipelines["decode"][-1] is decode_partitioner
+
+
+@pytest.mark.unit
+def test_export_normalizes_mapping_transform_passes_to_dict(monkeypatch):
+    """ExecuTorch dispatches per-method passes on isinstance(passes, dict).
+
+    A Mapping that is not a dict would silently run no passes at all, so it must
+    be normalized before being forwarded.
+    """
+    from collections.abc import Mapping as AbcMapping
+
+    class CustomMapping(AbcMapping):
+        def __init__(self, data):
+            self._data = data
+
+        def __getitem__(self, key):
+            return self._data[key]
+
+        def __iter__(self):
+            return iter(self._data)
+
+        def __len__(self):
+            return len(self._data)
+
+    export_module, lower = _patch_lowering(monkeypatch)
+    passes = ["a-pass"]
+
+    export_module.export(
+        {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
+        transform_passes=CustomMapping({"prefill": passes}),
+    )
+
+    forwarded = lower.call_args.kwargs["transform_passes"]
+    assert type(forwarded) is dict
+    assert forwarded == {"prefill": passes}
 
 
 @pytest.mark.unit
