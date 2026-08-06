@@ -17,19 +17,22 @@ torch_tensorrt.kernels
 Overview
 --------
 
-The ``kernels`` module registers NVRTC-compiled CUDA C++ kernels as
-TensorRT Quick Deployable Plugins. Tensor-only declarative kernels use
-Ahead-of-Time (AOT) plugin launches when available; kernels with
-``ScalarInput`` compile through TensorRT's QDP JIT path because QDP AOT
-extra arguments currently support symbolic integer expressions, not
-arbitrary runtime floats.
+The ``kernels`` module registers custom kernels — CUDA C++ compiled with
+NVRTC, or cuTile — as TensorRT Quick Deployable Plugins. Tensor-only
+declarative kernels use Ahead-of-Time (AOT) plugin launches when
+available; kernels with ``ScalarInput`` compile through TensorRT's QDP JIT
+path because QDP AOT extra arguments currently support symbolic integer
+expressions, not arbitrary runtime floats.
 
-A single function — :func:`cuda_kernel_op` — handles both the declarative
-case (drive everything from a :class:`KernelSpec` dataclass) and the
-override case (supply ``meta_fn`` / ``eager_fn`` / ``aot_fn`` / ``schema``
-keyword arguments when the declarative DSL doesn't cover your kernel).
-:func:`ptx_op` is a parallel entry point for kernels that are already
-compiled to PTX bytes.
+Three entry points share one registration funnel:
+
+* :func:`cuda_kernel_op` handles both the declarative case (drive
+  everything from a :class:`KernelSpec` dataclass) and the override case
+  (supply ``meta_fn`` / ``eager_fn`` / ``aot_fn`` / ``schema`` keyword
+  arguments when the declarative DSL doesn't cover your kernel).
+* :func:`ptx_op` registers kernels that are already compiled to PTX bytes.
+* :func:`cutile_op` registers a ``@ct.kernel`` cuTile program, compiling it
+  to PTX and deriving the AOT launch for you.
 
 Entry points
 ------------
@@ -117,18 +120,113 @@ Pre-compiled PTX entry point
 
 .. autofunction:: ptx_op
 
+cuTile entry point
+------------------
+
+.. autofunction:: cutile_op
+
+:func:`cutile_op` is the cuTile analogue of :func:`cuda_kernel_op`.  It
+compiles the kernel once with ``cuda.tile.compilation.export_kernel``, then
+registers the PyTorch custom op, the TRT plugin descriptor, the AOT impl
+embedding the PTX, and the Torch-TensorRT converter::
+
+    import cuda.tile as ct
+    import tensorrt.plugin as trtp
+    import torch
+    import torch_tensorrt.kernels as ttk
+
+    TILE = 128
+
+    @ct.kernel
+    def add_one_kernel(x, out, tile_size: ct.Constant[int]):
+        pid = ct.bid(0)
+        ct.store(out, index=(pid,),
+                 tile=ct.load(x, index=(pid,), shape=(tile_size,)) + 1.0)
+
+    def add_one_meta(X: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(X)
+
+    ttk.cutile_op(
+        "my::add_one",
+        kernel=add_one_kernel,
+        signature={"x": "fp32", "out": "fp32"},
+        meta_fn=add_one_meta,
+        grid=lambda inputs, outputs: (
+            trtp.cdiv(inputs[0].shape_expr.numel(), TILE),
+        ),
+        constants={"tile_size": TILE},
+    )
+
+``signature`` lists the kernel's array parameters in declaration order —
+inputs first, then outputs — mapped to their element type: a
+:class:`torch.dtype`, a dtype name like ``"float32"``, or a short alias
+like ``"fp32"``.  ``constants`` supplies the ``ct.Constant`` values baked
+into the compiled symbol.  ``grid`` receives ``trtp.TensorDesc`` objects, so use
+``.shape_expr`` to stay symbolic and keep one engine valid across shapes.
+
+Because the launch is built from symbolic shape expressions, ``cutile_op``
+supports dynamic shapes by default.  Pass ``eager_fn`` to also give the op
+a CUDA implementation outside TensorRT, or ``aot_fn`` to replace the
+derived launch entirely.  Threads-per-block comes from the ``.reqntid`` the
+compiled kernel declares — cuTile vectorizes, so this is often below the
+tile size, and it is a hard requirement rather than a hint.
+
+.. note::
+
+   cuTile groups each array's parameters as ``(ptr, extents..., strides...)``
+   in kernel-declaration order, which is *not* the
+   ``(input_ptrs..., extra_args..., output_ptrs...)`` order TensorRT's AOT
+   launcher uses.  ``cutile_op`` permutes the compiled PTX's ``.entry``
+   parameter list and supplies the matching extents and strides as AOT extra
+   arguments.  A mismatch here does not fail loudly — the kernel would read
+   whatever TensorRT placed in each slot — so the parameter count of the
+   compiled PTX is checked against the signature at registration time and a
+   disagreement raises :class:`RuntimeError`.
+
+   ``ndim`` (default 1) is the rank each array is compiled for; a rank-1
+   array's extent is the tensor's element count, which is what a kernel
+   written against a flattened view expects and what lets one registration
+   accept any input shape.  Pass ``ndim=`` or a ``"<dtype>[rank]"`` signature
+   entry for kernels that index multi-dimensional tiles.
+
+   A ``cutile_op`` registration compiles a single PTX for the given dtypes
+   and ``constants``.  Inputs or outputs whose dtypes differ from the
+   compiled ones are detected during conversion: the op is left out of the
+   engine and runs in PyTorch, with a warning naming the mismatch.  Register
+   a second op if you need a second dtype — multi-config autotuning is not
+   yet supported.
+
+   ``tileiras``, the cuTile compiler, ships with ``cuda-tile`` but is not on
+   ``PATH`` by default; add the package's bin directory (e.g.
+   ``<site-packages>/nvidia/cu13/bin``) before registering cuTile kernels.
+
+   ``tileiras`` emits the PTX ISA of the toolkit it was built against, which
+   can be newer than the installed driver loads.  Nothing catches that on its
+   own: TensorRT builds the engine, and at inference the plugin logs
+   ``onShapeChange status -1`` while ``enqueue`` still returns, so the model
+   silently produces wrong numbers.  :func:`cutile_op` therefore offers the
+   compiled PTX to the driver at registration.  If it is refused, the
+   ``.version`` header is lowered to what the driver accepts, the result is
+   re-checked, and a warning names both versions; if no header makes it
+   loadable, registration raises.  Aligning the driver with the cuda-tile
+   toolchain removes the step; ``max_ptx_version=`` pins the header manually.
+
 Kernel signature convention
 ---------------------------
 
-All entry points assume the ``__global__`` kernel takes its arguments in
-the fixed order::
+All entry points assume the kernel takes its arguments in the fixed
+order::
 
     (input_ptrs..., extras..., output_ptrs...)
 
-Pointers are ``void*`` cast to the appropriate element type.  Extras
-follow the order declared in :attr:`KernelSpec.extras` for the
-declarative path, or the order your ``aot_fn`` builds for the override
-path.
+This matches the order TensorRT passes tensor pointers and AOT extra
+arguments.  In a CUDA C++ ``__global__`` kernel, pointers are ``void*``
+cast to the appropriate element type; a cuTile kernel declares its arrays
+in ``(inputs..., outputs...)`` order and ``cutile_op`` rewrites the
+compiled PTX into the layout above.  Extras follow the order declared in
+:attr:`KernelSpec.extras` for the declarative path, the extents and strides
+:func:`cutile_op` derives from the signature, or the order your ``aot_fn``
+builds for the override path.
 
 Error behavior
 --------------

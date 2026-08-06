@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Tuple, get_type_hints
 
 import torch
 
@@ -55,31 +55,63 @@ _TORCH_TYPE_TO_SCHEMA = {
 }
 
 
-def _infer_schema(fn: Callable[..., Any]) -> str:
-    """Derive a TorchScript schema like '(Tensor x, int n) -> Tensor' from type hints."""
+def _schema_parts(fn: Callable[..., Any]) -> Tuple[List[Tuple[str, str]], List[str]]:
+    """``([(schema type, arg name)], [return schema types])`` from a fn's hints.
+
+    The single reader of those hints, so a schema built from them and an arity
+    counted from them cannot drift apart.
+    """
     try:
         hints = get_type_hints(fn)
     except Exception:
         hints = {}
 
-    params = list(inspect.signature(fn).parameters.keys())
-    args_str = ", ".join(
-        "{} {}".format(
-            _TORCH_TYPE_TO_SCHEMA.get(hints.get(p, torch.Tensor), "Tensor"), p
-        )
-        for p in params
-    )
+    args = [
+        (_TORCH_TYPE_TO_SCHEMA.get(hints.get(name, torch.Tensor), "Tensor"), name)
+        for name in inspect.signature(fn).parameters
+    ]
 
     ret = hints.get("return", torch.Tensor)
-    origin = getattr(ret, "__origin__", None)
-    if origin is tuple:
-        ret_str = "({})".format(
-            ", ".join(_TORCH_TYPE_TO_SCHEMA.get(t, "Tensor") for t in ret.__args__)
-        )
+    if getattr(ret, "__origin__", None) is tuple:
+        returns = [_TORCH_TYPE_TO_SCHEMA.get(t, "Tensor") for t in ret.__args__]
     else:
-        ret_str = _TORCH_TYPE_TO_SCHEMA.get(ret, "Tensor")
+        returns = [_TORCH_TYPE_TO_SCHEMA.get(ret, "Tensor")]
+    return args, returns
 
+
+def _infer_schema(fn: Callable[..., Any]) -> str:
+    """Derive a TorchScript schema like '(Tensor x, int n) -> Tensor' from type hints."""
+    args, returns = _schema_parts(fn)
+    args_str = ", ".join(f"{schema_type} {name}" for schema_type, name in args)
+    ret_str = returns[0] if len(returns) == 1 else "({})".format(", ".join(returns))
     return f"({args_str}) -> {ret_str}"
+
+
+def tensor_arity(
+    meta_fn: Callable[..., Any], schema: Optional[str] = None
+) -> Optional[Tuple[int, int]]:
+    """``(tensor inputs, outputs)`` of the op that will actually be registered.
+
+    Reads an explicit ``schema`` when one is given, since that is what reaches
+    the dispatcher, and otherwise the same hints :func:`_infer_schema` reads.
+    Returns ``None`` when neither can be interpreted, so callers skip an arity
+    cross-check rather than reject an op over an unreadable annotation.
+    """
+    try:
+        if schema is not None:
+            parsed = torch._C.parse_schema(f"_ttk::_probe{schema}")
+            tensor_type = torch._C.TensorType.get()
+            num_inputs = sum(
+                1 for arg in parsed.arguments if arg.type.isSubtypeOf(tensor_type)
+            )
+            return num_inputs, len(parsed.returns)
+        args, returns = _schema_parts(meta_fn)
+        return sum(1 for schema_type, _ in args if schema_type == "Tensor"), len(
+            returns
+        )
+    except Exception as exc:
+        _LOGGER.debug("Could not determine tensor arity: %s", exc)
+        return None
 
 
 def _torch_op_already_registered(op_name: str) -> bool:
@@ -218,7 +250,7 @@ def _aot_impl({sig}):
     _LOGGER.debug("Registered AOT impl for %s", op_name)
 
 
-def register_cuda_python_plugin(
+def register_qdp_plugin(
     op_name: str,
     spec: CudaPythonSpec,
     meta_fn: Optional[Callable[..., Any]],
@@ -231,23 +263,24 @@ def register_cuda_python_plugin(
     precompiled_ptx: Optional[bytes] = None,
     use_aot_if_available: bool = True,
 ) -> None:
-    """Register a NVRTC-compiled CUDA kernel as a TensorRT QDP plugin end-to-end.
+    """Register a kernel compiled to PTX as a TensorRT QDP plugin end-to-end.
 
     Steps performed:
-    1. Compile kernel source to PTX via NVRTC (skipped if ``precompiled_ptx`` is passed).
+    1. Compile kernel source to PTX via NVRTC (skipped if ``precompiled_ptx`` is
+       passed — always the case for kernels compiled by another toolchain).
     2. Optionally register the PyTorch custom op (define + fake impl).
     3. Register the TRT plugin descriptor + JIT impl via generate_plugin().
     4. Register the AOT impl with the compiled PTX.
     5. Register the Torch-TensorRT converter via generate_plugin_converter().
 
-    ``precompiled_ptx`` lets higher-level entry points (e.g. ``cuda_kernel_op``)
-    avoid a redundant second NVRTC pass when they already compiled the source
-    to build an eager kernel handle.
+    ``precompiled_ptx`` lets higher-level entry points (e.g. ``cuda_kernel_op``,
+    ``ptx_op``, ``cutile_op``) supply already-compiled PTX and skip the NVRTC
+    pass; the source-compilation fields are read only when it is ``None``.
     """
     if spec.aot_fn is None:
         raise ValueError(
-            f"CudaPythonSpec.aot_fn must be set before registering plugin '{op_name}'. "
-            "Pass aot_fn= to cuda_python() or assign spec.aot_fn directly."
+            f"spec.aot_fn must be set before registering plugin '{op_name}'. "
+            "Pass aot_fn= to the entry point or assign spec.aot_fn directly."
         )
 
     if precompiled_ptx is not None:
@@ -285,4 +318,4 @@ def register_cuda_python_plugin(
         _aot_register=lambda: _register_aot_impl(op_name, ptx, spec),
     )
 
-    _LOGGER.info("cuda-python QDP plugin '%s' registered successfully", op_name)
+    _LOGGER.info("QDP plugin '%s' registered successfully", op_name)

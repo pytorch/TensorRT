@@ -275,6 +275,12 @@ FAQ
     :ref:`aot_plugin` for an end-to-end example of compiling a Triton kernel as a
     TRT plugin for use in a serialized engine.
 
+**"I have a cuTile kernel. Can I use it in a serialized TRT engine?"**
+
+    Yes — ``torch_tensorrt.kernels.cutile_op`` compiles a ``@ct.kernel`` program
+    ahead of time and registers the op, plugin, and converter in one call, with
+    the PTX embedded in the engine. See :ref:`cutile_op`.
+
 **"Operator X is listed as supported but my model still falls back"**
 
     The converter may only support specific overloads or dtype combinations. Check:
