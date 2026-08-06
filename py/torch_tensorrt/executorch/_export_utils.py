@@ -8,19 +8,26 @@ from torch._subclasses.fake_tensor import is_fake
 from torch.export.graph_signature import InputKind
 
 
-def _is_graph_bound_metadata(value: Any) -> bool:
-    """True if a metadata value is tied to the exported program's shape environment.
+def _seed_graph_bound_leaves(value: Any, memo: dict[int, Any]) -> bool:
+    """Seed shape-environment-bound leaves into ``memo`` so deepcopy shares them.
 
     Fake tensors and symbolic sizes reach back to a live ``ShapeEnv`` that owns
     tensors deepcopy refuses to touch, and cloning them would also detach the copy
-    from the symbols the graph is guarded on.
+    from the symbols the graph is guarded on. Seeding only the leaves lets the
+    surrounding container still be copied, so a container such as the ``list`` a
+    multi-output op stores in ``meta["val"]`` is not shared with the caller.
+
+    Returns True if the value has to be shared wholesale because deepcopy cannot
+    reach its leaves through pytree.
     """
+    found = False
     for leaf in torch.utils._pytree.tree_leaves(value):
-        if isinstance(leaf, (torch.SymInt, torch.SymFloat, torch.SymBool)):
-            return True
-        if isinstance(leaf, torch.Tensor) and is_fake(leaf):
-            return True
-    return False
+        if isinstance(leaf, (torch.SymInt, torch.SymFloat, torch.SymBool)) or (
+            isinstance(leaf, torch.Tensor) and is_fake(leaf)
+        ):
+            memo[id(leaf)] = leaf
+            found = True
+    return found
 
 
 def get_engine_info_from_state(engine_obj: Any) -> list[Any]:
@@ -150,14 +157,19 @@ def _stage_graph_module(
                 f"Staged GraphModule {name or '<root>'!r} changed node identities."
             )
         for node_name, source_node in source_nodes.items():
-            staged_nodes[node_name].meta = {
-                key: (
-                    value
-                    if _is_graph_bound_metadata(value)
-                    else copy.deepcopy(value, payload_memo)
-                )
-                for key, value in source_node.meta.items()
-            }
+            staged_meta = {}
+            for key, value in source_node.meta.items():
+                # Seed the shape-bound leaves first so the container around them
+                # is still copied while the leaves stay shared.
+                _seed_graph_bound_leaves(value, payload_memo)
+                try:
+                    staged_meta[key] = copy.deepcopy(value, payload_memo)
+                except Exception:
+                    # A value deepcopy cannot reach through pytree (for example a
+                    # live ShapeEnv) has to be shared rather than lose the graph
+                    # its guards refer to.
+                    staged_meta[key] = value
+            staged_nodes[node_name].meta = staged_meta
     return staged
 
 

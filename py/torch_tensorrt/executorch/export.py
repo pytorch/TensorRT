@@ -189,6 +189,32 @@ def _prepare_programs(
     )
 
 
+def _reject_shared_partitioners(per_method: dict[str, list[Any]]) -> None:
+    """Reject one partitioner instance serving several methods.
+
+    A partitioner can carry method-specific state: ExecuTorch backends bake the
+    method name into the DelegationSpec built in the constructor, so a reused
+    instance tags every method with the first method's name and each delegate
+    then looks up the wrong compiled method at runtime.
+    """
+    if len(per_method) < 2:
+        return
+    owner_by_id: dict[int, str] = {}
+    for name, partitioners in per_method.items():
+        for partitioner in partitioners:
+            previous = owner_by_id.setdefault(id(partitioner), name)
+            if previous != name:
+                raise ValueError(
+                    f"partitioners reuses the same "
+                    f"{type(partitioner).__name__} instance for {previous!r} and "
+                    f"{name!r}. A partitioner may carry method-specific state, "
+                    "such as a method name baked into its delegation spec, so "
+                    "each method needs its own instance. For example: "
+                    'partitioners={"prefill": [MyPartitioner(...)], "decode": '
+                    "[MyPartitioner(...)]}."
+                )
+
+
 def _per_method_values(
     value: Sequence[Any] | Mapping[str, Sequence[Any] | None] | None,
     method_names: tuple[str, ...],
@@ -218,19 +244,6 @@ def _per_method_values(
             "sequence."
         )
     shared = list(value or ())
-    # A partitioner carries per-method state: ExecuTorch backends bake the method
-    # name into the DelegationSpec built in their constructor, so one instance
-    # reused across methods would tag every method with the first method's name.
-    if shared and option_name == "partitioners" and len(method_names) > 1:
-        raise ValueError(
-            "partitioners must be a mapping of method name to sequence when "
-            f"exporting multiple methods ({', '.join(method_names)}). A single "
-            "partitioner instance cannot be shared across methods because a "
-            "partitioner may carry method-specific state, such as a method name "
-            "baked into its delegation spec. Construct one per method, for "
-            'example partitioners={"prefill": [MyPartitioner(...)], "decode": '
-            "[MyPartitioner(...)]}."
-        )
     return {name: list(shared) for name in method_names}
 
 
@@ -266,9 +279,9 @@ def export(
     immutable. Method mappings preserve independent entry points but do not imply
     shared mutable state between them.
 
-    When exporting more than one method, pass ``partitioners`` as a mapping of
-    method name to its own partitioner instances. A partitioner may carry
-    method-specific state, so sharing one instance across methods is rejected.
+    When exporting more than one method, give each method its own partitioner
+    instances via ``partitioners={"method": [...]}``. A partitioner may carry
+    method-specific state, so reusing one instance across methods is rejected.
     """
     from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -304,6 +317,7 @@ def export(
     )
     program_map = {"forward": programs} if not isinstance(programs, dict) else programs
     extra_partitioners = _per_method_values(partitioners, method_names, "partitioners")
+    _reject_shared_partitioners(extra_partitioners)
     method_compile_specs = _per_method_values(
         compile_specs, method_names, "compile_specs"
     )
@@ -321,6 +335,9 @@ def export(
             raise ValueError(
                 f"transform_passes contains unknown methods: {sorted(unknown)}"
             )
+        # ExecuTorch dispatches per-method passes on isinstance(passes, dict), so a
+        # Mapping that is not a dict silently runs no passes at all.
+        transform_passes = dict(transform_passes)
 
     engine_counts = {
         name: validate_engine_program(program) for name, program in program_map.items()
