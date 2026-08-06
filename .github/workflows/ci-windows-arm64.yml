@@ -27,7 +27,7 @@ jobs:
     uses: ./.github/workflows/build_windows.yml
     with:
       repository: ${{ github.repository }}
-      ref: ${{ github.sha }}
+      ref: ""
       build-matrix: >-
         {"include":[{"build_name":"windows-arm64-cross","python_version":"3.13","desired_cuda":"cu132","validation_runner":"windows.g5.4xlarge.nvidia.gpu"}]}
       architecture: x64

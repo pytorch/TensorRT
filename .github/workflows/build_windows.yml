@@ -178,6 +178,22 @@ jobs:
       - uses: ./test-infra/.github/actions/setup-windows
         with:
           cuda-version: ${{ env.CU_VERSION }}
+      - name: Install CUDA 13.4 toolkit with ARM64 target libraries
+        if: inputs.cross-compile
+        shell: powershell
+        env:
+          CUDA_INSTALLER_URL: https://packages.nvidia.com/prerelease/cuda/13.4.0/local_installers/cuda_13.4.0_windows_x86_64.exe
+          CUDA_ROOT: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "cuda_13.4.0_windows_x86_64.exe"
+          Invoke-WebRequest -Uri $env:CUDA_INSTALLER_URL -OutFile $installer
+          $process = Start-Process -FilePath $installer -ArgumentList "-s" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "CUDA 13.4 installer failed with exit code $($process.ExitCode)" }
+          $cudaArm64Lib = Join-Path $env:CUDA_ROOT "lib\arm64\cudart.lib"
+          if (-not (Test-Path -LiteralPath $cudaArm64Lib -PathType Leaf)) { throw "CUDA 13.4 ARM64 target library was not installed: $cudaArm64Lib" }
+          "CUDA_PATH=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          (Join-Path $env:CUDA_ROOT "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - uses: ./test-infra/.github/actions/set-channel
       - name: Set PYTORCH_VERSION
         if: env.CHANNEL == 'test'
@@ -241,22 +257,6 @@ jobs:
           source "${BUILD_ENV_FILE}"
           # shellcheck disable=SC2086
           ${CONDA_RUN} ${PIP_INSTALL_TORCH}
-      - name: Install CUDA 13.4 toolkit with ARM64 target libraries
-        if: inputs.cross-compile
-        shell: powershell
-        env:
-          CUDA_INSTALLER_URL: https://packages.nvidia.com/prerelease/cuda/13.4.0/local_installers/cuda_13.4.0_windows_x86_64.exe
-          CUDA_ROOT: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4
-        run: |
-          $installer = Join-Path $env:RUNNER_TEMP "cuda_13.4.0_windows_x86_64.exe"
-          Invoke-WebRequest -Uri $env:CUDA_INSTALLER_URL -OutFile $installer
-          $process = Start-Process -FilePath $installer -ArgumentList "-s" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "CUDA 13.4 installer failed with exit code $($process.ExitCode)" }
-          $cudaArm64Lib = Join-Path $env:CUDA_ROOT "lib\arm64\cudart.lib"
-          if (-not (Test-Path -LiteralPath $cudaArm64Lib -PathType Leaf)) { throw "CUDA 13.4 ARM64 target library was not installed: $cudaArm64Lib" }
-          "CUDA_PATH=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          (Join-Path $env:CUDA_ROOT "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Run Pre-Script with Caching
         if: ${{ inputs.pre-script != '' && inputs.architecture == 'x64' }}
         uses: ./test-infra/.github/actions/run-script-with-cache
