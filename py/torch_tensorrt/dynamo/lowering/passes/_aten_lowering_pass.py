@@ -6,6 +6,9 @@ import torch
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
+from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import (
+    mark_constant_fold_exclusions,
+)
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     trace_intermediate_node_outputs,
 )
@@ -37,6 +40,7 @@ pre_lowering_pass_list = [
 post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
+    mark_constant_fold_exclusions,
     constant_fold,
     repair_input_as_output,
     fuse_prims_broadcast,
