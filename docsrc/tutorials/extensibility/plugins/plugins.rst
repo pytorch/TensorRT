@@ -23,6 +23,10 @@ depending on your kernel language and performance requirements:
      - Triton
      - Pre-compiled PTX embedded in engine
      - :ref:`aot_plugin`
+   * - QDP declarative (AOT)
+     - Triton
+     - Pre-compiled PTX embedded in engine
+     - :ref:`triton_op`
    * - QDP auto-generate (AOT)
      - CUDA C++ via NVRTC
      - Pre-compiled PTX embedded in engine
@@ -119,6 +123,7 @@ For complete end-to-end examples see:
 
 * :ref:`auto_generate_plugins` — Triton kernel, QDP JIT plugin
 * :ref:`aot_plugin` — Triton kernel, QDP AOT plugin (pre-compiled PTX, no Python overhead at runtime)
+* :ref:`triton_op` — the same Triton AOT plugin registered in one ``triton_op`` call
 * :ref:`nvrtc_aot_plugin` — CUDA C++ kernel compiled with NVRTC, QDP AOT plugin
 * :ref:`custom_kernel_plugins` — manual plugin + converter registration (legacy approach)
 

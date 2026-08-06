@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+
 import torch_tensorrt
 
 skip_no_cuda = pytest.mark.skipif(
@@ -15,20 +16,25 @@ skip_no_qdp = pytest.mark.skipif(
 )
 
 
-def _has_cuda_core() -> bool:
-    """True if the cuda-core ``cuda.core`` API (NVRTC/QDP backend) is importable."""
+def _has_module(*names: str) -> bool:
+    """True if any of ``names`` is importable."""
     import importlib.util
 
-    for mod in ("cuda.core", "cuda.core.experimental"):
+    for name in names:
         try:
-            if importlib.util.find_spec(mod) is not None:
+            if importlib.util.find_spec(name) is not None:
                 return True
         except (ImportError, ModuleNotFoundError, ValueError):
             continue
     return False
 
 
-_HAS_CUDA_CORE = _has_cuda_core()
+skip_no_triton = pytest.mark.skipif(
+    not _has_module("triton"), reason="triton not installed"
+)
+
+# The cuda-core ``cuda.core`` API is the NVRTC/QDP backend.
+_HAS_CUDA_CORE = _has_module("cuda.core", "cuda.core.experimental")
 
 skip_no_cuda_core = pytest.mark.skipif(
     not _HAS_CUDA_CORE,
