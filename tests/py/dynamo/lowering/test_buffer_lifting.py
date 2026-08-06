@@ -30,6 +30,7 @@ import torch
 from torch.export import export
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+    assert_predicted_kv_aliased,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
 )
@@ -243,6 +244,246 @@ class TestInlineLiftedBuffers(TestCase):
         if isinstance(out, tuple):
             out = out[0]
         self.assertEqual(out.item(), 33.0)
+
+
+class TestCopyBackClassification(TestCase):
+    """``lift_mutated_buffers`` splits mutated buffers into two kinds.
+
+    An *eligible* ``slice_scatter`` / ``index_copy`` KV write (one the converter
+    lowers to an ``IKVCacheUpdateLayer`` with in-place aliased I/O) relies on that
+    engine aliasing and is NOT recorded for copy-back. Every other mutation --
+    including a ``slice_scatter`` / ``index_copy`` that fails the converter's
+    eligibility (wrong rank/dim/shape) and is lowered to a non-aliasing scatter --
+    has no engine aliasing, so its new value is re-appended as a trailing graph
+    output and its buffer name recorded in
+    ``gm.meta['_copyback_mutation_buffers']`` for the exporters to reclassify as
+    a BUFFER_MUTATION.
+    """
+
+    def test_kv_slice_scatter_write_no_copyback(self):
+        """A slice-assignment KV write is aliased downstream, not copied back."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 4, 16, 8))
+
+            def forward(self, x):
+                self.cache[:, :, 3:4, :] = x
+                return self.cache.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(2, 4, 1, 8),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], [])
+        # Predicted-KV binding recorded so compile() can assert it actually aliases.
+        self.assertEqual(new_gm.meta["_predicted_kv_bindings"], ["buf_cache"])
+
+    def test_kv_index_copy_write_no_copyback(self):
+        """An eligible ``index_copy`` KV write (4-D static cache, dim=2, batch 1,
+        single-position source) is aliased by the KV converter, so it is not
+        copied back."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(1, 4, 16, 8))
+
+            def forward(self, x):
+                self.cache.index_copy_(2, torch.tensor([3]), x)
+                return self.cache.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(1, 4, 1, 8),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], [])
+
+    def test_non_kv_mutation_recorded_for_copyback(self):
+        """A non-KV in-place mutation is recorded for copy-back by buffer name."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(4))
+
+            def forward(self, x):
+                self.state.add_(x)
+                return self.state.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(4),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["state"])
+        # A non-KV mutation is not predicted to alias, so nothing to assert later.
+        self.assertEqual(new_gm.meta["_predicted_kv_bindings"], [])
+
+    def test_copyback_value_appended_as_last_output(self):
+        """The non-KV new value is re-attached as a trailing graph output so it
+        survives DCE; at the lift stage it is the LAST output and equals the
+        updated buffer."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(4))
+
+            def forward(self, x):
+                self.state.add_(x)
+                return self.state.sum()
+
+        x = torch.arange(4, dtype=torch.float32)
+        gm = _ep_module_decomposed(M(), (x.clone(),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        _, buf_name, buf_tensor = lifted[0]
+        self.assertEqual(buf_name, "state")
+
+        out = new_gm(x.clone(), buf_tensor.clone())
+        self.assertIsInstance(out, tuple)
+        # Last output is the copy-back value == state + x.
+        self.assertTrue(torch.allclose(out[-1], buf_tensor + x))
+
+    def test_index_put_is_copyback_not_kv(self):
+        """Regression: ``index_put`` has no aliasing converter, so it must fall
+        into copy-back rather than being dropped in expectation of aliasing."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(4, 8))
+
+            def forward(self, x):
+                self.state[torch.tensor([1, 3])] = x
+                return self.state.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(2, 8),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["state"])
+
+    def test_mixed_kv_and_copyback(self):
+        """One KV buffer + one non-KV buffer: only the non-KV one is recorded."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 4, 16, 8))
+                self.register_buffer("state", torch.zeros(4))
+
+            def forward(self, x_kv, x_state):
+                self.cache[:, :, 3:4, :] = x_kv
+                self.state.add_(x_state)
+                return self.cache.sum() + self.state.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(2, 4, 1, 8), torch.ones(4)))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 2)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["state"])
+
+    def test_ineligible_index_copy_is_copyback(self):
+        """Regression: an ``index_copy`` the KV converter cannot alias (here a 2-D
+        cache / dim 0, not the 4-D dim=2 layout ``IKVCacheUpdateLayer`` requires)
+        is lowered to a non-aliasing scatter, so its write-back must be preserved
+        as copy-back rather than dropped."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(4, 8))
+
+            def forward(self, x):
+                self.cache.index_copy_(0, torch.tensor([2]), x)
+                return self.cache.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(1, 8),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["cache"])
+
+    def test_ineligible_slice_scatter_is_copyback(self):
+        """Regression: a ``slice_scatter`` on a KV-shaped 4-D cache but the wrong
+        axis (dim 1, not dim 2) is not IKVCacheUpdateLayer-eligible, so it is
+        lowered to a non-aliasing scatter and must fall to copy-back rather than
+        being dropped."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 16, 4, 8))
+
+            def forward(self, x):
+                self.cache[:, 3:4, :, :] = x  # write on dim 1, not the seq dim 2
+                return self.cache.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(2, 1, 4, 8),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["cache"])
+
+
+class _FakeEngine:
+    """Stand-in for a compiled TRT submodule exposing an ``aliased_io`` map."""
+
+    def __init__(self, aliased_io):
+        self.aliased_io = aliased_io
+
+
+class _FakeGM:
+    """Stand-in for a compiled GraphModule whose children are TRT engines."""
+
+    def __init__(self, children):
+        self._children = children
+
+    def named_children(self):
+        return list(self._children.items())
+
+
+class TestPredictedKvAssertion(TestCase):
+    """`assert_predicted_kv_aliased` is the ground-truth backstop for the
+    pre-conversion KV prediction: every write predicted to alias must actually
+    appear in a compiled engine's `aliased_io`, else its write-back would be
+    silently dropped."""
+
+    def test_passes_when_predicted_kv_is_aliased(self):
+        gm = _FakeGM(
+            {
+                "_run_on_acc_0": _FakeEngine(
+                    {"out_k": ("buf_k_cache", "kv_cache_update")}
+                )
+            }
+        )
+        # buf_k_cache is aliased -> no error.
+        assert_predicted_kv_aliased(gm, ["buf_k_cache"])
+
+    def test_raises_when_predicted_kv_not_aliased(self):
+        # Predicted KV for buf_conv_state, but the engine aliased only buf_k_cache
+        # (the converter emitted no IKVCacheUpdateLayer for conv_state) -> must
+        # raise rather than silently drop the write-back.
+        gm = _FakeGM(
+            {
+                "_run_on_acc_0": _FakeEngine(
+                    {"out_k": ("buf_k_cache", "kv_cache_update")}
+                )
+            }
+        )
+        with self.assertRaises(RuntimeError):
+            assert_predicted_kv_aliased(gm, ["buf_conv_state"])
+
+    def test_aggregates_aliased_io_across_engines(self):
+        gm = _FakeGM(
+            {
+                "_run_on_acc_0": _FakeEngine(
+                    {"out_k": ("buf_k_cache", "kv_cache_update")}
+                ),
+                "_run_on_acc_1": _FakeEngine(
+                    {"out_v": ("buf_v_cache", "kv_cache_update")}
+                ),
+            }
+        )
+        # Both predicted-KV bindings are aliased across the two engines -> no error.
+        assert_predicted_kv_aliased(gm, ["buf_k_cache", "buf_v_cache"])
+
+    def test_noop_when_no_prediction(self):
+        assert_predicted_kv_aliased(_FakeGM({}), [])
 
 
 if __name__ == "__main__":

@@ -61,3 +61,18 @@ target_link_libraries(
     executorch::extensions
     executorch::kernels
     torchtrt::executorch_backend)
+
+# Caller-owned KV-cache persistence check (see kv_cache_decode_check.cpp). It
+# cudaMalloc's the device-tagged planned arenas that hold the KV buffers and
+# copies the logits back to host, so it links the CUDA runtime directly.
+find_package(CUDAToolkit REQUIRED)
+add_executable(kv_cache_decode_check kv_cache_decode_check.cpp)
+target_link_libraries(
+  kv_cache_decode_check
+  PRIVATE
+    executorch
+    executorch::backends
+    executorch::extensions
+    executorch::kernels
+    torchtrt::executorch_backend
+    CUDA::cudart)

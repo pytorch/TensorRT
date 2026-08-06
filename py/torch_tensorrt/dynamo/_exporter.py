@@ -1,9 +1,11 @@
 import base64
 import copy
+import logging
 import operator
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 import torch
+import torch.utils._pytree as pytree
 from torch._export.non_strict_utils import make_constraints
 from torch._guards import detect_fake_mode
 from torch._library.fake_class_registry import FakeScriptObject
@@ -19,8 +21,11 @@ from torch.export.exported_program import (
     OutputSpec,
     TensorArgument,
 )
+from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_lifted_custom_obj(
@@ -70,7 +75,9 @@ def export(
         inputs (torch.Tensor): Torch input tensors
         cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not
     """
-    patched_module = transform(gm, cross_compile_module)
+    patched_module = transform(
+        gm, cross_compile_module, expose_aliased_mutations=bool(use_legacy_exporter)
+    )
     if not use_legacy_exporter:
         args = ()
         if arg_inputs is not None:
@@ -95,6 +102,7 @@ def export(
 def transform(
     gm: torch.fx.GraphModule,
     cross_compile_module: Optional[bool] = False,
+    expose_aliased_mutations: bool = True,
 ) -> torch.fx.GraphModule:
     """
     Transforms the graphmodule by inlining Pytorch and TensorRT submodules.
@@ -113,7 +121,7 @@ def transform(
     gm = copy.deepcopy(gm)
 
     # Inline TensorRT submodules
-    inline_trt_modules(gm, cross_compile_module)
+    inline_trt_modules(gm, cross_compile_module, expose_aliased_mutations)
 
     # Inline pytorch submodules
     inline_torch_modules(gm)
@@ -230,6 +238,12 @@ def lift(
                         kind=input_kind,
                         arg=input_spec_arg,
                         target=node.target,
+                        # torch>=2.3 requires an explicit persistent flag on BUFFER
+                        # specs. state_dict() excludes non-persistent buffers by
+                        # construction, so any buffer reaching this in-state_dict
+                        # branch is persistent (non-persistent buffers take the
+                        # not-in-state_dict path above and are lifted as constants).
+                        persistent=(True if input_kind == InputKind.BUFFER else None),
                     ),
                 )
                 non_user_input_idx += 1
@@ -243,29 +257,6 @@ def lift(
     gm.graph.lint()
 
     return gm, graph_signature, state_dict, constants
-
-
-def get_duplicate_nodes(
-    gm: torch.fx.GraphModule, submodule: torch.fx.GraphModule
-) -> Tuple[Sequence[Any], Sequence[Any]]:
-    """
-    We check if there are duplicate nodes when we copy submodule graph into gm.
-    Handle the case where the subgraph input placeholders are same as
-    gm placeholders. This happens when the first submodule in the graph is
-    a pytorch submodule
-    """
-    submodule_placeholder_inputs = [
-        node for node in submodule.graph.nodes if node.op == "placeholder"
-    ]
-    submodule_input_node_names = [node.name for node in submodule_placeholder_inputs]
-    gm_node_names = [node.name for node in gm.graph.nodes]
-    submodule_duplicate_inputs = [
-        node for node in submodule_placeholder_inputs if node.name in gm_node_names
-    ]
-    gm_duplicate_inputs = [
-        node for node in gm.graph.nodes if node.name in submodule_input_node_names
-    ]
-    return submodule_duplicate_inputs, gm_duplicate_inputs
 
 
 def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
@@ -285,43 +276,31 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 # or a placeholder of the main graph
                 submodule_inputs = gm_node.args
 
-                submodule_duplicate_inputs, gm_duplicate_inputs = get_duplicate_nodes(
-                    gm, submodule
-                )
-                assert len(submodule_duplicate_inputs) == len(gm_duplicate_inputs)
-                # Avoid creating new copies of duplicate inputs by creating a mapping
-                val_map = {}
-                for i in range(len(submodule_duplicate_inputs)):
-                    val_map[submodule_duplicate_inputs[i]] = gm_duplicate_inputs[i]
-
-                # Copy all nodes in the submodule into gm and
-                # store the output node of this submodule which is now present in gm
+                # Copy the submodule's nodes into gm, then wire its inputs POSITIONALLY.
+                #
+                # We deliberately do NOT pre-seed val_map by matching submodule input
+                # placeholders to gm nodes by NAME. Name matching silently binds an
+                # input to the WRONG node when names collide (e.g. a _run_on_gpu input
+                # placeholder whose name matches a different engine's getitem), which
+                # rewires a consumer to the wrong producer and orphans the real one --
+                # the orphan is then pruned by dead-code elimination, leaving a delegate
+                # short an output at runtime. It also leaks a mixed submodule's
+                # computed-intermediate inputs as spurious graph inputs. gm_node.args is
+                # the authoritative, ordered list of the real inputs, so we let
+                # graph_copy create a fresh (auto-renamed on collision) placeholder for
+                # every submodule input and rewire each to submodule_inputs[i] by
+                # position, then erase it.
+                val_map: Dict[Any, Any] = {}
                 submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
 
-                # Get their references (since we copied) in the parent graph (gm)
-                if len(submodule_duplicate_inputs) == 0:
-                    submodule_placeholder_input_names = [
-                        node.name
-                        for node in submodule.graph.nodes
-                        if node.op == "placeholder"
-                    ]
-                    gm_added_placeholder_inputs = [
-                        node
-                        for node in gm.graph.nodes
-                        if node.name in submodule_placeholder_input_names
-                    ]
-
-                    assert len(submodule_inputs) == len(gm_added_placeholder_inputs)
-
-                    # Replace the added placeholder inputs with original inputs to this submodule node
-                    for idx in range(len(gm_added_placeholder_inputs)):
-                        gm_added_placeholder_inputs[idx].replace_all_uses_with(
-                            submodule_inputs[idx]
-                        )
-
-                    # Erase the placeholder input nodes in the gm
-                    for idx in range(len(gm_added_placeholder_inputs)):
-                        gm.graph.erase_node(gm_added_placeholder_inputs[idx])
+                submodule_placeholders = [
+                    node for node in submodule.graph.nodes if node.op == "placeholder"
+                ]
+                assert len(submodule_placeholders) == len(submodule_inputs)
+                for idx, submodule_placeholder in enumerate(submodule_placeholders):
+                    copied_placeholder = val_map[submodule_placeholder]
+                    copied_placeholder.replace_all_uses_with(submodule_inputs[idx])
+                    gm.graph.erase_node(copied_placeholder)
 
                 # Replace the pytorch submodule node (call_module) with the inlined subgraph output
                 # Special handling when submodule returns multiple outputs (tuple)
@@ -388,14 +367,54 @@ def create_trt_exp_program(
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
     assert output_nodes
-    output_nodes = output_nodes[0].args[0]
+    _output_node = output_nodes[0]
+    output_nodes = _output_node.args[0]
+
+    # Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer):
+    # lift_mutated_buffers appended each buffer's new-value as a trailing graph output. Tag it
+    # BUFFER_MUTATION (reusing the KV `_kv_mutation_target` path) so the runtime
+    # threads it and ExecuTorch copies it back to the caller-owned buffer, then move
+    # all mutation outputs before the user outputs (ExportedProgram verifier requires
+    # BUFFER_MUTATIONs to be contiguous at the front).
+    _copyback = gm.meta.get("_copyback_mutation_buffers", [])
+    if _copyback:
+        _outs = list(output_nodes)
+        for _n, _buf in zip(_outs[-len(_copyback) :], _copyback):
+            if isinstance(_n, torch.fx.Node):
+                _n.meta["_kv_mutation_target"] = _buf
+
+        def _is_mut(_n: Any) -> bool:
+            return isinstance(_n, torch.fx.Node) and "_kv_mutation_target" in _n.meta
+
+        output_nodes = tuple(
+            [_n for _n in _outs if _is_mut(_n)]
+            + [_n for _n in _outs if not _is_mut(_n)]
+        )
+        _output_node.args = (output_nodes,)
+
+    # Outputs tagged by `_expose_aliased_buffer_mutations` become BUFFER_MUTATION
+    # specs (their `_kv_mutation_target` meta names the backing buffer); the rest
+    # are ordinary user outputs, used below to rebuild the user-facing out_spec.
+    user_output_nodes = [
+        node for node in output_nodes if "_kv_mutation_target" not in node.meta
+    ]
 
     input_specs = [
         InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
         for node in input_nodes
     ]
     output_specs = [
-        OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=node.name), node.target)
+        (
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION,
+                TensorArgument(name=node.name),
+                node.meta["_kv_mutation_target"],
+            )
+            if "_kv_mutation_target" in node.meta
+            else OutputSpec(
+                OutputKind.USER_OUTPUT, TensorArgument(name=node.name), node.target
+            )
+        )
         for node in output_nodes
     ]
 
@@ -403,14 +422,31 @@ def create_trt_exp_program(
         input_specs=input_specs, output_specs=output_specs
     )
 
+    # A hybrid TRT+CUDA GraphModule from dynamo.compile carries a plain fx.CodeGen
+    # (no pytree_info): the module already returns a flat tuple, so rebuild
+    # in_spec/out_spec from the example inputs and the flat graph outputs. This
+    # matches retrace=True, which traces the same flat module and likewise cannot
+    # re-nest -- so the fallback never diverges from it.
+    codegen = gm.graph._codegen
+    if isinstance(codegen, _PyTreeCodeGen):
+        in_spec = codegen.pytree_info.in_spec
+        out_spec = codegen.pytree_info.out_spec
+    else:
+        example_args = tuple(arg_inputs) if arg_inputs is not None else ()
+        example_kwargs = kwarg_inputs or {}
+        in_spec = pytree.tree_flatten((example_args, example_kwargs))[1]
+        # out_spec describes the user-visible return structure only; buffer
+        # mutations are stripped before unflatten.
+        out_spec = pytree.tree_flatten(tuple(user_output_nodes))[1]
+
     module_call_graph = [
         ModuleCallEntry(
             "",
             ModuleCallSignature(
                 inputs=[],
                 outputs=[],
-                in_spec=gm.graph._codegen.pytree_info.in_spec,
-                out_spec=gm.graph._codegen.pytree_info.out_spec,
+                in_spec=in_spec,
+                out_spec=out_spec,
             ),
         )
     ]
@@ -491,8 +527,179 @@ def create_trt_exp_program(
     return trt_exp_program
 
 
+def _declare_aliased_kv_mutations_on_ep(
+    exp_program: ExportedProgram,
+    copyback_buffers: Optional[List[str]] = None,
+) -> ExportedProgram:
+    """retrace=True post-export pass: declare each engine's aliased KV output as a
+    BUFFER_MUTATION of its caller-owned buffer input, and reclassify any copy-back
+    outputs as BUFFER_MUTATIONs of their buffers.
+
+    torch.export produces execute_engine nodes whose meta['val'] covers only the
+    user outputs (the aliased KV outputs are network bindings excluded at the fx
+    boundary), so the KV buffers -- though BUFFER inputs -- are never recorded as
+    mutated and get frozen downstream. This surfaces each aliased output as a
+    getitem and declares it a BUFFER_MUTATION of the aliased input's buffer,
+    mirroring create_trt_exp_program's handling on the retrace=False path.
+
+    Non-KV mutable buffers (e.g. a convolution-state ring-buffer) have no engine
+    aliasing: lift_mutated_buffers appended their new values as trailing user outputs, which
+    torch.export kept as the last ``len(copyback_buffers)`` outputs. Those are
+    reclassified from USER_OUTPUT to BUFFER_MUTATION here so ExecuTorch copies them
+    back to the caller-owned buffers after the delegate runs.
+
+    Args:
+        exp_program: the retraced ExportedProgram to rewrite.
+        copyback_buffers: buffer FQNs, in output order, for the trailing copy-back
+            outputs to reclassify as BUFFER_MUTATION. Threaded from
+            ``gm.meta['_copyback_mutation_buffers']`` by ``save()``; empty/None means
+            KV-only (no copy-back).
+
+    Returns exp_program unchanged when no engine has aliased KV outputs and there are
+    no copy-back buffers.
+    """
+    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+        ALIASED_IO_IDX,
+        INPUT_BINDING_NAMES_IDX,
+        OUTPUT_BINDING_NAMES_IDX,
+        deserialize_binding_names,
+    )
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        deserialize_aliased_io,
+    )
+    from torch_tensorrt.executorch.backend import _get_engine_info_for_node
+
+    def _estr(engine_info: List[Any], idx: int) -> str:
+        if idx < 0 or idx >= len(engine_info) or engine_info[idx] is None:
+            return ""
+        v = engine_info[idx]
+        return v.decode("utf-8", "replace") if isinstance(v, bytes) else str(v)
+
+    gm = exp_program.graph_module
+    sig = exp_program.graph_signature
+    inputs_to_buffers = sig.inputs_to_buffers
+    output_node = next(n for n in gm.graph.nodes if n.op == "output")
+    exec_target = torch.ops.tensorrt.execute_engine.default
+
+    already_exposed: Set[str] = set()
+    mutation_outputs: List[Tuple[torch.fx.Node, str]] = []
+    for node in gm.graph.nodes:
+        if node.op != "call_function" or node.target is not exec_target:
+            continue
+        engine_info = _get_engine_info_for_node(exp_program, node)
+        aliased_io = deserialize_aliased_io(_estr(engine_info, ALIASED_IO_IDX))
+        if not aliased_io:
+            continue
+        in_names = deserialize_binding_names(
+            _estr(engine_info, INPUT_BINDING_NAMES_IDX)
+        )
+        out_names = deserialize_binding_names(
+            _estr(engine_info, OUTPUT_BINDING_NAMES_IDX)
+        )
+        input_nodes = list(node.args[0])
+        val_list = list(node.meta["val"])
+        for out_name in out_names:
+            if out_name not in aliased_io:
+                continue
+            in_name = aliased_io[out_name][0]
+            if in_name not in in_names:
+                continue
+            ii = in_names.index(in_name)
+            if ii >= len(input_nodes):
+                continue
+            buf_node = input_nodes[ii]
+            buf_fqn = inputs_to_buffers.get(getattr(buf_node, "name", None))
+            if buf_fqn is None or buf_fqn in already_exposed:
+                continue
+            oi = out_names.index(out_name)
+            while len(val_list) <= oi:
+                val_list.append(buf_node.meta["val"])
+            val_list[oi] = buf_node.meta["val"]
+            with gm.graph.inserting_after(node):
+                getitem_node = gm.graph.call_function(operator.getitem, (node, oi))
+            getitem_node.meta["val"] = buf_node.meta["val"]
+            already_exposed.add(buf_fqn)
+            mutation_outputs.append((getitem_node, buf_fqn))
+        node.meta["val"] = tuple(val_list)
+
+    copyback_buffers = copyback_buffers or []
+    num_copyback = len(copyback_buffers)
+    if not mutation_outputs and not num_copyback:
+        return exp_program
+
+    out_args = list(output_node.args[0])
+    orig_specs = list(sig.output_specs)
+
+    kv_getitems = [g for g, _ in mutation_outputs]
+    kv_specs = [
+        OutputSpec(OutputKind.BUFFER_MUTATION, TensorArgument(name=g.name), fqn)
+        for g, fqn in mutation_outputs
+    ]
+
+    # Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer): lift
+    # appended each buffer's new-value as a trailing user output; torch.export kept them as the
+    # last num_copyback outputs. Reclassify those from USER_OUTPUT to BUFFER_MUTATION
+    # so ET copies them back to the caller-owned buffers.
+    copyback_getitems: List[torch.fx.Node] = []
+    copyback_specs: List[OutputSpec] = []
+    remaining_specs = orig_specs
+    if num_copyback:
+        copyback_getitems = list(out_args[-num_copyback:])
+        remaining_args = out_args[:-num_copyback]
+        remaining_specs = orig_specs[:-num_copyback]
+        copyback_specs = [
+            OutputSpec(OutputKind.BUFFER_MUTATION, TensorArgument(name=g.name), buf)
+            for g, buf in zip(copyback_getitems, copyback_buffers)
+            if isinstance(g, torch.fx.Node)
+        ]
+        out_args = remaining_args
+
+    # BUFFER_MUTATIONs (KV + copy-back) must precede USER_OUTPUTs (verifier).
+    output_node.args = (tuple(kv_getitems + copyback_getitems + out_args),)
+    gm.graph.lint()
+    gm.recompile()
+
+    new_output_specs = kv_specs + copyback_specs + list(remaining_specs)
+    new_signature = ExportGraphSignature(
+        input_specs=list(sig.input_specs), output_specs=new_output_specs
+    )
+
+    # Copy-back outputs were user returns in the retraced program, so torch.export's
+    # out_spec counts them; after reclassifying them as BUFFER_MUTATION only the real
+    # user outputs remain. Rebuild the top-level out_spec (mirroring
+    # create_trt_exp_program) so to_edge's unflatten sees the right leaf count.
+    module_call_graph = exp_program.module_call_graph
+    if num_copyback and module_call_graph:
+        new_out_spec = pytree.tree_flatten(tuple(out_args))[1]
+        _e0 = module_call_graph[0]
+        _sig0 = _e0.signature
+        module_call_graph = [
+            ModuleCallEntry(
+                _e0.fqn,
+                ModuleCallSignature(
+                    inputs=_sig0.inputs if _sig0 is not None else [],
+                    outputs=[],
+                    in_spec=_sig0.in_spec if _sig0 is not None else None,
+                    out_spec=new_out_spec,
+                ),
+            )
+        ] + list(module_call_graph[1:])
+
+    return ExportedProgram(
+        root=gm,
+        graph=gm.graph,
+        graph_signature=new_signature,
+        state_dict=exp_program.state_dict,
+        range_constraints=exp_program.range_constraints,
+        module_call_graph=module_call_graph,
+        constants=exp_program.constants,
+    )
+
+
 def inline_trt_modules(
-    gm: torch.fx.GraphModule, cross_compile_module: Optional[bool] = False
+    gm: torch.fx.GraphModule,
+    cross_compile_module: Optional[bool] = False,
+    expose_aliased_mutations: bool = True,
 ) -> torch.fx.GraphModule:
     """
     Replace TRT submodules with trt engine nodes.
@@ -554,10 +761,123 @@ def inline_trt_modules(
             for idx, getitem_node in enumerate(getitem_nodes):
                 getitem_node.meta["val"] = trt_node.meta["val"][idx]
 
+        # Expose the engine's aliased (KV-cache) outputs as graph-level buffer
+        # mutations so the ExecuTorch path sees a real mutable buffer instead of
+        # a frozen constant. Only on the legacy (create_trt_exp_program) path,
+        # which declares the BUFFER_MUTATION specs; on the torch.export path the
+        # extra outputs would just perturb the user outputs (see save()'s
+        # post-export declaration for retrace=True). Non-cross-compile only.
+        if not cross_compile_module and expose_aliased_mutations:
+            _expose_aliased_buffer_mutations(gm, trt_node, trt_module, num_outputs)
+
         # Erase the TRT submodule (call_module) node.
         gm.graph.erase_node(trt_module_node)
 
     return gm
+
+
+def _expose_aliased_buffer_mutations(
+    gm: torch.fx.GraphModule,
+    trt_node: torch.fx.Node,
+    trt_module: Any,
+    num_user_outputs: int,
+) -> None:
+    """Surface an engine's aliased KV-cache outputs as graph buffer mutations.
+
+    The interpreter appends aliased layer outputs (e.g. ``IKVCacheUpdateLayer``)
+    to the engine's network bindings *after* the fx output boundary, so
+    ``trt_node.meta["val"]`` (and the partitioner-emitted getitems) only cover
+    the user outputs. Here we add a ``getitem`` for each aliased output binding
+    and route it to the graph output tagged as a buffer mutation of the aliased
+    input's backing buffer. ``create_trt_exp_program`` turns the tag into a
+    ``BUFFER_MUTATION`` OutputSpec, so ``torch.export``/``to_edge`` record the
+    cache in ``buffers_to_mutate`` -- without a graph ``copy_`` that
+    functionalization would fold away (the aliased output shares the buffer's
+    storage, so a ``copy_`` from it is a no-op self-copy).
+    """
+    aliased_io = getattr(trt_module, "aliased_io", None)
+    if not aliased_io:
+        return
+
+    in_names = list(getattr(trt_module, "input_binding_names", []))
+    out_names = list(getattr(trt_module, "output_binding_names", []))
+    input_arg_nodes = list(trt_node.args[0])
+
+    # Only get_attr nodes backed by a *registered buffer* can be declared
+    # BUFFER_MUTATION targets; a get_attr that lift() would classify as a
+    # constant (not in named_buffers) is not a valid mutation target.
+    registered_buffers = {name for name, _ in gm.named_buffers()}
+
+    # A buffer can be declared mutated at most once in the graph signature.
+    # Multiple engines can alias the same backing buffer (they share its
+    # storage), so dedup exposures across engines.
+    already_exposed = gm.meta.setdefault("_kv_exposed_mutation_targets", set())
+
+    output_node = next(node for node in gm.graph.nodes if node.op == "output")
+
+    val_list = list(trt_node.meta["val"])
+    new_mutation_outputs: List[torch.fx.Node] = []
+    for oi, out_name in enumerate(out_names):
+        if out_name not in aliased_io:
+            continue
+        in_name = aliased_io[out_name][0]
+        if in_name not in in_names:
+            continue
+        ii = in_names.index(in_name)
+        if ii >= len(input_arg_nodes):
+            continue
+        buffer_node = input_arg_nodes[ii]
+        buf_target = getattr(buffer_node, "target", None)
+        if buffer_node.op != "get_attr" or not isinstance(buf_target, str):
+            logger.warning(
+                "Aliased input %s for engine output %s is not a buffer get_attr "
+                "(op=%s); skipping buffer-mutation exposure.",
+                in_name,
+                out_name,
+                buffer_node.op,
+            )
+            continue
+        if buf_target not in registered_buffers:
+            logger.warning(
+                "Aliased input %s for engine output %s resolves to get_attr %s "
+                "which is not a registered buffer; skipping buffer-mutation exposure.",
+                in_name,
+                out_name,
+                buf_target,
+            )
+            continue
+        if buf_target in already_exposed:
+            logger.warning(
+                "Buffer %s (engine output %s / input %s) already exposed as a "
+                "mutation by another engine; skipping duplicate.",
+                buf_target,
+                out_name,
+                in_name,
+            )
+            continue
+        already_exposed.add(buf_target)
+
+        # Ensure the engine node advertises at least oi+1 outputs so getitem(oi)
+        # is in range; the aliased output has the shape/dtype of its input buffer.
+        while len(val_list) <= oi:
+            val_list.append(buffer_node.meta["val"])
+        val_list[oi] = buffer_node.meta["val"]
+
+        with gm.graph.inserting_after(trt_node):
+            getitem_node = gm.graph.call_function(operator.getitem, (trt_node, oi))
+        getitem_node.meta["val"] = buffer_node.meta["val"]
+        getitem_node.meta["_kv_mutation_target"] = buf_target
+        new_mutation_outputs.append(getitem_node)
+
+    if not new_mutation_outputs:
+        return
+
+    trt_node.meta["val"] = tuple(val_list)
+    # BUFFER_MUTATION outputs must precede USER_OUTPUTs (the ExportedProgram
+    # verifier treats output_nodes[num_tokens:num_tokens+num_mutations] as the
+    # mutations), so prepend.
+    out_args = list(output_node.args[0])
+    output_node.args = (tuple(new_mutation_outputs + out_args),)
 
 
 def replace_execute_engine_no_op_node(

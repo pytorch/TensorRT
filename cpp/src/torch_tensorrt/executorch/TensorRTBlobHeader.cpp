@@ -136,6 +136,7 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
 bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   out.input_binding_names.clear();
   out.output_binding_names.clear();
+  out.aliased_io.clear();
   out.hardware_compatible = false;
   out.device_id = 0;
 
@@ -225,6 +226,84 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
         out.input_binding_names.push_back(name);
       } else {
         out.output_binding_names.push_back(name);
+      }
+    }
+  }
+
+  // Optional aliased_io array: [{"output":..,"input":..,"kind":..}, ...].
+  // Absent in older blobs -> leave empty (backward compatible). Mirrors the
+  // io_bindings walk above using the same string helpers.
+  const std::size_t alias_key = json.find("\"aliased_io\"");
+  if (alias_key != std::string::npos) {
+    std::size_t apos = json.find('[', alias_key);
+    if (apos == std::string::npos) {
+      return false;
+    }
+    ++apos;
+    while (true) {
+      apos = skip_ws(json, apos);
+      if (apos >= json.size()) {
+        return false;
+      }
+      if (json[apos] == ']') {
+        ++apos;
+        break;
+      }
+      if (json[apos] == ',') {
+        ++apos;
+        continue;
+      }
+      if (json[apos] != '{') {
+        return false;
+      }
+      ++apos;
+
+      AliasedBinding ab;
+      while (true) {
+        apos = skip_ws(json, apos);
+        if (apos >= json.size()) {
+          return false;
+        }
+        if (json[apos] == '}') {
+          ++apos;
+          break;
+        }
+        if (json[apos] == ',') {
+          ++apos;
+          continue;
+        }
+        std::string key;
+        apos = parse_string(json, apos, key);
+        if (apos == std::string::npos) {
+          return false;
+        }
+        apos = skip_ws(json, apos);
+        if (apos >= json.size() || json[apos] != ':') {
+          return false;
+        }
+        apos = skip_ws(json, apos + 1);
+        if (key == "output") {
+          apos = parse_string(json, apos, ab.output);
+        } else if (key == "input") {
+          apos = parse_string(json, apos, ab.input);
+        } else if (key == "kind") {
+          apos = parse_string(json, apos, ab.kind);
+        } else {
+          apos = skip_value(json, apos);
+        }
+        if (apos == std::string::npos) {
+          return false;
+        }
+      }
+      if (!ab.output.empty() && !ab.input.empty()) {
+        // A missing "kind" key means an older blob (the Python serializer omits
+        // it for KV aliases); default to the TRT-enforced kind so init()'s kind
+        // validation treats an absent key the same as the Python runtime rather
+        // than rejecting it as unknown.
+        if (ab.kind.empty()) {
+          ab.kind = "kv_cache_update";
+        }
+        out.aliased_io.push_back(std::move(ab));
       }
     }
   }
