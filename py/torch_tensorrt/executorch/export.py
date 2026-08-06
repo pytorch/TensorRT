@@ -218,6 +218,19 @@ def _per_method_values(
             "sequence."
         )
     shared = list(value or ())
+    # A partitioner carries per-method state: ExecuTorch backends bake the method
+    # name into the DelegationSpec built in their constructor, so one instance
+    # reused across methods would tag every method with the first method's name.
+    if shared and option_name == "partitioners" and len(method_names) > 1:
+        raise ValueError(
+            "partitioners must be a mapping of method name to sequence when "
+            f"exporting multiple methods ({', '.join(method_names)}). A single "
+            "partitioner instance cannot be shared across methods because a "
+            "partitioner may carry method-specific state, such as a method name "
+            "baked into its delegation spec. Construct one per method, for "
+            'example partitioners={"prefill": [MyPartitioner(...)], "decode": '
+            "[MyPartitioner(...)]}."
+        )
     return {name: list(shared) for name in method_names}
 
 
@@ -252,6 +265,10 @@ def export(
     TensorRT engines. Transform passes must treat shared payload values as
     immutable. Method mappings preserve independent entry points but do not imply
     shared mutable state between them.
+
+    When exporting more than one method, pass ``partitioners`` as a mapping of
+    method name to its own partitioner instances. A partitioner may carry
+    method-specific state, so sharing one instance across methods is rejected.
     """
     from torch_tensorrt._features import ENABLED_FEATURES
 

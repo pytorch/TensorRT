@@ -677,6 +677,57 @@ def test_export_normalizes_none_per_method_values(monkeypatch):
 
 
 @pytest.mark.unit
+def test_export_rejects_shared_partitioners_across_methods(monkeypatch):
+    """One partitioner instance cannot serve several methods.
+
+    ExecuTorch backends bake the method name into the delegation spec built in
+    the partitioner constructor, so a shared instance would tag every method
+    with the first method's name.
+    """
+    export_module, lower = _patch_lowering(monkeypatch)
+
+    with pytest.raises(ValueError, match="must be a mapping of method name"):
+        export_module.export(
+            {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
+            partitioners=[object()],
+        )
+
+    lower.assert_not_called()
+
+
+@pytest.mark.unit
+def test_export_allows_shared_partitioners_for_single_method(monkeypatch):
+    """A flat sequence stays valid when there is only one method to tag."""
+    export_module, lower = _patch_lowering(monkeypatch)
+    partitioner = object()
+
+    export_module.export(FakeExportedProgram(), partitioners=[partitioner])
+
+    pipeline = lower.call_args.kwargs["partitioner"]
+    assert pipeline[-1] is partitioner
+
+
+@pytest.mark.unit
+def test_export_accepts_per_method_partitioner_instances(monkeypatch):
+    """Each method keeps the partitioner instance it was given."""
+    export_module, lower = _patch_lowering(monkeypatch)
+    prefill_partitioner = object()
+    decode_partitioner = object()
+
+    export_module.export(
+        {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
+        partitioners={
+            "prefill": [prefill_partitioner],
+            "decode": [decode_partitioner],
+        },
+    )
+
+    pipelines = lower.call_args.kwargs["partitioner"]
+    assert pipelines["prefill"][-1] is prefill_partitioner
+    assert pipelines["decode"][-1] is decode_partitioner
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("container_type", [list, tuple])
 def test_prepare_graph_module_infers_nested_dynamic_shapes(monkeypatch, container_type):
     export_module = importlib.import_module("torch_tensorrt.executorch.export")
