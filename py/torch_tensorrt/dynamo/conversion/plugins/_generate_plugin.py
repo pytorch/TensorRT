@@ -3,7 +3,7 @@ import itertools
 import logging
 import re
 from types import FunctionType
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -15,6 +15,10 @@ from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
 
 from torch_tensorrt._features import needs_qdp_plugin
+from torch_tensorrt.dynamo.conversion.plugins._alias_utils import (
+    detect_output_aliases,
+    mutated_tensor_indices,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -108,12 +112,22 @@ def _generate_plugin(plugin_name: str) -> None:
 
     # retrieve the corresponding torch operation using the passed in string
     torch_op = getattr(getattr(torch.ops, namespace), name)
+    default_schema = torch_op.default._schema
+
+    # Tensor inputs the schema marks mutated (``Tensor(a!)``) — candidates for
+    # aliased QDP outputs. The actual output->input alias map is decided at
+    # fake-run time by identity.
+    _mutated_tensor_arg_positions = mutated_tensor_indices(default_schema)
+
+    # Aliased output indices, set by the desc func at build time so the
+    # runtime impl skips the per-call probe.
+    _aliased_out_indices: Optional[frozenset[int]] = None
 
     # helper function that generates the required signature based on the torch operation
     def generate_signature(
         torch_op: Callable[[Any], Any],
     ) -> Tuple[str, str, str, dict[str, Any], dict[str, Any]]:
-        schema = torch_op._schemas[""]
+        schema = torch_op.default._schema
 
         arg_list = []
 
@@ -194,6 +208,7 @@ def _generate_plugin(plugin_name: str) -> None:
     ) = generate_signature(torch_op)
 
     def _generic_plugin_desc(*args: Any, **kwargs: Any) -> Tuple[trtp.TensorDesc, ...]:
+        nonlocal _aliased_out_indices
         shape_env = ShapeEnv()
         syms_args = []
         tensor_args = [elem for elem in args if isinstance(elem, trtp.TensorDesc)]
@@ -220,9 +235,12 @@ def _generate_plugin(plugin_name: str) -> None:
 
             output = torch_op(*fake_args, *non_tensor_args, **torch_kwargs)
 
-        # Normalize to a list of fake outputs. Multi-output torch ops return
-        # a tuple; single-output ops return a bare Tensor.
         outputs_list = list(output) if isinstance(output, (tuple, list)) else [output]
+
+        alias_map = detect_output_aliases(
+            outputs_list, fake_args, _mutated_tensor_arg_positions
+        )
+        _aliased_out_indices = frozenset(alias_map)
 
         input_node_expr = list(
             itertools.chain.from_iterable(
@@ -245,6 +263,14 @@ def _generate_plugin(plugin_name: str) -> None:
 
         out_descs = []
         for out_idx, fake_out in enumerate(outputs_list):
+            if out_idx in alias_map:
+                # Aliased output: shares the mutated input's buffer/shape/dtype.
+                # TRT limitation (ALIASED_PLUGIN_IO_10_03): a defensive copy
+                # breaks aliasing when a multi-output plugin's aliased output
+                # feeds another layer; single-output plugins work end-to-end.
+                out_descs.append(tensor_args[alias_map[out_idx]].aliased())
+                continue
+
             shape_calc_fns: list[Any] = [None] * fake_out.ndim
             for i in range(fake_out.ndim):
                 out_dim = fake_out.shape[i]
@@ -311,12 +337,23 @@ def _generate_plugin(plugin_name: str) -> None:
 
         dest_tensors = [torch.as_tensor(o, device="cuda") for o in outputs]
 
+        # Aliased outputs share storage with the input the eager op already
+        # mutated — copying would no-op or clobber the in-place result.
+        aliased_outputs = _aliased_out_indices
+        if aliased_outputs is None:
+            aliased_outputs = frozenset(
+                i for i, o in enumerate(outputs) if o.get_aliased() is not None
+            )
+
         stream = torch.cuda.ExternalStream(stream)
         with torch.cuda.stream(stream):
             out_tensors = torch_op(*in_tensors, *non_tensor_args, **torch_kwargs)
             if isinstance(out_tensors, torch.Tensor):
                 out_tensors = (out_tensors,)
-            [d.copy_(o) for (d, o) in zip(dest_tensors, out_tensors)]
+            for i, (d, o) in enumerate(zip(dest_tensors, out_tensors)):
+                if i in aliased_outputs:
+                    continue
+                d.copy_(o)
 
     plugin_impl_func = f"""
 {plugin_impl_signature}
