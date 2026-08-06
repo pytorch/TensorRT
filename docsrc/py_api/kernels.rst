@@ -201,16 +201,15 @@ tile size, and it is a hard requirement rather than a hint.
    ``<site-packages>/nvidia/cu13/bin``) before registering cuTile kernels.
 
    ``tileiras`` emits the PTX ISA of the toolkit it was built against, which
-   can be newer than the installed driver loads.  Because TensorRT loads
-   embedded PTX lazily, that would surface much later as an opaque
-   ``onShapeChange status -1`` from the engine, so :func:`cutile_op` offers the
-   compiled PTX to the driver at registration and raises if it is refused,
-   naming the highest ISA the driver does accept.  The mismatch is reported
-   rather than patched: lowering the ``.version`` header is a text substitution
-   over a body compiled for a different ISA, so whether it survives depends on
-   which instructions that body happens to contain.  Align the driver with the
-   cuda-tile toolchain, or — having established a lower ISA is safe for your
-   kernel — pass ``max_ptx_version=`` to set the header explicitly.
+   can be newer than the installed driver loads.  Nothing catches that on its
+   own: TensorRT builds the engine, and at inference the plugin logs
+   ``onShapeChange status -1`` while ``enqueue`` still returns, so the model
+   silently produces wrong numbers.  :func:`cutile_op` therefore offers the
+   compiled PTX to the driver at registration.  If it is refused, the
+   ``.version`` header is lowered to what the driver accepts, the result is
+   re-checked, and a warning names both versions; if no header makes it
+   loadable, registration raises.  Aligning the driver with the cuda-tile
+   toolchain removes the step; ``max_ptx_version=`` pins the header manually.
 
 Kernel signature convention
 ---------------------------

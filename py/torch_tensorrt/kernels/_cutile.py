@@ -510,23 +510,26 @@ def driver_max_ptx_version(below: int = _PTX_VERSION_CEILING) -> Optional[int]:
     return None
 
 
-def verify_driver_accepts_ptx(op_name: str, kernel_name: str, ptx: str) -> None:
-    """Raise unless the running driver will load the PTX about to be embedded.
+def fit_ptx_to_driver(op_name: str, kernel_name: str, ptx: str) -> str:
+    """Return PTX the running driver will load, or raise explaining why it cannot.
 
     ``tileiras`` emits the ISA of the toolkit it was built against, which can be
-    newer than the installed driver accepts. TensorRT loads embedded PTX lazily,
-    so a module the driver refuses does not surface at build time -- it appears
-    much later as an opaque ``onShapeChange status -1`` from the engine. Loading
-    it here turns that into an error at registration, next to its cause.
+    newer than the installed driver loads. Nothing catches that on its own:
+    TensorRT builds the engine happily, and at inference the plugin fails with
+    ``onShapeChange status -1`` on stderr while ``enqueue`` still returns -- so
+    the model silently produces garbage. Verifying here, against the same
+    ``cuModuleLoadData`` the driver will use later, is what makes the mismatch
+    visible at registration.
 
-    The mismatch is reported rather than patched around. Lowering the
-    ``.version`` header would sometimes work, but it is a text substitution over
-    a body the compiler emitted for a different ISA: whether it survives depends
-    on which instructions that body happens to contain, so it silently turns a
-    clear environment problem into a kernel that may or may not assemble. The
-    real fix is to align the driver with the cuda-tile toolchain, which the
-    error says. ``max_ptx_version=`` remains for callers who have established
-    that a lower header is safe for their kernel.
+    cuTile offers no ISA knob (``export_kernel`` takes an architecture, not a
+    PTX version, and ``CompilerOptions`` has none), so the only lever is the
+    ``.version`` header. Lowering it relabels a body the compiler emitted for a
+    newer ISA; that assembles whenever the body uses no newer instruction, which
+    is the common case because the bump usually reflects the toolkit default
+    rather than anything the kernel uses. It is applied only after the driver
+    has refused the PTX as emitted, it is logged, and the result is re-checked --
+    so a relabel that does not assemble raises here rather than reaching an
+    engine.
     """
     from cuda.bindings import driver as cuda
 
@@ -535,45 +538,43 @@ def verify_driver_accepts_ptx(op_name: str, kernel_name: str, ptx: str) -> None:
     except Exception as exc:  # pragma: no cover - environment dependent
         _LOGGER.warning(
             "Could not verify that the driver accepts the PTX for '%s' (%s); "
-            "embedding it unchecked. If the engine later fails at onShapeChange, "
-            "this is why.",
+            "embedding it unchecked. If inference later logs 'onShapeChange "
+            "status -1', this is why.",
             op_name,
             exc,
         )
-        return
+        return ptx
 
     if err == cuda.CUresult.CUDA_SUCCESS:
-        return
+        return ptx
 
-    reason = str(err).split(".")[-1].split(":")[0]
     emitted = parse_ptx_version(ptx)
     if err == cuda.CUresult.CUDA_ERROR_UNSUPPORTED_PTX_VERSION and emitted is not None:
         accepted = driver_max_ptx_version(emitted - 1)
-        remedy = (
-            "Update the CUDA driver, or install a cuda-tile built against a "
-            "toolkit it supports."
-        )
         if accepted is not None:
-            remedy += (
-                f" This driver loads at most PTX ISA {accepted // 10}."
-                f"{accepted % 10}; if you have established that ISA is safe for "
-                f"this kernel, pass max_ptx_version={accepted} to cutile_op to "
-                "set the header explicitly."
-            )
-        detail = (
-            f"cuda-tile compiled it to PTX ISA {emitted // 10}.{emitted % 10}, "
-            f"which this CUDA driver is too old to load. {remedy}"
-        )
-    else:
-        detail = (
-            "The PTX itself was rejected, so this is not merely a version gap; "
-            "the compiled kernel is unusable as emitted."
-        )
+            candidate = set_ptx_version(ptx, accepted)
+            if driver_loads_ptx(candidate):
+                _LOGGER.warning(
+                    "cuda-tile compiled '%s' to PTX ISA %d.%d, which this CUDA "
+                    "driver cannot load; relabelled it as %d.%d, which the "
+                    "driver accepts. The driver is older than the cuda-tile "
+                    "toolchain -- aligning them removes this step.",
+                    kernel_name,
+                    emitted // 10,
+                    emitted % 10,
+                    accepted // 10,
+                    accepted % 10,
+                )
+                return candidate
 
     raise RuntimeError(
         f"cutile_op '{op_name}': the CUDA driver refuses the PTX compiled for "
-        f"kernel '{kernel_name}' ({reason}). {detail} Embedding it anyway would "
-        "fail later inside the engine as an opaque 'onShapeChange status -1'."
+        f"kernel '{kernel_name}' ({str(err).split('.')[-1].split(':')[0]}), and "
+        "lowering the .version header did not make it loadable. Embedding it "
+        "would build an engine that fails at inference with 'onShapeChange "
+        "status -1' while still returning output, so the model would silently "
+        "produce wrong results. Align the CUDA driver with the cuda-tile "
+        "toolchain, or pass max_ptx_version= to pin the header yourself."
     )
 
 
@@ -631,10 +632,9 @@ def compile_cutile_to_ptx(
             baked into the compiled symbol.
         arch_override: target architecture (e.g. ``"sm_90"``). Defaults to the
             current device's compute capability.
-        max_ptx_version: ISA ceiling as a ``93``-style int, lowering the
-            ``.version`` header when the compiler emits something newer. Omit
-            it: by default the emitted ISA is left alone and a driver that
-            cannot load it is reported as an error.
+        max_ptx_version: ISA ceiling as a ``93``-style int, pinning the
+            ``.version`` header. Rarely needed -- by default the emitted PTX is
+            used as-is unless the driver refuses it.
 
     Returns:
         ``(ptx_bytes, kernel_name, reqntid)`` — the reordered PTX to embed in
@@ -732,7 +732,7 @@ def compile_cutile_to_ptx(
     if arch_override is None:
         # Only meaningful when the PTX targets the device we can load it on;
         # a deliberate cross-compile is the caller's to verify.
-        verify_driver_accepts_ptx(op_name, kernel_name, ptx)
+        ptx = fit_ptx_to_driver(op_name, kernel_name, ptx)
 
     reqntid = parse_reqntid(ptx)
     _LOGGER.debug(

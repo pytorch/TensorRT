@@ -139,24 +139,6 @@ def register_once(register_fn):
         pass
 
 
-def cutile_max_ptx_version():
-    """``max_ptx_version`` cuTile registrations need here, or None if unneeded.
-
-    cutile_op reports an ISA the driver cannot load rather than silently
-    lowering the header, so on a host whose driver is older than the cuda-tile
-    toolchain every registration must opt in explicitly. Tests mirror what a
-    user on such a host has to do.
-    """
-    from torch_tensorrt.kernels import _cutile
-
-    try:
-        # Capping is a no-op when the driver is at least as new as the
-        # toolchain, so the ceiling is always the right thing to pass.
-        return _cutile.driver_max_ptx_version()
-    except Exception:
-        return None
-
-
 def assert_ran_in_engine(trt_module, op_name: str) -> None:
     """Fail unless the op was actually lowered into a TensorRT engine.
 

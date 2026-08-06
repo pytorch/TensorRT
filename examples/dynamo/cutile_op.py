@@ -31,13 +31,6 @@ import torch_tensorrt.kernels as ttk
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--min_block_size", type=int, default=1)
-parser.add_argument(
-    "--max_ptx_version",
-    type=int,
-    default=None,
-    help="PTX ISA to pin, e.g. 91. Only needed when registration reports that "
-    "the driver cannot load the ISA cuda-tile emitted.",
-)
 ARGS, _ = parser.parse_known_args()
 
 # %%
@@ -101,12 +94,6 @@ ttk.cutile_op(
     constants={"tile_size": TILE_SIZE},
     eager_fn=add_one_eager,
     supports_dynamic_shapes=True,
-    # ``max_ptx_version`` is deliberately not set. When the CUDA driver is older
-    # than the cuda-tile toolchain, registration fails here with an error naming
-    # the ISA the driver does accept, rather than quietly rewriting the PTX
-    # header — pass that value as ``max_ptx_version=`` once you have checked it
-    # is safe for your kernel.
-    max_ptx_version=ARGS.max_ptx_version,
 )
 
 
