@@ -42,7 +42,6 @@ class TestNativeGroupNormConverter(DispatchTestCase):
         self.run_test(
             GroupNorm(),
             inputs,
-            precision=torch.half,
             use_dynamo_tracer=True,
             enable_passes=True,
         )
