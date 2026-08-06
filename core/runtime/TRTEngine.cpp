@@ -797,19 +797,35 @@ bool TRTEngine::bind_nccl_comm() {
   // When group_name is empty (e.g. engine loaded from a serialized
   // ExportedProgram where the Python TorchTensorRTModule wrapper was
   // inlined and set_group_name() was never called), auto-resolve the
-  // process group from the c10d registry.  PyTorch assigns sequential
-  // numeric names ("0", "1", ...) to process groups; probe until we
-  // find one with an NCCL backend.
+  // process group from the c10d registry.
   if (this->group_name.empty() && this->requires_native_multidevice) {
-    // PyTorch assigns sequential numeric names ("0", "1", ...) to process
-    // groups.  Collect every group that has an NCCL backend; we can only
-    // auto-resolve when there is exactly one — if there are several (TP+DP,
-    // Megatron 4-D parallelism, etc.) we cannot know which group this engine
-    // belongs to and the caller must pin it explicitly.
+    // PyTorch assigns numeric names ("0", "1", ...) via a monotonically
+    // increasing group_count counter:
+    //   - init_process_group()                      → always numeric
+    //   - new_group(use_local_synchronization=False) → numeric (default)
+    //   - new_group(use_local_synchronization=True)  → hashed name, but
+    //     still increments group_count, leaving a gap in numeric names
+    //     (e.g. "0", gap at "1", "2" for the next new_group()).
+    //
+    // In PyTorch 2.x, resolve_process_group throws c10::Error for missing
+    // group names instead of returning nullptr (previous behaviour). We catch
+    // and continue (not break) so gaps from use_local_synchronization=True
+    // don't stop us from finding numeric groups beyond the gap.
+    //
+    // We collect all numeric groups with an NCCL backend. Auto-resolution
+    // is only possible when exactly one is found. If multiple exist (e.g.
+    // world group + TP subgroup in a TP+DP setup), we cannot know which
+    // group this engine's collectives belong to — the caller must pin
+    // explicitly via distributed_context(group, model).
     std::vector<std::string> nccl_groups;
     for (int i = 0; i < 20; ++i) {
       auto candidate = std::to_string(i);
-      auto probe = c10d::resolve_process_group(candidate);
+      c10::intrusive_ptr<c10d::ProcessGroup> probe;
+      try {
+        probe = c10d::resolve_process_group(candidate);
+      } catch (const c10::Error&) {
+        continue; // gap in numeric names — keep probing
+      }
       if (probe != nullptr && probe->getBackendType() == c10d::ProcessGroup::BackendType::NCCL) {
         nccl_groups.push_back(candidate);
       }
@@ -842,7 +858,14 @@ bool TRTEngine::bind_nccl_comm() {
 
   // Soft-return when the process group isn't available yet (e.g. at engine
   // construction time when the caller hasn't called dist.init_process_group()).
-  auto pg = c10d::resolve_process_group(this->group_name);
+  // resolve_process_group throws c10::Error in newer PyTorch when the group
+  // doesn't exist (previously returned nullptr) — treat the exception as absent.
+  c10::intrusive_ptr<c10d::ProcessGroup> pg;
+  try {
+    pg = c10d::resolve_process_group(this->group_name);
+  } catch (const c10::Error&) {
+    pg = nullptr;
+  }
   if (pg == nullptr) {
     LOG_DEBUG("ProcessGroup '" << this->group_name << "' not yet registered in c10d; NCCL bind deferred.");
     return false;
