@@ -53,13 +53,13 @@ def test_schema_mixed_scalar():
 
 
 def test_overrides_forward_to_registrar(monkeypatch):
-    """Override kwargs land on register_cuda_python_plugin with the right values."""
+    """Override kwargs land on register_qdp_plugin with the right values."""
     from torch_tensorrt.kernels import _derive, _register
 
     captured = {}
     monkeypatch.setattr(
         _register,
-        "register_cuda_python_plugin",
+        "register_qdp_plugin",
         lambda *a, **k: captured.update(k),
     )
     # Skip the real NVRTC compile — we're testing wiring, not codegen.
@@ -115,7 +115,7 @@ def test_override_missing_required_dsl_field(kwargs, match):
 
 
 def test_precompiled_ptx_skips_nvrtc(monkeypatch):
-    """register_cuda_python_plugin(precompiled_ptx=...) must not call compile_to_ptx."""
+    """register_qdp_plugin(precompiled_ptx=...) must not call compile_to_ptx."""
     from torch_tensorrt.kernels import _nvrtc, _register
     from torch_tensorrt.kernels._cuda_python_spec import CudaPythonSpec
 
@@ -142,7 +142,7 @@ def test_precompiled_ptx_skips_nvrtc(monkeypatch):
     def _meta(x: torch.Tensor) -> torch.Tensor:
         return torch.empty_like(x)
 
-    _register.register_cuda_python_plugin(
+    _register.register_qdp_plugin(
         op_name="ttk_test::ptx_reused",
         spec=spec,
         meta_fn=_meta,

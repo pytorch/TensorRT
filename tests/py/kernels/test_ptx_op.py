@@ -23,7 +23,7 @@ def test_ptx_op_forwards_precompiled_ptx(monkeypatch):
     captured = {}
     monkeypatch.setattr(
         _register,
-        "register_cuda_python_plugin",
+        "register_qdp_plugin",
         lambda *a, **k: captured.update(k),
     )
 
@@ -53,7 +53,7 @@ def test_ptx_op_kernel_name_lands_on_spec(monkeypatch):
     captured = {}
     monkeypatch.setattr(
         _register,
-        "register_cuda_python_plugin",
+        "register_qdp_plugin",
         lambda *a, **k: captured.update(k),
     )
 

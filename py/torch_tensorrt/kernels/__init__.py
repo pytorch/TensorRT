@@ -22,6 +22,12 @@ The module exposes a single registration entry point for source kernels:
     Useful when the PTX comes from an external compiler (Triton, a cached
     NVRTC output, etc.).
 
+``cutile_op`` — register a ``@ct.kernel`` cuTile program. Compiles the kernel
+    to PTX for you, reorders its parameters from cuTile's per-array
+    ``(ptr, extents..., strides...)`` layout into TensorRT's launch order, and
+    derives the AOT launch — so you only supply the array ``signature``, the
+    ``ct.Constant`` values, a ``grid``, and a ``meta_fn``.
+
 Minimal example — declarative ``cuda_kernel_op``::
 
     import torch, torch_tensorrt
@@ -65,7 +71,7 @@ from torch_tensorrt.kernels._dsl import (
     SameAs,
     ScalarInput,
 )
-from torch_tensorrt.kernels._ops import cuda_kernel_op, ptx_op
+from torch_tensorrt.kernels._ops import cuda_kernel_op, cutile_op, ptx_op
 
 __all__ = [
     "Custom",
@@ -80,5 +86,6 @@ __all__ = [
     "SameAs",
     "ScalarInput",
     "cuda_kernel_op",
+    "cutile_op",
     "ptx_op",
 ]
