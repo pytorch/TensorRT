@@ -160,11 +160,16 @@ def _generate_plugin_converter(
         )
         layer.name = f"[{target}]-[{name}]"
         # Single-output ops expect a bare ITensor; multi-output ops expect a
-        # tuple so the downstream ``getitem`` converter can unpack it.
-        num_outputs = len(torch_schema.returns)
-        if num_outputs == 1:
+        # tuple so the downstream ``getitem`` converter can unpack it.  Use
+        # ``layer.num_outputs`` rather than ``len(torch_schema.returns)`` —
+        # the schema reports 1 even for multi-output ops declared with a
+        # ``Tensor[]`` return type (e.g. ops auto-registered by
+        # ``tta.custom_plugin``), but the FX graph still emits ``getitem``s
+        # against a tuple.  ``layer.num_outputs`` reflects the actual plugin
+        # port count and matches either declaration style.
+        if layer.num_outputs == 1:
             return layer.get_output(0)
-        return tuple(layer.get_output(i) for i in range(num_outputs))
+        return tuple(layer.get_output(i) for i in range(layer.num_outputs))
 
     custom_kernel_converter = dynamo_tensorrt_converter(
         torch_overload,
