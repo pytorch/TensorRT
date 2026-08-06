@@ -12,6 +12,15 @@ config_setting(
 )
 
 config_setting(
+    name = "rtx_sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
+)
+
+config_setting(
     name = "rtx_win",
     constraint_values = [
         "@platforms//os:windows",
@@ -38,7 +47,8 @@ cc_library(
 cc_import(
     name = "nvinfer_lib",
     shared_library = select({
-        ":rtx_win": "bin/tensorrt_rtx_1_5.dll",
+        ":rtx_sbsa": "lib/libtensorrt_rtx.so",
+        ":rtx_win": "bin/tensorrt_rtx_1_6.dll",
         ":rtx_x86_64": "lib/libtensorrt_rtx.so",
     }),
     visibility = ["//visibility:private"],
@@ -47,7 +57,7 @@ cc_import(
 cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
-        ":rtx_win": "lib/tensorrt_rtx_1_5.lib",
+        ":rtx_win": "lib/tensorrt_rtx_1_6.lib",
     }),
     visibility = ["//visibility:private"],
 )
@@ -59,6 +69,7 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
     ] + select({
+        ":rtx_sbsa": ["@cuda//:cudart"],
         ":rtx_win": [
             "nvinfer_static_lib",
             "@cuda_win//:cudart",

@@ -9,7 +9,7 @@ RELEASE_CUDA_VERSION = {
     "tarball": ["cu130", "cu132"],
 }
 RELEASE_PYTHON_VERSION = {
-    "wheel": ["3.10", "3.11", "3.12", "3.13"],
+    "wheel": ["3.10", "3.11", "3.12", "3.13", "3.14"],
     "tarball": ["3.11"],
 }
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"

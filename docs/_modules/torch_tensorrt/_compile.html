@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=71a86b84"></script>
+    <script src="../../_static/documentation_options.js?v=a0a7db6e"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -480,6 +480,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
@@ -488,6 +489,7 @@ document.write(`
     <span class="n">Callable</span><span class="p">,</span>
     <span class="n">Dict</span><span class="p">,</span>
     <span class="n">List</span><span class="p">,</span>
+    <span class="n">Literal</span><span class="p">,</span>
     <span class="n">Optional</span><span class="p">,</span>
     <span class="n">Sequence</span><span class="p">,</span>
     <span class="n">Set</span><span class="p">,</span>
@@ -1144,7 +1146,9 @@ document.write(`
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">extra_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">,</span>
+    <span class="n">output_format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span>
+        <span class="s2">&quot;exported_program&quot;</span><span class="p">,</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">,</span> <span class="s2">&quot;aot_inductor&quot;</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1239,6 +1243,13 @@ document.write(`
 <span class="sd">                ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``</span>
 <span class="sd">                and is forwarded to ``to_executorch(config=...)`` to customize</span>
 <span class="sd">                ExecuTorch lowering (e.g. memory planning or device placement).</span>
+<span class="sd">                ``partitioners=`` appends caller partitioners after the TensorRT</span>
+<span class="sd">                partitioner, so ops TensorRT does not take can be routed to another</span>
+<span class="sd">                delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +</span>
+<span class="sd">                CUDA ``.pte``. See :ref:`the ExecuTorch save guide</span>
+<span class="sd">                &lt;executorch_save&gt;` for the ``CudaPartitioner`` recipe, its</span>
+<span class="sd">                export-time requirements (CUDA backend + nvcc), and the external</span>
+<span class="sd">                ``.ptd`` weight caveats.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
@@ -1413,7 +1424,7 @@ document.write(`
             <span class="s2">&quot;Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.jit.ScriptModule | torch.fx.GraphModule | torch.export.ExportedProgram.&quot;</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">ts</span><span class="p">:</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">output_format</span> <span class="o">==</span> <span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;exported_program&quot;</span><span class="p">,</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">]):</span>
+        <span class="k">if</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported&quot;</span>
             <span class="p">)</span>
@@ -1818,6 +1829,29 @@ document.write(`
     <span class="k">return</span> <span class="n">exp_program</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_external_tensor_data</span><span class="p">(</span><span class="n">executorch_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write an ExecuTorch program&#39;s external named tensor data (``.ptd``) next to the ``.pte``.</span>
+
+<span class="sd">    The CUDA (AOTInductor) backend emits its weights as external named data</span>
+<span class="sd">    (``save_data_externally``), which ExecuTorch serializes only via</span>
+<span class="sd">    ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not</span>
+<span class="sd">    persist it. So a partition that carries external weights (e.g. a</span>
+<span class="sd">    ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not</span>
+<span class="sd">    load. This writes the ``.ptd`` data file(s) into the ``.pte``&#39;s directory when</span>
+<span class="sd">    the program has any; the runtime must then be given those data file(s) (e.g.</span>
+<span class="sd">    via the ExecuTorch ``Module`` data-files argument) to load the weights.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Direct attribute access (no getattr default) so a future rename fails loud.</span>
+    <span class="k">if</span> <span class="n">executorch_program</span><span class="o">.</span><span class="n">_tensor_data</span><span class="p">:</span>
+        <span class="n">out_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">file_path</span><span class="p">))</span>
+        <span class="n">executorch_program</span><span class="o">.</span><span class="n">write_tensor_data_to_file</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Wrote external delegate weights (.ptd) to </span><span class="si">%s</span><span class="s2">; point the runtime&#39;s &quot;</span>
+            <span class="s2">&quot;data-files at this directory to load them.&quot;</span><span class="p">,</span>
+            <span class="n">out_dir</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_save_as_executorch</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Save an ExportedProgram (with TensorRT execute_engine nodes) as an ExecuTorch .pte file.</span>
 
@@ -1886,6 +1920,7 @@ document.write(`
     <span class="n">executorch_program</span> <span class="o">=</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;backend_config&quot;</span><span class="p">))</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
         <span class="n">executorch_program</span><span class="o">.</span><span class="n">write_to_file</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="n">_write_external_tensor_data</span><span class="p">(</span><span class="n">executorch_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_engine_constants_to_python</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="s2">&quot;ExportedProgram&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>

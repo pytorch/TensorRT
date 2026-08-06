@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=71a86b84"></script>
+    <script src="../_static/documentation_options.js?v=a0a7db6e"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -647,16 +647,16 @@ installation guide for those. Only the RTX-specific deltas are listed below.</p>
 <section id="rtx-specific-dependencies">
 <h3>RTX-Specific Dependencies<a class="headerlink" href="#rtx-specific-dependencies" title="Link to this heading">#</a></h3>
 <p>Download the TensorRT-RTX tarball from <a class="reference external" href="https://developer.nvidia.com/tensorrt-rtx">https://developer.nvidia.com/tensorrt-rtx</a>.
-Torch-TensorRT currently uses TensorRT-RTX version <strong>1.5.0.114</strong>.</p>
+Torch-TensorRT currently uses TensorRT-RTX version <strong>1.6.1.120</strong>.</p>
 <p>Once downloaded:</p>
 <p><strong>On Linux</strong>, add the tarball <code class="docutils literal notranslate"><span class="pre">lib</span></code> directory to <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is extracted in /your_local_download_path/TensorRT-RTX-1.5.0.114</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.5.0.114/lib:<span class="nv">$LD_LIBRARY_PATH</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is extracted in /your_local_download_path/TensorRT-RTX-1.6.1.120</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.6.1.120/lib:<span class="nv">$LD_LIBRARY_PATH</span>
 </pre></div>
 </div>
 <p><strong>On Windows</strong>, add the tarball <code class="docutils literal notranslate"><span class="pre">lib</span></code> directory to the system <code class="docutils literal notranslate"><span class="pre">PATH</span></code>:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.5.0.114</span>
-<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.5.0.114\lib&quot;</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.6.1.120</span>
+<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.6.1.120\lib&quot;</span>
 <span class="nb">echo</span><span class="w"> </span>%PATH%<span class="w"> </span><span class="p">|</span><span class="w"> </span>findstr<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
