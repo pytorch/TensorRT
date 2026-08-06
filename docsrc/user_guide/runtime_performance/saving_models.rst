@@ -277,6 +277,53 @@ must be pointed at those data files to load them.
     ``.pte`` into the same directory overwrites the blob and the first ``.pte``
     will fail to load. Save each coalesced model into its own directory.
 
+**ExecuTorch lowering options**
+
+When ``output_format="executorch"``, ``torch_tensorrt.save`` forwards the following
+keyword arguments to ExecuTorch's ``to_edge_transform_and_lower(...)``. They are
+only consulted for the ``executorch`` format; passing them with any other
+``output_format`` logs a warning and is otherwise ignored.
+
+* ``constant_methods`` — a ``dict`` of extra constant methods to embed in the
+  ``.pte`` (e.g. ``{"get_max_seq_len": 2048}`` for an LLM runner).
+* ``transform_passes`` — additional edge-dialect transform passes to run before
+  lowering.
+* ``compile_config`` — an ``EdgeCompileConfig``. When omitted, Torch-TensorRT
+  supplies a default with ``_check_ir_validity=False`` (the TensorRT
+  ``execute_engine`` placeholder graph does not pass edge-IR validation). A
+  caller-supplied config is forwarded **verbatim**, so if you pass your own and
+  your graph carries TensorRT engines, set ``_check_ir_validity=False`` explicitly.
+* ``backend_config`` — an ``ExecutorchBackendConfig`` forwarded to
+  ``to_executorch(...)``.
+* ``generate_etrecord`` — a ``bool`` (default ``False``). When ``True``, an
+  `ETRecord <https://pytorch.org/executorch/stable/etrecord.html>`_ is written
+  next to the ``.pte`` as ``<base>_etrecord.bin`` (e.g. ``trt.pte`` →
+  ``trt_etrecord.bin``) for use with the ExecuTorch Developer Tools ``Inspector``.
+
+.. code-block:: python
+
+    from executorch.exir import EdgeCompileConfig
+
+    torch_tensorrt.save(
+        trt_gm, "trt.pte", output_format="executorch",
+        retrace=False, arg_inputs=inputs,
+        constant_methods={"get_max_seq_len": 2048},
+        compile_config=EdgeCompileConfig(_check_ir_validity=False),
+        generate_etrecord=True,
+    )
+
+The ETRecord sidecar can be parsed back and paired with a runtime ETDump in the
+Developer Tools ``Inspector``:
+
+.. code-block:: python
+
+    from executorch.devtools import Inspector
+    from executorch.devtools.etrecord import parse_etrecord
+
+    etrecord = parse_etrecord("trt_etrecord.bin")
+    inspector = Inspector(etdump_path="etdump.etdp", etrecord=etrecord)
+    inspector.print_data_tabular()
+
 
 Saving torch.compile models
 -----------------------------

@@ -333,3 +333,272 @@ def test_lift_preserves_constant_dtype_device(dtype, device):
     # The source constant is a contiguous 3x3, so from_tensor must carry its real
     # (3, 1) stride onto the meta, not the old all-ones synthetic stride.
     assert val.stride() == torch.zeros(3, 3).stride()
+
+
+# --- save(output_format="executorch") forwards ExecuTorch lowering kwargs -------
+# to_edge_transform_and_lower accepts transform_passes / constant_methods /
+# compile_config / generate_etrecord; save() should forward each. compile_config
+# defaults to _check_ir_validity=False (the TRT engine placeholder graph fails edge
+# IR validation) when omitted, but a caller-supplied config is forwarded verbatim.
+# generate_etrecord persists a "<base>_etrecord.bin" next to the .pte.
+
+
+def _patch_executorch_lowering(monkeypatch, captured):
+    """Stub the ExecuTorch lowering + TRT-specific pre/post steps in _save_as_executorch
+    so the test exercises only kwarg forwarding. Returns nothing; fills `captured`."""
+    import executorch.exir as exir
+    import torch_tensorrt._compile as tc
+
+    class _FakeETRecord:
+        def save(self, path):
+            with open(path, "wb") as fh:
+                fh.write(b"etrecord")
+
+    class _FakeExec:
+        def write_to_file(self, f):
+            f.write(b"")
+
+        def get_etrecord(self):
+            return _FakeETRecord()
+
+    class _FakeEdge:
+        def to_executorch(self, config=None):
+            captured["backend_config"] = config
+            return _FakeExec()
+
+    def _fake_lower(exp_program, **kw):
+        captured.update(kw)
+        return _FakeEdge()
+
+    monkeypatch.setattr(exir, "to_edge_transform_and_lower", _fake_lower)
+    monkeypatch.setattr(tc, "_count_executorch_engine_nodes", lambda ep: 0)
+    monkeypatch.setattr(tc, "_replace_execute_engine_for_executorch", lambda ep: ep)
+    monkeypatch.setattr(tc, "_write_external_tensor_data", lambda prog, path: None)
+    # ENABLED_FEATURES is an immutable namedtuple; swap the whole module attribute.
+    monkeypatch.setattr(
+        tc, "ENABLED_FEATURES", types.SimpleNamespace(torch_tensorrt_runtime=True)
+    )
+
+
+@pytest.mark.unit
+def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+    from executorch.exir import EdgeCompileConfig
+
+    captured = {}
+    _patch_executorch_lowering(monkeypatch, captured)
+
+    sentinel_passes = [object()]
+    sentinel_methods = {"get_max_seq_len": 128}
+    caller_cfg = EdgeCompileConfig(_check_ir_validity=True)
+    out = str(tmp_path / "model.pte")
+
+    tc._save_as_executorch(
+        object(),
+        out,
+        partitioners=[],
+        compile_specs=[],
+        backend_config=None,
+        constant_methods=sentinel_methods,
+        transform_passes=sentinel_passes,
+        compile_config=caller_cfg,
+        generate_etrecord=True,
+    )
+
+    assert captured["transform_passes"] is sentinel_passes
+    assert captured["constant_methods"] is sentinel_methods
+    assert captured["generate_etrecord"] is True
+    # A caller-supplied compile_config is forwarded verbatim (explicit override
+    # respected, not overridden even though it sets _check_ir_validity=True).
+    assert captured["compile_config"] is caller_cfg
+    assert captured["compile_config"]._check_ir_validity is True
+    # ETRecord persisted next to the .pte per ET's "<base>_etrecord.bin" convention.
+    assert (tmp_path / "model_etrecord.bin").exists()
+
+
+@pytest.mark.unit
+def test_save_executorch_defaults_when_lowering_kwargs_omitted(monkeypatch, tmp_path):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+
+    captured = {}
+    _patch_executorch_lowering(monkeypatch, captured)
+
+    out = str(tmp_path / "model.pte")
+    tc._save_as_executorch(object(), out)
+
+    # Falls back to get_edge_compile_config() (also _check_ir_validity=False).
+    assert captured["compile_config"]._check_ir_validity is False
+    assert captured["transform_passes"] is None
+    assert captured["generate_etrecord"] is False
+    # No etrecord written when generate_etrecord is falsy.
+    assert not (tmp_path / "model_etrecord.bin").exists()
+
+
+# --- the same lowering kwargs flow through the *public* torch_tensorrt.save() -----
+# save() pops the ExecuTorch-only kwargs and forwards them to _save_as_executorch
+# from three dispatch branches: an ExportedProgram input, a GraphModule with
+# retrace=True (re-exported here), and a GraphModule with retrace=False (routed
+# through the dynamo exporter). Each must extract the options and forward them.
+
+
+class _AddOne(torch.nn.Module):
+    def forward(self, x):
+        return x + 1
+
+
+def _stub_save_as_executorch(monkeypatch):
+    """Capture the (module, file_path, kwargs) that save() forwards to
+    _save_as_executorch without running the real lowering."""
+    import torch_tensorrt._compile as tc
+
+    calls = []
+
+    def _fake(module, file_path, **kw):
+        calls.append({"module": module, "file_path": file_path, "kwargs": kw})
+
+    monkeypatch.setattr(tc, "_save_as_executorch", _fake)
+    return calls
+
+
+def _assert_lowering_kwargs_forwarded(kw, methods, passes, cfg):
+    assert kw["constant_methods"] is methods
+    assert kw["transform_passes"] is passes
+    assert kw["compile_config"] is cfg
+    assert kw["generate_etrecord"] is True
+    assert kw["partitioners"] == []
+    assert kw["compile_specs"] == []
+    assert kw["backend_config"] is None
+
+
+@pytest.mark.unit
+def test_public_save_forwards_lowering_kwargs_exported_program(monkeypatch, tmp_path):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt
+    from executorch.exir import EdgeCompileConfig
+
+    calls = _stub_save_as_executorch(monkeypatch)
+    methods = {"get_max_seq_len": 128}
+    passes = [object()]
+    cfg = EdgeCompileConfig(_check_ir_validity=False)
+    out = str(tmp_path / "ep.pte")
+
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    torch_tensorrt.save(
+        ep,
+        out,
+        output_format="executorch",
+        partitioners=[],
+        compile_specs=[],
+        backend_config=None,
+        constant_methods=methods,
+        transform_passes=passes,
+        compile_config=cfg,
+        generate_etrecord=True,
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["module"] is ep
+    _assert_lowering_kwargs_forwarded(calls[0]["kwargs"], methods, passes, cfg)
+
+
+@pytest.mark.unit
+def test_public_save_forwards_lowering_kwargs_graphmodule_retrace(
+    monkeypatch, tmp_path
+):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt
+    from executorch.exir import EdgeCompileConfig
+
+    calls = _stub_save_as_executorch(monkeypatch)
+    methods = {"get_max_seq_len": 128}
+    passes = [object()]
+    cfg = EdgeCompileConfig(_check_ir_validity=False)
+    out = str(tmp_path / "gm_retrace.pte")
+
+    gm = torch.export.export(_AddOne(), (torch.randn(2, 2),)).module()
+    torch_tensorrt.save(
+        gm,
+        out,
+        output_format="executorch",
+        retrace=True,
+        arg_inputs=(torch.randn(2, 2),),
+        partitioners=[],
+        compile_specs=[],
+        backend_config=None,
+        constant_methods=methods,
+        transform_passes=passes,
+        compile_config=cfg,
+        generate_etrecord=True,
+    )
+
+    assert len(calls) == 1
+    _assert_lowering_kwargs_forwarded(calls[0]["kwargs"], methods, passes, cfg)
+
+
+@pytest.mark.unit
+def test_public_save_forwards_lowering_kwargs_graphmodule_no_retrace(
+    monkeypatch, tmp_path
+):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt
+    import torch_tensorrt.dynamo._exporter as _exporter
+    from executorch.exir import EdgeCompileConfig
+
+    calls = _stub_save_as_executorch(monkeypatch)
+    # retrace=False routes through the dynamo exporter (TRT-specific graph surgery);
+    # stub it so the test isolates save()'s option extraction + forwarding.
+    sentinel_ep = object()
+    monkeypatch.setattr(_exporter, "export", lambda *a, **k: sentinel_ep)
+
+    methods = {"get_max_seq_len": 128}
+    passes = [object()]
+    cfg = EdgeCompileConfig(_check_ir_validity=False)
+    out = str(tmp_path / "gm_no_retrace.pte")
+
+    gm = torch.export.export(_AddOne(), (torch.randn(2, 2),)).module()
+    torch_tensorrt.save(
+        gm,
+        out,
+        output_format="executorch",
+        retrace=False,
+        partitioners=[],
+        compile_specs=[],
+        backend_config=None,
+        constant_methods=methods,
+        transform_passes=passes,
+        compile_config=cfg,
+        generate_etrecord=True,
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["module"] is sentinel_ep
+    _assert_lowering_kwargs_forwarded(calls[0]["kwargs"], methods, passes, cfg)
+
+
+@pytest.mark.unit
+def test_save_executorch_real_etrecord_is_inspector_consumable(tmp_path):
+    """A real lowering with generate_etrecord=True writes a sidecar that ExecuTorch's
+    devtools can parse back into an Inspector-consumable ETRecord."""
+    pytest.importorskip("executorch.exir")
+    pytest.importorskip("executorch.devtools")
+    import torch_tensorrt
+    from executorch.devtools.etrecord import parse_etrecord
+    from torch_tensorrt._features import ENABLED_FEATURES
+
+    if not ENABLED_FEATURES.torch_tensorrt_runtime:
+        pytest.skip("output_format='executorch' requires the torch_tensorrt runtime")
+
+    ep = torch.export.export(_AddOne(), (torch.randn(4, 4),))
+    out = str(tmp_path / "tiny.pte")
+    torch_tensorrt.save(ep, out, output_format="executorch", generate_etrecord=True)
+
+    etrecord_path = tmp_path / "tiny_etrecord.bin"
+    assert etrecord_path.exists()
+
+    record = parse_etrecord(str(etrecord_path))
+    assert record is not None
+    # The parsed record carries the edge-dialect program the Inspector correlates
+    # runtime events against.
+    assert getattr(record, "edge_dialect_program", None) is not None
