@@ -20,8 +20,41 @@ from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_reduce_scatter_op,
     tensorrt_fused_nccl_scatter_op,
 )
+from torch_tensorrt.dynamo.lowering.passes.fuse_pad_into_convolution import (
+    tensorrt_conv_asym_pad_op,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+@dynamo_tensorrt_converter(tensorrt_conv_asym_pad_op, supports_dynamic_shapes=True)
+def conv_asym_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
+    """Folded pad+conv with independent pre/post padding per spatial dim."""
+    del kwargs
+    source, weight, bias, stride, pre_padding, post_padding, dilation, groups = args
+    return impl.conv.convNd(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        is_conv1d=False,
+        input=source,
+        weight=weight,
+        bias=bias,
+        stride=stride,
+        padding=[0] * len(pre_padding),
+        dilation=dilation,
+        groups=groups,
+        pre_padding=pre_padding,
+        post_padding=post_padding,
+    )
+
 
 if ENABLED_FEATURES.native_trt_collectives:
     # Use native TensorRT DistCollective API (no TensorRT-LLM dependency)

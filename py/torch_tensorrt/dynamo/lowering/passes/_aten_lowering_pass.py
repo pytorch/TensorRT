@@ -16,6 +16,7 @@ from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
+from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .normalize_negative_slice_stop import normalize_negative_slice_stop
 from .pass_manager import DynamoPassManager
@@ -41,6 +42,7 @@ post_lowering_pass_list = [
     repair_input_as_output,
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
+    fuse_pad_into_convolution,
     remove_assert_nodes,
     remove_num_users_is_0_nodes,
     complex_graph_detection,

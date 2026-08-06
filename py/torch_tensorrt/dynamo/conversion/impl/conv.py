@@ -36,6 +36,8 @@ def convNd(
     output_padding: Union[int, Sequence[int]] = 0,
     scale: Optional[Union[torch.Tensor, float]] = None,
     zero_point: Optional[Union[torch.Tensor, float]] = None,
+    pre_padding: Optional[Sequence[int]] = None,
+    post_padding: Optional[Sequence[int]] = None,
 ) -> TRTTensor:
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for convolution."
@@ -159,7 +161,16 @@ def convNd(
         dilation = (dilation[0], 1) if dilation is not None else dilation
 
     # Set relevant attributes of convolution layer
-    if padding is not None:
+    if pre_padding is not None or post_padding is not None:
+        # Asymmetric padding (e.g. causal 3D conv) must use pre/post padding.
+        # Symmetric padding_nd cannot express (pad_before, 0) on a spatial dim.
+        if pre_padding is None or post_padding is None:
+            raise ValueError(
+                f"Convolution {name}: pre_padding and post_padding must both be set"
+            )
+        conv_layer.pre_padding = tuple(pre_padding)
+        conv_layer.post_padding = tuple(post_padding)
+    elif padding is not None:
         conv_layer.padding_nd = padding
     if stride is not None:
         conv_layer.stride_nd = stride
