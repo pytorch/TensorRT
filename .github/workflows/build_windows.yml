@@ -185,12 +185,58 @@ jobs:
           CUDA_INSTALLER_URL: https://packages.nvidia.com/prerelease/cuda/13.4.0/local_installers/cuda_13.4.0_windows_x86_64.exe
           CUDA_ROOT: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4
         run: |
+          function Write-CudaDiagnostic([string] $Phase) {
+            Write-Host "===== CUDA diagnostic: $Phase ====="
+            Write-Host "CUDA_ROOT=$env:CUDA_ROOT"
+            Get-ChildItem Env: | Where-Object { $_.Name -match '^CUDA' } | Sort-Object Name | Format-Table -AutoSize | Out-String | Write-Host
+            foreach ($path in @($env:CUDA_ROOT, (Join-Path $env:CUDA_ROOT "include"), (Join-Path $env:CUDA_ROOT "lib"), (Join-Path $env:CUDA_ROOT "lib\\arm64"))) {
+              Write-Host "Directory summary: $path"
+              if (Test-Path -LiteralPath $path -PathType Container) {
+                Get-ChildItem -LiteralPath $path -Force | Format-Table -AutoSize | Out-String | Write-Host
+                $files = @(Get-ChildItem -LiteralPath $path -File -Recurse -ErrorAction SilentlyContinue)
+                Write-Host "File count: $($files.Count); total bytes: $(($files | Measure-Object -Property Length -Sum).Sum)"
+                $files | Group-Object Extension | Sort-Object Count -Descending | Select-Object -First 20 Name, Count | Format-Table -AutoSize | Out-String | Write-Host
+              } else {
+                Write-Host "Directory does not exist."
+              }
+            }
+            $headers = @(Get-ChildItem -LiteralPath $env:CUDA_ROOT -Filter "cuda_runtime_api.h" -File -Recurse -ErrorAction SilentlyContinue)
+            Write-Host "cuda_runtime_api.h matches: $($headers.Count)"
+            $headers | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String | Write-Host
+            Get-ChildItem -Path "HKLM:\\SOFTWARE\\NVIDIA Corporation\\GPU Computing Toolkit\\CUDA" -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty -Path $_.PSPath } | Format-List * | Out-String | Write-Host
+            Write-Host "===== End CUDA diagnostic: $Phase ====="
+          }
+          Write-CudaDiagnostic -Phase "before installation"
           $installer = Join-Path $env:RUNNER_TEMP "cuda_13.4.0_windows_x86_64.exe"
           Invoke-WebRequest -Uri $env:CUDA_INSTALLER_URL -OutFile $installer
+          $installerItem = Get-Item -LiteralPath $installer
+          Write-Host "Downloaded CUDA installer: $($installerItem.FullName); size=$($installerItem.Length); SHA256=$((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash)"
           $process = Start-Process -FilePath $installer -ArgumentList "-s" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "CUDA 13.4 installer failed with exit code $($process.ExitCode)" }
+          Write-Host "CUDA installer exit code: $($process.ExitCode)"
+          if ($process.ExitCode -ne 0) {
+            Write-CudaDiagnostic -Phase "failed installation"
+            throw "CUDA 13.4 installer failed with exit code $($process.ExitCode)"
+          }
+          Write-CudaDiagnostic -Phase "after installation"
           $cudaArm64Lib = Join-Path $env:CUDA_ROOT "lib\arm64\cudart.lib"
           if (-not (Test-Path -LiteralPath $cudaArm64Lib -PathType Leaf)) { throw "CUDA 13.4 ARM64 target library was not installed: $cudaArm64Lib" }
+          $cudaInclude = Join-Path $env:CUDA_ROOT "include"
+          $cudaRuntimeHeader = Join-Path $cudaInclude "cuda_runtime_api.h"
+          if (-not (Test-Path -LiteralPath $cudaRuntimeHeader -PathType Leaf)) {
+            Write-Host "CUDA root contents ($env:CUDA_ROOT):"
+            if (Test-Path -LiteralPath $env:CUDA_ROOT -PathType Container) {
+              Get-ChildItem -LiteralPath $env:CUDA_ROOT -Force | Format-Table -AutoSize | Out-String | Write-Host
+            } else {
+              Write-Host "CUDA root directory does not exist."
+            }
+            Write-Host "CUDA include contents ($cudaInclude):"
+            if (Test-Path -LiteralPath $cudaInclude -PathType Container) {
+              Get-ChildItem -LiteralPath $cudaInclude -Force | Format-Table -AutoSize | Out-String | Write-Host
+            } else {
+              Write-Host "CUDA include directory does not exist."
+            }
+            throw "CUDA 13.4 headers were not installed. Expected $cudaRuntimeHeader. The Windows ARM64 cross-build requires the CUDA include directory as well as lib\\arm64\\cudart.lib."
+          }
           "CUDA_PATH=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           (Join-Path $env:CUDA_ROOT "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
