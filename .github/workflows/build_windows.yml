@@ -193,6 +193,7 @@ jobs:
           if (-not (Test-Path -LiteralPath $cudaArm64Lib -PathType Leaf)) { throw "CUDA 13.4 ARM64 target library was not installed: $cudaArm64Lib" }
           "CUDA_PATH=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TORCHTRT_CROSS_COMPILE_CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           (Join-Path $env:CUDA_ROOT "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - uses: ./test-infra/.github/actions/set-channel
       - name: Set PYTORCH_VERSION

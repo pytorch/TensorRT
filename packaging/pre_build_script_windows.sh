@@ -26,7 +26,12 @@ INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${TORCH_INDEX_CU_VERSION}
 # rediscover a half-removed torch dist-info through the original C:\ path.
 python -m pip install --pre "${TORCH}" --index-url "${INDEX_URL}" || exit 1
 
-export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
+if [[ -n "${TORCHTRT_CROSS_COMPILE_CUDA_HOME:-}" ]]; then
+  export CUDA_HOME="${TORCHTRT_CROSS_COMPILE_CUDA_HOME//\\//}"
+else
+  export CUDA_HOME="${CUDA_PATH//\\//}"
+fi
+
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__).replace('\\\\', '/'))")" || exit 1
 
 # tried with conda install -c conda-forge fmt -y, but build still failed in windows with the following error:
