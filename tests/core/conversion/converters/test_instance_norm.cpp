@@ -28,6 +28,13 @@ constexpr auto graph = R"IR(
         return (%4)
 )IR";
 
+// The aten::instance_norm converter is implemented with a TensorRT plugin, which TensorRT-RTX
+// does not provide, so aten::instance_norm is left unregistered for RTX builds (see
+// core/conversion/converters/impl/batch_norm.cpp). All three tests below share the same
+// aten::instance_norm graph, so all three are guarded -- the first two additionally carry an
+// unconditional GTEST_SKIP() that is unrelated to RTX.
+#ifndef TRT_MAJOR_RTX
+
 TEST(Converters, ATenInstanceNormConvertsCorrectly) {
   GTEST_SKIP();
   auto g = std::make_shared<torch::jit::Graph>();
@@ -103,3 +110,5 @@ TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
+
+#endif // TRT_MAJOR_RTX
