@@ -323,6 +323,15 @@ def export(
     )
 
     if constant_methods is not None:
+        invalid = [
+            name
+            for name in constant_methods
+            if not isinstance(name, str) or not name.isidentifier()
+        ]
+        if invalid:
+            raise ValueError(
+                f"constant_methods keys must be valid Python identifiers: {invalid}"
+            )
         collisions = set(constant_methods) & set(method_names)
         if collisions:
             raise ValueError(

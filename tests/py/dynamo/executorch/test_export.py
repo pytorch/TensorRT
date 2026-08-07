@@ -788,6 +788,32 @@ def test_export_accepts_per_method_partitioner_instances(monkeypatch):
 
 
 @pytest.mark.unit
+def test_export_rejects_invalid_constant_method_names(monkeypatch):
+    """Constant-method names are baked into the .pte, so reject unusable ones."""
+    export_module, lower = _patch_lowering(monkeypatch)
+
+    for bad_name in ("not an identifier", "1_leading_digit", ""):
+        with pytest.raises(ValueError, match="valid Python identifiers"):
+            export_module.export(FakeExportedProgram(), constant_methods={bad_name: 1})
+
+    with pytest.raises(ValueError, match="valid Python identifiers"):
+        export_module.export(FakeExportedProgram(), constant_methods={42: 1})
+
+    lower.assert_not_called()
+
+
+@pytest.mark.unit
+def test_export_accepts_valid_constant_method_names(monkeypatch):
+    export_module, lower = _patch_lowering(monkeypatch)
+
+    export_module.export(
+        FakeExportedProgram(), constant_methods={"get_vocab_size": 256}
+    )
+
+    assert lower.call_args.kwargs["constant_methods"] == {"get_vocab_size": 256}
+
+
+@pytest.mark.unit
 def test_export_normalizes_mapping_transform_passes_to_dict(monkeypatch):
     """ExecuTorch dispatches per-method passes on isinstance(passes, dict).
 
