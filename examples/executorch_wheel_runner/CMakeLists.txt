@@ -58,9 +58,9 @@ endif()
 # The CUDA delegate ships in the accelerator wheel. Device-side input allocation
 # additionally needs the CUDA toolkit headers, so it is only compiled in when both
 # the delegate and the toolkit are present.
-if(TARGET executorch::cuda_backend)
+if(TARGET executorch::backend_cuda)
     target_link_libraries(
-        executorch_wheel_runner PRIVATE executorch::cuda_backend
+        executorch_wheel_runner PRIVATE executorch::backend_cuda
     )
     find_package(CUDAToolkit QUIET)
     if(TARGET CUDA::cudart)
