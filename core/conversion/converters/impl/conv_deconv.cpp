@@ -294,7 +294,9 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     deconv->setStrideNd(stride);
     deconv->setPrePadding(begPadding);
     deconv->setPostPadding(padding);
-#if NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1)
+// TensorRT-RTX reports NV_TENSORRT_MAJOR == 1, so the plain version comparison below would
+// select the pre-7.1 fallback and reject grouped or dilated deconvolutions that RTX supports.
+#if defined(TRT_MAJOR_RTX) || NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1)
     deconv->setDilationNd(dilation);
     deconv->setNbGroups(groups);
 #else
