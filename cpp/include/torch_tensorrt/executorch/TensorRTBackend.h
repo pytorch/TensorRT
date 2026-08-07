@@ -59,6 +59,21 @@ struct EngineHandle {
   std::vector<size_t> cached_output_sizes;
   size_t num_inputs = 0;
   size_t num_outputs = 0;
+  // Per output binding [0..num_outputs): index into input_binding_names of the
+  // input it aliases (in-place KV-cache / user alias), or -1 for a normal output.
+  // Built at init from the blob's aliased_io. The KV buffers are threaded by
+  // ExecuTorch as caller-owned mutable-buffer delegate args (input AND aliased
+  // output): execute() binds each aliased TRT output binding to its aliased
+  // input's caller-provided pointer (in-place) and reflects the result into the
+  // delegate output EValue (a no-op when the memory planner already aliased the
+  // two -> zero-copy).
+  std::vector<int> output_aliased_input_idx;
+  // Per input binding [0..num_inputs): true if any output aliases this input, so
+  // its in-place (KV/user) update must land in the caller-owned storage. Built at
+  // init from aliased_io; execute() uses it to reject a non-device-resident
+  // aliased input instead of silently staging its update into delegate scratch.
+  std::vector<bool> input_is_alias_target;
+  size_t num_aliased_outputs = 0;
   int device_id = 0;
   bool unified_memory = false;
   std::mutex mu;

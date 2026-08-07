@@ -103,3 +103,30 @@ Loading the method initializes the TensorRT ExecuTorch backend for any
 Torch-TensorRT delegate subgraphs embedded in the `.pte`. The Python
 `torch_tensorrt` package is needed when exporting the `.pte`; it is not needed
 by this native runner at inference time.
+
+## Caller-Owned KV-Cache Persistence Check
+
+`kv_cache_decode_check` is a small self-asserting runner for a caller-owned
+KV-cache decode `.pte` (its aliased KV output is bound in place to the caller's
+mutable buffer, which persists across `execute()` calls).
+
+Export a minimal single-layer decode model:
+
+```bash
+python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
+  --model_path=kv_cache_decode.pte
+```
+
+The same CMake build produces the check runner (`kv_cache_decode_check`
+target). Run it:
+
+```bash
+./build-executorch-reference-runner/kv_cache_decode_check --model_path=kv_cache_decode.pte
+```
+
+It loads the method twice (each starting from a zeroed cache) and runs a decode
+at `input_pos=1` once with no prior step and once after a step at `input_pos=0`.
+Because the causal attention at position 1 covers positions 0..1, the two logits
+differ only if the KV written at position 0 persisted across `execute()` calls.
+The runner prints `[kv-check] PASS` and returns 0 on success, or fails if the
+two are identical (the update did not persist). It requires a CUDA device.

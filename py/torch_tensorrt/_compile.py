@@ -1113,6 +1113,26 @@ def save(
                         strict=False,
                     )
 
+                # Aliased-I/O (e.g. KV-cache) buffer mutations are only declared for
+                # the executorch path (via _declare_aliased_kv_mutations_on_ep); the
+                # other retrace=True formats save the program with the mutation absent
+                # from its signature. The engine still mutates in place at runtime, but
+                # exported_program consumers that trust the signature see a wrong
+                # contract, and whether an aliased in-place mutation survives
+                # functionalization under aot_inductor is unverified. Warn loudly.
+                if output_format in ("exported_program", "aot_inductor") and any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.named_modules()
+                ):
+                    logger.warning(
+                        "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                        "but output_format=%r does not declare those aliased outputs as "
+                        "buffer mutations. The saved program's signature will not reflect "
+                        "the in-place update. Aliased I/O is only fully supported with "
+                        "output_format='executorch'.",
+                        output_format,
+                    )
+
                 if output_format == "exported_program":
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
@@ -1134,6 +1154,13 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
+                    from torch_tensorrt.dynamo._exporter import (
+                        _declare_aliased_kv_mutations_on_ep,
+                    )
+
+                    # retrace=True: torch.export truncates the engines' aliased KV
+                    # outputs, so declare them as buffer mutations before lowering.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
                         file_path,

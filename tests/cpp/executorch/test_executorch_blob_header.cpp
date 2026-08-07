@@ -107,6 +107,48 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsMissingIoBindingsMetadata) {
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
 }
 
+TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIo) {
+  const std::string metadata = R"({"io_bindings":[{"name":"in_k","is_input":true},{"name":"out_k","is_input":false},)"
+                               R"({"name":"in_u","is_input":true},{"name":"out_u","is_input":false}],)"
+                               R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"},)"
+                               R"({"output":"out_u","input":"in_u","kind":"user"}],)"
+                               R"("hardware_compatible":false,"device_id":0})";
+  const auto blob = make_blob(metadata);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+
+  ASSERT_EQ(header.aliased_io.size(), 2u);
+  EXPECT_EQ(header.aliased_io[0].output, "out_k");
+  EXPECT_EQ(header.aliased_io[0].input, "in_k");
+  EXPECT_EQ(header.aliased_io[0].kind, "kv_cache_update");
+  EXPECT_EQ(header.aliased_io[1].output, "out_u");
+  EXPECT_EQ(header.aliased_io[1].input, "in_u");
+  EXPECT_EQ(header.aliased_io[1].kind, "user");
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, DefaultsMissingAliasedIo) {
+  // Blobs written before aliased_io existed omit the key; parsing must still
+  // succeed and leave aliased_io empty (backward compatible).
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+                R"("hardware_compatible":false,"device_id":0})");
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.aliased_io.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ParsesEmptyAliasedIo) {
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+                R"("aliased_io":[],"hardware_compatible":false,"device_id":0})");
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.aliased_io.empty());
+}
+
 } // namespace
 } // namespace executorch_backend
 } // namespace torch_tensorrt

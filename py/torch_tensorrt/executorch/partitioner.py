@@ -39,6 +39,28 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _keep_mutated_buffers_above_delegate(exported_program: ExportedProgram) -> None:
+    """Undo tag_constant_data freezing a delegate-mutated buffer as constant.
+
+    tag_constant_data detects a mutated buffer only via its *direct* users, so a
+    buffer whose mutation is produced inside the delegate (the mutation is a
+    getitem off the call_delegate, not a direct user of the buffer placeholder)
+    is misclassified as constant data and tagged into the delegate. A TensorRT
+    engine is stateless across executions, so an absorbed mutable buffer would be
+    a frozen constant (the KV-cache update would be lost). Strip the delegation
+    tag from any buffer that is a mutation target so it stays a caller-owned
+    mutable buffer owned above the delegate.
+    """
+    sig = exported_program.graph_signature
+    mutated_buffer_targets = set(sig.buffers_to_mutate.values())
+    for node in exported_program.graph_module.graph.nodes:
+        if (
+            node.op == "placeholder"
+            and sig.inputs_to_buffers.get(node.name) in mutated_buffer_targets
+        ):
+            node.meta.pop("delegation_tag", None)
+
+
 class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
     """Partitions the graph for TensorRT delegation.
 
@@ -140,6 +162,7 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
                 )
 
         tag_constant_data(exported_program)
+        _keep_mutated_buffers_above_delegate(exported_program)
 
         return PartitionResult(
             tagged_exported_program=exported_program,
