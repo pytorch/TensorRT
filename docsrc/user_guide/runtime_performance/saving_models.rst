@@ -270,9 +270,50 @@ inspect the delegated graph, add metadata, or control final memory planning:
 engine-bearing ``ExportedProgram``, or a mapping of independently exported
 methods. It always applies the TensorRT partitioner first, followed by caller
 ``partitioners`` in order, and returns ExecuTorch's native
-``EdgeProgramManager``. Method mappings preserve independent entry points but
-do not imply shared mutable state. Use ``save`` for the one-shot path where
-Torch-TensorRT manages Edge lowering, finalization, and persistence.
+``EdgeProgramManager``. Use ``save`` for the one-shot path where Torch-TensorRT
+manages Edge lowering, finalization, and persistence.
+
+**Several methods in one .pte**
+
+Pass a mapping of method name to ``ExportedProgram`` to keep independent entry
+points, such as a separate prefill and decode, in one program. Give each method
+its own partitioner instances: a partitioner can carry method-specific state (an
+ExecuTorch backend bakes the method name into the delegation spec it builds in
+its constructor), so reusing one instance across methods is rejected.
+
+.. code-block:: python
+
+    edge = torch_tensorrt.executorch.export(
+        {"prefill": prefill_program, "decode": decode_program},
+        partitioners={
+            "prefill": [CudaPartitioner([])],
+            "decode": [CudaPartitioner([])],
+        },
+    )
+
+Each method is validated before any program is rewritten, so an error in one
+method leaves the others untouched. A method mapping preserves independent entry
+points but does not by itself give them shared mutable state.
+
+.. warning::
+
+    **The returned Edge program shares weight and engine storage with the
+    programs you passed in.** Only structure is copied: the graph, the graph
+    signature, the ``state_dict`` keys, and node metadata. Tensor and TensorRT
+    engine contents are shared by reference, which is what keeps a multi-gigabyte
+    engine from being duplicated.
+
+    Two consequences to plan for:
+
+    * A transform pass must not modify a shared payload in place. An in-place
+      edit such as ``weight.data.mul_(scale)`` changes the program you passed in,
+      and every other Edge program exported from it. Build a new tensor and
+      rebind it instead of mutating the existing one.
+    * Modifying a source program after calling ``export`` is also visible in the
+      Edge program. Finish preparing a program before exporting it.
+
+    Neither case raises an error or a warning, so treat every shared payload as
+    read-only.
 
 **Coalesced TensorRT + CUDA .pte**
 
