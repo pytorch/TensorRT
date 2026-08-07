@@ -31,7 +31,7 @@ target_link_libraries(executorch_wheel_runner PRIVATE executorch::runtime)
 # need to know where the wheel puts its libraries or how to keep a
 # registration-only library on the link line. Each target is optional, because
 # the same runner checks a plain CPU wheel where no delegate is installed.
-foreach(_component threadpool kernels xnnpack_backend)
+foreach(_component threadpool kernels_optimized backend_xnnpack)
     if(TARGET executorch::${_component})
         target_link_libraries(
             executorch_wheel_runner PRIVATE executorch::${_component}
