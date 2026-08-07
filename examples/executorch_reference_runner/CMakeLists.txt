@@ -60,4 +60,4 @@ target_link_libraries(
     executorch::backends
     executorch::extensions
     executorch::kernels
-    torchtrt::executorch_backend)
+    torchtrt::backend_tensorrt)

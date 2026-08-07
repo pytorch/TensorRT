@@ -1,0 +1,67 @@
+@PACKAGE_INIT@
+
+# Package config for the ExecuTorch TensorRT delegate.
+#
+# A C++ application that wants to run a .pte containing TensorRT partitions needs
+# three things: the ExecuTorch runtime, the TensorRT libraries, and this delegate.
+# The delegate registers itself from a static initializer, so the application
+# never references any of its symbols directly. Consuming it through an imported
+# target keeps that link correct without the application knowing the details.
+
+include(CMakeFindDependencyMacro)
+
+# The delegate resolves the ExecuTorch runtime at load time, so a consumer needs the same
+# runtime package this was built against. The version found at build time is recorded here
+# so a prefix that resolves a different ExecuTorch is refused at configure time rather
+# than producing a delegate paired with a runtime it cannot work with.
+set(_torchtrt_executorch_build_version "@TORCHTRT_EXECUTORCH_VERSION@")
+if(_torchtrt_executorch_build_version)
+  # EXACT because there is no promise of a stable C++ ABI across ExecuTorch
+  # releases. A newer same-major runtime would satisfy an inexact request and then
+  # fail to load the delegate, so the version this was built against is required
+  # rather than preferred.
+  find_dependency(executorch "${_torchtrt_executorch_build_version}" EXACT CONFIG)
+else()
+  find_dependency(executorch CONFIG)
+endif()
+unset(_torchtrt_executorch_build_version)
+
+include("${CMAKE_CURRENT_LIST_DIR}/torchtrtExecuTorchTargets.cmake")
+
+# The export set names the concrete library. Offer the stable name consumers use,
+# so an application does not depend on which of the two library flavors it got.
+if(NOT TARGET torchtrt::backend_tensorrt)
+    if(TARGET torchtrt::backend_tensorrt_shared)
+        # The delegate is useful because a static initializer registers the
+        # backend. Nothing in an application references a symbol from it, so a
+        # normal link drops it and the backend is never registered. The target
+        # carries the retention itself, so the documented two-line usage is
+        # enough and a consumer does not have to know this.
+        #
+        # The library goes inside the single option: a SHELL: string would split
+        # on spaces, and separate options repeat identical text that CMake
+        # de-duplicates, which would unscope every library after the first.
+        if(NOT (APPLE OR MSVC))
+            set_property(
+                TARGET torchtrt::backend_tensorrt_shared
+                APPEND
+                PROPERTY
+                    INTERFACE_LINK_OPTIONS
+                    "LINKER:--push-state,--no-as-needed,$<TARGET_FILE:torchtrt::backend_tensorrt_shared>,--pop-state"
+            )
+        elseif(APPLE)
+            set_property(
+                TARGET torchtrt::backend_tensorrt_shared
+                APPEND
+                PROPERTY
+                    INTERFACE_LINK_OPTIONS
+                    "SHELL:LINKER:-force_load,$<TARGET_FILE:torchtrt::backend_tensorrt_shared>"
+            )
+        endif()
+        add_library(torchtrt::backend_tensorrt ALIAS
+                    torchtrt::backend_tensorrt_shared
+        )
+    endif()
+endif()
+
+check_required_components(torch_tensorrt_executorch)

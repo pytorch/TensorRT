@@ -143,9 +143,9 @@ genrule(
 )
 
 genrule(
-    name = "executorch_trt_backend_archive",
+    name = "executorch_backend_tensorrt_archive",
     srcs = ["//cpp:tensorrt_executorch_backend"],
-    outs = ["libexecutorch_trt_backend.a"],
+    outs = ["libexecutorch_backend_tensorrt.a"],
     cmd = """
 set -e
 for f in $(locations //cpp:tensorrt_executorch_backend); do
@@ -159,15 +159,15 @@ exit 1
 )
 
 alias(
-    name = "executorch_trt_backend",
-    actual = ":executorch_trt_backend_archive",
+    name = "executorch_backend_tensorrt",
+    actual = ":executorch_backend_tensorrt_archive",
 )
 
 pkg_files(
     name = "executorch_lib_pkg_files",
     srcs = [
         ":executorch_core_archive",
-        ":executorch_trt_backend_archive",
+        ":executorch_backend_tensorrt_archive",
     ],
     prefix = "lib/",
     visibility = ["//visibility:public"],
