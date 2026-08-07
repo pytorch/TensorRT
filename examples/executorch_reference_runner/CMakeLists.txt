@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.24)
 project(my_runner LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -28,6 +28,9 @@ set(TORCHTRT_EXECUTORCH_SOURCE_DIR
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_PYBIND OFF CACHE BOOL "" FORCE)
+# Keep this reference runner libtorch-free. The Torch-TensorRT backend builds
+# only ExecuTorch's minimal shared caller-stream extension from source below.
+set(EXECUTORCH_BUILD_CUDA OFF CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_MODULE ON CACHE BOOL "" FORCE)

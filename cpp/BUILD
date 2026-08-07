@@ -141,11 +141,13 @@ cc_library(
     ] + select({
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
             "@cuda//:cudart",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
             "@cuda//:cudart",
             "@tensorrt_sbsa//:nvinfer",
         ],
