@@ -259,6 +259,7 @@ Platform-specific Installation
 
    jetpack
    tensorrt_rtx
+   windows_arm64
 
 
 

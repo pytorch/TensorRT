@@ -11,6 +11,9 @@ bazel_dep(name = "rules_python", version = "1.3.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
+cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
+use_repo(cc_configure, "local_config_cc")
+
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     ignore_root_user_error = True,
@@ -94,6 +97,13 @@ new_local_repository(
     path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.2/",
 )
 
+# supposedly cuda 13.4 on windows x86 preview has everything required for cross compile for windows on arm
+new_local_repository(
+    name = "cuda_win_arm64",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/",
+)
+
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 ####################################################################################
@@ -161,6 +171,16 @@ http_archive(
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
     urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-win-shared-with-deps-latest.zip"],
+)
+
+# Pinned Windows ARM64 PyTorch wheel used by the RTX cross-build.
+http_archive(
+    name = "libtorch_win_arm64",
+    build_file = "@//third_party/libtorch:BUILD",
+    sha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200",
+    strip_prefix = "torch",
+    type = "zip",
+    urls = ["https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.14.0.dev20260728%2Bcu134-cp313-cp313-win_arm64.whl"],
 )
 
 http_archive(
@@ -239,5 +259,14 @@ http_archive(
     strip_prefix = "TensorRT-RTX-1.6.1.120",
     urls = [
         "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-amd64-cuda-13.4-Release-external.zip",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_rtx_win_arm64",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.6.1.120",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-arm64-cuda-13.4-Release-external.zip",
     ],
 )

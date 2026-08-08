@@ -64,8 +64,20 @@ config_setting(
 )
 
 config_setting(
-    name = "rtx_win",
+    name = "rtx_win_x86_64",
     constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "rtx_win_arm64",
+    constraint_values = [
+        "@platforms//cpu:arm64",
         "@platforms//os:windows",
     ],
     flag_values = {
@@ -126,6 +138,7 @@ cc_library(
     hdrs = [
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
     ],
+    strip_include_prefix = "include",
     # Build the TensorRT backend as a static library. The final application
     # links this target together with the ExecuTorch runtime it was compiled
     # against, avoiding any runtime plugin/dlopen dependency.
@@ -134,19 +147,18 @@ cc_library(
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    strip_include_prefix = "include",
     deps = [
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
     ] + select({
         ":linux_x86_64": [
-            "@executorch//:executorch_headers",
             "@cuda//:cudart",
+            "@executorch//:executorch_headers",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
-            "@executorch//:executorch_headers",
             "@cuda//:cudart",
+            "@executorch//:executorch_headers",
             "@tensorrt_sbsa//:nvinfer",
         ],
         "//conditions:default": [],
