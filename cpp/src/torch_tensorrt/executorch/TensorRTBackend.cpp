@@ -51,6 +51,15 @@ using ::executorch::runtime::Span;
 namespace {
 thread_local cudaStream_t g_user_stream = nullptr;
 thread_local bool g_user_stream_set = false;
+
+extern const Error kRegistrationResult;
+
+Error check_registration() {
+  if (kRegistrationResult != Error::Ok) {
+    ET_LOG(Error, "TensorRTBackend registration failed: %s", ::executorch::runtime::to_string(kRegistrationResult));
+  }
+  return kRegistrationResult;
+}
 } // namespace
 
 CudaStreamGuard::CudaStreamGuard(cudaStream_t stream) : prev_stream_(g_user_stream), prev_set_(g_user_stream_set) {
@@ -209,6 +218,10 @@ bool is_cuda_accessible_ptr(const void* ptr) {
 // is_available
 // ---------------------------------------------------------------------------
 bool TensorRTBackend::is_available() const {
+  if (check_registration() != Error::Ok) {
+    return false;
+  }
+
   TRTLogger logger;
   TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
   return runtime != nullptr;
@@ -226,6 +239,11 @@ Result<DelegateHandle*> TensorRTBackend::init(
     FreeableBuffer* processed,
     ArrayRef<CompileSpec> compile_specs) const {
   (void)compile_specs;
+
+  const Error registration_result = check_registration();
+  if (registration_result != Error::Ok) {
+    return registration_result;
+  }
 
   TORCHTRT_ET_CHECK_NOT_NULL(processed, Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
   TORCHTRT_ET_CHECK_NOT_NULL(processed->data(), Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
@@ -642,14 +660,18 @@ void TensorRTBackend::destroy(DelegateHandle* handle) const {
 // Static registration – links the name "TensorRTBackend" used in the .pte
 // file to this implementation at program startup.
 // ---------------------------------------------------------------------------
+namespace torch_tensorrt {
+namespace executorch_backend {
 namespace {
 
-torch_tensorrt::executorch_backend::TensorRTBackend& get_backend() {
+TensorRTBackend& get_backend() {
   static torch_tensorrt::executorch_backend::TensorRTBackend backend;
   return backend;
 }
 
 const ::executorch::runtime::Backend kBackendId{"TensorRTBackend", &get_backend()};
-const auto kRegistered = ::executorch::runtime::register_backend(kBackendId);
+const Error kRegistrationResult = ::executorch::runtime::register_backend(kBackendId);
 
 } // namespace
+} // namespace executorch_backend
+} // namespace torch_tensorrt

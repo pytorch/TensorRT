@@ -1,4 +1,4 @@
-name: ExecuTorch Static Linux Build
+name: ExecuTorch Delegate Linux Test
 
 on:
   workflow_call:
@@ -56,45 +56,39 @@ jobs:
           print("matrix=" + json.dumps({"include": [preferred]}))
           PY
 
-  build:
+  test:
     needs: select-matrix
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: executorch-static-build
+      job-name: executorch-runtime-test
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.select-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
-      fail-on-empty: false
+      additional-artifact: torch-tensorrt-executorch-runtime
       script: |
         set -euo pipefail
-        BAZELISK_VERSION="1.26.0"
-        case "$(uname -m)" in
-          aarch64|arm64)
-            BAZEL_PLATFORM="arm64"
-            ;;
-          x86_64|amd64)
-            BAZEL_PLATFORM="amd64"
-            ;;
-          *)
-            echo "Unsupported Bazelisk platform: $(uname -m)"
-            exit 1
-            ;;
-        esac
         mkdir -p "${RUNNER_TEMP}/bin"
-        curl -L "https://github.com/bazelbuild/bazelisk/releases/download/v${BAZELISK_VERSION}/bazelisk-linux-${BAZEL_PLATFORM}" \
+        curl -L "https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-amd64" \
           -o "${RUNNER_TEMP}/bin/bazel"
         chmod +x "${RUNNER_TEMP}/bin/bazel"
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
-        bazel --version
 
-        # this is to build the libtorchtrt.tar.gz
+        python -m pip install pyyaml executorch
+        python -c 'from torch_tensorrt_executorch_runtime import get_runtime; assert get_runtime().backend_registry.is_available("TensorRTBackend")'
+
+        source tests/py/utils/ci_helpers.sh
+        trt_tier_executorch
+
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
-        # this is to verify the end user's workflow
-        python -m pip install pyyaml "executorch>=1.3.1"
-        .github/scripts/verify-executorch-reference-runner.sh
+        python examples/torchtrt_executorch_example/export_static_shape.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
+        .github/scripts/verify-executorch-reference-runner.sh \
+          "${RUNNER_TEMP}/torchtrt-python.pte"
+        python examples/executorch_reference_runner/load_model.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1
