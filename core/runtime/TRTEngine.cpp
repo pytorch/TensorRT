@@ -292,6 +292,10 @@ TRTEngine::TRTEngine(
   // engines built outside Torch-TensorRT). User-declared aliases (kind=kUser)
   // are preserved as-is since TRT doesn't know about them.
   this->aliased_io = aliased_io;
+// ICudaEngine::getAliasedInputTensor is not available before TRT 10.15 (e.g. Jetpack
+// L4T builds), where an engine cannot report its aliasing and the build-time map is
+// the only source of truth.
+#if NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 15)
   for (const auto& out_name : this->out_binding_names) {
     // TRT returns nullptr / empty string for non-aliased outputs; any thrown
     // exception is a real error in the engine state and propagates.
@@ -315,6 +319,7 @@ TRTEngine::TRTEngine(
       it->second = AliasedIOSpec{std::string(aliased_in), AliasKind::kKVCacheUpdate};
     }
   }
+#endif
 
   // Precompute the set of input binding names that are the alias source of some
   // output (for the O(1) per-call membership test) and validate every aliased
