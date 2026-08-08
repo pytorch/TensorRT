@@ -22,8 +22,11 @@ import logging
 from typing import Optional, Tuple
 
 import numpy as np
+import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import (
     AliasedOutput,
     AliasKind,
@@ -34,9 +37,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl import select
-
-import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
+from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 logger = logging.getLogger(__name__)
 
@@ -215,8 +217,36 @@ def slice_scatter(
     target_shape[dim] = len(indices_np)
     indices_np = indices_np.reshape(target_shape)
     src_shape = tuple(src.shape)
-    indices_np = np.broadcast_to(indices_np, src_shape).astype(np.int64)
-    indices_tensor = get_trt_tensor(ctx, indices_np, name + "_fallback_indices")
+    if DYNAMIC_DIM in src_shape:
+        indices_tensor = get_trt_tensor(ctx, indices_np, name + "_fallback_indices")
+        runtime_src_shape = []
+        for axis, size in enumerate(src_shape):
+            if axis == dim % rank:
+                runtime_src_shape.append(len(indices_np))
+            elif size == DYNAMIC_DIM:
+                runtime_src_shape.append(
+                    get_shape(
+                        ctx,
+                        target,
+                        source_ir,
+                        name + f"_fallback_src_shape_{axis}",
+                        src,
+                        axis,
+                    )
+                )
+            else:
+                runtime_src_shape.append(size)
+        indices_tensor = impl.slice.expand(
+            ctx,
+            target,
+            source_ir,
+            name + "_fallback_indices_expand",
+            indices_tensor,
+            tuple(runtime_src_shape),
+        )
+    else:
+        indices_np = np.broadcast_to(indices_np, src_shape).astype(np.int64)
+        indices_tensor = get_trt_tensor(ctx, indices_np, name + "_fallback_indices")
 
     return select.scatter(
         ctx,
