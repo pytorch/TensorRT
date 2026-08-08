@@ -68,7 +68,7 @@ class Program:
 def load(path: Union[str, Path]) -> Program:
     """Load a `.pte` with the delegate-enabled ExecuTorch Python runtime.
 
-    External `.pdf` weight files are not supported; weights must be embedded
+    External `.ptd` weight files are not supported; weights must be embedded
     in the `.pte` file.
     """
     model_path = Path(path)

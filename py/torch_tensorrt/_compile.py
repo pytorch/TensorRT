@@ -793,7 +793,7 @@ def save(
                 CUDA ``.pte``. See :ref:`the ExecuTorch save guide
                 <executorch_save>` for the ``CudaPartitioner`` recipe, its
                 export-time requirements (CUDA backend + nvcc), and the external
-                ``.pdf`` weight caveats.
+                ``.ptd`` weight caveats.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -1373,14 +1373,14 @@ def _replace_execute_engine_for_executorch(exp_program: Any) -> Any:
 
 
 def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None:
-    """Write an ExecuTorch program's external named tensor data (``.pdf``) next to the ``.pte``.
+    """Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.
 
     The CUDA (AOTInductor) backend emits its weights as external named data
     (``save_data_externally``), which ExecuTorch serializes only via
     ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not
     persist it. So a partition that carries external weights (e.g. a
     ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not
-    load. This writes the ``.pdf`` data file(s) into the ``.pte``'s directory when
+    load. This writes the ``.ptd`` data file(s) into the ``.pte``'s directory when
     the program has any; the runtime must then be given those data file(s) (e.g.
     via the ExecuTorch ``Module`` data-files argument) to load the weights.
     """
@@ -1389,7 +1389,7 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
         out_dir = os.path.dirname(os.path.abspath(file_path))
         executorch_program.write_tensor_data_to_file(out_dir)
         logger.info(
-            "Wrote external delegate weights (.pdf) to %s; point the runtime's "
+            "Wrote external delegate weights (.ptd) to %s; point the runtime's "
             "data-files at this directory to load them.",
             out_dir,
         )
