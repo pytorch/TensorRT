@@ -66,6 +66,15 @@ def _kv_eligible(
     return True, f"eligible (s_max={s_max}, write_start={start}, len={update_len})"
 
 
+def has_kv_cache_update(net: trt.INetworkDefinition) -> bool:
+    """Whether this TensorRT build can emit a KV-cache update layer.
+
+    The layer and its mode enum arrived together in TensorRT 10.15, and the write
+    through an aliased input depends on both, so probe them as one capability.
+    """
+    return hasattr(net, "add_kv_cache_update") and hasattr(trt, "KVCacheMode")
+
+
 def input_binding_name(ctx: ConversionContext, tensor: TRTTensor) -> Optional[str]:
     """If ``tensor`` is a direct network input, return its binding name, else None."""
     for i in range(ctx.net.num_inputs):
@@ -96,6 +105,18 @@ def emit_kv_cache_update_layer(
     if cache_input_name is None:
         logger.debug("KV cache update: skipped — input is not a direct network input")
         return None
+
+    # The cache is a network input being written in place, so falling back to the
+    # functional scatter would compute the right value and never write it back. That
+    # is worse than failing, so refuse instead of returning None here.
+    if not has_kv_cache_update(ctx.net):
+        raise RuntimeError(
+            f"Writing in place to the network input '{cache_input_name}' needs the "
+            "TensorRT KV-cache update layer, which was added in TensorRT 10.15. This "
+            "build does not have it, and without it the write would be computed and "
+            "then discarded. Use TensorRT 10.15 or newer, or return the updated "
+            "tensor instead of writing into an input."
+        )
 
     layer = ctx.net.add_kv_cache_update(
         cache, src, write_indices, trt.KVCacheMode.LINEAR

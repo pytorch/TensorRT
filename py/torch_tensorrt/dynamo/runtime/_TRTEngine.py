@@ -665,9 +665,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         Also enforces that aliased outputs are incompatible with the dynamic
         output allocator, and recomputes ``aliased_input_binding_names``.
         """
-        for out_name in self.out_binding_names:
+        # TensorRT older than 10.15 has no getAliasedInputTensor, so an engine cannot
+        # report aliasing and the deserialized map stands as-is. Only the loop below is
+        # engine-driven; everything after it must still run, because user-declared
+        # aliases exist independently of the API.
+        report_aliasing = getattr(self.cuda_engine, "get_aliased_input_tensor", None)
+        for out_name in self.out_binding_names if report_aliasing else ():
             # TRT returns None / empty string for non-aliased outputs.
-            aliased_in = self.cuda_engine.get_aliased_input_tensor(out_name)
+            aliased_in = report_aliasing(out_name)
             if not aliased_in:
                 continue
             existing = self.aliased_io.get(out_name)

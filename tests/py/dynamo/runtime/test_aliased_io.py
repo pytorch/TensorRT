@@ -26,6 +26,7 @@ also honors aliasing by binding the aliased output to the source input's
 storage; :class:`TestPythonRuntimeAliasedIO` exercises that path directly.
 """
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.export import export
@@ -335,6 +336,95 @@ class TestPythonRuntimeAliasedIO(TestCase):
         self.assertAlmostEqual(cache.sum().item(), 64.0, places=3)
         engine.execute(self._ordered_inputs(engine, cache, torch.ones_like(upd) * 5.0))
         self.assertAlmostEqual(cache.sum().item(), 320.0, places=3)
+
+
+class TestMissingAliasingApi(TestCase):
+    """TensorRT older than 10.15 has no getAliasedInputTensor and no KV-cache
+    update layer. Reconciliation is the only consumer of the first, so a model
+    without aliasing must still work; a mutated buffer cannot be preserved
+    without the second, so it has to raise rather than lose the write."""
+
+    def test_model_without_aliasing_still_compiles(self):
+        original = getattr(trt.ICudaEngine, "get_aliased_input_tensor", None)
+        if original is not None:
+            del trt.ICudaEngine.get_aliased_input_tensor
+        try:
+
+            class Plain(torch.nn.Module):
+                def __init__(self):
+                    super().__init__()
+                    self.fc = torch.nn.Linear(8, 8)
+
+                def forward(self, x):
+                    return torch.relu(self.fc(x))
+
+            inputs = (torch.randn(2, 8).cuda(),)
+            model = Plain().eval().cuda()
+            compiled = torch_tensorrt.dynamo.compile(
+                export(model, inputs),
+                inputs=list(inputs),
+                min_block_size=1,
+                truncate_double=True,
+            )
+            with torch.no_grad():
+                torch.testing.assert_close(compiled(*inputs), model(*inputs))
+        finally:
+            if original is not None:
+                trt.ICudaEngine.get_aliased_input_tensor = original
+
+    def test_mutated_buffer_is_refused(self):
+        original = getattr(trt.INetworkDefinition, "add_kv_cache_update", None)
+        if original is not None:
+            del trt.INetworkDefinition.add_kv_cache_update
+        try:
+
+            class Stateful(torch.nn.Module):
+                def __init__(self):
+                    super().__init__()
+                    self.register_buffer("cache", torch.zeros(2, 8))
+
+                def forward(self, x):
+                    self.cache.copy_(x)
+                    return x + self.cache
+
+            inputs = (torch.randn(2, 8).cuda(),)
+            model = Stateful().eval().cuda()
+            with self.assertRaisesRegex(RuntimeError, "mutates module state"):
+                torch_tensorrt.dynamo.compile(
+                    export(model, inputs),
+                    inputs=list(inputs),
+                    min_block_size=1,
+                    truncate_double=True,
+                )
+        finally:
+            if original is not None:
+                trt.INetworkDefinition.add_kv_cache_update = original
+
+    def test_user_input_write_is_refused(self):
+        original = getattr(trt.INetworkDefinition, "add_kv_cache_update", None)
+        if original is not None:
+            del trt.INetworkDefinition.add_kv_cache_update
+        try:
+
+            class WritesItsInput(torch.nn.Module):
+                def forward(self, cache, update):
+                    cache[:, :, 3:4, :] = update
+                    return cache.sum()
+
+            cache = torch.zeros(1, 2, 8, 4).cuda()
+            update = torch.full((1, 2, 1, 4), 7.0).cuda()
+            model = WritesItsInput().eval().cuda()
+            with self.assertRaisesRegex(RuntimeError, "KV-cache update layer"):
+                torch_tensorrt.dynamo.compile(
+                    export(model, (cache, update)),
+                    inputs=[cache, update],
+                    min_block_size=1,
+                    truncate_double=True,
+                    use_python_runtime=True,
+                )
+        finally:
+            if original is not None:
+                trt.INetworkDefinition.add_kv_cache_update = original
 
 
 if __name__ == "__main__":

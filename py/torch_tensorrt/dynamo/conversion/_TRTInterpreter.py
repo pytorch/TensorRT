@@ -515,8 +515,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # string for non-aliased outputs; any raised exception is a real
         # error in the engine and propagates.
         engine_aliased_io: Dict[str, Tuple[str, str]] = dict(self._aliased_io)
-        for out_name in self._output_names:
-            aliased_in = cuda_engine.get_aliased_input_tensor(out_name)
+        # TensorRT older than 10.15 has no getAliasedInputTensor, so an engine cannot
+        # report aliasing and the build-time records are the only source of truth.
+        report_aliasing = getattr(cuda_engine, "get_aliased_input_tensor", None)
+        for out_name in self._output_names if report_aliasing else ():
+            aliased_in = report_aliasing(out_name)
             if aliased_in:
                 # Engine-reported aliasing is always KV-cache-update origin
                 # (the only TRT-enforced aliasing API in 10.x).

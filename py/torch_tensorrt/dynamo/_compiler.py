@@ -9,6 +9,7 @@ import warnings
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
+import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
 from torch.export.graph_signature import InputKind
@@ -39,6 +40,9 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import fn_supports_debugger
+from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
+    has_kv_cache_update,
+)
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -419,6 +423,28 @@ def cross_compile_for_windows(
     return trt_gm
 
 
+def _refuse_lift_without_kv_cache_update(
+    lifted_buffers: Sequence[Tuple[str, str, torch.Tensor]],
+) -> None:
+    """Refuse a lifted mutable buffer when the engine cannot write it back.
+
+    Lifting drops the writeback copy because the engine is expected to write through
+    the aliased input. Without the KV-cache update layer that never happens, and the
+    mutation would be lost with no error at all.
+    """
+    if not lifted_buffers:
+        return
+    if has_kv_cache_update(trt.INetworkDefinition):
+        return
+    names = ", ".join(sorted(buffer_name for _, buffer_name, _ in lifted_buffers))
+    raise RuntimeError(
+        f"This model mutates module state ({names}), which needs the TensorRT "
+        "KV-cache update layer to preserve. That layer was added in TensorRT 10.15 "
+        "and this build does not have it. Use TensorRT 10.15 or newer, or keep the "
+        "stateful part of the model outside TensorRT."
+    )
+
+
 def compile(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -792,6 +818,7 @@ def compile(
     # module-held cache). Returns a fresh GraphModule whose forward signature
     # reflects the new placeholders.
     gm, lifted_buffers = lift_mutated_buffers(gm)
+    _refuse_lift_without_kv_cache_update(lifted_buffers)
     if lifted_buffers:
         # Append each lifted buffer as an engine input AFTER the user inputs.
         # Buffer tensors live on the gm's state; prepare an Input spec for
@@ -2005,6 +2032,7 @@ def convert_exported_program_to_serialized_trt_engine(
     lifted_buffers: List[Tuple[str, str, torch.Tensor]] = []
     if lift_mutable_buffers:
         gm, lifted_buffers = lift_mutated_buffers(gm)
+        _refuse_lift_without_kv_cache_update(lifted_buffers)
         if lifted_buffers:
             buffer_tensors = [t for _, _, t in lifted_buffers]
             buffer_inputs = prepare_inputs(buffer_tensors)
