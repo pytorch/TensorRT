@@ -751,19 +751,30 @@ def _declare_aliased_kv_mutations_on_ep(
     ]
 
     # Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer): lift
-    # appended each buffer's new-value as a trailing user output; torch.export kept them as the
-    # last num_copyback outputs. Reclassify those from USER_OUTPUT to BUFFER_MUTATION
-    # so ET copies them back to the caller-owned buffers.
+    # appended each buffer's new-value as a trailing user output. torch.export usually
+    # leaves them as the last outputs, but when it recognises the mutation itself it
+    # declares them BUFFER_MUTATION and moves them to the front, because the verifier
+    # requires mutations to precede user outputs. Taking the tail unconditionally then
+    # reclassifies a real user output as a buffer mutation, and the runtime later fails
+    # copying that output into a buffer of a different shape. Reclassify only the buffers
+    # the program does not already declare as mutated.
     copyback_getitems: List[torch.fx.Node] = []
     copyback_specs: List[OutputSpec] = []
     remaining_specs = orig_specs
-    if num_copyback:
-        copyback_getitems = list(out_args[-num_copyback:])
-        remaining_args = out_args[:-num_copyback]
-        remaining_specs = orig_specs[:-num_copyback]
+    already_mutated = {
+        spec.target
+        for spec in orig_specs
+        if spec.kind == OutputKind.BUFFER_MUTATION and isinstance(spec.target, str)
+    }
+    pending_copyback = [buf for buf in copyback_buffers if buf not in already_mutated]
+    if pending_copyback:
+        num_pending = len(pending_copyback)
+        copyback_getitems = list(out_args[-num_pending:])
+        remaining_args = out_args[:-num_pending]
+        remaining_specs = orig_specs[:-num_pending]
         copyback_specs = [
             OutputSpec(OutputKind.BUFFER_MUTATION, TensorArgument(name=g.name), buf)
-            for g, buf in zip(copyback_getitems, copyback_buffers)
+            for g, buf in zip(copyback_getitems, pending_copyback)
             if isinstance(g, torch.fx.Node)
         ]
         out_args = remaining_args
@@ -783,7 +794,7 @@ def _declare_aliased_kv_mutations_on_ep(
     # user outputs remain. Rebuild the top-level out_spec (mirroring
     # create_trt_exp_program) so to_edge's unflatten sees the right leaf count.
     module_call_graph = exp_program.module_call_graph
-    if num_copyback and module_call_graph:
+    if copyback_specs and module_call_graph:
         new_out_spec = pytree.tree_flatten(tuple(out_args))[1]
         _e0 = module_call_graph[0]
         _sig0 = _e0.signature

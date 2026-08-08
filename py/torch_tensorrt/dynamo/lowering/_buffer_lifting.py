@@ -28,14 +28,43 @@ This module provides:
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 
 logger = logging.getLogger(__name__)
 
 
-def _kv_write_will_alias(value_node: object, cache_shape: Tuple[int, ...]) -> bool:
+def _write_is_excluded_from_tensorrt(
+    value_node: object,
+    settings: Optional[CompilationSettings] = None,
+) -> bool:
+    """Whether the caller kept this buffer write out of TensorRT.
+
+    An excluded write stays in PyTorch and is claimed by whichever other backend
+    partitions the graph, so TensorRT must leave the buffer alone. Lifting it would
+    move the mutation across a delegate boundary, which ExecuTorch cannot express.
+    """
+    if settings is None or not settings.torch_executed_ops:
+        return False
+    if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
+        return False
+    from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
+
+    excluded = set(settings.torch_executed_ops)
+    target = value_node.target
+    return (
+        ConverterRegistry.qualified_name_or_str(target) in excluded
+        or target in excluded
+    )
+
+
+def _kv_write_will_alias(
+    value_node: object,
+    cache_shape: Tuple[int, ...],
+    settings: Optional[CompilationSettings] = None,
+) -> bool:
     """Whether the converter will emit an ``IKVCacheUpdateLayer`` (with in-place
     aliased I/O) for this mutated buffer's new-value node.
 
@@ -49,6 +78,12 @@ def _kv_write_will_alias(value_node: object, cache_shape: Tuple[int, ...]) -> bo
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
         return False
     args = value_node.args
+    # An op the caller excluded from TensorRT never reaches a converter, so it
+    # cannot emit an IKVCacheUpdateLayer and the engine will not alias it. Without
+    # this the write is classified as engine-aliased, its copy_ is dropped, and
+    # compile() later fails its own aliased_io cross-check.
+    if _write_is_excluded_from_tensorrt(value_node, settings):
+        return False
     # The KV layer aliases the cache only if it is a direct network input; after
     # lifting, the mutated buffer is a placeholder the write op reads from.
     if not (
@@ -123,6 +158,7 @@ def assert_predicted_kv_aliased(
 
 def lift_mutated_buffers(
     gm: torch.fx.GraphModule,
+    settings: Optional[CompilationSettings] = None,
 ) -> Tuple[torch.fx.GraphModule, List[Tuple[str, str, torch.Tensor]]]:
     """Lift each mutated buffer from a ``get_attr`` to a ``placeholder``.
 
@@ -204,6 +240,14 @@ def lift_mutated_buffers(
 
     for copy_node, get_attr_node in mutation_pairs:
         buffer_name = get_attr_node.target
+        new_value_probe = copy_node.args[1] if len(copy_node.args) > 1 else None
+        if _write_is_excluded_from_tensorrt(new_value_probe, settings):
+            logger.debug(
+                "lift_mutated_buffers: %s is written by an op excluded from "
+                "TensorRT; leaving it to the other backend",
+                buffer_name,
+            )
+            continue
         # A get_attr target is fully qualified, so a buffer owned by a submodule
         # arrives as "layers.0.self_attn.kv_cache.k_cache". getattr does not walk a
         # dotted path, so it reports every nested buffer as missing; get_buffer
@@ -264,7 +308,9 @@ def lift_mutated_buffers(
         # BUFFER_MUTATION output below, then drop the (now input-target) copy_.
         new_value = copy_node.args[1] if len(copy_node.args) > 1 else None
         if isinstance(new_value, torch.fx.Node):
-            if _kv_write_will_alias(new_value, tuple(buffer_tensor.shape)):
+            if _kv_write_will_alias(
+                new_value, tuple(buffer_tensor.shape), settings
+            ):
                 predicted_kv_bindings.add(replacement.name)
             else:
                 copyback.append((new_value, buffer_name))

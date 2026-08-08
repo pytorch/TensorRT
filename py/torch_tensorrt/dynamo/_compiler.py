@@ -816,7 +816,7 @@ def compile(
     # prerequisite for IKVCacheUpdateLayer / aliased I/O to fire on a
     # module-held cache). Returns a fresh GraphModule whose forward signature
     # reflects the new placeholders.
-    gm, lifted_buffers = lift_mutated_buffers(gm)
+    gm, lifted_buffers = lift_mutated_buffers(gm, settings)
     _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
     _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
     if lifted_buffers:
@@ -2084,7 +2084,7 @@ def convert_exported_program_to_serialized_trt_engine(
     # in the order returned here.
     lifted_buffers: List[Tuple[str, str, torch.Tensor]] = []
     if lift_mutable_buffers:
-        gm, lifted_buffers = lift_mutated_buffers(gm)
+        gm, lifted_buffers = lift_mutated_buffers(gm, settings)
         if lifted_buffers:
             buffer_tensors = [t for _, _, t in lifted_buffers]
             buffer_inputs = prepare_inputs(buffer_tensors)
