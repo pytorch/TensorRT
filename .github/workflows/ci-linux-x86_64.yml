@@ -131,6 +131,9 @@ jobs:
   executorch-runtime-test:
     needs: [decide, generate-matrix, executorch-runtime-build]
     if: >-
+      always() &&
+      needs.decide.result == 'success' &&
+      needs.generate-matrix.result == 'success' &&
       needs.decide.outputs.lane != 'skip' &&
       needs.decide.outputs.backend != 'rtx' &&
       needs.executorch-runtime-build.result == 'success'

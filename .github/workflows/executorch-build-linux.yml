@@ -56,7 +56,7 @@ jobs:
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       fail-on-empty: false
-      upload-artifact: torch-tensorrt-executorch-runtime
+      upload-artifact: torch-tensorrt-executorch-runtime-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ inputs.architecture }}
       script: |
         set -euo pipefail
         BAZELISK_VERSION="1.26.0"

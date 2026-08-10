@@ -55,7 +55,7 @@ jobs:
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
-      additional-artifact: torch-tensorrt-executorch-runtime
+      additional-artifact: torch-tensorrt-executorch-runtime-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ inputs.architecture }}
       script: |
         set -euo pipefail
         mkdir -p "${RUNNER_TEMP}/bin"
