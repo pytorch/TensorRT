@@ -25,39 +25,27 @@ on:
         type: string
 
 jobs:
-  select-matrix:
+  filter-matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.pick.outputs.matrix }}
+      matrix: ${{ steps.generate.outputs.matrix }}
     steps:
-      - id: pick
-        env:
-          FULL_MATRIX: ${{ inputs.build-matrix }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/checkout@v6
+      - name: Filter matrix
+        id: generate
         run: |
-          set -euo pipefail
-          python - <<'PY' >> "${GITHUB_OUTPUT}"
-          import json
-          import os
-
-          matrix = json.loads(os.environ["FULL_MATRIX"])
-          include = matrix.get("include", [])
-          if not include:
-              raise SystemExit("build-matrix include[] is empty")
-
-          preferred = None
-          for entry in include:
-              if entry.get("python_version") == "3.11":
-                  preferred = entry
-                  break
-
-          if preferred is None:
-              preferred = include[0]
-
-          print("matrix=" + json.dumps({"include": [preferred]}))
-          PY
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(inputs.build-matrix) }}
+          LIMIT_PR=${{ (github.event_name == 'push' || github.event_name == 'schedule') && 'false' || 'true' }}
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx false --limit-pr-builds "${LIMIT_PR}" --matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   test:
-    needs: select-matrix
+    needs: filter-matrix
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: executorch-runtime-test
@@ -65,7 +53,7 @@ jobs:
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
-      build-matrix: ${{ needs.select-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       additional-artifact: torch-tensorrt-executorch-runtime
       script: |
