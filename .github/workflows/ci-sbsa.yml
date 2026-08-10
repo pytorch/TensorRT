@@ -7,8 +7,8 @@ name: CI SBSA
 # RTX channels build @tensorrt_rtx_sbsa via USE_TRT_RTX=1.)
 
 on:
-  #pull_request:
-    #types: [opened, synchronize, reopened, labeled]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
   pull_request_review:
     types: [submitted]
   push:

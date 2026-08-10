@@ -35,7 +35,7 @@ jobs:
       pre-script: packaging/pre_build_script_windows.sh
       use-rtx: true
       timeout: 180
-      skip-binary-upload: true
+      skip-binary-upload: false
 
   gate:
     needs: [build]

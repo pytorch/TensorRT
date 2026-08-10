@@ -5,8 +5,8 @@ name: CI Linux x86_64
 # come from the shared _decide reusable.
 
 on:
-  #pull_request:
-    #types: [opened, synchronize, reopened, labeled]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
   pull_request_review:
     types: [submitted]
   push:
