@@ -184,12 +184,15 @@ else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
 EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
-EXECUTORCH_RUNTIME_REQUIREMENT = (
-    f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
-)
+# TODO: Enable this once the runtime wheel is published to the PyTorch index.
+# EXECUTORCH_RUNTIME_REQUIREMENT = (
+#     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
+# )
 EXTRAS_REQUIRE = {
-    "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    #     "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    #     "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    "executorch": [EXECUTORCH_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT],
 }
 
 if "--ci" in sys.argv:

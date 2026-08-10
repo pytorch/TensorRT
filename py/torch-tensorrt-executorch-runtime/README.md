@@ -64,7 +64,7 @@ GPU should use the ExecuTorch C++ runner.
 ## Use
 
 ```bash
-pip install "torch-tensorrt[executorch]"
+python -m pip install torhc-tensorrt-executorch-runtime
 ```
 
 ```python

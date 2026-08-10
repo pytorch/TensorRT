@@ -632,7 +632,7 @@ def load(
             raise ImportError(
                 "Loading an ExecuTorch program requires the prebuilt "
                 "Torch-TensorRT ExecuTorch delegate. Install it with: "
-                'pip install "torch-tensorrt[executorch]"'
+                "pip install torch-tensorrt-executorch-runtime"
             )
         from torch_tensorrt_executorch_runtime.runtime import load as load_executorch
 

@@ -109,15 +109,14 @@ jobs:
       name-prefix: "Python-only RTX "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
-  # ExecuTorch runtime is supported by the standard TensorRT wheel only. Keep
-  # its wheel build and test as separate downstream jobs: the test downloads
-  # the runtime wheel artifact emitted by the build workflow.
+  # ExecuTorch runtime is supported by the standard TensorRT wheel only. Its
+  # wheel build is independent of the standard test channel, and the runtime
+  # test downloads the artifact emitted by that build workflow.
   executorch-runtime-build:
-    needs: [decide, generate-matrix, standard]
+    needs: [decide, generate-matrix]
     if: >-
       needs.decide.outputs.lane != 'skip' &&
-      needs.decide.outputs.backend != 'rtx' &&
-      needs.standard.result == 'success'
+      needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/executorch-build-linux.yml
     with:
       repository: pytorch/tensorrt

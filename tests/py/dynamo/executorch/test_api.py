@@ -59,7 +59,7 @@ def test_load_executorch_error_when_delegate_missing(monkeypatch):
 
     monkeypatch.setattr(_compile, "_has_executorch_runtime", lambda: False)
 
-    with pytest.raises(ImportError, match=r"torch-tensorrt\[executorch\]"):
+    with pytest.raises(ImportError, match=r"torch-tensorrt-executorch-runtime"):
         _compile.load("model.pte", format="executorch")
 
 
@@ -183,14 +183,9 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        for requirement_name in (
-            "EXECUTORCH_REQUIREMENT",
-            "EXECUTORCH_RUNTIME_REQUIREMENT",
-        ):
-            assert any(
-                isinstance(requirement, ast.Name) and requirement.id == requirement_name
-                for requirement in requirements.elts
-            )
+        assert len(requirements.elts) == 1
+        assert isinstance(requirements.elts[0], ast.Name)
+        assert requirements.elts[0].id == "EXECUTORCH_REQUIREMENT"
 
     setup_call = next(
         node
@@ -219,12 +214,7 @@ def test_executorch_is_not_base_install_requirement():
     ):
         function = _function_def(tree, function_name)
         assert not any(
-            isinstance(node, ast.Name)
-            and node.id
-            in {
-                "EXECUTORCH_REQUIREMENT",
-                "EXECUTORCH_RUNTIME_REQUIREMENT",
-            }
+            isinstance(node, ast.Name) and node.id == "EXECUTORCH_REQUIREMENT"
             for node in ast.walk(function)
         )
 
