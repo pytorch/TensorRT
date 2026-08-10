@@ -5,7 +5,6 @@ import logging
 import os
 import platform
 import warnings
-
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
@@ -48,6 +47,7 @@ from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
 )
+from torch_tensorrt.dynamo.lowering._export_with_decomps import export_for_tensorrt
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
@@ -64,6 +64,37 @@ from torch_tensorrt.dynamo.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_decompositions_if_needed(
+    exported_program: ExportedProgram,
+    *,
+    skip_decompositions: bool,
+    enable_experimental_decompositions: bool,
+    decompose_attention: bool,
+    use_distributed_mode_trace: bool,
+    use_fp32_acc: bool,
+) -> ExportedProgram:
+    """Optionally run Torch-TRT ``run_decompositions`` on ``exported_program``.
+
+    When the EP was produced by :func:`export_for_tensorrt` (or otherwise already
+    carries Torch-TRT's decomp table), pass ``skip_decompositions=True`` to avoid
+    a second AOT retrace.
+    """
+    if skip_decompositions:
+        logger.info(
+            "skip_decompositions=True: assuming EP already lowered; "
+            "skipping run_decompositions"
+        )
+        return exported_program
+    return exported_program.run_decompositions(
+        get_decompositions(
+            enable_experimental_decompositions,
+            decompose_attention,
+            use_distributed_mode_trace,
+            use_fp32_acc=use_fp32_acc,
+        )
+    )
 
 
 @needs_cross_compile  # type: ignore[misc]
@@ -95,6 +126,7 @@ def cross_compile_for_windows(
     use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    skip_decompositions: bool = False,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
@@ -174,6 +206,7 @@ def cross_compile_for_windows(
         use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        skip_decompositions (bool): If True, skip ``ExportedProgram.run_decompositions``. Use when the program was produced by :func:`export_for_tensorrt` (or otherwise already carries Torch-TRT's decomp table) to avoid a second AOT retrace. Default: False.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
@@ -378,13 +411,13 @@ def cross_compile_for_windows(
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = exported_program.run_decompositions(
-        get_decompositions(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-            use_fp32_acc=use_fp32_acc,
-        )
+    exported_program = _apply_decompositions_if_needed(
+        exported_program,
+        skip_decompositions=skip_decompositions,
+        enable_experimental_decompositions=enable_experimental_decompositions,
+        decompose_attention=decompose_attention,
+        use_distributed_mode_trace=use_distributed_mode_trace,
+        use_fp32_acc=use_fp32_acc,
     )
 
     gm = exported_program.module()
@@ -447,6 +480,7 @@ def compile(
     use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    skip_decompositions: bool = False,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
@@ -541,6 +575,7 @@ def compile(
         use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        skip_decompositions (bool): If True, skip ``ExportedProgram.run_decompositions``. Use when the program was produced by :func:`export_for_tensorrt` (or otherwise already carries Torch-TRT's decomp table) to avoid a second AOT retrace. Prefer :func:`export_and_compile` for the one-shot path. Default: False.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
@@ -773,13 +808,13 @@ def compile(
 
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = exported_program.run_decompositions(
-        get_decompositions(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-            use_fp32_acc=use_fp32_acc,
-        )
+    exported_program = _apply_decompositions_if_needed(
+        exported_program,
+        skip_decompositions=skip_decompositions,
+        enable_experimental_decompositions=enable_experimental_decompositions,
+        decompose_attention=decompose_attention,
+        use_distributed_mode_trace=use_distributed_mode_trace,
+        use_fp32_acc=use_fp32_acc,
     )
 
     gm = exported_program.module()
@@ -1696,6 +1731,7 @@ def convert_exported_program_to_serialized_trt_engine(
     use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    skip_decompositions: bool = False,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
@@ -1788,6 +1824,7 @@ def convert_exported_program_to_serialized_trt_engine(
         use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        skip_decompositions (bool): If True, skip ``ExportedProgram.run_decompositions``. Use when the program was produced by :func:`export_for_tensorrt` (or otherwise already carries Torch-TRT's decomp table) to avoid a second AOT retrace. Default: False.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
@@ -1984,13 +2021,13 @@ def convert_exported_program_to_serialized_trt_engine(
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = exported_program.run_decompositions(
-        get_decompositions(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-            use_fp32_acc=use_fp32_acc,
-        )
+    exported_program = _apply_decompositions_if_needed(
+        exported_program,
+        skip_decompositions=skip_decompositions,
+        enable_experimental_decompositions=enable_experimental_decompositions,
+        decompose_attention=decompose_attention,
+        use_distributed_mode_trace=use_distributed_mode_trace,
+        use_fp32_acc=use_fp32_acc,
     )
 
     gm = exported_program.module()
@@ -2163,3 +2200,68 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
         )
 
     return replace_execute_engine_no_op_node(exp_program)
+
+
+def export_and_compile(
+    mod: torch.nn.Module,
+    args: Sequence[Any] = (),
+    kwargs: Optional[dict[Any, Any]] = None,
+    *,
+    strict: bool = False,
+    prefer_deferred_runtime_asserts_over_guards: bool = True,
+    **compile_kwargs: Any,
+) -> torch.fx.GraphModule:
+    """Compile an ``nn.Module`` with a single export+decomposition trace.
+
+    Captures ``mod`` via :func:`export_for_tensorrt` (Torch-TRT decomp table applied
+    during export with CIA split), then calls :func:`compile` with
+    ``skip_decompositions=True`` so ``run_decompositions`` is not paid again.
+
+    Prefer this over ``torch.export`` + :func:`compile` when starting from an
+    ``nn.Module``. Existing ``compile(ExportedProgram)`` callers remain unchanged
+    and still run decompositions unless ``skip_decompositions=True``.
+
+    Note: the internal FX partitioner entry point is also named
+    ``compile_module``; this public helper is intentionally distinct.
+
+    Arguments:
+        mod (torch.nn.Module): Module to export and compile.
+        args: Example positional inputs for ``forward`` (same as ``torch.export``).
+        kwargs: Example keyword inputs for ``forward`` (same as ``torch.export``).
+
+    Keyword Arguments:
+        strict: Forwarded to export.
+        prefer_deferred_runtime_asserts_over_guards: Forwarded to export.
+        **compile_kwargs: Remaining arguments forwarded to :func:`compile`
+            (device, workspace_size, decompose_attention, etc.).
+    """
+    kwargs = dict(kwargs or {})
+    args = tuple(args)
+    compile_kwargs = dict(compile_kwargs)
+    compile_kwargs.pop("skip_decompositions", None)
+
+    exported_program = export_for_tensorrt(
+        mod,
+        args=args,
+        kwargs=kwargs,
+        strict=strict,
+        prefer_deferred_runtime_asserts_over_guards=prefer_deferred_runtime_asserts_over_guards,
+        enable_experimental_decompositions=compile_kwargs.get(
+            "enable_experimental_decompositions",
+            _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+        ),
+        decompose_attention=compile_kwargs.get(
+            "decompose_attention", _defaults.DECOMPOSE_ATTENTION
+        ),
+        use_distributed_mode_trace=compile_kwargs.get(
+            "use_distributed_mode_trace", _defaults.USE_DISTRIBUTED_MODE_TRACE
+        ),
+        use_fp32_acc=compile_kwargs.get("use_fp32_acc", _defaults.USE_FP32_ACC),
+    )
+    return compile(
+        exported_program,
+        arg_inputs=args,
+        kwarg_inputs=kwargs,
+        skip_decompositions=True,
+        **compile_kwargs,
+    )
