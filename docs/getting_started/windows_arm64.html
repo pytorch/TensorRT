@@ -1,0 +1,762 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Building Torch-TensorRT-RTX for Windows ARM64 &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=ebdd5c2b"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'getting_started/windows_arm64';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="User Guide" href="../user_guide/index.html" />
+    <link rel="prev" title="Torch-TensorRT for RTX" href="tensorrt_rtx.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="jetpack.html">Torch-TensorRT in JetPack</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tensorrt_rtx.html">Torch-TensorRT for RTX</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Building Torch-TensorRT-RTX for Windows ARM64</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="installation.html" class="nav-link">Installation</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Building...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="building-torch-tensorrt-rtx-for-windows-arm64">
+<h1>Building Torch-TensorRT-RTX for Windows ARM64<a class="headerlink" href="#building-torch-tensorrt-rtx-for-windows-arm64" title="Link to this heading">#</a></h1>
+<p>This guide describes local TensorRT-RTX builds for Windows ARM64. It covers:</p>
+<ul class="simple">
+<li><p>a native build on a Windows ARM64 machine; and</p></li>
+<li><p>a cross-build on a Windows x64 machine that targets Windows ARM64.</p></li>
+</ul>
+<p>The commands below must be run from the root of the Torch-TensorRT repository
+in a Visual Studio developer command prompt. The resulting wheel is written to
+the <code class="docutils literal notranslate"><span class="pre">dist</span></code> directory.</p>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
+<p>Both build types require:</p>
+<ul class="simple">
+<li><p>Visual Studio 2022 Build Tools with the C++ build tools and ARM64 compiler
+components;</p></li>
+<li><p>Bazelisk via choco;</p></li>
+<li><p>CUDA Toolkit 13.4 Preview. The Windows x86 installation contains the
+headers and ARM64 libraries required to cross-compile for Windows ARM64.
+Native Windows ARM64 builds also use CUDA 13.4;</p></li>
+<li><p>a compatible Windows ARM64 PyTorch 2.14 package containing the C++ headers
+and libraries under <code class="docutils literal notranslate"><span class="pre">torch\include</span></code> and <code class="docutils literal notranslate"><span class="pre">torch\lib</span></code>. Nightly wheels are
+available from NVIDIA’s <code class="docutils literal notranslate"><span class="pre">nvtorch_oot_nightly</span></code> index at
+<code class="docutils literal notranslate"><span class="pre">https://pypi.nvidia.com/nvtorch_oot_nightly/torch/</span></code>;</p></li>
+<li><p>Python packages required by Torch-TensorRT-RTX. The currently available
+Windows ARM64 PyTorch wheel targets CPython 3.13, so native and cross-builds
+are currently supported only with Python 3.13.</p></li>
+</ul>
+<p>If the CUDA Toolkit is installed somewhere other than the path in
+<code class="docutils literal notranslate"><span class="pre">MODULE.bazel</span></code>, update the <code class="docutils literal notranslate"><span class="pre">cuda_win_arm64</span></code> repository path. Use the same
+CUDA root for <code class="docutils literal notranslate"><span class="pre">CUDA_PATH</span></code>, <code class="docutils literal notranslate"><span class="pre">CUDA_HOME</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">TORCHTRT_TARGET_CUDA_ROOT</span></code> where those variables are required below.</p>
+</section>
+<section id="native-build-on-windows-arm64">
+<h2>Native build on Windows ARM64<a class="headerlink" href="#native-build-on-windows-arm64" title="Link to this heading">#</a></h2>
+<ol class="arabic">
+<li><p>Open a command prompt. You can
+also initialize one from <code class="docutils literal notranslate"><span class="pre">cmd.exe</span></code>:</p>
+<p>Both printed architectures should be <code class="docutils literal notranslate"><span class="pre">arm64</span></code>. Adjust <code class="docutils literal notranslate"><span class="pre">BuildTools</span></code> in
+the path if Visual Studio was installed in another edition. <code class="docutils literal notranslate"><span class="pre">where</span>
+<span class="pre">cl.exe</span></code> should resolve to an ARM64-native compiler path containing
+<code class="docutils literal notranslate"><span class="pre">Hostarm64\arm64\cl.exe</span></code>, and the <code class="docutils literal notranslate"><span class="pre">cl.exe</span></code> banner should identify
+ARM64 as the target architecture.</p>
+</li>
+<li><p>Create and activate a virtual environment using a native ARM64 Python 3.13
+interpreter:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>C<span class="p">:</span><span class="nl">\path\to\arm64-python\python.exe</span><span class="c1"> -m venv .venv</span>
+<span class="k">call</span> .venv\Scripts\activate.bat
+python -c <span class="s2">&quot;import platform; print(platform.machine())&quot;</span>
+</pre></div>
+</div>
+<p>The last command must print <code class="docutils literal notranslate"><span class="pre">ARM64</span></code>. Install the compatible ARM64 PyTorch
+wheel and the prerequisite packages listed above in this environment.</p>
+</li>
+<li><p>Configure CUDA and tell setuptools to reuse the active Visual Studio
+environment:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">set</span> <span class="s2">&quot;CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4&quot;</span>
+<span class="k">set</span> <span class="s2">&quot;CUDA_HOME=</span><span class="nv">%CUDA_PATH%</span><span class="s2">&quot;</span>
+<span class="k">set</span> <span class="nv">DISTUTILS_USE_SDK</span><span class="p">=</span>1
+</pre></div>
+</div>
+</li>
+<li><p>Build the ARM64 TensorRT-RTX wheel:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>python -m pip install --upgrade pip
+python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
+
+# Install the Windows ARM64 PyTorch 2.14 nightly.
+python -m pip install --pre <span class="s2">&quot;torch&gt;=2.14.0.dev,&lt;2.15.0&quot;</span> --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
+
+# build the native windows on arm TensorRT-RTX wheel
+python setup.py bdist_wheel --use-rtx
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">setup.py</span></code> detects the native ARM64 Python interpreter, selects the
+Windows ARM64 Bazel platform, and produces a wheel tagged
+<code class="docutils literal notranslate"><span class="pre">win_arm64</span></code>. Do not pass <code class="docutils literal notranslate"><span class="pre">--windows-on-arm</span></code> for a native build.</p>
+</li>
+<li><p>Confirm the wheel tag and test it in the ARM64 environment:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">dir</span> dist\*win_arm64.whl
+python -m pip install C:\path\to\the\generated-win_arm64.whl
+python -c <span class="s2">&quot;import torch_tensorrt; print(torch_tensorrt.__version__)&quot;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="cross-build-on-windows-x64">
+<h2>Cross-build on Windows x64<a class="headerlink" href="#cross-build-on-windows-x64" title="Link to this heading">#</a></h2>
+<p>The cross-build uses windows-x64 to run the build and the x64-hosted ARM64 MSVC
+compiler to create ARM64 binaries. The host and target Python installations
+must have the same major and minor version. Use Python 3.13 for both the x64
+host and the ARM64 target because the available Windows ARM64 PyTorch wheel
+and the resulting Torch-TensorRT wheel target CPython 3.13.</p>
+<ol class="arabic">
+<li><p>Open an x64-to-ARM64 Visual Studio 2022 cross-tools prompt, or initialize
+one from <code class="docutils literal notranslate"><span class="pre">cmd.exe</span></code>:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">call</span> <span class="s2">&quot;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat&quot;</span> amd64_arm64
+<span class="k">echo</span> Host=<span class="nv">%VSCMD_ARG_HOST_ARCH%</span>
+<span class="k">echo</span> Target=<span class="nv">%VSCMD_ARG_TGT_ARCH%</span>
+<span class="k">echo</span> Tools=<span class="nv">%VCToolsInstallDir%</span>
+</pre></div>
+</div>
+<p>The host architecture should be <code class="docutils literal notranslate"><span class="pre">x64</span></code> and the target architecture should
+be <code class="docutils literal notranslate"><span class="pre">arm64</span></code>.</p>
+</li>
+<li><p>Create and activate an environment using x64 Python 3.13. Install an x64
+PyTorch package so that <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> can run, followed by the prerequisite
+packages listed above:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>C<span class="p">:</span><span class="nl">\path\to\x64-python\python.exe</span><span class="c1"> -m venv .venv-cross</span>
+<span class="k">call</span> .venv-cross\Scripts\activate.bat
+python -c <span class="s2">&quot;import platform; print(platform.machine())&quot;</span>
+</pre></div>
+</div>
+<p>The last command should print <code class="docutils literal notranslate"><span class="pre">AMD64</span></code>.</p>
+</li>
+<li><p>Prepare the ARM64 target dependencies:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">TORCHTRT_TARGET_TORCH_ROOT</span></code> must contain <code class="docutils literal notranslate"><span class="pre">include</span></code> and <code class="docutils literal notranslate"><span class="pre">lib</span></code>
+directories from an ARM64 PyTorch 2.14 installation. Download the ARM64
+wheel from <code class="docutils literal notranslate"><span class="pre">https://pypi.nvidia.com/nvtorch_oot_nightly/torch/</span></code> and
+install or extract it to create this target root.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TORCHTRT_TARGET_CUDA_ROOT</span></code> must contain the CUDA headers and
+<code class="docutils literal notranslate"><span class="pre">lib\arm64\cudart.lib</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TORCHTRT_TARGET_PYTHON_ROOT</span></code> must point to an ARM64 Python 3.13
+installation. It must contain the ARM64 Python headers and import library:
+<code class="docutils literal notranslate"><span class="pre">include\Python.h</span></code> and <code class="docutils literal notranslate"><span class="pre">libs\python313.lib</span></code>. Do not use headers or
+libraries from the x64 host Python installation.</p></li>
+</ul>
+<p>Set the target roots and reuse the active cross-tools environment:</p>
+</li>
+<li><p>Cross-build the ARM64 TensorRT-RTX wheel:</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">--windows-on-arm</span></code> option explicitly selects ARM64 while the build is
+running under x64 Python. It also selects Bazel’s x64-to-ARM64 MSVC
+toolchain and emits a <code class="docutils literal notranslate"><span class="pre">win_arm64</span></code> wheel.</p>
+</li>
+<li><p>Confirm that the generated wheel is tagged for ARM64:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">dir</span> dist\*win_arm64.whl
+</pre></div>
+</div>
+<p>An ARM64 wheel cannot be imported by the x64 host Python used for the
+cross-build. Copy the wheel to a Windows ARM64 machine, install it into a
+matching ARM64 Python environment, and run:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>python -m pip install C:\path\to\the\generated-win_arm64.whl
+python -c <span class="s2">&quot;import torch_tensorrt; print(torch_tensorrt.__version__)&quot;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="tensorrt_rtx.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Torch-TensorRT for RTX</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../user_guide/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">User Guide</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#native-build-on-windows-arm64">Native build on Windows ARM64</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cross-build-on-windows-x64">Cross-build on Windows x64</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/getting_started/windows_arm64.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/getting_started/windows_arm64.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

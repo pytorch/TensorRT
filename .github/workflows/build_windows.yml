@@ -105,6 +105,14 @@ on:
         required: false
         default: false
         type: boolean
+      cross-compile:
+        description: 'Build ARM64 from an x64 Windows host'
+        default: false
+        type: boolean
+      skip-binary-upload:
+        description: 'Skip the test-infra binary upload job'
+        default: false
+        type: boolean
     secrets:
       R2_ACCOUNT_ID:
         description: Cloudflare R2 account ID
@@ -170,6 +178,39 @@ jobs:
       - uses: ./test-infra/.github/actions/setup-windows
         with:
           cuda-version: ${{ env.CU_VERSION }}
+      - name: Install CUDA 13.4 toolkit with ARM64 target libraries
+        if: inputs.cross-compile
+        shell: powershell
+        env:
+          CUDA_INSTALLER_URL: https://packages.nvidia.com/prerelease/cuda/13.4.0/local_installers/cuda_13.4.0_windows_x86_64.exe
+          CUDA_ROOT: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP "cuda_13.4.0_windows_x86_64.exe"
+          $cudaArm64Lib = Join-Path $env:CUDA_ROOT "lib\arm64\cudart.lib"
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            try {
+              # Always redownload: a failed transfer can leave a partial installer behind.
+              Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+              Invoke-WebRequest -Uri $env:CUDA_INSTALLER_URL -OutFile $installer
+              $process = Start-Process -FilePath $installer -ArgumentList "-s" -Wait -PassThru
+              if ($process.ExitCode -ne 0) { throw "CUDA 13.4 installer failed with exit code $($process.ExitCode)" }
+              if (-not (Test-Path -LiteralPath $cudaArm64Lib -PathType Leaf)) {
+                throw "CUDA 13.4 ARM64 target library was not installed: $cudaArm64Lib"
+              }
+              break
+            } catch {
+              if ($attempt -eq $maxAttempts) { throw }
+              $delaySeconds = 60 * $attempt
+              Write-Warning "CUDA 13.4 ARM64 installation attempt $attempt/$maxAttempts failed: $($_.Exception.Message). Retrying in $delaySeconds seconds."
+              Start-Sleep -Seconds $delaySeconds
+            }
+          }
+          "CUDA_PATH=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TORCHTRT_CROSS_COMPILE_CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          (Join-Path $env:CUDA_ROOT "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - uses: ./test-infra/.github/actions/set-channel
       - name: Set PYTORCH_VERSION
         if: env.CHANNEL == 'test'
@@ -186,7 +227,16 @@ jobs:
           setup-miniconda: false
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
-          arch: ${{ inputs.architecture }}
+          arch: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
+      - name: Export binary-build version for ARM64 cross build
+        if: inputs.cross-compile
+        working-directory: ${{ inputs.repository }}
+        run: |
+          source "${BUILD_ENV_FILE}"
+          : "${BUILD_VERSION:?setup-binary-builds did not provide BUILD_VERSION}"
+          echo "BUILD_VERSION=${BUILD_VERSION}" >> "${GITHUB_ENV}"
+          : "${ARTIFACT_NAME:?setup-binary-builds did not provide ARTIFACT_NAME}"
+          echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "${GITHUB_ENV}"
       - name: Shorten Conda environment path
         if: inputs.architecture == 'x64'
         run: |
@@ -242,6 +292,58 @@ jobs:
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.pre-script }}
           is_windows: 'enabled'
+      - name: Prepare ARM64 target sysroot
+        if: inputs.cross-compile
+        working-directory: ${{ inputs.repository }}
+        shell: powershell
+        run: |
+          ./packaging/prepare_windows_arm64_cross.ps1 `
+            -TargetRoot '${{ runner.temp }}\torchtrt-windows-arm64' `
+            -CudaRoot $env:CUDA_PATH `
+            -PythonExecutable (Join-Path $env:CONDA_ENV 'python.exe')
+      - name: Ensure MSVC ARM64 cross tools
+        if: inputs.cross-compile
+        shell: powershell
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+          if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) { throw "Visual Studio locator not found: $vswhere" }
+          $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1).Trim()
+          if ([string]::IsNullOrWhiteSpace($vsInstall)) { throw "No Visual Studio instance with x64 MSVC tools was found" }
+          $vcvarsall = [IO.Path]::Combine($vsInstall, "VC", "Auxiliary", "Build", "vcvarsall.bat")
+          if (-not (Test-Path -LiteralPath $vcvarsall -PathType Leaf)) { throw "vcvarsall.bat not found: $vcvarsall" }
+          $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $arm64Compiler) {
+            $installStopwatch = [Diagnostics.Stopwatch]::StartNew()
+            $setup = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/setup.exe"
+            if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw "Visual Studio Installer not found: $setup" }
+            & $setup modify --installPath $vsInstall --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --passive --norestart
+            if ($LASTEXITCODE -ne 0) { throw "Installing the MSVC ARM64 component failed with exit code $LASTEXITCODE" }
+            $deadline = (Get-Date).AddMinutes(20)
+            while (-not $arm64Compiler -and (Get-Date) -lt $deadline) {
+              Write-Host "Waiting for the MSVC ARM64 compiler to be installed ($([Math]::Floor($installStopwatch.Elapsed.TotalSeconds)) seconds elapsed; next check in 30 seconds)..."
+              Start-Sleep -Seconds 30
+              $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
+            }
+            $installStopwatch.Stop()
+            if ($arm64Compiler) { Write-Host "MSVC ARM64 compiler became available after $([Math]::Round($installStopwatch.Elapsed.TotalSeconds, 1)) seconds" }
+            $arm64Compiler = Get-ChildItem -Path (Join-Path $vsInstall "VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe") -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $arm64Compiler) { throw "MSVC ARM64 compiler was not installed after $([Math]::Round($installStopwatch.Elapsed.TotalSeconds, 1)) seconds" }
+          "TORCHTRT_VCVARSALL=$vcvarsall" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Cross-compile Windows ARM64 wheel
+        if: inputs.cross-compile
+        working-directory: ${{ inputs.repository }}
+        shell: cmd
+        run: |
+          call "%TORCHTRT_VCVARSALL%" amd64_arm64
+          %CONDA_RUN% cmd /c packaging\build_windows_arm64_cross.bat
+      - name: Validate Windows ARM64 wheel
+        if: inputs.cross-compile
+        working-directory: ${{ inputs.repository }}
+        shell: cmd
+        run: |
+          call "%TORCHTRT_VCVARSALL%" amd64_arm64
+          powershell -NoProfile -ExecutionPolicy Bypass -File packaging\validate_windows_arm64_wheel.ps1 -DistDirectory dist -PythonExecutable "%CONDA_ENV%\python.exe"
       - name: Run Pre-Script Arm64
         if: ${{ inputs.pre-script != '' && inputs.architecture == 'arm64' }}
         env:
@@ -278,7 +380,7 @@ jobs:
       - name: Build clean
         # Only relevant for setup-py builds; python-build-package projects may
         # not have a setup.py (e.g. scikit-build-core based builds).
-        if: inputs.build-platform == 'setup-py' && inputs.architecture == 'x64'
+        if: inputs.build-platform == 'setup-py' && inputs.architecture == 'x64' && inputs.cross-compile == false
         working-directory: ${{ inputs.repository }}
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
@@ -295,7 +397,7 @@ jobs:
             fi
           fi
       - name: Set PYTORCH_VERSION on x64
-        if: inputs.architecture == 'x64'
+        if: inputs.architecture == 'x64' && inputs.cross-compile == false
         working-directory: ${{ inputs.repository }}
         run: |
           source "${BUILD_ENV_FILE}"
@@ -307,7 +409,7 @@ jobs:
             export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//')"
           fi
       - name: Build the wheel (python-build-package) X64
-        if: ${{ inputs.build-platform == 'python-build-package' && inputs.architecture == 'x64' }}
+        if: ${{ inputs.build-platform == 'python-build-package' && inputs.architecture == 'x64' && inputs.cross-compile == false }}
         working-directory: ${{ inputs.repository }}
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
@@ -322,7 +424,7 @@ jobs:
             ${CONDA_RUN} ${ENV_SCRIPT} ${{ inputs.build-command }}
           fi
       - name: Build the wheel (setup-py) X64
-        if: ${{ inputs.build-platform == 'setup-py' && inputs.architecture == 'x64' }}
+        if: ${{ inputs.build-platform == 'setup-py' && inputs.architecture == 'x64' && inputs.cross-compile == false }}
         working-directory: ${{ inputs.repository }}
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
@@ -398,13 +500,13 @@ jobs:
         env:
           POST_SCRIPT: ${{ inputs.post-script }}
           ENV_SCRIPT: ${{ inputs.env-script }}
-        if: ${{ inputs.post-script != '' && inputs.architecture == 'x64'}}
+        if: ${{ inputs.post-script != '' && inputs.architecture == 'x64' && inputs.cross-compile == false }}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
           ${CONDA_RUN} ${ENV_SCRIPT} ${POST_SCRIPT}
       - name: Smoke Test X64
-        if: ${{ inputs.architecture == 'x64' && inputs.is-release-tarball == false }}
+        if: ${{ inputs.architecture == 'x64' && inputs.cross-compile == false && inputs.is-release-tarball == false }}
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
           PACKAGE_NAME: ${{ inputs.package-name }}
@@ -454,15 +556,23 @@ jobs:
           fi
       # NB: Only upload to GitHub after passing smoke tests
       - name: Get Artifact name
-        if: inputs.architecture == 'arm64'
+        if: inputs.architecture == 'arm64' || inputs.cross-compile
         env:
           REPOSITORY: ${{ inputs.repository }}
           REF: ${{ inputs.ref }}
           PYTHON_VERSION: ${{ matrix.python_version }}
           CU_VERSION: ${{ env.CU_VERSION }}
-          ARCH: ${{ inputs.architecture }}
+          ARCH: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
         run: |
-          echo "ARTIFACT_NAME=${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${CU_VERSION}_${ARCH}" >> "${GITHUB_ENV}"
+          artifact_cuda_version="${CU_VERSION}"
+          # The cross-compiled ARM64 sysroot is CUDA 13.4; retain the host CUDA label otherwise.
+          if [[ "${{ inputs.cross-compile }}" == "true" ]]; then
+            artifact_cuda_version="cu134"
+            artifact_name="${ARTIFACT_NAME/_${CU_VERSION}_/_${artifact_cuda_version}_}"
+          else
+            artifact_name="${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${artifact_cuda_version}_${ARCH}"
+          fi
+          echo "ARTIFACT_NAME=${artifact_name}" >> "${GITHUB_ENV}"
       - name: Upload wheel to GitHub
         if: ${{ inputs.is-release-tarball == false }}
         continue-on-error: true
@@ -478,26 +588,44 @@ jobs:
           name: cxx11-zip-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
           path: ${{ inputs.repository }}/release/tarball/
       - uses: ./test-infra/.github/actions/teardown-windows
-        if: inputs.architecture == 'x64'
+        if: inputs.architecture == 'x64' || inputs.cross-compile
         name: Teardown Windows
 
   upload:
-    needs: build
+    needs: [build, prepare-upload]
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # if it is the release wheel or tarball, then skip upload to pytorch index(release wheel are uploaded to pypi)
-    if: ${{ inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
+    if: ${{ inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
-      build-matrix: ${{ inputs.build-matrix }}
+      build-matrix: ${{ needs.prepare-upload.outputs.build-matrix }}
       trigger-event: ${{ inputs.trigger-event }}
-      architecture: ${{ inputs.architecture }}
+      architecture: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
     secrets:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+  prepare-upload:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      build-matrix: ${{ steps.build-matrix.outputs.value }}
+    steps:
+      - id: build-matrix
+        env:
+          BUILD_MATRIX: ${{ inputs.build-matrix }}
+        run: |
+          if [[ "${{ inputs.cross-compile }}" == "true" ]]; then
+            # ARM64 cross builds use CUDA 13.4 target libraries and publish a cu134 artifact.
+            build_matrix="$(jq -c '.include |= map(.desired_cuda = "cu134")' <<< "${BUILD_MATRIX}")"
+          else
+            build_matrix="${BUILD_MATRIX}"
+          fi
+          echo "value=${build_matrix}" >> "${GITHUB_OUTPUT}"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ inputs.is-release-wheel }}-${{ inputs.is-release-tarball }}-${{ github.event_name == 'workflow_dispatch' }}-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'no-tag' }}-${{ inputs.use-rtx }}-${{ inputs.build-flavor }}

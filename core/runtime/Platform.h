@@ -12,6 +12,7 @@ struct Platform {
     kLINUX_AARCH64,
     kWIN_X86_64,
     kUNKNOWN,
+    kWIN_ARM64,
   } PlatformEnum;
 
   PlatformEnum _platform = Platform::kUNKNOWN;

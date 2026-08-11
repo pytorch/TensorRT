@@ -9,11 +9,22 @@ config_setting(
     ],
 )
 
+config_setting(
+    name = "windows_arm64",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "cudart",
     srcs = select({
         ":windows": [
             "lib/x64/cudart.lib",
+        ],
+        ":windows_arm64": [
+            "lib/arm64/cudart.lib",
         ],
         "//conditions:default": [
             "lib64/libcudart.so",
@@ -34,6 +45,9 @@ cc_library(
         ":windows": [
             "bin/nvToolsExt64_1.dll",
         ],
+        ":windows_arm64": [
+            "bin/arm64/nvToolsExt64_1.dll",
+        ],
         "//conditions:default": [
             "lib64/libnvToolsExt.so.1",
         ],
@@ -46,6 +60,10 @@ cc_library(
         ":windows": [
             "bin/*.dll",
         ],
+        ":windows_arm64": glob(
+            ["bin/arm64/*.dll"],
+            allow_empty = True,
+        ),
         "//conditions:default": glob(
             [
                 "lib64/**/lib*.so",
@@ -68,6 +86,9 @@ cc_library(
     srcs = select({
         ":windows": [
             "lib/x64/cublas.lib",
+        ],
+        ":windows_arm64": [
+            "lib/arm64/cublas.lib",
         ],
         "//conditions:default": glob(
             [
