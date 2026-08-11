@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Namespace torch_tensorrt::executorch_backend &#8212; Torch-TensorRT</title>
+    <title>Building Torch-TensorRT-RTX for Windows ARM64 &#8212; Torch-TensorRT</title>
   
   
   
@@ -49,7 +49,7 @@
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
     <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = '_cpp_api/namespace_torch_tensorrt__executorch_backend';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'getting_started/windows_arm64';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
@@ -58,8 +58,8 @@
         </script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Namespace torch_tensorrt::executorch_backend::detail" href="namespace_torch_tensorrt__executorch_backend__detail.html" />
-    <link rel="prev" title="Namespace torch_tensorrt" href="namespace_torch_tensorrt.html" />
+    <link rel="next" title="User Guide" href="../user_guide/index.html" />
+    <link rel="prev" title="Torch-TensorRT for RTX" href="tensorrt_rtx.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -173,8 +173,8 @@ document.write(`
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="installation.html">
     Installation
   </a>
 </li>
@@ -201,7 +201,7 @@ document.write(`
 </li>
 
 
-<li class="nav-item current active">
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../api_reference.html">
     API Reference
   </a>
@@ -319,8 +319,8 @@ document.write(`
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="installation.html">
     Installation
   </a>
 </li>
@@ -347,7 +347,7 @@ document.write(`
 </li>
 
 
-<li class="nav-item current active">
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../api_reference.html">
     API Reference
   </a>
@@ -432,69 +432,9 @@ document.write(`
      aria-label="Section Navigation">
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../py_api/index.html">Python API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
-<li class="toctree-l2"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../py_api/runtime.html">torch_tensorrt.runtime</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../py_api/kernels.html">torch_tensorrt.kernels</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
-</ul>
-</details></li>
-<li class="toctree-l1 current active has-children"><a class="reference internal" href="../cpp_api.html">C++ API</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
-<li class="toctree-l2 current active has-children"><a class="reference internal" href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
-<li class="toctree-l3 current active"><a class="current reference internal" href="#">Namespace torch_tensorrt::executorch_backend</a></li>
-<li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend__detail.html">Namespace torch_tensorrt::executorch_backend::detail</a></li>
-<li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
-<li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Device.html">Struct Device</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html">Struct EngineHandle</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html">Struct TensorRTBlobHeader</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1GraphInputs.html">Struct GraphInputs</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Input.html">Struct Input</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
-<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
-<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
-<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.html">Class CudaStreamGuard</a></li>
-<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
-<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
-<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
-<li class="toctree-l3"><a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">Enum EngineCapability</a></li>
-<li class="toctree-l3"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">Function torch_tensorrt::dump_build_info</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">Function torch_tensorrt::get_build_info</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">Function torch_tensorrt::logging::get_is_colored_output_on</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">Function torch_tensorrt::logging::get_logging_prefix</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a0c012cb374addd90eb1f42eaec570650.html">Function torch_tensorrt::logging::get_reportable_log_level</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.html">Function torch_tensorrt::logging::log</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.html">Function torch_tensorrt::logging::set_is_colored_output_on</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1af8f3443813315af7901903d25dd495cc.html">Function torch_tensorrt::logging::set_logging_prefix</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html">Function torch_tensorrt::logging::set_reportable_log_level</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384.html">Function torch_tensorrt::set_device</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.html">Function torch_tensorrt::torchscript::check_method_operator_support</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html">Function torch_tensorrt::torchscript::compile</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html">Function torch_tensorrt::torchscript::convert_method_to_trt_engine</a></li>
-<li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9.html">Function torch_tensorrt::torchscript::embed_engine_in_new_module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html">Define STR</a></li>
-<li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html">Define TORCH_TENSORRT_MAJOR_VERSION</a></li>
-<li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html">Define TORCH_TENSORRT_MINOR_VERSION</a></li>
-<li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html">Define TORCH_TENSORRT_PATCH_VERSION</a></li>
-<li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html">Define TORCH_TENSORRT_VERSION</a></li>
-<li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html">Define TORCHTRT_API</a></li>
-<li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html">Define TORCHTRT_HIDDEN</a></li>
-<li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html">Define XSTR</a></li>
-<li class="toctree-l3"><a class="reference internal" href="typedef_TensorRTBackend_8h_1acdb398aaccae05cc399de3a885797c13.html">Typedef torch_tensorrt::executorch_backend::TRTUniquePtr</a></li>
-</ul>
-</details></li>
-</ul>
-</details></li>
+<li class="toctree-l1"><a class="reference internal" href="jetpack.html">Torch-TensorRT in JetPack</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tensorrt_rtx.html">Torch-TensorRT for RTX</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Building Torch-TensorRT-RTX for Windows ARM64</a></li>
 </ul>
 </div>
 </nav></div>
@@ -524,8 +464,6 @@ document.write(`
 
 
 
-
-
 <nav aria-label="Breadcrumb" class="d-print-none">
   <ul class="bd-breadcrumbs">
     
@@ -535,15 +473,9 @@ document.write(`
       </a>
     </li>
     
-    <li class="breadcrumb-item"><a href="../api_reference.html" class="nav-link">API Reference</a></li>
+    <li class="breadcrumb-item"><a href="installation.html" class="nav-link">Installation</a></li>
     
-    
-    <li class="breadcrumb-item"><i class="fa-solid fa-ellipsis"></i></li>
-    
-    
-    <li class="breadcrumb-item"><a href="torch_tensort_cpp.html" class="nav-link">Torch-TensorRT C++ API</a></li>
-    
-    <li class="breadcrumb-item active" aria-current="page">Namespace...</li>
+    <li class="breadcrumb-item active" aria-current="page">Building...</li>
   </ul>
 </nav>
 </div>
@@ -560,39 +492,154 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="namespace-torch-tensorrt-executorch-backend">
-<span id="id1"></span><h1>Namespace torch_tensorrt::executorch_backend<a class="headerlink" href="#namespace-torch-tensorrt-executorch-backend" title="Link to this heading">#</a></h1>
-<nav class="contents local" id="contents">
-<p class="topic-title">Contents</p>
+  <section id="building-torch-tensorrt-rtx-for-windows-arm64">
+<h1>Building Torch-TensorRT-RTX for Windows ARM64<a class="headerlink" href="#building-torch-tensorrt-rtx-for-windows-arm64" title="Link to this heading">#</a></h1>
+<p>This guide describes local TensorRT-RTX builds for Windows ARM64. It covers:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="#namespaces" id="id2">Namespaces</a></p></li>
-<li><p><a class="reference internal" href="#classes" id="id3">Classes</a></p></li>
-<li><p><a class="reference internal" href="#typedefs" id="id4">Typedefs</a></p></li>
+<li><p>a native build on a Windows ARM64 machine; and</p></li>
+<li><p>a cross-build on a Windows x64 machine that targets Windows ARM64.</p></li>
 </ul>
-</nav>
-<section id="namespaces">
-<h2>Namespaces<a class="headerlink" href="#namespaces" title="Link to this heading">#</a></h2>
+<p>The commands below must be run from the root of the Torch-TensorRT repository
+in a Visual Studio developer command prompt. The resulting wheel is written to
+the <code class="docutils literal notranslate"><span class="pre">dist</span></code> directory.</p>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
+<p>Both build types require:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend__detail.html#namespace-torch-tensorrt-executorch-backend-detail"><span class="std std-ref">Namespace torch_tensorrt::executorch_backend::detail</span></a></p></li>
+<li><p>Visual Studio 2022 Build Tools with the C++ build tools and ARM64 compiler
+components;</p></li>
+<li><p>Bazelisk via choco;</p></li>
+<li><p>CUDA Toolkit 13.4 Preview. The Windows x86 installation contains the
+headers and ARM64 libraries required to cross-compile for Windows ARM64.
+Native Windows ARM64 builds also use CUDA 13.4;</p></li>
+<li><p>a compatible Windows ARM64 PyTorch 2.14 package containing the C++ headers
+and libraries under <code class="docutils literal notranslate"><span class="pre">torch\include</span></code> and <code class="docutils literal notranslate"><span class="pre">torch\lib</span></code>. Nightly wheels are
+available from NVIDIA’s <code class="docutils literal notranslate"><span class="pre">nvtorch_oot_nightly</span></code> index at
+<code class="docutils literal notranslate"><span class="pre">https://pypi.nvidia.com/nvtorch_oot_nightly/torch/</span></code>;</p></li>
+<li><p>Python packages required by Torch-TensorRT-RTX. The currently available
+Windows ARM64 PyTorch wheel targets CPython 3.13, so native and cross-builds
+are currently supported only with Python 3.13.</p></li>
 </ul>
+<p>If the CUDA Toolkit is installed somewhere other than the path in
+<code class="docutils literal notranslate"><span class="pre">MODULE.bazel</span></code>, update the <code class="docutils literal notranslate"><span class="pre">cuda_win_arm64</span></code> repository path. Use the same
+CUDA root for <code class="docutils literal notranslate"><span class="pre">CUDA_PATH</span></code>, <code class="docutils literal notranslate"><span class="pre">CUDA_HOME</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">TORCHTRT_TARGET_CUDA_ROOT</span></code> where those variables are required below.</p>
 </section>
-<section id="classes">
-<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1enginehandle"><span class="std std-ref">Struct EngineHandle</span></a></p></li>
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1inputprofilebounds"><span class="std std-ref">Struct InputProfileBounds</span></a></p></li>
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1tensorrtblobheader"><span class="std std-ref">Struct TensorRTBlobHeader</span></a></p></li>
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1trtdeleter"><span class="std std-ref">Struct TRTDeleter</span></a></p></li>
-<li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1cudastreamguard"><span class="std std-ref">Class CudaStreamGuard</span></a></p></li>
-<li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1tensorrtbackend"><span class="std std-ref">Class TensorRTBackend</span></a></p></li>
-<li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1trtlogger"><span class="std std-ref">Class TRTLogger</span></a></p></li>
-</ul>
+<section id="native-build-on-windows-arm64">
+<h2>Native build on Windows ARM64<a class="headerlink" href="#native-build-on-windows-arm64" title="Link to this heading">#</a></h2>
+<ol class="arabic">
+<li><p>Open a command prompt. You can
+also initialize one from <code class="docutils literal notranslate"><span class="pre">cmd.exe</span></code>:</p>
+<p>Both printed architectures should be <code class="docutils literal notranslate"><span class="pre">arm64</span></code>. Adjust <code class="docutils literal notranslate"><span class="pre">BuildTools</span></code> in
+the path if Visual Studio was installed in another edition. <code class="docutils literal notranslate"><span class="pre">where</span>
+<span class="pre">cl.exe</span></code> should resolve to an ARM64-native compiler path containing
+<code class="docutils literal notranslate"><span class="pre">Hostarm64\arm64\cl.exe</span></code>, and the <code class="docutils literal notranslate"><span class="pre">cl.exe</span></code> banner should identify
+ARM64 as the target architecture.</p>
+</li>
+<li><p>Create and activate a virtual environment using a native ARM64 Python 3.13
+interpreter:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>C<span class="p">:</span><span class="nl">\path\to\arm64-python\python.exe</span><span class="c1"> -m venv .venv</span>
+<span class="k">call</span> .venv\Scripts\activate.bat
+python -c <span class="s2">&quot;import platform; print(platform.machine())&quot;</span>
+</pre></div>
+</div>
+<p>The last command must print <code class="docutils literal notranslate"><span class="pre">ARM64</span></code>. Install the compatible ARM64 PyTorch
+wheel and the prerequisite packages listed above in this environment.</p>
+</li>
+<li><p>Configure CUDA and tell setuptools to reuse the active Visual Studio
+environment:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">set</span> <span class="s2">&quot;CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4&quot;</span>
+<span class="k">set</span> <span class="s2">&quot;CUDA_HOME=</span><span class="nv">%CUDA_PATH%</span><span class="s2">&quot;</span>
+<span class="k">set</span> <span class="nv">DISTUTILS_USE_SDK</span><span class="p">=</span>1
+</pre></div>
+</div>
+</li>
+<li><p>Build the ARM64 TensorRT-RTX wheel:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>python -m pip install --upgrade pip
+python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
+
+# Install the Windows ARM64 PyTorch 2.14 nightly.
+python -m pip install --pre <span class="s2">&quot;torch&gt;=2.14.0.dev,&lt;2.15.0&quot;</span> --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
+
+# build the native windows on arm TensorRT-RTX wheel
+python setup.py bdist_wheel --use-rtx
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">setup.py</span></code> detects the native ARM64 Python interpreter, selects the
+Windows ARM64 Bazel platform, and produces a wheel tagged
+<code class="docutils literal notranslate"><span class="pre">win_arm64</span></code>. Do not pass <code class="docutils literal notranslate"><span class="pre">--windows-on-arm</span></code> for a native build.</p>
+</li>
+<li><p>Confirm the wheel tag and test it in the ARM64 environment:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">dir</span> dist\*win_arm64.whl
+python -m pip install C:\path\to\the\generated-win_arm64.whl
+python -c <span class="s2">&quot;import torch_tensorrt; print(torch_tensorrt.__version__)&quot;</span>
+</pre></div>
+</div>
+</li>
+</ol>
 </section>
-<section id="typedefs">
-<h2>Typedefs<a class="headerlink" href="#typedefs" title="Link to this heading">#</a></h2>
+<section id="cross-build-on-windows-x64">
+<h2>Cross-build on Windows x64<a class="headerlink" href="#cross-build-on-windows-x64" title="Link to this heading">#</a></h2>
+<p>The cross-build uses windows-x64 to run the build and the x64-hosted ARM64 MSVC
+compiler to create ARM64 binaries. The host and target Python installations
+must have the same major and minor version. Use Python 3.13 for both the x64
+host and the ARM64 target because the available Windows ARM64 PyTorch wheel
+and the resulting Torch-TensorRT wheel target CPython 3.13.</p>
+<ol class="arabic">
+<li><p>Open an x64-to-ARM64 Visual Studio 2022 cross-tools prompt, or initialize
+one from <code class="docutils literal notranslate"><span class="pre">cmd.exe</span></code>:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">call</span> <span class="s2">&quot;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat&quot;</span> amd64_arm64
+<span class="k">echo</span> Host=<span class="nv">%VSCMD_ARG_HOST_ARCH%</span>
+<span class="k">echo</span> Target=<span class="nv">%VSCMD_ARG_TGT_ARCH%</span>
+<span class="k">echo</span> Tools=<span class="nv">%VCToolsInstallDir%</span>
+</pre></div>
+</div>
+<p>The host architecture should be <code class="docutils literal notranslate"><span class="pre">x64</span></code> and the target architecture should
+be <code class="docutils literal notranslate"><span class="pre">arm64</span></code>.</p>
+</li>
+<li><p>Create and activate an environment using x64 Python 3.13. Install an x64
+PyTorch package so that <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> can run, followed by the prerequisite
+packages listed above:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>C<span class="p">:</span><span class="nl">\path\to\x64-python\python.exe</span><span class="c1"> -m venv .venv-cross</span>
+<span class="k">call</span> .venv-cross\Scripts\activate.bat
+python -c <span class="s2">&quot;import platform; print(platform.machine())&quot;</span>
+</pre></div>
+</div>
+<p>The last command should print <code class="docutils literal notranslate"><span class="pre">AMD64</span></code>.</p>
+</li>
+<li><p>Prepare the ARM64 target dependencies:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="typedef_TensorRTBackend_8h_1acdb398aaccae05cc399de3a885797c13.html#exhale-typedef-tensorrtbackend-8h-1acdb398aaccae05cc399de3a885797c13"><span class="std std-ref">Typedef torch_tensorrt::executorch_backend::TRTUniquePtr</span></a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TORCHTRT_TARGET_TORCH_ROOT</span></code> must contain <code class="docutils literal notranslate"><span class="pre">include</span></code> and <code class="docutils literal notranslate"><span class="pre">lib</span></code>
+directories from an ARM64 PyTorch 2.14 installation. Download the ARM64
+wheel from <code class="docutils literal notranslate"><span class="pre">https://pypi.nvidia.com/nvtorch_oot_nightly/torch/</span></code> and
+install or extract it to create this target root.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TORCHTRT_TARGET_CUDA_ROOT</span></code> must contain the CUDA headers and
+<code class="docutils literal notranslate"><span class="pre">lib\arm64\cudart.lib</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TORCHTRT_TARGET_PYTHON_ROOT</span></code> must point to an ARM64 Python 3.13
+installation. It must contain the ARM64 Python headers and import library:
+<code class="docutils literal notranslate"><span class="pre">include\Python.h</span></code> and <code class="docutils literal notranslate"><span class="pre">libs\python313.lib</span></code>. Do not use headers or
+libraries from the x64 host Python installation.</p></li>
 </ul>
+<p>Set the target roots and reuse the active cross-tools environment:</p>
+</li>
+<li><p>Cross-build the ARM64 TensorRT-RTX wheel:</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">--windows-on-arm</span></code> option explicitly selects ARM64 while the build is
+running under x64 Python. It also selects Bazel’s x64-to-ARM64 MSVC
+toolchain and emits a <code class="docutils literal notranslate"><span class="pre">win_arm64</span></code> wheel.</p>
+</li>
+<li><p>Confirm that the generated wheel is tagged for ARM64:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">dir</span> dist\*win_arm64.whl
+</pre></div>
+</div>
+<p>An ARM64 wheel cannot be imported by the x64 host Python used for the
+cross-build. Copy the wheel to a Windows ARM64 machine, install it into a
+matching ARM64 Python environment, and run:</p>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>python -m pip install C:\path\to\the\generated-win_arm64.whl
+python -c <span class="s2">&quot;import torch_tensorrt; print(torch_tensorrt.__version__)&quot;</span>
+</pre></div>
+</div>
+</li>
+</ol>
 </section>
 </section>
 
@@ -607,20 +654,20 @@ document.write(`
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="namespace_torch_tensorrt.html"
+       href="tensorrt_rtx.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Namespace torch_tensorrt</p>
+        <p class="prev-next-title">Torch-TensorRT for RTX</p>
       </div>
     </a>
     <a class="right-next"
-       href="namespace_torch_tensorrt__executorch_backend__detail.html"
+       href="../user_guide/index.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Namespace torch_tensorrt::executorch_backend::detail</p>
+        <p class="prev-next-title">User Guide</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -642,9 +689,9 @@ document.write(`
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#namespaces">Namespaces</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#typedefs">Typedefs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#native-build-on-windows-arm64">Native build on Windows ARM64</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cross-build-on-windows-x64">Cross-build on Windows x64</a></li>
 </ul>
   </nav></div>
 
@@ -652,7 +699,7 @@ document.write(`
 
   
   <div class="tocsection editthispage">
-    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/_cpp_api/namespace_torch_tensorrt__executorch_backend.rst">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/getting_started/windows_arm64.rst">
       <i class="fa-solid fa-pencil"></i>
       
       
@@ -667,7 +714,7 @@ document.write(`
   <div class="sidebar-secondary-item">
 
   <div class="tocsection sourcelink">
-    <a href="../_sources/_cpp_api/namespace_torch_tensorrt__executorch_backend.rst.txt">
+    <a href="../_sources/getting_started/windows_arm64.rst.txt">
       <i class="fa-solid fa-file-lines"></i> Show Source
     </a>
   </div>
