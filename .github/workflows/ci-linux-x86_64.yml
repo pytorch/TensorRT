@@ -10,15 +10,13 @@ on:
   pull_request_review:
     types: [submitted]
   push:
-    branches: [main]
-  schedule:
-    - cron: "0 7 * * *"
+    branches: [main, nightly, 'release/**']
   workflow_dispatch:
     inputs:
       lane:
         description: "Which lane to run"
         type: choice
-        options: [fast, full, nightly]
+        options: [fast, full, nightly, release]
         default: full
       backend:
         description: "Which backend(s) to test"

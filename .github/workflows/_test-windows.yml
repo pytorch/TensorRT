@@ -10,7 +10,7 @@ on:
   workflow_call:
     inputs:
       lane:
-        description: "fast | full | nightly"
+        description: "fast | full | nightly | release"
         required: true
         type: string
       use-rtx:
@@ -52,7 +52,7 @@ jobs:
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(inputs.raw-matrix) }}
           # Build one representative wheel for PR-triggered runs (any lane);
-          # the full python×cuda matrix only on push-to-main and nightly.
+          # the full python×cuda matrix on main, nightly, and release pushes.
           LIMIT_PR=${{ (github.event_name == 'push' || github.event_name == 'schedule') && 'false' || 'true' }}
           MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx ${{ inputs.use-rtx }} --limit-pr-builds "${LIMIT_PR}" --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"

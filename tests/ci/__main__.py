@@ -179,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
         "run-lane", help="run every suite in a lane/tier, past failures"
     )
     g = sp.add_mutually_exclusive_group()
-    g.add_argument("--lane", choices=("fast", "full", "nightly", "python-only"))
+    g.add_argument("--lane", choices=("fast", "full", "nightly", "release", "python-only"))
     g.add_argument("--tier", choices=("l0", "l1", "l2"))
     sp.add_argument("--variant", choices=("standard", "rtx"))
     sp.add_argument("--platform", choices=("linux-x86_64", "windows"))
@@ -194,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sp = sub.add_parser("matrix", help="emit a GitHub Actions matrix as JSON")
     g = sp.add_mutually_exclusive_group()
-    g.add_argument("--lane", choices=("fast", "full", "nightly", "python-only"))
+    g.add_argument("--lane", choices=("fast", "full", "nightly", "release", "python-only"))
     g.add_argument("--tier", choices=("l0", "l1", "l2"))
     sp.add_argument("--variant", choices=("standard", "rtx"))
     sp.add_argument("--platform", choices=("linux-x86_64", "windows"))

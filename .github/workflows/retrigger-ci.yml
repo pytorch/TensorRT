@@ -10,7 +10,7 @@ name: Retrigger CI
 #   /cancel all     cancel EVERY in-flight run for this PR (full stop)
 #   /test <lane> [backend]
 #                   dispatch a fresh run on this PR's branch — lane ∈
-#                   fast|full|nightly, backend ∈ standard|rtx|both (default both).
+#                   fast|full|nightly|release, backend ∈ standard|rtx|both (default both).
 #                   e.g. `/test full rtx`, `/test nightly`, `/test full`
 #
 # The comment author must have write access to the repo.
@@ -64,7 +64,7 @@ jobs:
             // ── /test <lane> [backend] — dispatch a run with an exact lane ──
             if (body.startsWith('/test')) {
               const parts = body.split(/\s+/).slice(1);
-              const lane = ['fast', 'full', 'nightly'].includes(parts[0]) ? parts[0] : 'full';
+              const lane = ['fast', 'full', 'nightly', 'release'].includes(parts[0]) ? parts[0] : 'full';
               const backend = ['standard', 'rtx', 'both'].includes(parts[1]) ? parts[1] : 'both';
               let dispatched = 0;
               for (const wf of ['ci-linux-x86_64.yml', 'ci-windows.yml', 'ci-sbsa.yml']) {

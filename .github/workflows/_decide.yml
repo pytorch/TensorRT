@@ -5,7 +5,8 @@ name: _decide
 # rules live in exactly one place. `github.*` here refers to the caller's event.
 #
 #   lane:    fast (PR push) | full (approval / `ci: full` / main push) |
-#            nightly (schedule) | skip (non-approval review)
+#            nightly (nightly push) | release (release branch push) |
+#            skip (non-approval review)
 #   backend: standard | rtx | both  — from the `backend: TensorRT[-RTX]` labels
 #            (or the workflow_dispatch `backend` input)
 
@@ -13,7 +14,7 @@ on:
   workflow_call:
     outputs:
       lane:
-        description: "fast | full | nightly | skip"
+        description: "fast | full | nightly | release | skip"
         value: ${{ jobs.decide.outputs.lane }}
       backend:
         description: "standard | rtx | both"
@@ -29,6 +30,7 @@ jobs:
       - id: pick
         env:
           EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           REVIEW_STATE: ${{ github.event.review.state }}
           # Lane labels (consolidated): `ci: full` runs all tiers (L0+L1+L2);
           # `ci: nightly` also adds the nightly-only suites. Neither → fast (L0
@@ -46,7 +48,12 @@ jobs:
           case "$EVENT" in
             schedule)           lane=nightly ;;
             workflow_dispatch)  lane="${DISPATCH_LANE:-full}" ;;
-            push)               lane=full ;;                  # main canary
+            push)
+              case "$REF" in
+                refs/heads/nightly)   lane=nightly ;;
+                refs/heads/release/*) lane=release ;;
+                *)                    lane=full ;;
+              esac ;;
             pull_request_review)
               [ "$REVIEW_STATE" = "approved" ] && lane=full || lane=skip ;;
             pull_request)

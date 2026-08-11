@@ -12,15 +12,13 @@ on:
   pull_request_review:
     types: [submitted]
   push:
-    branches: [main]
-  schedule:
-    - cron: "0 7 * * *"
+    branches: [main, nightly, 'release/**']
   workflow_dispatch:
     inputs:
       lane:
         description: "Which lane to run"
         type: choice
-        options: [fast, full, nightly]
+        options: [fast, full, nightly, release]
         default: full
       backend:
         description: "Which backend(s) to test"
@@ -65,7 +63,7 @@ jobs:
 
   build:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly' || needs.decide.outputs.lane == 'release') && needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
@@ -76,7 +74,7 @@ jobs:
 
   python-only:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly' || needs.decide.outputs.lane == 'release') && needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: python-only
@@ -91,7 +89,7 @@ jobs:
   # @tensorrt_rtx_sbsa. Build-only, same as the standard SBSA channels.
   build-rtx:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly' || needs.decide.outputs.lane == 'release') && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
@@ -103,7 +101,7 @@ jobs:
 
   python-only-rtx:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly' || needs.decide.outputs.lane == 'release') && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: python-only

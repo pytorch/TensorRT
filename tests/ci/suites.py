@@ -6,7 +6,7 @@ grouped two ways:
 
   * ``tier``  — the legacy L0/L1/L2 grouping, kept so the migration can be
     coverage-equivalent to today's ``ci_helpers.sh`` (``ci matrix --tier l0``).
-  * ``lanes`` — the target grouping (``fast`` / ``full`` / ``nightly``) the
+  * ``lanes`` — the target grouping (``fast`` / ``full`` / ``nightly`` / ``release``) the
     redesign moves to (``ci matrix --lane fast``). Depth within a subsystem is
     expressed by a marker on the test, not a filename prefix.
 
@@ -33,8 +33,8 @@ from typing import Any, Literal
 Tier = Literal["l0", "l1", "l2"]
 # python-only validates the PYTHON_ONLY=1 wheel (no C++ runtime) against the
 # dynamo runtime suite. It's its own lane because it pairs a distinct BUILD mode
-# with a focused test set, orthogonal to fast/full/nightly depth.
-Lane = Literal["fast", "full", "nightly", "python-only"]
+# with a focused test set, orthogonal to fast/full/nightly/release depth.
+Lane = Literal["fast", "full", "nightly", "release", "python-only"]
 Variant = Literal["standard", "rtx"]
 # Test channels. SBSA (linux-aarch64) is build-only — no GPU test runners — so it
 # is a build channel handled at the workflow level, not a suite platform here.
