@@ -75,6 +75,17 @@ target_link_libraries(portable_lib PRIVATE
   extension_threadpool
   CUDA::cudart TensorRT::nvinfer Threads::Threads)
 
+# The build and validation containers do not necessarily provide the same
+# libstdc++. Statically link the C++ runtime into both Python extensions so a
+# wheel built with a newer compiler does not require newer CXXABI symbols from
+# the host, such as exception_ptr::_M_addref.
+foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
+  target_link_options(${_torch_tensorrt_executorch_runtime_target} PRIVATE
+    -static-libstdc++
+    -static-libgcc
+    -Wl,-Bsymbolic)
+endforeach()
+
 # The runtime wheel intentionally does not bundle PyTorch, TensorRT, or CUDA.
 # TensorRT and CUDA pip packages install their shared libraries in sibling
 # directories under site-packages, relative to this extension package.
