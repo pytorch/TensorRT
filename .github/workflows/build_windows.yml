@@ -185,12 +185,28 @@ jobs:
           CUDA_INSTALLER_URL: https://packages.nvidia.com/prerelease/cuda/13.4.0/local_installers/cuda_13.4.0_windows_x86_64.exe
           CUDA_ROOT: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4
         run: |
+          $ErrorActionPreference = 'Stop'
           $installer = Join-Path $env:RUNNER_TEMP "cuda_13.4.0_windows_x86_64.exe"
-          Invoke-WebRequest -Uri $env:CUDA_INSTALLER_URL -OutFile $installer
-          $process = Start-Process -FilePath $installer -ArgumentList "-s" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "CUDA 13.4 installer failed with exit code $($process.ExitCode)" }
           $cudaArm64Lib = Join-Path $env:CUDA_ROOT "lib\arm64\cudart.lib"
-          if (-not (Test-Path -LiteralPath $cudaArm64Lib -PathType Leaf)) { throw "CUDA 13.4 ARM64 target library was not installed: $cudaArm64Lib" }
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            try {
+              # Always redownload: a failed transfer can leave a partial installer behind.
+              Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+              Invoke-WebRequest -Uri $env:CUDA_INSTALLER_URL -OutFile $installer
+              $process = Start-Process -FilePath $installer -ArgumentList "-s" -Wait -PassThru
+              if ($process.ExitCode -ne 0) { throw "CUDA 13.4 installer failed with exit code $($process.ExitCode)" }
+              if (-not (Test-Path -LiteralPath $cudaArm64Lib -PathType Leaf)) {
+                throw "CUDA 13.4 ARM64 target library was not installed: $cudaArm64Lib"
+              }
+              break
+            } catch {
+              if ($attempt -eq $maxAttempts) { throw }
+              $delaySeconds = 60 * $attempt
+              Write-Warning "CUDA 13.4 ARM64 installation attempt $attempt/$maxAttempts failed: $($_.Exception.Message). Retrying in $delaySeconds seconds."
+              Start-Sleep -Seconds $delaySeconds
+            }
+          }
           "CUDA_PATH=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "TORCHTRT_CROSS_COMPILE_CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -576,7 +592,7 @@ jobs:
         name: Teardown Windows
 
   upload:
-    needs: build
+    needs: [build, prepare-upload]
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # if it is the release wheel or tarball, then skip upload to pytorch index(release wheel are uploaded to pypi)
     if: ${{ inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
@@ -585,13 +601,31 @@ jobs:
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
-      build-matrix: ${{ inputs.build-matrix }}
+      build-matrix: ${{ needs.prepare-upload.outputs.build-matrix }}
       trigger-event: ${{ inputs.trigger-event }}
-      architecture: ${{ inputs.architecture }}
+      architecture: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
     secrets:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+  prepare-upload:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      build-matrix: ${{ steps.build-matrix.outputs.value }}
+    steps:
+      - id: build-matrix
+        env:
+          BUILD_MATRIX: ${{ inputs.build-matrix }}
+        run: |
+          if [[ "${{ inputs.cross-compile }}" == "true" ]]; then
+            # ARM64 cross builds use CUDA 13.4 target libraries and publish a cu134 artifact.
+            build_matrix="$(jq -c '.include |= map(.desired_cuda = "cu134")' <<< "${BUILD_MATRIX}")"
+          else
+            build_matrix="${BUILD_MATRIX}"
+          fi
+          echo "value=${build_matrix}" >> "${GITHUB_OUTPUT}"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ inputs.is-release-wheel }}-${{ inputs.is-release-tarball }}-${{ github.event_name == 'workflow_dispatch' }}-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'no-tag' }}-${{ inputs.use-rtx }}-${{ inputs.build-flavor }}
