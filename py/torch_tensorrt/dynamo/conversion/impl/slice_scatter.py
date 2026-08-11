@@ -222,7 +222,7 @@ def slice_scatter(
         runtime_src_shape = []
         for axis, size in enumerate(src_shape):
             if axis == dim % rank:
-                runtime_src_shape.append(len(indices_np))
+                runtime_src_shape.append(indices_np.shape[axis])
             elif size == DYNAMIC_DIM:
                 runtime_src_shape.append(
                     get_shape(
