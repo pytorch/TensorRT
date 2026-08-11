@@ -297,12 +297,7 @@ def select(
         if aff is not None:  # None → a broad change → do not narrow
             pool = [s for s in pool if s.name in aff]
     for s in pool:
-        if lane == "nightly":
-            # Nightly coverage is the deduplicated union of full and
-            # nightly-only suites.
-            if not {"full", "nightly"}.intersection(s.lanes):
-                continue
-        elif lane is not None and lane not in s.lanes:
+        if lane is not None and lane not in s.lanes:
             continue
         if tier is not None and s.tier != tier:
             continue
