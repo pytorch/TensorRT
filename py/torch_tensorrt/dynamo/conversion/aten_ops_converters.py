@@ -488,6 +488,54 @@ def aten_ops_hardtanh(
     )
 
 
+def glu_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    input_meta = node.args[0].meta
+    input_val = input_meta.get("tensor_meta")
+    if input_val is None:
+        input_val = input_meta.get("val")
+    if input_val is None:
+        _LOGGER.warning(
+            "Meta information of input is missing. Unable to validate GLU's "
+            "split dimension, falling back to PyTorch operation."
+        )
+        return False
+
+    input_shape = input_val.shape
+    dim = get_positive_dim(args_bounds_check(node.args, 1, -1), len(input_shape))
+    split_dim_size = input_shape[dim]
+
+    return isinstance(split_dim_size, int) and split_dim_size % 2 == 0
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.glu.default,
+    capability_validator=glu_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_glu(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = args[0]
+    dim = get_positive_dim(args_bounds_check(args, 1, -1), len(input_val.shape))
+    split_size = input_val.shape[dim] // 2
+    first, second = impl.split.split(
+        ctx, target, SourceIR.ATEN, f"{name}_split", input_val, split_size, dim
+    )
+    gated = impl.activation.sigmoid(
+        ctx, target, SourceIR.ATEN, f"{name}_sigmoid", second
+    )
+    return impl.elementwise.mul(ctx, target, SourceIR.ATEN, f"{name}_mul", first, gated)
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default, supports_dynamic_shapes=True)
 def aten_ops_sigmoid(
     ctx: ConversionContext,
