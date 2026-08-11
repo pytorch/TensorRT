@@ -11,6 +11,9 @@ bazel_dep(name = "rules_python", version = "1.3.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
+cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
+use_repo(cc_configure, "local_config_cc")
+
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     ignore_root_user_error = True,
@@ -69,6 +72,14 @@ new_local_repository(
 
 new_local_repository(
     name = "cuda_win",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "${CUDA_HOME}",
+)
+
+# ARM64 target sysroot; this must contain lib/arm64/cudart.lib and must not
+# point at the x86_64 host CUDA installation above.
+new_local_repository(
+    name = "cuda_win_arm64",
     build_file = "@//third_party/cuda:BUILD",
     path = "${CUDA_HOME}",
 )
@@ -158,6 +169,15 @@ http_archive(
     ],
 )
 
+http_archive(
+    name = "tensorrt_rtx_win_arm64",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.6.1.120",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-arm64-cuda-13.4-Release-external.zip",
+    ],
+)
+
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
@@ -174,6 +194,15 @@ new_local_repository(
     name = "libtorch_win",
     path = "${TORCH_INSTALL_PATH}",
     build_file = "third_party/libtorch/BUILD"
+)
+
+http_archive(
+    name = "libtorch_win_arm64",
+    build_file = "third_party/libtorch/BUILD",
+    sha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200",
+    strip_prefix = "torch",
+    type = "zip",
+    urls = ["https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.14.0.dev20260728%2Bcu134-cp313-cp313-win_arm64.whl"],
 )
 
 new_local_repository(

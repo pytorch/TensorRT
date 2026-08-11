@@ -1377,6 +1377,13 @@ class Platform(Enum):
 
     UNKNOWN = auto()
 
+    WIN_ARM64 = auto()
+    """
+    OS: Windows, CPU Arch: ARM64
+
+    :meta hide-value:
+    """
+
     @classmethod
     def current_platform(cls) -> Platform:
         """
@@ -1406,11 +1413,13 @@ class Platform(Enum):
             # Windows...
             machine = platform.machine().lower()
             python_platform = sysconfig.get_platform().lower()
-            if (
-                machine.startswith("amd64")
-                or machine.startswith("x86_64")
-                or python_platform in ("win-amd64", "win_amd64")
-            ):
+            if python_platform in ("win-arm64", "win_arm64"):
+                return Platform.WIN_ARM64
+            elif python_platform in ("win-amd64", "win_amd64"):
+                return Platform.WIN_X86_64
+            elif machine.startswith(("arm64", "aarch64")):
+                return Platform.WIN_ARM64
+            elif machine.startswith(("amd64", "x86_64")):
                 return Platform.WIN_X86_64
 
         return Platform.UNKNOWN
@@ -1427,6 +1436,8 @@ class Platform(Enum):
             return cast(str, torch.ops.tensorrt._platform_linux_aarch64())
         elif self == Platform.WIN_X86_64:
             return cast(str, torch.ops.tensorrt._platform_win_x86_64())
+        elif self == Platform.WIN_ARM64:
+            return cast(str, torch.ops.tensorrt._platform_win_arm64())
 
         return cast(str, torch.ops.tensorrt._platform_unknown())
 
@@ -1439,4 +1450,6 @@ class Platform(Enum):
             return cls.LINUX_AARCH64
         elif val == torch.ops.tensorrt._platform_win_x86_64():
             return cls.WIN_X86_64
+        elif val == torch.ops.tensorrt._platform_win_arm64():
+            return cls.WIN_ARM64
         return cls.UNKNOWN

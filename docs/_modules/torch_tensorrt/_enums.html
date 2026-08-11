@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=a0a7db6e"></script>
+    <script src="../../_static/documentation_options.js?v=ebdd5c2b"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1901,6 +1901,13 @@ document.write(`
 
     <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
 
+    <span class="n">WIN_ARM64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OS: Windows, CPU Arch: ARM64</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">current_platform</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Platform</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -1930,11 +1937,13 @@ document.write(`
             <span class="c1"># Windows...</span>
             <span class="n">machine</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
             <span class="n">python_platform</span> <span class="o">=</span> <span class="n">sysconfig</span><span class="o">.</span><span class="n">get_platform</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="n">machine</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;amd64&quot;</span><span class="p">)</span>
-                <span class="ow">or</span> <span class="n">machine</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;x86_64&quot;</span><span class="p">)</span>
-                <span class="ow">or</span> <span class="n">python_platform</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;win-amd64&quot;</span><span class="p">,</span> <span class="s2">&quot;win_amd64&quot;</span><span class="p">)</span>
-            <span class="p">):</span>
+            <span class="k">if</span> <span class="n">python_platform</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;win-arm64&quot;</span><span class="p">,</span> <span class="s2">&quot;win_arm64&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_ARM64</span>
+            <span class="k">elif</span> <span class="n">python_platform</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;win-amd64&quot;</span><span class="p">,</span> <span class="s2">&quot;win_amd64&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_X86_64</span>
+            <span class="k">elif</span> <span class="n">machine</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;arm64&quot;</span><span class="p">,</span> <span class="s2">&quot;aarch64&quot;</span><span class="p">)):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_ARM64</span>
+            <span class="k">elif</span> <span class="n">machine</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;amd64&quot;</span><span class="p">,</span> <span class="s2">&quot;x86_64&quot;</span><span class="p">)):</span>
                 <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_X86_64</span>
 
         <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">UNKNOWN</span>
@@ -1951,6 +1960,8 @@ document.write(`
             <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_linux_aarch64</span><span class="p">())</span>
         <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_X86_64</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_win_x86_64</span><span class="p">())</span>
+        <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_ARM64</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_win_arm64</span><span class="p">())</span>
 
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_unknown</span><span class="p">())</span>
 
@@ -1963,6 +1974,8 @@ document.write(`
             <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">LINUX_AARCH64</span>
         <span class="k">elif</span> <span class="n">val</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_win_x86_64</span><span class="p">():</span>
             <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">WIN_X86_64</span>
+        <span class="k">elif</span> <span class="n">val</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_win_arm64</span><span class="p">():</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">WIN_ARM64</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">UNKNOWN</span>
 </pre></div>
 

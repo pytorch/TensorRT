@@ -1,0 +1,53 @@
+name: CI Windows ARM64
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+concurrency:
+  # Keep one active ARM64 run per PR/ref; CI-control labels supersede the prior run,
+  # while unrelated label churn remains isolated.
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
+  cancel-in-progress: true
+
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  build:
+    uses: ./.github/workflows/build_windows.yml
+    with:
+      repository: ${{ github.repository }}
+      ref: ""
+      build-matrix: >-
+        {"include":[{"build_name":"windows-arm64-cross","python_version":"3.13","desired_cuda":"cu132","validation_runner":"windows.g5.4xlarge.nvidia.gpu"}]}
+      architecture: x64
+      cross-compile: true
+      pre-script: packaging/pre_build_script_windows.sh
+      use-rtx: true
+      timeout: 180
+      skip-binary-upload: false
+
+  gate:
+    needs: [build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate Windows ARM64 builds
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          set -euo pipefail
+          if [[ "${BUILD_RESULT}" != "success" ]]; then
+            exit 1
+          fi
+          echo "Windows ARM64 RTX cross-build gate passed."
