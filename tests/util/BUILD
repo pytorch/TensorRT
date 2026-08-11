@@ -66,8 +66,20 @@ config_setting(
 )
 
 config_setting(
-    name = "rtx_win",
+    name = "rtx_win_x86_64",
     constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "rtx_win_arm64",
+    constraint_values = [
+        "@platforms//cpu:arm64",
         "@platforms//os:windows",
     ],
     flag_values = {
@@ -91,9 +103,10 @@ cc_library(
         "@googletest//:gtest_main",
     ] + select({
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],
-        ":rtx_win": ["@tensorrt_rtx_win//:nvinfer"],
-        ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
         ":rtx_sbsa": ["@tensorrt_rtx_sbsa//:nvinfer"],
+        ":rtx_win_arm64": ["@tensorrt_rtx_win_arm64//:nvinfer"],
+        ":rtx_win_x86_64": ["@tensorrt_rtx_win//:nvinfer"],
+        ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
         ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
         ":windows": ["@tensorrt_win//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],
