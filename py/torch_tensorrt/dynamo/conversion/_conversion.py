@@ -4,6 +4,7 @@ import io
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -24,8 +25,6 @@ from torch_tensorrt.dynamo.utils import (
     release_host_and_device_memory,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +216,48 @@ def interpret_module_to_result(
     Returns:
         SerializedInterpreterResult
     """
+    from torch_tensorrt.dynamo.tuning import (
+        gpt_settings_requested,
+        require_global_perf_tuner,
+        should_run_tuning,
+        tune_subgraph,
+        validate_tuning_options,
+    )
+
+    if gpt_settings_requested(settings) or should_run_tuning(settings):
+        require_global_perf_tuner("Requested Global Performance Tuner settings")
+        validate_tuning_options(settings)
+
+    if should_run_tuning(settings):
+        return tune_subgraph(
+            module,
+            inputs,
+            settings,
+            engine_cache=engine_cache,
+            input_binding_names=input_binding_names,
+            output_binding_names=output_binding_names,
+        )
+
+    return _interpret_module_to_result_impl(
+        module,
+        inputs,
+        settings,
+        engine_cache,
+        input_binding_names=input_binding_names,
+        output_binding_names=output_binding_names,
+    )
+
+
+def _interpret_module_to_result_impl(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    settings: CompilationSettings = CompilationSettings(),
+    engine_cache: Optional[BaseEngineCache] = None,
+    *,
+    input_binding_names: Optional[Sequence[str]] = None,
+    output_binding_names: Optional[Sequence[str]] = None,
+) -> SerializedInterpreterResult:
+    """Interpret an FX module to a TRTInterpreterResult (single build, no GPT sweep)."""
 
     symbolic_shape_expressions = extract_symbolic_shape_expressions(module)
     if symbolic_shape_expressions is None:

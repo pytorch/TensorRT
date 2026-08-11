@@ -5,7 +5,6 @@ import logging
 import os
 import platform
 import warnings
-
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
@@ -484,6 +483,18 @@ def compile(
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
+    build_route: str = _defaults.BUILD_ROUTE,
+    tune_build_routes: str = _defaults.TUNE_BUILD_ROUTES,
+    tune_build_route_file: Optional[str] = _defaults.TUNE_BUILD_ROUTE_FILE,
+    tuning_search: str = _defaults.TUNING_SEARCH,
+    tuning_timeout_s: int = _defaults.TUNING_TIMEOUT_S,
+    tuning_cache_file: Optional[str] = _defaults.TUNING_CACHE_FILE,
+    tuning_continue: bool = _defaults.TUNING_CONTINUE,
+    tuning_dry_run: bool = _defaults.TUNING_DRY_RUN,
+    accuracy_threshold: Optional[float] = _defaults.ACCURACY_THRESHOLD,
+    accuracy_algorithm: str = _defaults.ACCURACY_ALGORITHM,
+    accuracy_atol: float = _defaults.ACCURACY_ATOL,
+    accuracy_rtol: float = _defaults.ACCURACY_RTOL,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -578,6 +589,18 @@ def compile(
             the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
+        build_route (str): TensorRT Global Performance Tuner build route string (space-separated "-knob=value" tokens). Empty uses the default route. This feature requires TensorRT with Global Performance Tuner enabled; currently unavailable on TensorRT-RTX / Windows.
+        tune_build_routes (str): Build-route expression for an in-process autotuning sweep (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). Empty disables tuning.
+        tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".
+        tuning_search (str): Search algorithm: "fast", "full", or "mixed". Default is "fast". "fast" runs a baseline with all knobs at default, then varies one knob at a time. "full" runs a full grid search. "mixed" runs "fast" first, and then "full" only on knobs that improved performance.
+        tuning_timeout_s (int): Time budget for the entire tuning process. The current iteration finishes before the loop stops. Use -1 (default) to disable the timeout. Helpful for capping large "full" sweeps.
+        tuning_cache_file (Optional[str]): JSONL path for tuning results / resume.
+        tuning_continue (bool): Resume an interrupted sweep from "tuning_cache_file". When it is True, "tuning_cache_file" must be provided; "tune_build_routes", "tune_build_route_file", and "tuning_dry_run" must not be provided.
+        tuning_dry_run (bool): Enumerate candidate routes without building engines.
+        accuracy_threshold (Optional[float]): Max allowed accuracy loss between the engine outputs and eager Torch reference outputs; routes with accuracy loss above this threshold are excluded from best-engine selection. "None" skips accuracy checks.
+        accuracy_algorithm (str): Loss metric: "l0", "l1", "l2", "lInf", or "cos" (lower is better).
+        accuracy_atol (float): Absolute tolerance for "accuracy_algorithm="l0"".
+        accuracy_rtol (float): Relative tolerance for "accuracy_algorithm="l0"".
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -767,6 +790,18 @@ def compile(
         "decompose_attention": decompose_attention,
         "attn_bias_is_causal": attn_bias_is_causal,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
+        "build_route": build_route,
+        "tune_build_routes": tune_build_routes,
+        "tune_build_route_file": tune_build_route_file,
+        "tuning_search": tuning_search,
+        "tuning_timeout_s": tuning_timeout_s,
+        "tuning_cache_file": tuning_cache_file,
+        "tuning_continue": tuning_continue,
+        "tuning_dry_run": tuning_dry_run,
+        "accuracy_threshold": accuracy_threshold,
+        "accuracy_algorithm": accuracy_algorithm,
+        "accuracy_atol": accuracy_atol,
+        "accuracy_rtol": accuracy_rtol,
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
