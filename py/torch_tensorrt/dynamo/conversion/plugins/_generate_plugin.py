@@ -3,7 +3,7 @@ import itertools
 import logging
 import re
 from types import FunctionType
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -13,7 +13,6 @@ from sympy import lambdify
 from torch._dynamo.source import LocalSource
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
-
 from torch_tensorrt._features import needs_qdp_plugin
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -95,7 +94,12 @@ def mksym(
     )
 
 
-def _generate_plugin(plugin_name: str) -> None:
+def _generate_plugin(
+    plugin_name: str,
+    *,
+    aot_impl: Optional[Callable[..., Any]] = None,
+    autotune: Optional[Callable[..., Any]] = None,
+) -> None:
     try:
         import tensorrt.plugin as trtp
     except ImportError as e:
@@ -340,14 +344,29 @@ def _generate_plugin(plugin_name: str) -> None:
 
     trtp.impl(plugin_name)(plugin_impl)
 
+    if autotune is not None:
+        trtp.autotune(plugin_name)(autotune)
+
+    if aot_impl is not None:
+        trtp.aot_impl(plugin_name)(aot_impl)
+
 
 @needs_qdp_plugin  # type: ignore
-def generate_plugin(plugin_name: str) -> None:
+def generate_plugin(
+    plugin_name: str,
+    *,
+    aot_impl: Optional[Callable[..., Any]] = None,
+    autotune: Optional[Callable[..., Any]] = None,
+) -> None:
     """
     Generate the Plugin using external kernels and TensorRT Quick Deployable Plugin APIs.
 
     Args:
         plugin_name: the plugin name that is used to generate the plugin automatically.
             There should be existing kernels and pytorch custom operation for this plugin name.
+        aot_impl: optional callback registered with ``tensorrt.plugin.aot_impl``.
+            The callback owns kernel compilation and the QDP launch contract;
+            Torch-TensorRT does not rewrite the generated PTX or CUBIN.
+        autotune: optional callback registered with ``tensorrt.plugin.autotune``.
     """
-    _generate_plugin(plugin_name)
+    _generate_plugin(plugin_name, aot_impl=aot_impl, autotune=autotune)
