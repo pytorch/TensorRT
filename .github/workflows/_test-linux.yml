@@ -14,7 +14,7 @@ on:
   workflow_call:
     inputs:
       lane:
-        description: "fast | full | nightly | release"
+        description: "fast | full | nightly"
         required: true
         type: string
       use-rtx:

@@ -16,7 +16,7 @@ on:
       lane:
         description: "Which lane to run"
         type: choice
-        options: [fast, full, nightly, release]
+        options: [fast, full, nightly]
         default: full
       backend:
         description: "Which backend(s) to test"

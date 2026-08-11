@@ -5,8 +5,7 @@ name: _decide
 # rules live in exactly one place. `github.*` here refers to the caller's event.
 #
 #   lane:    fast (PR push) | full (approval / `ci: full` / main push) |
-#            nightly (nightly push) | release (release branch push) |
-#            skip (non-approval review)
+#            nightly (nightly or release-branch push) | skip (non-approval review)
 #   backend: standard | rtx | both  — from the `backend: TensorRT[-RTX]` labels
 #            (or the workflow_dispatch `backend` input)
 
@@ -14,7 +13,7 @@ on:
   workflow_call:
     outputs:
       lane:
-        description: "fast | full | nightly | release | skip"
+        description: "fast | full | nightly | skip"
         value: ${{ jobs.decide.outputs.lane }}
       backend:
         description: "standard | rtx | both"
@@ -51,7 +50,7 @@ jobs:
             push)
               case "$REF" in
                 refs/heads/nightly)   lane=nightly ;;
-                refs/heads/release/*) lane=release ;;
+                refs/heads/release/*) lane=nightly ;;
                 *)                    lane=full ;;
               esac ;;
             pull_request_review)

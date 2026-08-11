@@ -16,7 +16,7 @@ on:
       lane:
         description: "Which lane to run"
         type: choice
-        options: [fast, full, nightly, release]
+        options: [fast, full, nightly]
         default: full
       backend:
         description: "Which backend(s) to test"
@@ -63,7 +63,7 @@ jobs:
 
   standard:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly' || needs.decide.outputs.lane == 'release') && needs.decide.outputs.backend != 'rtx'
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
@@ -73,7 +73,7 @@ jobs:
 
   rtx:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly' || needs.decide.outputs.lane == 'release') && needs.decide.outputs.backend != 'standard'
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
@@ -84,7 +84,7 @@ jobs:
 
   python-only:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly' || needs.decide.outputs.lane == 'release') && needs.decide.outputs.backend != 'rtx'
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: python-only
@@ -95,7 +95,7 @@ jobs:
   # python-only against TensorRT-RTX (so backend=both runs BOTH python-only variants).
   python-only-rtx:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly' || needs.decide.outputs.lane == 'release') && needs.decide.outputs.backend != 'standard'
+    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: python-only
