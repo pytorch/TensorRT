@@ -819,7 +819,16 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         the enqueue stream). Used by auto-selection, which switches on
         ``_engine_stream`` before ``execute_async_v3``. Mirrors the C++ runtime.
         """
-        if self.num_optimization_profiles <= 1:
+        # An index this engine does not have is a request that cannot be honored,
+        # so say so rather than no-op quietly. Covers the single-profile engine
+        # too, where 0 is the only valid index. Reachable only by calling the
+        # engine directly; optimization_profile() validates the index first.
+        if not 0 <= profile_index < self.num_optimization_profiles:
+            logger.warning(
+                f"Ignoring optimization profile index {profile_index}: this engine has "
+                f"{self.num_optimization_profiles} optimization profile(s), so it stays on "
+                f"profile {self._active_profile_index}."
+            )
             return
         if profile_index == self._active_profile_index:
             return
