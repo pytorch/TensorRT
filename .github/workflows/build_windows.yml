@@ -234,6 +234,9 @@ jobs:
         run: |
           source "${BUILD_ENV_FILE}"
           : "${BUILD_VERSION:?setup-binary-builds did not provide BUILD_VERSION}"
+          # The host build environment remains cu132, but the ARM64 target sysroot
+          # and published wheel target CUDA 13.4.
+          BUILD_VERSION="${BUILD_VERSION%+*}+cu134"
           echo "BUILD_VERSION=${BUILD_VERSION}" >> "${GITHUB_ENV}"
           : "${ARTIFACT_NAME:?setup-binary-builds did not provide ARTIFACT_NAME}"
           echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "${GITHUB_ENV}"
