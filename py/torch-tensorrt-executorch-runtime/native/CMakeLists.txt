@@ -1,4 +1,22 @@
 cmake_minimum_required(VERSION 3.24)
+
+# rules_foreign_cc initializes these flags with an explicit dynamic -lstdc++.
+# CMake consumes the *_INIT variables when project() enables CXX, so removing
+# it later from CMAKE_{MODULE,SHARED}_LINKER_FLAGS is too late on some CMake
+# versions: the dynamic runtime is already retained in the generated link
+# rule. Preserve the remaining Bazel toolchain flags, but remove only that
+# dependency before CMake initializes the language.
+foreach(_torch_tensorrt_linker_flags_init
+    CMAKE_MODULE_LINKER_FLAGS_INIT
+    CMAKE_SHARED_LINKER_FLAGS_INIT)
+  string(REPLACE "-Wl,--push-state,-as-needed -lstdc++ -Wl,--pop-state" ""
+    _torch_tensorrt_sanitized_linker_flags
+    "${${_torch_tensorrt_linker_flags_init}}")
+  set(${_torch_tensorrt_linker_flags_init}
+    "${_torch_tensorrt_sanitized_linker_flags}" CACHE STRING
+    "Torch-TensorRT sanitized linker flags" FORCE)
+endforeach()
+
 project(torch_tensorrt_executorch_runtime LANGUAGES CXX)
 
 if(NOT EXECUTORCH_SOURCE_DIR AND EXECUTORCH_CMAKE_FILE)
@@ -110,7 +128,7 @@ foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
   set_property(TARGET ${_torch_tensorrt_executorch_runtime_target}
     PROPERTY LINKER_LANGUAGE CXX)
   target_link_libraries(${_torch_tensorrt_executorch_runtime_target} PRIVATE
-    "${TORCH_TENSORRT_STATIC_LIBSTDCXX}"
+    "$<LINK_LIBRARY:WHOLE_ARCHIVE,${TORCH_TENSORRT_STATIC_LIBSTDCXX}>"
     "${TORCH_TENSORRT_STATIC_LIBGCC}")
   target_link_options(${_torch_tensorrt_executorch_runtime_target} PRIVATE
     -static-libstdc++
