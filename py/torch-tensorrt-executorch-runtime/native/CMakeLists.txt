@@ -76,10 +76,42 @@ target_link_libraries(portable_lib PRIVATE
   CUDA::cudart TensorRT::nvinfer Threads::Threads)
 
 # The build and validation containers do not necessarily provide the same
-# libstdc++. Statically link the C++ runtime into both Python extensions so a
-# wheel built with a newer compiler does not require newer CXXABI symbols from
-# the host, such as exception_ptr::_M_addref.
+# libstdc++. Link the C++ runtime archives explicitly into both Python
+# extensions. In particular, data_loader is an ExecuTorch target and merely
+# passing -static-libstdc++ as a driver option was not sufficient to prevent
+# its shared object from retaining an unresolved
+# exception_ptr::_M_addref reference on the older CI runtime.
+execute_process(
+  COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.a
+  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBSTDCXX
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(
+  COMMAND "${CMAKE_CXX_COMPILER}" -print-libgcc-file-name
+  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBGCC
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
+   NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBGCC}")
+  message(FATAL_ERROR "A static C++ runtime is required to build the ExecuTorch runtime wheel")
+endif()
+
+# rules_foreign_cc injects an explicit dynamic -lstdc++ into module and shared
+# linker flags. Remove only that scoped fragment: the archives below provide
+# the C++ runtime, and retaining this injected library makes the wheel depend
+# on the build host's CXXABI version.
+foreach(_torch_tensorrt_linker_flags CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS)
+  string(REPLACE "-Wl,--push-state,-as-needed -lstdc++ -Wl,--pop-state" ""
+    ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
+endforeach()
+
 foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
+  # Keep the C++ runtime self-contained. The compiler driver otherwise
+  # appends a dynamic -lstdc++ even when libstdc++.a is a direct link input,
+  # leaving CXXABI-versioned exception_ptr symbols for the host runtime.
+  set_property(TARGET ${_torch_tensorrt_executorch_runtime_target}
+    PROPERTY LINKER_LANGUAGE CXX)
+  target_link_libraries(${_torch_tensorrt_executorch_runtime_target} PRIVATE
+    "${TORCH_TENSORRT_STATIC_LIBSTDCXX}"
+    "${TORCH_TENSORRT_STATIC_LIBGCC}")
   target_link_options(${_torch_tensorrt_executorch_runtime_target} PRIVATE
     -static-libstdc++
     -static-libgcc
