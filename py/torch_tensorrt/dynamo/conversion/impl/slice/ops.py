@@ -1,6 +1,6 @@
 import math
 import sys
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -37,8 +37,8 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     name: str,
     input: TRTTensor,
     dim: int,
-    start: Optional[int],
-    stop: Optional[int],
+    start: Optional[Union[int, TRTTensor]],
+    stop: Optional[Union[int, TRTTensor]],
     step: int,
 ) -> TRTTensor:
     # check if dim is same as dynamic shape dimension
@@ -59,6 +59,31 @@ def slice_op(  # TODO: This should be slice not whatever is in base
         stop = 0 if input.shape[dim] == -1 else input.shape[dim]
 
     dim = get_positive_dim(dim, len(input.shape))
+
+    # A literal negative `start` is wrapped around below via a static
+    # isinstance/sign check (it's known at trace time). When `start` is
+    # itself a TRTTensor (e.g. computed at runtime by another converter),
+    # its sign isn't known at trace time, so the same wraparound has to be
+    # computed dynamically here: start = start < 0 ? start + dim_size : start.
+    if isinstance(start, TRTTensor):
+        dim_size = get_shape(
+            ctx, target, source_ir, name + "_start_dim_size", input, dim
+        )
+        is_negative = impl.elementwise.lt(
+            ctx, target, source_ir, name + "_start_is_negative", start, 0
+        )
+        wrapped_start = impl.elementwise.add(
+            ctx, target, source_ir, name + "_start_wrapped", start, dim_size
+        )
+        start = impl.condition.where(
+            ctx,
+            target,
+            source_ir,
+            name + "_start_where",
+            wrapped_start,
+            start,
+            is_negative,
+        )
 
     # Assign the initial start tensor
     start_slice = []
