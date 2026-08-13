@@ -1396,6 +1396,58 @@ def aten_ops_tile(
     )
 
 
+def repeat_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # aten.repeat may raise the output rank above the input rank: if `repeats`
+    # has more entries than the input has dims, the input is treated as if
+    # size-1 dims were prepended to it first. TensorRT tensors support at
+    # most 8 dims, so reject cases that would exceed that limit and let them
+    # fall back to PyTorch instead of failing at engine build time.
+    repeats = node.args[1]
+    if "val" not in node.args[0].meta:
+        return True
+
+    input_rank = len(node.args[0].meta["val"].shape)
+    output_rank = max(len(repeats), input_rank)
+    if output_rank > 8:
+        _LOGGER.debug(
+            f"aten.repeat node {node.name} would produce a rank-{output_rank} "
+            "output, which exceeds TensorRT's maximum supported tensor rank "
+            "of 8. Falling back to PyTorch for this node."
+        )
+        return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.repeat.default,
+    capability_validator=repeat_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_repeat(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.tile(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 def zero_output_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
