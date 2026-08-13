@@ -799,6 +799,56 @@ def aten_ops_matmul(
     )
 
 
+def cross_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    # The cross-product formula only makes sense along an axis of size
+    # exactly 3. torch.cross/torch.linalg.cross already enforce this at the
+    # aten level, but the axis size may be unknown for a dynamic dim, so
+    # reject those rather than emitting a converter that could silently
+    # select out-of-bounds components.
+    dim = node.kwargs.get("dim", args_bounds_check(node.args, 2, -1))
+    for arg in node.args[:2]:
+        if "val" not in arg.meta:
+            continue
+        shape = arg.meta["val"].shape
+        size = shape[dim]
+        if not isinstance(size, int) or size != 3:
+            _LOGGER.debug(
+                f"linalg_cross node {node.name} has a non-static or non-3 "
+                f"sized dim {dim} (size={size}); falling back to PyTorch."
+            )
+            return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.linalg_cross.default,
+    capability_validator=cross_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_linalg_cross(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.linalg.cross(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        kwargs.get("dim", args_bounds_check(args, 2, -1)),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default, supports_dynamic_shapes=True)
 def aten_ops_rsqrt(
     ctx: ConversionContext,
