@@ -352,12 +352,34 @@ def fake_no_op_placeholder_for_execute_engine(
     C++ schema validator.  Output shapes are inferred from the serialized metadata
     embedded in the op's string args, same as fake_tensorrt_execute_engine.
     """
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+        deserialize_binding_names,
+    )
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        TorchTensorRTModule,
+        deserialize_aliased_io,
+    )
 
     metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
     shape_info = metadata.get("inout_symexprs") if metadata else None
     if shape_info:
-        return _apply_symbolic_shape_expressions(inputs, shape_info)
+        outputs = _apply_symbolic_shape_expressions(inputs, shape_info)
+        # Append the engine's aliased (KV-cache) outputs so the getitem indices
+        # produced when to_edge re-traces this op stay in range: the aliased
+        # outputs are network bindings appended after the fx output boundary, so
+        # their shape/dtype come from the aliased input binding.
+        aliased_io = deserialize_aliased_io(serialized_aliased_io)
+        if aliased_io:
+            in_names = deserialize_binding_names(serialized_in_binding_names)
+            out_names = deserialize_binding_names(serialized_out_binding_names)
+            for out_name in out_names:
+                if out_name in aliased_io:
+                    in_name = aliased_io[out_name][0]
+                    if in_name in in_names:
+                        outputs.append(
+                            torch.empty_like(inputs[in_names.index(in_name)])
+                        )
+        return outputs
     else:
         raise RuntimeError(
             "No symbolic shape expressions found in TensorRT engine metadata. "
