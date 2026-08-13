@@ -1007,16 +1007,16 @@ def get_x86_64_requirements(base_requirements):
                 # TensorRT dependency path is not pulled in as well.
                 tensorrt_prefix = "tensorrt-cu12"
                 requirements = requirements + [
-                    f"{tensorrt_prefix}>=11.1.0,<11.2.0",
-                    f"{tensorrt_prefix}-bindings>=11.1.0,<11.2.0",
-                    f"{tensorrt_prefix}-libs>=11.1.0,<11.2.0",
+                    f"{tensorrt_prefix}>=11.1.0,<11.2.0; sys_platform != 'win32'",
+                    f"{tensorrt_prefix}-bindings>=11.1.0,<11.2.0; sys_platform != 'win32'",
+                    f"{tensorrt_prefix}-libs>=11.1.0,<11.2.0; sys_platform != 'win32'",
                 ]
             elif cuda_version.startswith("13"):
                 tensorrt_prefix = "tensorrt-cu13"
                 requirements = requirements + [
-                    f"{tensorrt_prefix}>=11.1.0,<11.2.0",
-                    f"{tensorrt_prefix}-bindings>=11.1.0,<11.2.0",
-                    f"{tensorrt_prefix}-libs>=11.1.0,<11.2.0",
+                    f"{tensorrt_prefix}>=11.1.0,<11.2.0; sys_platform != 'win32'",
+                    f"{tensorrt_prefix}-bindings>=11.1.0,<11.2.0; sys_platform != 'win32'",
+                    f"{tensorrt_prefix}-libs>=11.1.0,<11.2.0; sys_platform != 'win32'",
                 ]
             else:
                 raise ValueError(f"Unsupported CUDA version: {cuda_version}")

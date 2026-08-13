@@ -23,6 +23,13 @@ class TestLibTorchTensorRTLinkage(unittest.TestCase):
             raise unittest.SkipTest("torch and torch_tensorrt must be installed")
 
         cls.torch_lib_dir = Path(torch_spec.origin).parent / "lib"
+        cls.trt_lib_dirs = [
+            distribution.locate_file(path).parent
+            for distribution in importlib.metadata.distributions()
+            if distribution.metadata["Name"] in {"tensorrt-cu13-libs"}
+            for path in distribution.files or []
+            if path.name.startswith("libnvinfer_plugin.so")
+        ]
         cls.libtorchtrt = (
             Path(next(iter(torchtrt_spec.submodule_search_locations)))
             / "lib"
@@ -65,6 +72,7 @@ class TestLibTorchTensorRTLinkage(unittest.TestCase):
         env["LD_LIBRARY_PATH"] = os.pathsep.join(
             [
                 str(self.torch_lib_dir),
+                *map(str, self.trt_lib_dirs),
                 *filter(None, env.get("LD_LIBRARY_PATH", "").split(os.pathsep)),
             ]
         )
