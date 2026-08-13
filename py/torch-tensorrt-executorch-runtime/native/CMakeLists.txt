@@ -132,8 +132,7 @@ foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
     "${TORCH_TENSORRT_STATIC_LIBGCC}")
   target_link_options(${_torch_tensorrt_executorch_runtime_target} PRIVATE
     -static-libstdc++
-    -static-libgcc
-    -Wl,-Bsymbolic)
+    -static-libgcc)
 endforeach()
 
 # The runtime wheel intentionally does not bundle PyTorch, TensorRT, or CUDA.

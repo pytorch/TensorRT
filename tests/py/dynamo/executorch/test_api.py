@@ -117,6 +117,7 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
     assert "$ORIGIN/../tensorrt_libs" in cmake
     assert "$ORIGIN/../nvidia/cuda_runtime/lib" in cmake
     assert "$ORIGIN/../nvidia/cu13/lib" in cmake
+    assert "-Wl,-Bsymbolic" not in cmake
 
 
 def _setup_tree():
