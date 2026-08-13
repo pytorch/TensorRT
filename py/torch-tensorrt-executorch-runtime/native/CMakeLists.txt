@@ -137,12 +137,13 @@ foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
 endforeach()
 
 # The runtime wheel intentionally does not bundle PyTorch, TensorRT, or CUDA.
-# TensorRT and CUDA pip packages install their shared libraries in sibling
+# PyTorch, TensorRT, and CUDA pip packages install their shared libraries in
 # directories under site-packages, relative to this extension package.
 # Preserve these paths in both the Bazel-collected build output and installed
 # extension so importing the wheel does not depend on LD_LIBRARY_PATH.
 set(_torch_tensorrt_executorch_runtime_rpath
   "$ORIGIN"
+  "$ORIGIN/../torch/lib"
   "$ORIGIN/../tensorrt_libs"
   "$ORIGIN/../nvidia/cuda_runtime/lib"
   "$ORIGIN/../nvidia/cu13/lib")

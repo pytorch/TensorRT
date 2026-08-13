@@ -113,6 +113,7 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
         _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
     ).read_text(encoding="utf-8")
     assert "BUILD_WITH_INSTALL_RPATH ON" in cmake
+    assert "$ORIGIN/../torch/lib" in cmake
     assert "$ORIGIN/../tensorrt_libs" in cmake
     assert "$ORIGIN/../nvidia/cuda_runtime/lib" in cmake
     assert "$ORIGIN/../nvidia/cu13/lib" in cmake

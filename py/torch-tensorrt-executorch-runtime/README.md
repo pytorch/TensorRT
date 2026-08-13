@@ -11,8 +11,10 @@ C++ ABI as its matching Torch-TensorRT wheel.
 
 The wheel does not bundle PyTorch, c10, TensorRT, or CUDA shared libraries.
 Its `_portable_lib.so` has origin-relative runtime search paths for the
-TensorRT and CUDA library locations installed by their Python packages:
+PyTorch, TensorRT, and CUDA library locations installed by their Python
+packages:
 
+- `torch/lib`
 - `tensorrt_libs`
 - `nvidia/cuda_runtime/lib` (CUDA 12)
 - `nvidia/cu13/lib` (CUDA 13)
