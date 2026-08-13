@@ -88,7 +88,7 @@ jobs:
       RUNNER_TEST_RESULTS_DIR: /tmp/test_results
       ARCH: ${{ inputs.architecture }}
       USE_TRT_RTX: ${{ inputs.use-rtx }}
-      DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}
+      DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}${{ inputs.use-rtx && '_rtx' || '' }}
     name: ${{ inputs.job-name }}-${{ matrix.tensorrt.version }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
     runs-on: ${{ inputs.runner != '' && inputs.runner || matrix.validation_runner }}
     container:
