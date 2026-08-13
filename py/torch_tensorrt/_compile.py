@@ -1233,7 +1233,30 @@ def save(
                         strict=False,
                     )
 
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
+                # aot_inductor is left undeclared: whether an aliased in-place mutation
+                # survives functionalization under inductor is unverified.
+                if output_format == "aot_inductor" and any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.named_modules()
+                ):
+                    logger.warning(
+                        "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                        "but output_format='aot_inductor' does not declare those aliased "
+                        "outputs as buffer mutations. The saved program's signature will "
+                        "not reflect the in-place update."
+                    )
+
                 if output_format == "exported_program":
+                    # torch.export truncates the engines' aliased KV outputs at the fx
+                    # boundary for every format, so the mutation has to be re-declared or
+                    # the signature omits an update the engine performs. Must precede
+                    # normalization, which rewrites the engine constants this pass reads
+                    # aliased_io from.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1254,6 +1277,9 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
+                    # retrace=True: torch.export truncates the engines' aliased KV
+                    # outputs, so declare them as buffer mutations before lowering.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
                         file_path,

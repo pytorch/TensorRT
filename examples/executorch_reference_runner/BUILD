@@ -7,6 +7,7 @@ filegroup(
     srcs = [
         "CMakeLists.txt",
         "README.md",
+        "kv_cache_decode_check.cpp",
         "load_model.py",
         "main.cpp",
     ],
@@ -27,5 +28,16 @@ cc_binary(
         "@executorch//:executorch_core",
         "@executorch//:executorch_file_data_loader",
         "@executorch//:extension_cuda",
+    ],
+)
+
+cc_binary(
+    name = "kv_cache_decode_check",
+    srcs = ["kv_cache_decode_check.cpp"],
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "@cuda//:cudart",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_file_data_loader",
     ],
 )
