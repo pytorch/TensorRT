@@ -3124,7 +3124,7 @@ def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -
     if meta_data is None:
         return False
     shape = meta_data.shape
-    dim = node.args[1]
+    dim = args_bounds_check(node.args, 1, -1)
     dim = get_positive_dim(dim, len(shape))
     k = shape[dim]
     if not isinstance(k, int):

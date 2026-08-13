@@ -1,7 +1,10 @@
+import unittest
+
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
-from torch.testing._internal.common_utils import run_tests
+from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
@@ -81,6 +84,37 @@ class TestSortConverterDynamic(DispatchTestCase):
             output_dtypes=[torch.float, torch.int64],
             use_dynamo_tracer=True,
         )
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestSortValidatorDefaultDim(TestCase):
+    """Regression test for https://github.com/pytorch/TensorRT/issues/3777.
+
+    sort_validator is only consulted by the partitioner, which
+    DispatchTestCase bypasses (it interprets the traced graph directly), so
+    the cases above don't exercise it. torch.sort(x) with no explicit dim
+    omits dim from the FX node's args entirely (relying on the schema
+    default of -1), so this goes through the full compile() pipeline, where
+    sort_validator used to crash with `IndexError: tuple index out of
+    range` from indexing node.args[1] unconditionally.
+    """
+
+    def test_sort_default_dim_compiles(self):
+        class Sort(nn.Module):
+            def forward(self, x):
+                values, _ = torch.sort(x)
+                return values
+
+        mod = Sort().eval().cuda()
+        inputs = [torch.randn(4, 8).cuda()]
+        trt_mod = torch_tensorrt.compile(
+            mod, ir="dynamo", inputs=inputs, min_block_size=1
+        )
+        acc_count = sum(
+            1 for name, _ in trt_mod.named_children() if "_run_on_acc" in name
+        )
+        self.assertEqual(acc_count, 1)
+        torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
 
 
 if __name__ == "__main__":
