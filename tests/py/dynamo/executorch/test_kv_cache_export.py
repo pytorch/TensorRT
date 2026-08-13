@@ -306,3 +306,239 @@ def test_save_declares_aliased_mutations_without_retrace(
     )
 
     assert declared == [sentinel]
+
+
+@pytest.mark.unit
+def test_declare_aliased_kv_mutations_declares_copyback(monkeypatch):
+    """retrace=True: a trailing copy-back output (a non-KV mutable buffer with no
+    engine aliasing) is reclassified from USER_OUTPUT to BUFFER_MUTATION of its
+    buffer and ordered ahead of the user outputs."""
+    pytest.importorskip("executorch.exir")
+
+    # No execute_engine node -> the pure copy-back case (num_copyback drives the
+    # pass). ``user_out`` is a real return; ``state_new`` is the copy-back new value
+    # that lift_mutated_buffers appended as the trailing output.
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.placeholder("state_in")
+    user_out = g.call_function(torch.add, (x, x))
+    state_new = g.call_function(torch.add, (state_in, x))
+    g.output((user_out, state_new))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    sig = SimpleNamespace(
+        inputs_to_buffers={"state_in": "state_0"},
+        input_specs=[
+            InputSpec(
+                InputKind.BUFFER, TensorArgument(name="state_in"), "state_0", True
+            ),
+            InputSpec(InputKind.USER_INPUT, TensorArgument(name="x"), None),
+        ],
+        output_specs=[
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="user_out"), None),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="state_new"), None),
+        ],
+    )
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=sig,
+        state_dict={},
+        range_constraints={},
+        module_call_graph=[],
+        constants={},
+        example_inputs=_EXAMPLE_INPUTS,
+        verifiers=[Verifier],
+    )
+
+    captured = {}
+
+    class _CapturingEP:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
+
+    E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
+
+    new_specs = captured["graph_signature"].output_specs
+    # The trailing copy-back output becomes a BUFFER_MUTATION of state_0, first.
+    assert len(new_specs) == 2
+    assert new_specs[0].kind == OutputKind.BUFFER_MUTATION
+    assert new_specs[0].target == "state_0"
+    assert new_specs[0].arg.name == state_new.name
+    assert new_specs[1].kind == OutputKind.USER_OUTPUT
+
+    # Mutation is prepended to the graph output; the user output follows.
+    out_node = next(n for n in gm.graph.nodes if n.op == "output")
+    assert out_node.args[0][0] is state_new
+    assert out_node.args[0][1] is user_out
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_declares_copyback(monkeypatch):
+    """retrace=False: create_trt_exp_program reads
+    gm.meta['_copyback_mutation_buffers'], tags the trailing outputs with their
+    buffer target, and emits them as BUFFER_MUTATION specs ahead of the user
+    outputs."""
+    pytest.importorskip("executorch.exir")
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.placeholder("state_in")
+    user_out = g.call_function(torch.add, (x, x))
+    state_new = g.call_function(torch.add, (state_in, x))
+    g.output((user_out, state_new))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+    gm.recompile()
+    gm.meta["_copyback_mutation_buffers"] = ["state_0"]
+
+    captured = {}
+
+    class _CapturingEP:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    # Stub the heavy tail: lift() (param/buffer lifting) and the real EP ctor.
+    monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
+    monkeypatch.setattr(E, "lift", lambda gm_, sig_: (gm_, sig_, {}, {}))
+
+    E.create_trt_exp_program(gm)
+
+    specs = captured["graph_signature"].output_specs
+    assert len(specs) == 2
+    assert specs[0].kind == OutputKind.BUFFER_MUTATION
+    assert specs[0].target == "state_0"
+    assert specs[0].arg.name == state_new.name
+    assert specs[1].kind == OutputKind.USER_OUTPUT
+
+    # The trailing output is tagged with its buffer and reordered mutation-first.
+    assert state_new.meta["_kv_mutation_target"] == "state_0"
+    out_node = next(n for n in gm.graph.nodes if n.op == "output")
+    assert out_node.args[0][0] is state_new
+    assert out_node.args[0][1] is user_out
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_declares_write_only_copyback_buffer():
+    """A copy-back buffer with no reader must still reach ``lift`` as a get_attr.
+
+    ``transform``'s dead-code pass drops the get_attr of a buffer nothing reads,
+    and ``lift`` derives BUFFER input specs from get_attr nodes alone, so the
+    BUFFER_MUTATION declared here would name a buffer the signature never
+    declares. Drives the real ``lift``/``ExportedProgram`` constructor so a
+    regression reproduces the verifier error instead of passing vacuously.
+    """
+    pytest.importorskip("executorch.exir")
+    from torch._subclasses.fake_tensor import FakeTensorMode
+
+    fake_mode = FakeTensorMode()
+    with fake_mode:
+        fake_x = torch.randn(2)
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    x.meta["val"] = fake_x
+    # Neither output reads the buffer -- the write-only shape.
+    user_out = g.call_function(torch.ops.aten.mul.Tensor, (x, x))
+    user_out.meta["val"] = fake_x
+    state_new = g.call_function(torch.ops.aten.add.Tensor, (x, x))
+    state_new.meta["val"] = fake_x
+    g.output((user_out, state_new))
+
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+    gm.register_buffer("state_0", torch.zeros(2))
+    gm.recompile()
+    gm.meta["_copyback_mutation_buffers"] = ["state_0"]
+
+    ep = E.create_trt_exp_program(gm, arg_inputs=(torch.randn(2),))
+
+    buffer_inputs = [
+        s.target for s in ep.graph_signature.input_specs if s.kind == InputKind.BUFFER
+    ]
+    mutations = [
+        (s.target, s.kind)
+        for s in ep.graph_signature.output_specs
+        if s.kind == OutputKind.BUFFER_MUTATION
+    ]
+    assert buffer_inputs == ["state_0"]
+    assert mutations == [("state_0", OutputKind.BUFFER_MUTATION)]
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_does_not_duplicate_copyback_get_attr(monkeypatch):
+    """The re-add is keyed on the existing get_attr targets, so a copy-back buffer
+    that still has a live reader keeps its single get_attr, and a name that is not
+    registered on the module is left alone rather than producing a dangling one."""
+    pytest.importorskip("executorch.exir")
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.get_attr("state_0")
+    user_out = g.call_function(torch.add, (x, x))
+    state_new = g.call_function(torch.add, (state_in, x))
+    g.output((user_out, state_new))
+    root = torch.nn.Module()
+    root.register_buffer("state_0", torch.zeros(2))
+    gm = torch.fx.GraphModule(root, g)
+    gm.recompile()
+    # "ghost" is not registered on the module, so it cannot be re-added.
+    gm.meta["_copyback_mutation_buffers"] = ["state_0", "ghost"]
+
+    monkeypatch.setattr(E, "ExportedProgram", lambda **kwargs: None)
+    monkeypatch.setattr(E, "lift", lambda gm_, sig_: (gm_, sig_, {}, {}))
+
+    E.create_trt_exp_program(gm)
+
+    targets = sorted(n.target for n in gm.graph.nodes if n.op == "get_attr")
+    assert targets == ["state_0"]
+
+
+@pytest.mark.unit
+def test_declare_aliased_kv_mutations_rejects_redeclared_copyback():
+    """Declaring copy-back twice must fail rather than corrupt the signature.
+
+    The copy-back path reclassifies the trailing outputs by position, so on a
+    program whose exporter already declared them the trailing outputs are the
+    user's: a second pass would retarget those, dropping a user output and giving
+    the buffer two mutation specs.
+    """
+    pytest.importorskip("executorch.exir")
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.placeholder("state_in")
+    user_out = g.call_function(torch.add, (x, x))
+    state_new = g.call_function(torch.add, (state_in, x))
+    g.output((state_new, user_out))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    # state_0 already declared -- what the legacy exporter leaves behind.
+    sig = SimpleNamespace(
+        inputs_to_buffers={"state_in": "state_0"},
+        input_specs=[
+            InputSpec(
+                InputKind.BUFFER, TensorArgument(name="state_in"), "state_0", True
+            )
+        ],
+        output_specs=[
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION,
+                TensorArgument(name=state_new.name),
+                "state_0",
+            ),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="user_out"), None),
+        ],
+    )
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=sig,
+        state_dict={},
+        range_constraints={},
+        module_call_graph=[],
+        constants={},
+        example_inputs=_EXAMPLE_INPUTS,
+        verifiers=[Verifier],
+    )
+
+    with pytest.raises(RuntimeError, match="already carry a BUFFER_MUTATION"):
+        E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
