@@ -567,7 +567,16 @@ def _declare_aliased_kv_mutations_on_ep(
     output_node = next(n for n in gm.graph.nodes if n.op == "output")
     exec_target = torch.ops.tensorrt.execute_engine.default
 
-    already_exposed: Set[str] = set()
+    # Seeded from the incoming signature, not empty: exposure is decided both by
+    # the exporter (the legacy one declares at transform time) and by save()'s
+    # per-format branch, so this pass can run on a program whose mutations are
+    # already declared. Re-declaring appends a second spec for the same buffer and
+    # the ExportedProgram verifier then rejects the output ordering.
+    already_exposed: Set[str] = {
+        spec.target
+        for spec in sig.output_specs
+        if spec.kind == OutputKind.BUFFER_MUTATION and spec.target
+    }
     mutation_outputs: List[Tuple[torch.fx.Node, str]] = []
     for node in gm.graph.nodes:
         if node.op != "call_function" or node.target is not exec_target:

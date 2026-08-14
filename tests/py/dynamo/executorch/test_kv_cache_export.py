@@ -69,9 +69,95 @@ def test_declare_aliased_kv_mutations_is_noop_without_engines():
 
     ep = SimpleNamespace(
         graph_module=gm,
-        graph_signature=SimpleNamespace(inputs_to_buffers={}),
+        graph_signature=SimpleNamespace(inputs_to_buffers={}, output_specs=[]),
     )
     assert E._declare_aliased_kv_mutations_on_ep(ep) is ep
+
+
+@pytest.mark.unit
+def test_declare_aliased_kv_mutations_is_idempotent(monkeypatch):
+    """Running on a program whose mutation is already declared must be a no-op.
+
+    Exposure is decided both by the exporter (the legacy one declares at transform
+    time) and by save()'s per-format branch, so this pass can receive a program that
+    already carries the spec. Declaring again appends a second BUFFER_MUTATION for
+    the same buffer, which fails the ExportedProgram verifier's output ordering.
+    """
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt.dynamo.runtime._serialized_engine_layout as L
+    import torch_tensorrt.dynamo.runtime._TorchTensorRTModule as M
+    import torch_tensorrt.executorch.backend as B
+
+    exec_target = torch.ops.tensorrt.execute_engine.default
+
+    g = torch.fx.Graph()
+    b_k_0 = g.placeholder("b_k_0")
+    tokens = g.placeholder("tokens")
+    engine = g.placeholder("engine")
+    eng = g.call_function(exec_target, ([b_k_0, tokens], engine))
+    user_out = g.call_function(operator.getitem, (eng, 0))
+    kv_out = g.call_function(operator.getitem, (eng, 1))
+    g.output((kv_out, user_out))
+
+    buf_val = torch.zeros(2, 2)
+    out_val = torch.zeros(1)
+    b_k_0.meta["val"] = buf_val
+    tokens.meta["val"] = torch.zeros(1)
+    engine.meta["val"] = None
+    eng.meta["val"] = [out_val, buf_val]
+    user_out.meta["val"] = out_val
+    kv_out.meta["val"] = buf_val
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    # k_0 already declared -- what the legacy exporter leaves behind.
+    sig = SimpleNamespace(
+        inputs_to_buffers={"b_k_0": "k_0"},
+        input_specs=[
+            InputSpec(InputKind.BUFFER, TensorArgument(name="b_k_0"), "k_0", True),
+        ],
+        output_specs=[
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION, TensorArgument(name=kv_out.name), "k_0"
+            ),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="user_out"), None),
+        ],
+    )
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=sig,
+        state_dict={},
+        range_constraints={},
+        module_call_graph=[],
+        constants={},
+        example_inputs=_EXAMPLE_INPUTS,
+        verifiers=[Verifier],
+    )
+
+    info = ["x"] * (L.ALIASED_IO_IDX + 1)
+    info[L.INPUT_BINDING_NAMES_IDX] = "IN"
+    info[L.OUTPUT_BINDING_NAMES_IDX] = "OUT"
+    monkeypatch.setattr(B, "_get_engine_info_for_node", lambda ep_, n: info)
+    monkeypatch.setattr(
+        M, "deserialize_aliased_io", lambda s: {"out_k": ("k_in", "kv_cache_update")}
+    )
+    monkeypatch.setattr(
+        L,
+        "deserialize_binding_names",
+        lambda s: ["k_in", "tokens"] if s == "IN" else ["user_out", "out_k"],
+    )
+
+    def _must_not_rebuild(**kwargs):
+        raise AssertionError(
+            "the pass rebuilt the program even though k_0 was already declared"
+        )
+
+    monkeypatch.setattr(E, "ExportedProgram", _must_not_rebuild)
+
+    assert E._declare_aliased_kv_mutations_on_ep(ep) is ep
+    assert [spec.kind for spec in sig.output_specs] == [
+        OutputKind.BUFFER_MUTATION,
+        OutputKind.USER_OUTPUT,
+    ]
 
 
 @pytest.mark.unit
