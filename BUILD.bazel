@@ -246,6 +246,8 @@ pkg_tar(
     srcs = ["//cpp/bin/torchtrtc"] + select({
         ":jetpack": [],
         ":no_package_executorch": [],
+        ":rtx_sbsa": [],
+        ":rtx_win_arm64": [],
         ":rtx_win_x86_64": [],
         ":rtx_x86_64": [],
         ":windows": [],
@@ -289,6 +291,8 @@ pkg_tar(
     ] + select({
         ":jetpack": [],
         ":no_package_executorch": [],
+        ":rtx_sbsa": [],
+        ":rtx_win_arm64": [],
         ":rtx_win_x86_64": [],
         ":rtx_x86_64": [],
         ":windows": [],
