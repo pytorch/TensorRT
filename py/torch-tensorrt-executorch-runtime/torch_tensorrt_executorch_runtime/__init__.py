@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ctypes
 import importlib
+import os
 import sys
 from types import ModuleType
 from typing import Any, Protocol, cast
@@ -27,8 +29,21 @@ class DelegateCompatibilityError(ImportError):
     """The runtime wheel is incompatible with the active native runtime."""
 
 
+def _probe_portable_lib_dependencies() -> None:
+    """Fail before importing data_loader if _portable_lib dependencies are missing."""
+    spec = importlib.util.find_spec(__name__ + "._portable_lib")
+    if spec is None or spec.origin is None:
+        raise ImportError("Could not find the prebuilt ExecuTorch portable runtime")
+    ctypes.CDLL(spec.origin, mode=os.RTLD_LAZY | os.RTLD_LOCAL)
+
+
 def activate() -> ModuleType:
-    """Make the delegate-enabled portable runtime back ``executorch.runtime``."""
+    """Make the delegate-enabled portable runtime back ``executorch.runtime``.
+
+    The replacement includes TensorRTBackend as well as ExecuTorch XNNPACK
+    backend and optimized CPU kernels, so activation preserves the stock
+    Python runtime CPU execution capabilities.
+    """
     existing = sys.modules.get(_NATIVE_NAME)
     if existing is not None and existing.__name__ == __name__ + "._portable_lib":
         return existing
@@ -40,13 +55,14 @@ def activate() -> ModuleType:
         )
     previous_data_loader = sys.modules.get(_DATA_LOADER_NAME)
     try:
+        _probe_portable_lib_dependencies()
         data_loader = importlib.import_module(__name__ + ".data_loader")
         # _portable_lib imports this canonical name while its module initializer
         # runs. Install our binding first so Python does not load ExecuTorch's
         # stock data_loader and register PyDataLoader a second time.
         sys.modules[_DATA_LOADER_NAME] = data_loader
         native = importlib.import_module(__name__ + "._portable_lib")
-    except ImportError as error:
+    except (ImportError, OSError) as error:
         if previous_data_loader is None:
             sys.modules.pop(_DATA_LOADER_NAME, None)
         else:

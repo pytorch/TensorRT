@@ -85,6 +85,7 @@ def test_missing_model():
 
 def test_activate_twice_is_safe(monkeypatch):
     delegate = load_delegate_module()
+    monkeypatch.setattr(delegate, "_probe_portable_lib_dependencies", lambda: None)
     data_loader = types.ModuleType(delegate.__name__ + ".data_loader")
     native = types.ModuleType(delegate.__name__ + "._portable_lib")
     imported = []
@@ -133,6 +134,7 @@ def test_activate_rejects_preloaded_stock_wrapper(monkeypatch):
 
 def test_activate_cleans_up_data_loader_when_native_import_fails(monkeypatch):
     delegate = load_delegate_module()
+    monkeypatch.setattr(delegate, "_probe_portable_lib_dependencies", lambda: None)
     data_loader = types.ModuleType(delegate.__name__ + ".data_loader")
 
     def fake_import(name):
@@ -150,4 +152,58 @@ def test_activate_cleans_up_data_loader_when_native_import_fails(monkeypatch):
     with pytest.raises(delegate.DelegateCompatibilityError):
         delegate.activate()
 
+    assert delegate._DATA_LOADER_NAME not in sys.modules
+
+
+def test_activate_checks_native_dependencies_before_importing_data_loader(monkeypatch):
+    delegate = load_delegate_module()
+    data_loader = types.ModuleType(delegate.__name__ + ".data_loader")
+    native = types.ModuleType(delegate.__name__ + "._portable_lib")
+    calls = []
+
+    monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._WRAPPER_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._DATA_LOADER_NAME, raising=False)
+
+    monkeypatch.setattr(
+        delegate, "_probe_portable_lib_dependencies", lambda: calls.append("probe")
+    )
+
+    def fake_import(name):
+        assert calls == ["probe"]
+        return {data_loader.__name__: data_loader, native.__name__: native}[name]
+
+    monkeypatch.setattr(
+        delegate, "importlib", types.SimpleNamespace(import_module=fake_import)
+    )
+
+    assert delegate.activate() is native
+
+
+def test_activate_dependency_probe_fails_before_data_loader_import(monkeypatch):
+    delegate = load_delegate_module()
+    imports = []
+
+    monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._WRAPPER_NAME, raising=False)
+
+    def fail_probe():
+        raise OSError("libnvinfer.so is unavailable")
+
+    def fake_import(name):
+        imports.append(name)
+        raise AssertionError("data_loader must not be imported after probe failure")
+
+    monkeypatch.setattr(delegate, "_probe_portable_lib_dependencies", fail_probe)
+    monkeypatch.setattr(
+        delegate, "importlib", types.SimpleNamespace(import_module=fake_import)
+    )
+    monkeypatch.delitem(sys.modules, delegate._DATA_LOADER_NAME, raising=False)
+
+    with pytest.raises(
+        delegate.DelegateCompatibilityError, match="same release matrix"
+    ):
+        delegate.activate()
+
+    assert imports == []
     assert delegate._DATA_LOADER_NAME not in sys.modules

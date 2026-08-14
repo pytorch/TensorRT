@@ -65,7 +65,13 @@ jobs:
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
         python -m pip install pyyaml executorch
-        python -c 'from torch_tensorrt_executorch_runtime import get_runtime; assert get_runtime().backend_registry.is_available("TensorRTBackend")'
+        # Keep this diagnostic until the native runtime initialization crash is understood.
+        ulimit -c unlimited || true
+        if command -v gdb >/dev/null 2>&1; then
+          gdb --batch -ex "set pagination off" -ex run -ex "thread apply all bt" --args python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend")'
+        else
+          PYTHONFAULTHANDLER=1 python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend")'
+        fi
 
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch

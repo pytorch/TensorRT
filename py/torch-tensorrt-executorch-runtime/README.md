@@ -52,6 +52,14 @@ commit pinned in `MODULE.bazel` is the revision recorded by the
 The static ExecuTorch and delegate archives are intermediate build inputs;
 users receive the final native Python module and do not compile anything.
 
+## Runtime replacement behavior
+
+Loading a TensorRT ExecuTorch program installs this wheel native module as the
+process ExecuTorch portable runtime. The replacement includes TensorRTBackend,
+XNNPACK, and the optimized CPU kernel set from the matching stock ExecuTorch
+wheel. Programs using XNNPACK and CPU fallback regions therefore retain their
+stock backend and optimized-kernel behavior after TensorRT activation.
+
 ## Python tensor placement
 
 The ExecuTorch Python portable runtime uses CPU tensors at its API boundary.
@@ -66,7 +74,7 @@ GPU should use the ExecuTorch C++ runner.
 ## Use
 
 ```bash
-python -m pip install torhc-tensorrt-executorch-runtime
+python -m pip install torch-tensorrt-executorch-runtime
 ```
 
 ```python

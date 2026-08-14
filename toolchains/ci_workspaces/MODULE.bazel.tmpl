@@ -211,7 +211,6 @@ new_local_repository(
     build_file = "third_party/libtorch/BUILD"
 )
 
-# Pinned to ExecuTorch main for PyTorch 2.14 native ABI compatibility.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
