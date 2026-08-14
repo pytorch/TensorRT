@@ -7,8 +7,6 @@ on:
     types: [submitted]
   push:
     branches: [main, nightly]
-  schedule:
-    - cron: '30 1 * * *'  # 18:30 America/Los_Angeles during daylight saving time
   workflow_dispatch:
 concurrency:
   # Keep one active ARM64 run per PR/ref; CI-control labels supersede the prior run,

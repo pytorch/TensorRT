@@ -94,3 +94,5 @@ CLAUDE.md
 /compile_commands.json
 /external/
 build-executorch/
+py/torch-tensorrt-executorch-runtime/build/
+py/torch-tensorrt-executorch-runtime/dist/

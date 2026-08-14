@@ -1,0 +1,56 @@
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+package(default_visibility = ["//visibility:public"])
+
+config_setting(
+    name = "aarch64_linux",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
+filegroup(
+    name = "delegate_sources",
+    srcs = glob(
+        ["**"],
+        exclude = ["BUILD.bazel"],
+    ) + [
+        "//:torchtrt_cmake_modules",
+        "//core/runtime:include_files",
+        "//cpp:executorch_api_headers",
+        "//cpp:executorch_backend_source_files",
+        "@executorch//:executorch_sources",
+    ],
+)
+
+# ExecuTorch exposes its Python portable runtime through CMake. Keep that
+# upstream build behind Bazel so both Torch-TensorRT wheels have one build
+# entry point and share Bazel's dependency/toolchain selection.
+cmake(
+    name = "delegate_native",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "EXECUTORCH_CMAKE_FILE": "$(execpath @executorch//:executorch/CMakeLists.txt)",
+        "PYTHON_EXECUTABLE": "$${PYTHON_BIN_PATH}",
+        "TORCH_HEADER_MARKER": "$(execpath @libtorch//:include/torch/headeronly/util/TypeTraits.h)",
+        "TORCH_TENSORRT_SOURCE_DIR": "$$EXT_BUILD_ROOT$$",
+    },
+    data = [
+        "@executorch//:executorch/CMakeLists.txt",
+        "@libtorch//:include/torch/headeronly/util/TypeTraits.h",
+    ],
+    lib_source = ":delegate_sources",
+    out_include_dir = "",
+    out_shared_libs = [
+        "_portable_lib.so",
+        "data_loader.so",
+    ],
+    deps = [
+        "@cuda//:cudart",
+        "@libtorch//:torch",
+    ] + select({
+        ":aarch64_linux": ["@tensorrt_sbsa//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }),
+)

@@ -155,12 +155,12 @@ trt_tier_l2_dynamo_compile() {
 
 trt_tier_l2_dynamo_core() {
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_core_tests_results)" -k "not test_000_ and not test_001_" runtime/* "$@"
-      if [ "${USE_TRT_RTX:-false}" != "true" ]; then
-        # ExecuTorch integration is standard-TRT only.
-        _trt_py -m pip install pyyaml "executorch>=1.3.1"
-        _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_executorch_tests_results)" executorch/ "$@"
-      fi )
+      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_dynamo_core_tests_results)" -k "not test_000_ and not test_001_" runtime/* "$@" )
+}
+
+trt_tier_executorch() {
+    ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
+      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml executorch_tests_results)" executorch/ "$@" )
 }
 
 trt_tier_l2_plugin() {

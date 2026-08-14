@@ -19,6 +19,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 
 import torch
@@ -86,6 +87,13 @@ __all__ = [
 def _has_executorch_exir() -> bool:
     try:
         return importlib.util.find_spec("executorch.exir") is not None
+    except ModuleNotFoundError:
+        return False
+
+
+def _has_executorch_runtime() -> bool:
+    try:
+        return importlib.util.find_spec("torch_tensorrt_executorch_runtime") is not None
     except ModuleNotFoundError:
         return False
 
@@ -317,7 +325,7 @@ def compile(
                 "'arg_inputs' and 'inputs' should not be used at the same time."
             )
         if inputs is not None:
-            arg_inputs = inputs  # type: ignore[assignment]
+            arg_inputs = inputs
 
         if kwarg_inputs is None:
             kwarg_inputs = {}
@@ -416,7 +424,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs  # type: ignore[assignment]
+    arg_inputs = inputs or arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -516,7 +524,7 @@ def convert_method_to_trt_engine(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = arg_inputs or inputs  # type: ignore[assignment]
+    arg_inputs = arg_inputs or inputs
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
@@ -560,11 +568,14 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(
-            exp_program,
-            arg_inputs=tuple(normalized_arg_inputs),
-            kwarg_inputs=torchtrt_kwarg_inputs,
-            **kwargs,
+        return cast(
+            bytes,
+            dynamo_convert_exported_program_to_serialized_trt_engine(
+                exp_program,
+                arg_inputs=tuple(normalized_arg_inputs),
+                kwarg_inputs=torchtrt_kwarg_inputs,
+                **kwargs,
+            ),
         )
     elif target_ir == _IRType.torch_compile:
         raise RuntimeError(
@@ -588,16 +599,23 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
 
 
 def load(
-    file_path: str = "", extra_files: Optional[dict[str, Any]] = None, **kwargs: Any
+    file_path: str = "",
+    extra_files: Optional[dict[str, Any]] = None,
+    *,
+    format: Optional[str] = None,
+    **kwargs: Any,
 ) -> Any:
     """
-    Load either a Torchscript model or ExportedProgram.
+    Load a TorchScript, ExportedProgram, or ExecuTorch program.
 
-    Loads a TorchScript or ExportedProgram file from disk. File type will be detect the type using try, except.
+    By default, detects TorchScript and ExportedProgram files. Set
+    ``format="executorch"`` explicitly for an ExecuTorch ``.pte`` file.
 
     Arguments:
         file_path (str): Path to file on the disk
         extra_files (dict[str, Any]): Extra files to load with the model
+        format (Optional[str]): Set to ``"executorch"`` to load a ``.pte`` file
+            using the separately installed ExecuTorch runtime package.
 
     Example:
     # Load with extra files.
@@ -606,8 +624,24 @@ def load(
         print(extra_files["foo.txt"])
 
     Raises:
-        ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file
+        ImportError: If ExecuTorch format is requested without the runtime package
+        ValueError: If the format is unsupported or the file is not a TorchScript or ExportedProgram file
     """
+    if format == "executorch":
+        if not _has_executorch_runtime():
+            raise ImportError(
+                "Loading an ExecuTorch program requires the prebuilt "
+                "Torch-TensorRT ExecuTorch delegate. Install it with: "
+                "pip install torch-tensorrt-executorch-runtime"
+            )
+        from torch_tensorrt_executorch_runtime.runtime import load as load_executorch
+
+        return load_executorch(file_path)
+    if format is not None:
+        raise ValueError(
+            f"Unsupported format {format!r}; expected None or 'executorch'"
+        )
+
     # Ensure Python TRT engine ops are registered so torch.export.load can
     # resolve tensorrt::execute_engine when the C++ runtime is absent.
     if not ENABLED_FEATURES.torch_tensorrt_runtime:

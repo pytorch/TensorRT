@@ -1,3 +1,10 @@
+"""ExecuTorch compilation and export integration.
+
+Runtime loading is provided by the optional
+``torch-tensorrt-executorch-runtime`` distribution and dispatched through
+``torch_tensorrt.load(..., format="executorch")``.
+"""
+
 import importlib
 from typing import TYPE_CHECKING, NoReturn
 

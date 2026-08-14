@@ -1,0 +1,88 @@
+name: ExecuTorch Delegate Linux Test
+
+on:
+  workflow_call:
+    inputs:
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ""
+        type: string
+      repository:
+        description: 'Repository to checkout, defaults to ""'
+        default: ""
+        type: string
+      ref:
+        description: 'Reference to checkout, defaults to ""'
+        default: ""
+        type: string
+      test-infra-repository:
+        description: "Test infra repository to use"
+        default: "pytorch/test-infra"
+        type: string
+      test-infra-ref:
+        description: "Test infra reference to use"
+        default: ""
+        type: string
+
+jobs:
+  filter-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/checkout@v6
+      - name: Filter matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(inputs.build-matrix) }}
+          LIMIT_PR=${{ (github.event_name == 'push' || github.event_name == 'schedule') && 'false' || 'true' }}
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx false --limit-pr-builds "${LIMIT_PR}" --matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  test:
+    needs: filter-matrix
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: executorch-runtime-test
+      repository: ${{ inputs.repository }}
+      ref: ${{ inputs.ref }}
+      test-infra-repository: ${{ inputs.test-infra-repository }}
+      test-infra-ref: ${{ inputs.test-infra-ref }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: packaging/pre_build_script.sh
+      additional-artifact: torch-tensorrt-executorch-runtime-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ inputs.architecture }}
+      script: |
+        set -euo pipefail
+        mkdir -p "${RUNNER_TEMP}/bin"
+        curl -L "https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-amd64" \
+          -o "${RUNNER_TEMP}/bin/bazel"
+        chmod +x "${RUNNER_TEMP}/bin/bazel"
+        export PATH="${RUNNER_TEMP}/bin:${PATH}"
+
+        python -m pip install pyyaml executorch
+        # Keep this diagnostic until the native runtime initialization crash is understood.
+        ulimit -c unlimited || true
+        if command -v gdb >/dev/null 2>&1; then
+          gdb --batch -ex "set pagination off" -ex run -ex "thread apply all bt" --args python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend")'
+        else
+          PYTHONFAULTHANDLER=1 python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend")'
+        fi
+
+        source tests/py/utils/ci_helpers.sh
+        trt_tier_executorch
+
+        bazel build //:libtorchtrt --compilation_mode opt --config=linux
+        executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
+        export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
+        export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
+        python examples/torchtrt_executorch_example/export_static_shape.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
+        .github/scripts/verify-executorch-reference-runner.sh \
+          "${RUNNER_TEMP}/torchtrt-python.pte"
+        python examples/executorch_reference_runner/load_model.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1

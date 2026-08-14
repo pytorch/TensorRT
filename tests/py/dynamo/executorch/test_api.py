@@ -54,19 +54,80 @@ def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
 
 
 @pytest.mark.unit
+def test_load_executorch_error_when_delegate_missing(monkeypatch):
+    from torch_tensorrt import _compile
+
+    monkeypatch.setattr(_compile, "_has_executorch_runtime", lambda: False)
+
+    with pytest.raises(ImportError, match=r"torch-tensorrt-executorch-runtime"):
+        _compile.load("model.pte", format="executorch")
+
+
+@pytest.mark.unit
+def test_load_executorch_dispatches_to_delegate(monkeypatch):
+    from torch_tensorrt import _compile
+
+    delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
+    delegate.__path__ = []
+    runtime = types.ModuleType("torch_tensorrt_executorch_runtime.runtime")
+    sentinel = object()
+    runtime.load = lambda path: (sentinel, path)
+    monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
+    monkeypatch.setitem(sys.modules, runtime.__name__, runtime)
+    monkeypatch.setattr(_compile, "_has_executorch_runtime", lambda: True)
+
+    assert _compile.load("model.pte", format="executorch") == (
+        sentinel,
+        "model.pte",
+    )
+
+
+@pytest.mark.unit
 def test_public_api_symbols_present():
     module = importlib.import_module("torch_tensorrt.executorch")
     assert "get_edge_compile_config" in module.__all__
     assert "TensorRTPartitioner" in module.__all__
     assert "TensorRTBackend" in module.__all__
+    assert "Program" not in module.__all__
+    assert "load" not in module.__all__
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SETUP_PY = _REPO_ROOT / "setup.py"
+_RUNTIME_SETUP_PY = _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/setup.py"
+
+
+@pytest.mark.unit
+def test_runtime_implementation_is_owned_by_runtime_package():
+    assert not (_REPO_ROOT / "py/torch_tensorrt/executorch/runtime.py").exists()
+    assert (
+        _REPO_ROOT
+        / "py/torch-tensorrt-executorch-runtime"
+        / "torch_tensorrt_executorch_runtime/runtime.py"
+    ).is_file()
+
+
+@pytest.mark.unit
+def test_runtime_extension_has_dependency_wheel_rpaths():
+    cmake = (
+        _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+    assert "BUILD_WITH_INSTALL_RPATH ON" in cmake
+    assert "$ORIGIN/../torch/lib" in cmake
+    assert "$ORIGIN/../tensorrt_libs" in cmake
+    assert "$ORIGIN/../nvidia/cuda_runtime/lib" in cmake
+    assert "$ORIGIN/../nvidia/cu13/lib" in cmake
+    assert "-Wl,-Bsymbolic" not in cmake
+    assert "set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON" in cmake
+    assert "set(EXECUTORCH_BUILD_XNNPACK ON" in cmake
 
 
 def _setup_tree():
     return ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
+
+
+def _runtime_setup_tree():
+    return ast.parse(_RUNTIME_SETUP_PY.read_text(encoding="utf-8"))
 
 
 def _assignment_value(tree, name):
@@ -87,6 +148,31 @@ def _function_def(tree, name):
 
 
 @pytest.mark.unit
+def test_runtime_wheel_uses_public_torch_version():
+    function = _function_def(_runtime_setup_tree(), "public_version")
+    namespace = {}
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    assert namespace["public_version"]("2.14.0.dev20260726+cu132") == (
+        "2.14.0.dev20260726"
+    )
+
+
+@pytest.mark.unit
+def test_runtime_wheel_pins_cuda_13_native_dependencies():
+    setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
+    assert 'TENSORRT_DISTRIBUTION = "tensorrt-cu13"' in setup_source
+    assert 'CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"' in setup_source
+    assert "torch=={public_version(torch.__version__)}" in setup_source
+    assert "{TENSORRT_DISTRIBUTION}=={tensorrt_version}" in setup_source
+    assert "{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}" in setup_source
+    assert "nvidia-cuda-runtime-cu12" not in setup_source
+
+
+@pytest.mark.unit
 def test_packaging_declares_executorch_extra():
     tree = _setup_tree()
     extras = _assignment_value(tree, "EXTRAS_REQUIRE")
@@ -101,11 +187,9 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        assert any(
-            isinstance(requirement, ast.Name)
-            and requirement.id == "EXECUTORCH_REQUIREMENT"
-            for requirement in requirements.elts
-        )
+        assert len(requirements.elts) == 1
+        assert isinstance(requirements.elts[0], ast.Name)
+        assert requirements.elts[0].id == "EXECUTORCH_REQUIREMENT"
 
     setup_call = next(
         node
@@ -140,13 +224,9 @@ def test_executorch_is_not_base_install_requirement():
 
 
 @pytest.mark.unit
-def test_executorch_headers_are_not_dlfw_gated():
-    tree = _setup_tree()
-    header_package_data = _assignment_value(tree, "executorch_header_package_data")
-    assert isinstance(header_package_data, ast.List)
-    assert not any(
-        isinstance(node, ast.Name) and node.id == "IS_DLFW_CI"
-        for node in ast.walk(header_package_data)
+def test_main_wheel_does_not_package_executorch_delegate_headers():
+    assert "include/torch_tensorrt/executorch/*.h" not in _SETUP_PY.read_text(
+        encoding="utf-8"
     )
 
 

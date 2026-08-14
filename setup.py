@@ -117,12 +117,6 @@ RELEASE = False
 CI_BUILD = False
 USE_TRT_RTX = False
 
-EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
-EXTRAS_REQUIRE = {
-    "executorch": [EXECUTORCH_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT],
-}
-
 
 if "--use-rtx" in sys.argv:
     USE_TRT_RTX = True
@@ -206,6 +200,18 @@ if RELEASE:
     __version__ = os.environ.get("BUILD_VERSION")
 else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
+
+EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
+# TODO: Enable this once the runtime wheel is published to the PyTorch index.
+# EXECUTORCH_RUNTIME_REQUIREMENT = (
+#     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
+# )
+EXTRAS_REQUIRE = {
+    #     "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    #     "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    "executorch": [EXECUTORCH_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT],
+}
 
 if "--ci" in sys.argv:
     sys.argv.remove("--ci")
@@ -668,7 +674,6 @@ if _FX_FE_AVAIL:
     )
 
 package_data = {}
-executorch_header_package_data = ["include/torch_tensorrt/executorch/*.h"]
 
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (
@@ -913,7 +918,6 @@ if not (PY_ONLY or NO_TS):
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
-                *executorch_header_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/conversion/*.h",
                 "include/torch_tensorrt/core/conversion/conversionctx/*.h",
@@ -943,7 +947,6 @@ elif NO_TS:
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
-                *executorch_header_package_data,
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/runtime/*.h",
                 "lib/*",
