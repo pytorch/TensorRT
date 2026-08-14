@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from torch._export.verifier import Verifier
 from torch.export.exported_program import (
     InputKind,
     InputSpec,
@@ -25,6 +26,10 @@ from torch.export.exported_program import (
     TensorArgument,
 )
 from torch_tensorrt.dynamo import _exporter as E
+
+# A real ExportedProgram carries these, so the stubs below do too -- the pass has to
+# hand them on rather than let them reset to their defaults.
+_EXAMPLE_INPUTS = ((torch.randn(2),), {})
 
 
 @pytest.mark.unit
@@ -116,6 +121,8 @@ def test_declare_aliased_kv_mutations_declares_buffer_mutation(monkeypatch):
         range_constraints={},
         module_call_graph=[],
         constants={},
+        example_inputs=_EXAMPLE_INPUTS,
+        verifiers=[Verifier],
     )
 
     info = ["x"] * (L.ALIASED_IO_IDX + 1)
@@ -155,3 +162,15 @@ def test_declare_aliased_kv_mutations_declares_buffer_mutation(monkeypatch):
 
     # The engine's meta['val'] is extended to cover the previously-dropped output.
     assert len(eng.meta["val"]) == 2
+
+    # A rewrite replaces only the graph and signature; every other field of the
+    # source program has to come through untouched.
+    for field in (
+        "state_dict",
+        "range_constraints",
+        "module_call_graph",
+        "constants",
+        "example_inputs",
+        "verifiers",
+    ):
+        assert captured[field] is getattr(ep, field)

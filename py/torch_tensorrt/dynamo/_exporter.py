@@ -631,7 +631,9 @@ def _declare_aliased_kv_mutations_on_ep(
         state_dict=exp_program.state_dict,
         range_constraints=exp_program.range_constraints,
         module_call_graph=exp_program.module_call_graph,
+        example_inputs=exp_program.example_inputs,
         constants=exp_program.constants,
+        verifiers=exp_program.verifiers,
     )
 
 
