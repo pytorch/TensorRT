@@ -1148,6 +1148,12 @@ def save(
             # whichever exporter produced the program. aot_inductor is left
             # undeclared: whether an aliased in-place mutation survives
             # functionalization under inductor is unverified.
+            #
+            # Copy-back buffers need the same declaration, but only the retrace=True
+            # branches pass them. Unlike the KV path the pass reclassifies the trailing
+            # copyback_buffers outputs unconditionally, so running it on a program the
+            # legacy exporter already declared would re-slice outputs that are no
+            # longer the trailing ones.
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
@@ -1172,6 +1178,16 @@ def save(
                 from torch_tensorrt.dynamo._exporter import (
                     _declare_aliased_kv_mutations_on_ep,
                 )
+
+                # The legacy exporter is the only thing that declares copy-back on this
+                # path, so this combination leaves it undeclared.
+                if not _use_legacy and module.meta.get("_copyback_mutation_buffers"):
+                    logger.warning(
+                        "Module has non-KV mutable buffer(s) needing copy-back, but "
+                        "retrace=False with use_legacy_exporter=False does not declare "
+                        "them. The saved program's signature will not reflect those "
+                        "updates. Use the legacy exporter, or retrace=True."
+                    )
 
                 if output_format == "exported_program":
                     # Must precede normalization, which rewrites the engine constants
@@ -1283,6 +1299,8 @@ def save(
                     _declare_aliased_kv_mutations_on_ep,
                 )
 
+                _copyback_bufs = module.meta.get("_copyback_mutation_buffers", [])
+
                 if output_format == "aot_inductor" and any(
                     getattr(sub, "aliased_io", None)
                     for _sub_name, sub in module.named_modules()
@@ -1297,7 +1315,9 @@ def save(
                 if output_format == "exported_program":
                     # Must precede normalization, which rewrites the engine constants
                     # this pass reads aliased_io from.
-                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
+                    exp_program = _declare_aliased_kv_mutations_on_ep(
+                        exp_program, copyback_buffers=_copyback_bufs
+                    )
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1318,7 +1338,6 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
-                    _copyback_bufs = module.meta.get("_copyback_mutation_buffers", [])
                     exp_program = _declare_aliased_kv_mutations_on_ep(
                         exp_program, copyback_buffers=_copyback_bufs
                     )

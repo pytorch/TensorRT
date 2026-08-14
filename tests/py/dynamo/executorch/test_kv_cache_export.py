@@ -542,3 +542,39 @@ def test_declare_aliased_kv_mutations_rejects_redeclared_copyback():
 
     with pytest.raises(RuntimeError, match="already carry a BUFFER_MUTATION"):
         E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("use_legacy, expect_warning", [(True, False), (False, True)])
+def test_save_warns_when_copyback_cannot_be_declared(
+    monkeypatch, tmp_path, caplog, use_legacy, expect_warning
+):
+    """retrace=False only declares copy-back through the legacy exporter, so the
+    non-legacy combination drops it. Say so rather than saving a signature that
+    omits the update."""
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt
+    from torch_tensorrt import _compile as C
+    from torch_tensorrt.dynamo import _exporter as E
+
+    monkeypatch.setattr(E, "export", lambda *a, **k: object())
+    monkeypatch.setattr(E, "_declare_aliased_kv_mutations_on_ep", lambda ep, **k: ep)
+    monkeypatch.setattr(C, "_normalize_engine_constants_to_python", lambda ep: None)
+    monkeypatch.setattr(torch.export, "save", lambda *a, **k: None)
+
+    g = torch.fx.Graph()
+    g.output((g.placeholder("x"),))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+    gm.meta["_copyback_mutation_buffers"] = ["state_0"]
+
+    with caplog.at_level("WARNING"):
+        torch_tensorrt.save(
+            gm,
+            str(tmp_path / "out.pt2"),
+            output_format="exported_program",
+            retrace=False,
+            use_legacy_exporter=use_legacy,
+        )
+
+    warned = any("copy-back" in r.message for r in caplog.records)
+    assert warned is expect_warning
