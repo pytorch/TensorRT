@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=36dd9789"></script>
+    <script src="../../_static/documentation_options.js?v=969d8bf3"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -495,6 +495,7 @@ document.write(`
     <span class="n">Set</span><span class="p">,</span>
     <span class="n">Tuple</span><span class="p">,</span>
     <span class="n">Union</span><span class="p">,</span>
+    <span class="n">cast</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -562,6 +563,13 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">_has_executorch_exir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">&quot;executorch.exir&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="k">except</span> <span class="ne">ModuleNotFoundError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_has_executorch_runtime</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">&quot;torch_tensorrt_executorch_runtime&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
     <span class="k">except</span> <span class="ne">ModuleNotFoundError</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span>
 
@@ -795,7 +803,7 @@ document.write(`
                 <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span>  <span class="c1"># type: ignore[assignment]</span>
+            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span>
 
         <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -895,7 +903,7 @@ document.write(`
             <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
         <span class="p">)</span>
 
-    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>  <span class="c1"># type: ignore[assignment]</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>
 
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -997,7 +1005,7 @@ document.write(`
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
             <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
         <span class="p">)</span>
-    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">arg_inputs</span> <span class="ow">or</span> <span class="n">inputs</span>  <span class="c1"># type: ignore[assignment]</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">arg_inputs</span> <span class="ow">or</span> <span class="n">inputs</span>
 
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">target_ir</span> <span class="o">=</span> <span class="n">_get_target_fe</span><span class="p">(</span><span class="n">module_type</span><span class="p">,</span> <span class="n">ir</span><span class="p">)</span>
@@ -1041,11 +1049,14 @@ document.write(`
             <span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
         <span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">dynamo_convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
-            <span class="n">exp_program</span><span class="p">,</span>
-            <span class="n">arg_inputs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">normalized_arg_inputs</span><span class="p">),</span>
-            <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
+            <span class="nb">bytes</span><span class="p">,</span>
+            <span class="n">dynamo_convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
+                <span class="n">exp_program</span><span class="p">,</span>
+                <span class="n">arg_inputs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">normalized_arg_inputs</span><span class="p">),</span>
+                <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">),</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">torch_compile</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1075,16 +1086,23 @@ document.write(`
 <div class="viewcode-block" id="load">
 <a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.load">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span>
-    <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">extra_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="n">extra_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="nb">format</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Load either a Torchscript model or ExportedProgram.</span>
+<span class="sd">    Load a TorchScript, ExportedProgram, or ExecuTorch program.</span>
 
-<span class="sd">    Loads a TorchScript or ExportedProgram file from disk. File type will be detect the type using try, except.</span>
+<span class="sd">    By default, detects TorchScript and ExportedProgram files. Set</span>
+<span class="sd">    ``format=&quot;executorch&quot;`` explicitly for an ExecuTorch ``.pte`` file.</span>
 
 <span class="sd">    Arguments:</span>
 <span class="sd">        file_path (str): Path to file on the disk</span>
 <span class="sd">        extra_files (dict[str, Any]): Extra files to load with the model</span>
+<span class="sd">        format (Optional[str]): Set to ``&quot;executorch&quot;`` to load a ``.pte`` file</span>
+<span class="sd">            using the separately installed ExecuTorch runtime package.</span>
 
 <span class="sd">    Example:</span>
 <span class="sd">    # Load with extra files.</span>
@@ -1093,8 +1111,24 @@ document.write(`
 <span class="sd">        print(extra_files[&quot;foo.txt&quot;])</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file</span>
+<span class="sd">        ImportError: If ExecuTorch format is requested without the runtime package</span>
+<span class="sd">        ValueError: If the format is unsupported or the file is not a TorchScript or ExportedProgram file</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">format</span> <span class="o">==</span> <span class="s2">&quot;executorch&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_has_executorch_runtime</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+                <span class="s2">&quot;Loading an ExecuTorch program requires the prebuilt &quot;</span>
+                <span class="s2">&quot;Torch-TensorRT ExecuTorch delegate. Install it with: &quot;</span>
+                <span class="s2">&quot;pip install torch-tensorrt-executorch-runtime&quot;</span>
+            <span class="p">)</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt_executorch_runtime.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">load</span> <span class="k">as</span> <span class="n">load_executorch</span>
+
+        <span class="k">return</span> <span class="n">load_executorch</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">format</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unsupported format </span><span class="si">{</span><span class="nb">format</span><span class="si">!r}</span><span class="s2">; expected None or &#39;executorch&#39;&quot;</span>
+        <span class="p">)</span>
+
     <span class="c1"># Ensure Python TRT engine ops are registered so torch.export.load can</span>
     <span class="c1"># resolve tensorrt::execute_engine when the C++ runtime is absent.</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
