@@ -107,9 +107,45 @@ jobs:
       name-prefix: "Python-only RTX "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
+  # ExecuTorch runtime is supported by the standard TensorRT wheel only. Wait
+  # for the standard channel to upload its wheel artifact, but still build the
+  # runtime if a standard test fails.
+  executorch-runtime-build:
+    needs: [decide, generate-matrix, standard]
+    if: >-
+      always() &&
+      needs.decide.result == 'success' &&
+      needs.generate-matrix.result == 'success' &&
+      needs.decide.outputs.lane != 'skip' &&
+      needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/executorch-build-linux.yml
+    with:
+      repository: pytorch/tensorrt
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
+  executorch-runtime-test:
+    needs: [decide, generate-matrix, executorch-runtime-build]
+    if: >-
+      always() &&
+      needs.decide.result == 'success' &&
+      needs.generate-matrix.result == 'success' &&
+      needs.decide.outputs.lane != 'skip' &&
+      needs.decide.outputs.backend != 'rtx' &&
+      needs.executorch-runtime-build.result == 'success'
+    uses: ./.github/workflows/executorch-test-linux.yml
+    with:
+      repository: pytorch/tensorrt
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
   # Required check. Fails ONLY on a genuine failure; skipped/cancelled don't block.
   gate:
-    needs: [decide, standard, rtx, python-only, python-only-rtx]
+    needs: [decide, standard, rtx, python-only, python-only-rtx, executorch-runtime-build, executorch-runtime-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -124,7 +160,7 @@ jobs:
 
   # Consolidated, agent-friendly report over this run's suites (informational).
   report:
-    needs: [standard, rtx, python-only, python-only-rtx]
+    needs: [standard, rtx, python-only, python-only-rtx, executorch-runtime-build, executorch-runtime-test]
     if: always()
     runs-on: ubuntu-latest
     steps:

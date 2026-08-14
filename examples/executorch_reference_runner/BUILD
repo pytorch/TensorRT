@@ -7,6 +7,7 @@ filegroup(
     srcs = [
         "CMakeLists.txt",
         "README.md",
+        "load_model.py",
         "main.cpp",
     ],
 )

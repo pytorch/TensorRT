@@ -6,11 +6,12 @@ set +x
 #
 #   1. Build //:libtorchtrt first so bazel-bin/libtorchtrt.tar.gz exists.
 #   2. Provide an ExecuTorch source checkout with EXECUTORCH_SOURCE_DIR.
-#   3. This script exports a small Torch-TensorRT ExecuTorch .pte model,
-#      unpacks libtorchtrt.tar.gz, configures the packaged CMake runner,
-#      builds example_executorch_runner, and runs one inference.
+#   3. Provide a Torch-TensorRT ExecuTorch .pte model.
+#   4. This script unpacks libtorchtrt.tar.gz, configures and builds the
+#      packaged CMake runner, and runs one inference.
 #
 # Required:
+#   First argument: path to an existing .pte model.
 #   EXECUTORCH_SOURCE_DIR=/path/to/executorch
 #
 # Optional:
@@ -27,6 +28,16 @@ set +x
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
+
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 PATH_TO_MODEL.pte" >&2
+  exit 1
+fi
+model_path="$1"
+if [[ ! -f "${model_path}" ]]; then
+  echo "ExecuTorch model not found: ${model_path}" >&2
+  exit 1
+fi
 
 python_executable="${PYTHON_EXECUTABLE:-}"
 if [[ -z "${python_executable}" ]]; then
@@ -201,14 +212,13 @@ else
   export LD_LIBRARY_PATH="${torch_lib_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 fi
 
-# Fail early if the Python environment cannot export a Torch-TensorRT
-# ExecuTorch model or run ExecuTorch's CMake codegen.
+# Fail early if the Python environment cannot run ExecuTorch's CMake codegen.
 if ! "${python_executable}" - <<'PY'
 import importlib
 import importlib.util
 
 missing = []
-for name in ("yaml", "torch", "torch_tensorrt", "executorch.exir"):
+for name in ("yaml", "torch", "executorch.exir"):
     try:
         spec = importlib.util.find_spec(name)
     except ModuleNotFoundError:
@@ -217,55 +227,16 @@ for name in ("yaml", "torch", "torch_tensorrt", "executorch.exir"):
         missing.append(name)
 if missing:
     raise SystemExit(
-        "Missing Python package(s) required to export the .pte and build the runner: "
+        "Missing Python package(s) required to build the runner: "
         + ", ".join(missing)
     )
 
-for name in ("yaml", "torch", "torch_tensorrt", "executorch.exir"):
+for name in ("yaml", "torch", "executorch.exir"):
     importlib.import_module(name)
 PY
 then
   exit 1
 fi
-
-model_path="${verify_root}/model.pte"
-"${python_executable}" - "${model_path}" <<'PY'
-import importlib.util
-import runpy
-import sys
-from pathlib import Path
-
-model_path = sys.argv[1]
-repo_root = Path.cwd()
-
-# Use the installed package for native extensions and the in-tree ExecuTorch
-# route for the serializer/backend under test.
-import torch_tensorrt  # noqa: F401
-
-
-def overlay_module(name: str, path: Path) -> None:
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Could not load {name} from {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-
-
-overlay_module(
-    "torch_tensorrt.executorch.serialization",
-    repo_root / "py/torch_tensorrt/executorch/serialization.py",
-)
-overlay_module(
-    "torch_tensorrt.executorch.backend",
-    repo_root / "py/torch_tensorrt/executorch/backend.py",
-)
-
-export_script = repo_root / "examples/torchtrt_executorch_example/export_static_shape.py"
-sys.argv = [str(export_script), "--model_path", model_path]
-runpy.run_path(str(export_script), run_name="__main__")
-PY
-test -f "${model_path}"
 
 if [[ -n "${TensorRT_ROOT:-}" && -d "${TensorRT_ROOT}/lib" ]]; then
   export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${original_ld_library_path:+:${original_ld_library_path}}"

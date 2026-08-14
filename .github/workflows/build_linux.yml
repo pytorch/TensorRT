@@ -255,6 +255,12 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ env.ARCH }}
+      # Standard and RTX wheels are built for the same Python/CUDA/architecture
+      # matrix entries. Keep their GitHub artifact names distinct so consumers
+      # cannot download an RTX wheel for a standard-TensorRT job.
+      - name: Mark TensorRT-RTX artifact
+        if: ${{ inputs.use-rtx }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
       - name: Combine Env Var and Build Env Files
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}

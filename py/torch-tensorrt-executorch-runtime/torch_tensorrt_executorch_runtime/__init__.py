@@ -1,0 +1,91 @@
+"""Activate the TensorRT delegate-enabled ExecuTorch Python runtime."""
+
+from __future__ import annotations
+
+import ctypes
+import importlib
+import os
+import sys
+from types import ModuleType
+from typing import Any, Protocol, cast
+
+BACKEND_NAME = "TensorRTBackend"
+_NATIVE_NAME = "executorch.extension.pybindings._portable_lib"
+_WRAPPER_NAME = "executorch.extension.pybindings.portable_lib"
+_DATA_LOADER_NAME = "executorch.extension.pybindings.data_loader"
+
+
+class _BackendRegistry(Protocol):
+    def is_available(self, name: str) -> bool: ...
+
+
+class _Runtime(Protocol):
+    backend_registry: _BackendRegistry
+
+    def load_program(self, data: bytes) -> Any: ...
+
+
+class DelegateCompatibilityError(ImportError):
+    """The runtime wheel is incompatible with the active native runtime."""
+
+
+def _probe_portable_lib_dependencies() -> None:
+    """Fail before importing data_loader if _portable_lib dependencies are missing."""
+    spec = importlib.util.find_spec(__name__ + "._portable_lib")
+    if spec is None or spec.origin is None:
+        raise ImportError("Could not find the prebuilt ExecuTorch portable runtime")
+    ctypes.CDLL(spec.origin, mode=os.RTLD_LAZY | os.RTLD_LOCAL)
+
+
+def activate() -> ModuleType:
+    """Make the delegate-enabled portable runtime back ``executorch.runtime``.
+
+    The replacement includes TensorRTBackend as well as ExecuTorch XNNPACK
+    backend and optimized CPU kernels, so activation preserves the stock
+    Python runtime CPU execution capabilities.
+    """
+    existing = sys.modules.get(_NATIVE_NAME)
+    if existing is not None and existing.__name__ == __name__ + "._portable_lib":
+        return existing
+    if existing is not None or _WRAPPER_NAME in sys.modules:
+        raise DelegateCompatibilityError(
+            "ExecuTorch's stock runtime was imported first. Call "
+            'torch_tensorrt.load(..., format="executorch") before importing '
+            "executorch.runtime."
+        )
+    previous_data_loader = sys.modules.get(_DATA_LOADER_NAME)
+    try:
+        _probe_portable_lib_dependencies()
+        data_loader = importlib.import_module(__name__ + ".data_loader")
+        # _portable_lib imports this canonical name while its module initializer
+        # runs. Install our binding first so Python does not load ExecuTorch's
+        # stock data_loader and register PyDataLoader a second time.
+        sys.modules[_DATA_LOADER_NAME] = data_loader
+        native = importlib.import_module(__name__ + "._portable_lib")
+    except (ImportError, OSError) as error:
+        if previous_data_loader is None:
+            sys.modules.pop(_DATA_LOADER_NAME, None)
+        else:
+            sys.modules[_DATA_LOADER_NAME] = previous_data_loader
+        raise DelegateCompatibilityError(
+            "Could not load the prebuilt Torch-TensorRT ExecuTorch runtime. "
+            "Install torch, executorch, torch-tensorrt, and the runtime package from "
+            "the same release matrix."
+        ) from error
+    sys.modules[_NATIVE_NAME] = native
+    sys.modules.pop(_WRAPPER_NAME, None)
+    return native
+
+
+def get_runtime() -> _Runtime:
+    """Return the activated ExecuTorch Runtime singleton."""
+    activate()
+    from executorch.runtime import Runtime
+
+    value = cast(_Runtime, Runtime.get())
+    if not value.backend_registry.is_available(BACKEND_NAME):
+        raise DelegateCompatibilityError(f"{BACKEND_NAME} is not registered")
+    return value
+
+
+__all__ = ["BACKEND_NAME", "DelegateCompatibilityError", "activate", "get_runtime"]
