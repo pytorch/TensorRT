@@ -811,13 +811,22 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         return Error::InvalidArgument;
       }
       exec_aten::Tensor et_alias_out = out_arg->toTensor();
+      // nbytes() below sizes both the reflect copy and ExecuTorch's write-back, so
+      // the tensor has to carry the shape TRT inferred before either of them reads it.
       nvinfer1::Dims a_dims = ctx->getTensorShape(name.c_str());
-      if (a_dims.nbDims >= 0 && a_dims.nbDims <= nvinfer1::Dims::MAX_DIMS) {
-        SizesType a_sizes[nvinfer1::Dims::MAX_DIMS];
-        for (int d = 0; d < a_dims.nbDims; ++d) {
-          a_sizes[d] = static_cast<SizesType>(a_dims.d[d]);
-        }
-        (void)executorch::runtime::resize_tensor(et_alias_out, {a_sizes, static_cast<size_t>(a_dims.nbDims)});
+      if (a_dims.nbDims < 0 || a_dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
+        ET_LOG(Error, "TensorRTBackend::execute: invalid rank for aliased output '%s'", name.c_str());
+        return Error::InvalidState;
+      }
+      SizesType a_sizes[nvinfer1::Dims::MAX_DIMS];
+      for (int d = 0; d < a_dims.nbDims; ++d) {
+        a_sizes[d] = static_cast<SizesType>(a_dims.d[d]);
+      }
+      Error a_resize_err =
+          executorch::runtime::resize_tensor(et_alias_out, {a_sizes, static_cast<size_t>(a_dims.nbDims)});
+      if (a_resize_err != Error::Ok) {
+        ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for aliased output '%s'", name.c_str());
+        return a_resize_err;
       }
       void* dst = et_alias_out.nbytes() > 0 ? et_alias_out.mutable_data_ptr() : nullptr;
       // dst != bind_ptr guards against issuing a self-copy. The memory planner does
