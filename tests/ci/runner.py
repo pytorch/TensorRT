@@ -318,6 +318,10 @@ def matrix(**filters: str | None) -> list[dict[str, str]]:
             "variant": var,
             "tier": s.tier,
             "cwd": s.for_variant(var)["cwd"],
+            # "" means "no override" -- linux-test.yml falls back to
+            # matrix.validation_runner. Set on suites that need specific
+            # hardware (e.g. multi-GPU for distributed).
+            "runner": s.for_variant(var)["runner"] or "",
         }
         for s, var in select(**filters)
     ]
