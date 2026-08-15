@@ -1121,6 +1121,14 @@ def save(
                 **kwargs,
             )
         else:
+            # torch.export truncates the engines' aliased KV outputs at the fx
+            # boundary, so a retraced program's signature omits an update the engine
+            # performs unless the mutations are re-declared; the legacy exporter
+            # instead exposes them at transform time. The declaration pass skips
+            # buffers that already carry a spec, so every branch below can run it
+            # whichever exporter produced the program. aot_inductor is left
+            # undeclared: whether an aliased in-place mutation survives
+            # functionalization under inductor is unverified.
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
@@ -1141,7 +1149,15 @@ def save(
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
                 )
+
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
                 if output_format == "exported_program":
+                    # Must precede normalization, which rewrites the engine constants
+                    # this pass reads aliased_io from.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1162,6 +1178,7 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
                         file_path,
@@ -1237,8 +1254,6 @@ def save(
                     _declare_aliased_kv_mutations_on_ep,
                 )
 
-                # aot_inductor is left undeclared: whether an aliased in-place mutation
-                # survives functionalization under inductor is unverified.
                 if output_format == "aot_inductor" and any(
                     getattr(sub, "aliased_io", None)
                     for _sub_name, sub in module.named_modules()
@@ -1251,11 +1266,8 @@ def save(
                     )
 
                 if output_format == "exported_program":
-                    # torch.export truncates the engines' aliased KV outputs at the fx
-                    # boundary for every format, so the mutation has to be re-declared or
-                    # the signature omits an update the engine performs. Must precede
-                    # normalization, which rewrites the engine constants this pass reads
-                    # aliased_io from.
+                    # Must precede normalization, which rewrites the engine constants
+                    # this pass reads aliased_io from.
                     exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
@@ -1277,8 +1289,6 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
-                    # retrace=True: torch.export truncates the engines' aliased KV
-                    # outputs, so declare them as buffer mutations before lowering.
                     exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
