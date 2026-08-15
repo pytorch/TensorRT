@@ -221,14 +221,26 @@ def _reorder_input_names_for_executorch(
     first arg lists its input nodes in binding order, so sort the names by each
     node's slot among the graph placeholders (its runtime delegate-arg position).
 
-    Only inputs need this. Outputs are also bound positionally by the runtime,
-    but they are ``getitem(engine_node, idx)`` nodes whose index order equals the
-    engine output-binding order. ExecuTorch lowering can reorder delegate outputs
-    (``arrange_graph_outputs`` moves buffer-mutation outputs ahead of user
-    outputs), but a TensorRT delegate partition is a functional inference engine
-    with no mutation outputs, so that pass is a no-op here and the output order is
-    preserved. If a TRT partition ever produced mutation outputs, outputs would
-    need the same node-identity reordering as inputs.
+    Only inputs need this. Outputs are also bound positionally, but they are
+    ``getitem(engine_node, idx)`` nodes whose index order equals the engine
+    output-binding order, and that order survives lowering -- though not because
+    the partition is mutation-free. With aliased-I/O (KV-cache) support a TensorRT
+    partition *does* produce mutation outputs, and ``arrange_graph_outputs`` does
+    move buffer-mutation outputs ahead of user outputs. It stays a no-op here
+    because ``_keep_mutated_buffers_above_delegate`` (``partitioner.py``) strips
+    the ``delegation_tag`` from mutated buffer placeholders, so they stay out of
+    the delegate's state dict and constants; ExecuTorch's ``_get_new_signature``
+    then records the mutation as a plain ``USER_OUTPUT`` rather than a
+    ``BUFFER_MUTATION`` (it uses the latter only when the delegate itself consumes
+    the buffer). The lowered submodule therefore has no mutation specs, so
+    ``arrange_graph_outputs`` computes the identity permutation and the getitem
+    indices still line up with the engine's output bindings.
+
+    That guarantee is conditional, not structural: if a mutated buffer is ever
+    tagged into a delegate its spec becomes ``BUFFER_MUTATION``, the delegate's
+    outputs are permuted, and they would need the same node-identity reordering as
+    the inputs below. ``_validate_output_binding_order`` checks that correspondence
+    on every preprocess, so it would fail loudly rather than mis-bind.
     """
     input_nodes = list(engine_node.args[0])
     if len(input_nodes) != len(input_names):
