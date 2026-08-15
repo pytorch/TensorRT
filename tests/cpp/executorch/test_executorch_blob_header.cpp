@@ -13,6 +13,7 @@ namespace executorch_backend {
 namespace {
 
 constexpr char TENSORRT_MAGIC[4] = {'T', 'R', '0', '1'};
+constexpr char TENSORRT_MAGIC_ALIASED_IO[4] = {'T', 'R', '0', '2'};
 constexpr uint32_t METADATA_OFFSET_FIELD_OFFSET = 4;
 constexpr uint32_t METADATA_SIZE_FIELD_OFFSET = 8;
 constexpr uint32_t ENGINE_OFFSET_FIELD_OFFSET = 12;
@@ -29,13 +30,16 @@ std::size_t align_up(std::size_t value, std::size_t alignment) {
   return ((value + alignment - 1) / alignment) * alignment;
 }
 
-std::vector<uint8_t> make_blob(const std::string& metadata, std::size_t engine_size = 4) {
+std::vector<uint8_t> make_blob(
+    const std::string& metadata,
+    std::size_t engine_size = 4,
+    const char* magic = TENSORRT_MAGIC) {
   const auto metadata_offset = static_cast<uint32_t>(HEADER_SIZE);
   const auto metadata_size = static_cast<uint32_t>(metadata.size());
   const auto engine_offset = static_cast<uint32_t>(align_up(metadata_offset + metadata_size, ENGINE_ALIGNMENT));
   std::vector<uint8_t> blob(static_cast<std::size_t>(engine_offset) + engine_size, 0);
 
-  std::memcpy(blob.data(), TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC));
+  std::memcpy(blob.data(), magic, sizeof(TENSORRT_MAGIC));
   write_field(blob, METADATA_OFFSET_FIELD_OFFSET, metadata_offset);
   write_field(blob, METADATA_SIZE_FIELD_OFFSET, metadata_size);
   write_field(blob, ENGINE_OFFSET_FIELD_OFFSET, engine_offset);
@@ -147,6 +151,27 @@ TEST(ExecuTorchTensorRTBlobHeader, ParsesEmptyAliasedIo) {
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
   EXPECT_TRUE(header.aliased_io.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIoMagic) {
+  const std::string metadata = R"({"io_bindings":[{"name":"in_k","is_input":true},{"name":"out_k","is_input":false}],)"
+                               R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"}]})";
+  const auto blob = make_blob(metadata, 4, TENSORRT_MAGIC_ALIASED_IO);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  ASSERT_EQ(header.aliased_io.size(), 1u);
+  EXPECT_EQ(header.aliased_io[0].output_name, "out_k");
+  EXPECT_EQ(header.aliased_io[0].input_name, "in_k");
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
+  constexpr char kFutureMagic[4] = {'T', 'R', '0', '3'};
+  const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}]})";
+  const auto blob = make_blob(metadata, 4, kFutureMagic);
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
 }
 
 } // namespace

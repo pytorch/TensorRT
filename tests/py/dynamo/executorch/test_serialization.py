@@ -4,6 +4,7 @@ import pytest
 from torch_tensorrt.executorch.serialization import (
     HEADER_SIZE,
     TENSORRT_MAGIC,
+    TENSORRT_MAGIC_ALIASED_IO,
     TensorRTBlobMetadata,
     TensorRTIOBinding,
     deserialize_engine,
@@ -76,3 +77,46 @@ def test_metadata_from_json_without_aliased_io_defaults_empty():
 
     restored = TensorRTBlobMetadata.from_json(json.dumps(data).encode("utf-8"))
     assert restored.aliased_io == {}
+
+
+@pytest.mark.unit
+def test_aliased_io_blob_uses_the_bumped_magic():
+    """aliased_io changes what a blob means: a parser that ignores it binds each
+    aliased output to its own allocation instead of the input it aliases, and
+    returns wrong results. The magic is the only field such a parser validates, so
+    aliased blobs must not present as TR01."""
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[
+            TensorRTIOBinding(name="x", is_input=True),
+            TensorRTIOBinding(name="out_k", is_input=False),
+        ],
+        aliased_io={"out_k": ("x", "kv_cache_update")},
+    )
+    blob = serialize_engine(b"engine-bytes", metadata)
+    assert blob[:4] == TENSORRT_MAGIC_ALIASED_IO
+    assert blob[:4] != TENSORRT_MAGIC
+
+
+@pytest.mark.unit
+def test_blob_without_aliased_io_keeps_the_original_magic():
+    """Nothing about a non-aliased blob is new, so it stays loadable by a parser
+    that predates aliased_io."""
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[TensorRTIOBinding(name="x", is_input=True)]
+    )
+    assert serialize_engine(b"engine-bytes", metadata)[:4] == TENSORRT_MAGIC
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("aliased_io", [{}, {"out_k": ("x", "kv_cache_update")}])
+def test_deserialize_accepts_both_magics(aliased_io):
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[
+            TensorRTIOBinding(name="x", is_input=True),
+            TensorRTIOBinding(name="out_k", is_input=False),
+        ],
+        aliased_io=aliased_io,
+    )
+    engine, parsed = deserialize_engine(serialize_engine(b"engine-bytes", metadata))
+    assert engine == b"engine-bytes"
+    assert parsed.aliased_io == aliased_io

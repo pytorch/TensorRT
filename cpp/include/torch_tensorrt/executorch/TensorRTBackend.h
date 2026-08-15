@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  *
  * ExecuTorch backend delegate that runs TensorRT engines serialized by
- * torch_tensorrt. The processed blob uses the standalone TR01 wire format from
+ * torch_tensorrt. The processed blob uses the standalone wire format from
  * py/torch_tensorrt/executorch/serialization.py and is parsed directly here.
  * This runtime path intentionally does not depend on the legacy
  * Torch-TensorRT C++ runtime or libtorch.

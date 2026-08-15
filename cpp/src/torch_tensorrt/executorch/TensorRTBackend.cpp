@@ -242,7 +242,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
 
   TensorRTBlobHeader header;
   if (!TensorRTBlobHeader::parse(processed->data(), processed->size(), header)) {
-    ET_LOG(Error, "TensorRTBackend::init: failed to parse TR01 TensorRT blob");
+    ET_LOG(Error, "TensorRTBackend::init: failed to parse TensorRT blob");
     return Error::InvalidProgram;
   }
 

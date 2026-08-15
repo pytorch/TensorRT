@@ -321,7 +321,7 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
     """Backend that serializes TensorRT engines for the native ExecuTorch runtime.
 
     The partition contains a single execute_engine node; we extract the engine
-    and metadata and encode them as a standalone TR01 blob. The C++ runtime
+    and metadata and encode them as a standalone blob. The C++ runtime
     backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.
     """
 
