@@ -260,3 +260,49 @@ def test_declare_aliased_kv_mutations_declares_buffer_mutation(monkeypatch):
         "verifiers",
     ):
         assert captured[field] is getattr(ep, field)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("output_format", ["exported_program", "executorch"])
+@pytest.mark.parametrize("use_legacy", [True, False])
+def test_save_declares_aliased_mutations_without_retrace(
+    monkeypatch, tmp_path, output_format, use_legacy
+):
+    """retrace=False must declare the aliased KV mutations as well.
+
+    Only the legacy exporter exposes them at transform time, so with
+    use_legacy_exporter=False nothing declares them and the saved program omits an
+    update the engine performs. The pass skips buffers already declared, so save()
+    can run it for either exporter.
+    """
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt
+    from torch_tensorrt import _compile as C
+    from torch_tensorrt.dynamo import _exporter as E
+
+    sentinel = object()
+    declared = []
+
+    def _declare(ep, **kwargs):
+        declared.append(ep)
+        return ep
+
+    monkeypatch.setattr(E, "export", lambda *a, **k: sentinel)
+    monkeypatch.setattr(E, "_declare_aliased_kv_mutations_on_ep", _declare)
+    monkeypatch.setattr(C, "_normalize_engine_constants_to_python", lambda ep: None)
+    monkeypatch.setattr(C, "_save_as_executorch", lambda *a, **k: None)
+    monkeypatch.setattr(torch.export, "save", lambda *a, **k: None)
+
+    g = torch.fx.Graph()
+    g.output((g.placeholder("x"),))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    torch_tensorrt.save(
+        gm,
+        str(tmp_path / "out.pte"),
+        output_format=output_format,
+        retrace=False,
+        use_legacy_exporter=use_legacy,
+    )
+
+    assert declared == [sentinel]
