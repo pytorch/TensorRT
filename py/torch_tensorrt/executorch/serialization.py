@@ -12,7 +12,14 @@ import struct
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
+# A blob carrying aliased_io means something different to a parser that ignores it:
+# the runtime would bind each aliased output to its own allocation instead of the
+# input it aliases, and return wrong results rather than fail. The only field a
+# pre-aliasing parser validates is the magic, so aliased blobs carry TR02 and it
+# rejects them. Blobs without aliased_io keep TR01 and stay readable everywhere.
 TENSORRT_MAGIC = b"TR01"
+TENSORRT_MAGIC_ALIASED_IO = b"TR02"
+SUPPORTED_MAGICS = (TENSORRT_MAGIC, TENSORRT_MAGIC_ALIASED_IO)
 HEADER_FORMAT = "<4sIIIQ8s"
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
@@ -99,7 +106,7 @@ def serialize_engine(engine_bytes: bytes, metadata: TensorRTBlobMetadata) -> byt
     reserved = b"\x01" + b"\x00" * 7
     header = struct.pack(
         HEADER_FORMAT,
-        TENSORRT_MAGIC,
+        TENSORRT_MAGIC_ALIASED_IO if metadata.aliased_io else TENSORRT_MAGIC,
         metadata_offset,
         len(metadata_json),
         engine_offset,
@@ -116,7 +123,7 @@ def deserialize_engine(blob: bytes) -> Tuple[bytes, TensorRTBlobMetadata]:
     magic, metadata_offset, metadata_size, engine_offset, engine_size, _ = (
         struct.unpack(HEADER_FORMAT, blob[:HEADER_SIZE])
     )
-    if magic != TENSORRT_MAGIC:
+    if magic not in SUPPORTED_MAGICS:
         raise ValueError(f"Invalid magic: {magic!r}")
     if engine_offset % 16 != 0:
         raise ValueError(f"Engine offset is not 16-byte aligned: {engine_offset}")

@@ -9,7 +9,10 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 namespace {
 
+// TR02 marks a blob whose metadata carries aliased_io; TR01 is one without. This
+// parser handles aliased_io, so it accepts either.
 constexpr char TENSORRT_MAGIC[4] = {'T', 'R', '0', '1'};
+constexpr char TENSORRT_MAGIC_ALIASED_IO[4] = {'T', 'R', '0', '2'};
 constexpr uint32_t METADATA_OFFSET_FIELD_OFFSET = 4;
 constexpr uint32_t METADATA_SIZE_FIELD_OFFSET = 8;
 constexpr uint32_t ENGINE_OFFSET_FIELD_OFFSET = 12;
@@ -324,7 +327,8 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   }
 
   const auto* bytes = static_cast<const uint8_t*>(data);
-  if (std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0) {
+  if (std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0 &&
+      std::memcmp(bytes, TENSORRT_MAGIC_ALIASED_IO, sizeof(TENSORRT_MAGIC_ALIASED_IO)) != 0) {
     return false;
   }
 
