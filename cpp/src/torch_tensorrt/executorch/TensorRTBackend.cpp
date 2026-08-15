@@ -781,7 +781,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // Caller-owned KV: (dst = delegate output EValue ptr, src = aliased input ptr,
   // nbytes). The engine updates the aliased input in place; reflect that into the
   // delegate output EValue after enqueue so ExecuTorch's write-back copy_ sees the
-  // updated cache. Skipped when dst == src (memory planner aliased them: zero-copy).
+  // updated cache.
   std::vector<std::tuple<void*, void*, size_t>> aliased_reflects;
   for (size_t o = 0; o < num_outputs; ++o) {
     const std::string& name = engine->output_binding_names[o];
@@ -820,6 +820,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         (void)executorch::runtime::resize_tensor(et_alias_out, {a_sizes, static_cast<size_t>(a_dims.nbDims)});
       }
       void* dst = et_alias_out.nbytes() > 0 ? et_alias_out.mutable_data_ptr() : nullptr;
+      // dst != bind_ptr guards against issuing a self-copy. The memory planner does
+      // not currently place the delegate's output slot on the aliased input -- the
+      // two are live at the same time -- so this holds for every aliased output.
       if (dst != nullptr && dst != bind_ptr) {
         aliased_reflects.emplace_back(dst, bind_ptr, et_alias_out.nbytes());
       }
@@ -911,8 +914,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // Caller-owned KV: reflect each engine in-place update into its delegate output
-  // EValue (D2D on the same stream, after the engine work). No-op list under
-  // zero-copy (dst == src filtered out at bind time).
+  // EValue (D2D on the same stream, after the engine work).
   for (const auto& r : aliased_reflects) {
     cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDeviceToDevice, stream);
     if (cuda_err != cudaSuccess) {
@@ -938,11 +940,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
   // copies live in the must_sync branch: an output staged to host always sets
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
-  // A non-zero-copy aliased reflect enqueues the engine's in-place update into
-  // the delegate output EValue on `stream`; ExecuTorch's buffer-mutation copy_
-  // reads that EValue after execute() returns, so the reflect must complete
-  // first. Zero-copy aliases (dst == src) record no reflect, so the common
-  // caller-owned KV fast path is untouched.
+  // An aliased reflect enqueues the engine's in-place update into the delegate
+  // output EValue on `stream`; ExecuTorch's buffer-mutation copy_ reads that EValue
+  // after execute() returns, so the reflect must complete first. A model with
+  // aliased outputs therefore always syncs here.
   const bool aliased_reflect_pending = !aliased_reflects.empty();
   const bool must_sync =
       output_staged_to_host || input_staged_from_host || aliased_reflect_pending || !caller_stream_set;

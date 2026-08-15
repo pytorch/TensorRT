@@ -246,7 +246,7 @@ def test_declare_aliased_kv_mutations_declares_buffer_mutation(monkeypatch):
     assert out_node.args[0][0].name == new_specs[0].arg.name
     assert out_node.args[0][1] is user_out
 
-    # The engine's meta['val'] is extended to cover the previously-dropped output.
+    # The engine's meta['val'] is extended to cover the truncated aliased output.
     assert len(eng.meta["val"]) == 2
 
     # A rewrite replaces only the graph and signature; every other field of the

@@ -65,8 +65,7 @@ struct EngineHandle {
   // ExecuTorch as caller-owned mutable-buffer delegate args (input AND aliased
   // output): execute() binds each aliased TRT output binding to its aliased
   // input's caller-provided pointer (in-place) and reflects the result into the
-  // delegate output EValue (a no-op when the memory planner already aliased the
-  // two -> zero-copy).
+  // delegate output EValue, which ExecuTorch's write-back copy_ then reads.
   std::vector<int> output_aliased_input_idx;
   // Per input binding [0..num_inputs): true if any output aliases this input, so
   // its in-place (KV/user) update must land in the caller-owned storage. Built at
