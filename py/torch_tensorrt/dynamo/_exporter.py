@@ -771,8 +771,9 @@ def _expose_aliased_buffer_mutations(
         if out_name not in aliased_io:
             continue
         in_name = aliased_io[out_name][0]
-        # These two are internal invariant violations: aliased_io is built from the
-        # engine's own bindings, so an aliased output must map to a real input arg.
+        # The two checks below are internal invariant violations: aliased_io is
+        # built from the engine's own bindings, so an aliased output must map to a
+        # real input arg.
         # If it doesn't, the mutation can't be wired and its in-place update would be
         # silently dropped (a corrupted cache) -- fail loudly rather than degrade.
         if in_name not in in_names:
