@@ -1,5 +1,6 @@
 # ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
+import operator
 from typing import Any, List, final
 
 import torch
@@ -253,6 +254,57 @@ def _reorder_input_names_for_executorch(
     return [input_names[i] for i in order]
 
 
+def _validate_output_binding_order(
+    edge_program: ExportedProgram, engine_node: Any, output_names: List[str]
+) -> None:
+    """Check the delegate's outputs are the engine's output bindings, in order.
+
+    The runtime binds output ``i`` to ``output_binding_names[i]``, and nothing
+    downstream re-derives that correspondence: it holds because the partition's
+    outputs are ``getitem(engine_node, i)`` in index order. A pass that reordered
+    them -- ``arrange_graph_outputs`` moves buffer mutations ahead of user outputs,
+    which only stays a no-op here while the mutated buffers are kept above the
+    delegate -- would swap the names silently. Inputs cannot rely on position at
+    all and recover their order by node identity in
+    ``_reorder_input_names_for_executorch``.
+    """
+    output_node = next(
+        node for node in edge_program.graph_module.graph.nodes if node.op == "output"
+    )
+    out_args = list(output_node.args[0])
+    # A single-output engine is returned directly rather than through a getitem,
+    # and one binding has no order to get wrong.
+    if len(out_args) == 1 and out_args[0] is engine_node:
+        if len(output_names) != 1:
+            raise ValueError(
+                "TensorRT ExecuTorch backend: the delegate returns the engine node "
+                f"directly but the engine declares {len(output_names)} output "
+                "bindings; only a single-output engine can be returned unwrapped."
+            )
+        return
+    indices: List[Any] = []
+    for node in out_args:
+        if (
+            not isinstance(node, torch.fx.Node)
+            or node.op != "call_function"
+            or node.target is not operator.getitem
+            or node.args[0] is not engine_node
+        ):
+            raise ValueError(
+                "TensorRT ExecuTorch backend: delegate output "
+                f"{getattr(node, 'name', node)!r} is not a getitem of the engine "
+                "node; cannot establish a reliable output binding order."
+            )
+        indices.append(node.args[1])
+    if indices != list(range(len(output_names))):
+        raise ValueError(
+            "TensorRT ExecuTorch backend: delegate outputs map to engine output "
+            f"indices {indices}, expected {list(range(len(output_names)))} -- the "
+            "runtime binds output i to output_binding_names[i], so a permuted or "
+            "incomplete output list would bind the wrong tensors."
+        )
+
+
 def _get_str(engine_info: List[Any], index: int, default: str = "") -> str:
     if index < 0 or index >= len(engine_info):
         return default
@@ -304,6 +356,7 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         output_names = _split_binding_names(
             _get_str(engine_info, OUTPUT_BINDING_NAMES_IDX)
         )
+        _validate_output_binding_order(edge_program, engine_node, output_names)
         io_bindings = [
             TensorRTIOBinding(name=name, is_input=True) for name in input_names
         ] + [TensorRTIOBinding(name=name, is_input=False) for name in output_names]
