@@ -14,6 +14,10 @@ set +x
 #   First argument: path to an existing .pte model.
 #   EXECUTORCH_SOURCE_DIR=/path/to/executorch
 #
+# Optional second argument: path to a caller-owned KV-cache decode .pte (see
+#   examples/torchtrt_executorch_example/export_kv_cache_decode.py). When given,
+#   kv_cache_decode_check is built and run against it as well.
+#
 # Optional:
 #   TensorRT_ROOT=/path/to/extracted/TensorRT
 #     If unset, the script reuses Bazel's fetched TensorRT SDK when available
@@ -29,13 +33,18 @@ set +x
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 PATH_TO_MODEL.pte" >&2
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "Usage: $0 PATH_TO_MODEL.pte [PATH_TO_KV_CACHE_DECODE.pte]" >&2
   exit 1
 fi
 model_path="$1"
 if [[ ! -f "${model_path}" ]]; then
   echo "ExecuTorch model not found: ${model_path}" >&2
+  exit 1
+fi
+kv_model_path="${2:-}"
+if [[ -n "${kv_model_path}" && ! -f "${kv_model_path}" ]]; then
+  echo "KV-cache decode model not found: ${kv_model_path}" >&2
   exit 1
 fi
 
@@ -274,6 +283,7 @@ require_tar_entry "torch_tensorrt/src/torch_tensorrt/executorch/CMakeLists.txt"
 require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt"
 require_tar_entry "torch_tensorrt/bin/example_executorch_runner"
 require_tar_entry "torch_tensorrt/lib/libextension_cuda.so"
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/kv_cache_decode_check.cpp"
 require_tar_entry "torch_tensorrt/BUILD"
 
 export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
@@ -295,8 +305,13 @@ fi
 
 cmake "${cmake_args[@]}"
 
+build_targets=(example_executorch_runner)
+if [[ -n "${kv_model_path}" ]]; then
+  build_targets+=(kv_cache_decode_check)
+fi
+
 cmake --build "${verify_root}/build-executorch-reference-runner" \
-  --target example_executorch_runner \
+  --target "${build_targets[@]}" \
   -j"${MAX_JOBS:-$(nproc)}"
 
 runner_log="${verify_root}/my_runner.log"
@@ -452,3 +467,20 @@ for _log in "${runner_log}" "${packaged_runner_log}"; do
     fi
   done
 done
+
+if [[ -n "${kv_model_path}" ]]; then
+  # kv_cache_decode_check exits non-zero when a decode step does not observe the KV
+  # the previous step wrote; the grep additionally pins the assertion itself, so
+  # weakening the check inside the binary cannot quietly turn this into a no-op.
+  kv_check_log="${verify_root}/kv_cache_decode_check.log"
+  kv_check_path="${verify_root}/build-executorch-reference-runner/kv_cache_decode_check"
+  if command -v ldd >/dev/null 2>&1 &&
+    ldd "${kv_check_path}" |
+      grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
+    echo "kv_cache_decode_check links PyTorch/libtorch shared libraries" >&2
+    exit 1
+  fi
+
+  "${kv_check_path}" --model_path="${kv_model_path}" 2>&1 | tee "${kv_check_log}"
+  grep -q "PASS: decode at pos=1 observed the KV written at pos=0" "${kv_check_log}"
+fi
