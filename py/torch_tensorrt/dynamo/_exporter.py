@@ -597,14 +597,50 @@ def _declare_aliased_kv_mutations_on_ep(
             if out_name not in aliased_io:
                 continue
             in_name = aliased_io[out_name][0]
+            # The alias map comes from the engine's own bindings, so an entry that does
+            # not resolve to a delegate input arg means the map and the engine disagree.
+            # The mutation is then left undeclared and only surfaces as a delegate arity
+            # error at execute, so log which output was dropped.
             if in_name not in in_names:
+                logger.warning(
+                    "Aliased output %s references input %s, which is not an engine "
+                    "input binding; leaving the mutation undeclared.",
+                    out_name,
+                    in_name,
+                )
                 continue
             ii = in_names.index(in_name)
             if ii >= len(input_nodes):
+                logger.warning(
+                    "Aliased output %s maps to input index %d, out of range for %d "
+                    "delegate args; leaving the mutation undeclared.",
+                    out_name,
+                    ii,
+                    len(input_nodes),
+                )
                 continue
             buf_node = input_nodes[ii]
             buf_fqn = inputs_to_buffers.get(getattr(buf_node, "name", None))
-            if buf_fqn is None or buf_fqn in already_exposed:
+            if buf_fqn is None:
+                # A caller-supplied cache that is not a registered buffer: there is no
+                # buffer to declare a mutation of, and the engine still has the output
+                # binding, so the delegate ends up one arg short at execute.
+                logger.warning(
+                    "Aliased output %s updates %s in place, but that input is not a "
+                    "registered buffer, so no buffer mutation is declared for it.",
+                    out_name,
+                    in_name,
+                )
+                continue
+            if buf_fqn in already_exposed:
+                # Already declared, by this pass for another engine sharing the buffer
+                # or by the exporter at transform time. Expected, not a fault.
+                logger.debug(
+                    "Buffer %s already carries a mutation spec; skipping aliased "
+                    "output %s.",
+                    buf_fqn,
+                    out_name,
+                )
                 continue
             oi = out_names.index(out_name)
             while len(val_list) <= oi:
