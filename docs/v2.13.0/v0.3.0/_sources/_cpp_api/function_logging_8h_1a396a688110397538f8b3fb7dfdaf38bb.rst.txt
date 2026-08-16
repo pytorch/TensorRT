@@ -1,0 +1,13 @@
+.. _exhale_function_logging_8h_1a396a688110397538f8b3fb7dfdaf38bb:
+
+Function trtorch::logging::set_logging_prefix
+=============================================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_logging.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::logging::set_logging_prefix(std::string)

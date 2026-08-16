@@ -1,0 +1,83 @@
+
+.. _file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h:
+
+File TensorRTBackend.h
+======================
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp_include_torch_tensorrt_executorch>` (``cpp/include/torch_tensorrt/executorch``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+Definition (``cpp/include/torch_tensorrt/executorch/TensorRTBackend.h``)
+------------------------------------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+
+   program_listing_file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h.rst
+
+
+
+
+
+Includes
+--------
+
+
+- ``NvInfer.h``
+
+- ``cuda_runtime.h``
+
+- ``executorch/runtime/backend/interface.h``
+
+- ``memory``
+
+- ``mutex``
+
+- ``string``
+
+- ``vector``
+
+
+
+
+
+
+Namespaces
+----------
+
+
+- :ref:`namespace_torch_tensorrt`
+
+- :ref:`namespace_torch_tensorrt__executorch_backend`
+
+
+Classes
+-------
+
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle`
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds`
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter`
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard`
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend`
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger`
+
+
+Typedefs
+--------
+
+
+- :ref:`exhale_typedef_TensorRTBackend_8h_1acdb398aaccae05cc399de3a885797c13`
+
