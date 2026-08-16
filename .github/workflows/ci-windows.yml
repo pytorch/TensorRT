@@ -52,6 +52,8 @@ jobs:
   # generate_binary_build_matrix's cancel-in-progress concurrency would otherwise
   # make per-channel calls cancel each other).
   generate-matrix:
+    needs: decide
+    if: needs.decide.result == 'success' && needs.decide.outputs.lane != 'skip'
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
