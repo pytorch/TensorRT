@@ -23,13 +23,14 @@ class TestLibTorchTensorRTLinkage(unittest.TestCase):
             raise unittest.SkipTest("torch and torch_tensorrt must be installed")
 
         cls.torch_lib_dir = Path(torch_spec.origin).parent / "lib"
-        cls.trt_lib_dirs = [
-            distribution.locate_file(path).parent
+        cls.trt_plugin_paths = [
+            distribution.locate_file(path)
             for distribution in importlib.metadata.distributions()
-            if distribution.metadata["Name"] in {"tensorrt-cu13-libs"}
+            if distribution.metadata["Name"].replace("_", "-") == "tensorrt-cu13-libs"
             for path in distribution.files or []
             if path.name.startswith("libnvinfer_plugin.so")
         ]
+        cls.trt_lib_dirs = [path.parent for path in cls.trt_plugin_paths]
         cls.libtorchtrt = (
             Path(next(iter(torchtrt_spec.submodule_search_locations)))
             / "lib"
@@ -102,8 +103,16 @@ assert "torch" not in sys.modules
             capture_output=True,
             text=True,
         )
+        diagnostics = "\n".join(
+            [
+                f"TensorRT plugin paths: {self.trt_plugin_paths}",
+                f"Plugin paths exist: {[path.is_file() for path in self.trt_plugin_paths]}",
+                f"TensorRT library dirs: {self.trt_lib_dirs}",
+                f"Child LD_LIBRARY_PATH: {env['LD_LIBRARY_PATH']}",
+            ]
+        )
         self.assertEqual(
             result.returncode,
             0,
-            msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+            msg=f"{diagnostics}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}",
         )
