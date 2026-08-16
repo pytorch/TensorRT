@@ -53,6 +53,8 @@ jobs:
   # per-channel makes the channels cancel each other's matrix job. All channels
   # share this one output and filter it per-variant.
   generate-matrix:
+    needs: decide
+    if: needs.decide.result == 'success' && needs.decide.outputs.lane != 'skip'
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
