@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -660,10 +660,14 @@ document.write(`
                 <span class="n">input_kind</span> <span class="o">=</span> <span class="n">InputKind</span><span class="o">.</span><span class="n">CONSTANT_TENSOR</span>
 
                 <span class="c1"># state_dict has these parameters/buffers as torch.Tensors. We override them as torch.nn.Parameter/torch.Tensors respectively.</span>
-                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
                     <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
                         <span class="n">input_kind</span> <span class="o">=</span> <span class="n">InputKind</span><span class="o">.</span><span class="n">PARAMETER</span>
-                        <span class="n">state_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">state_dict</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+                        <span class="c1"># state_dict() drops requires_grad and Parameter defaults it</span>
+                        <span class="c1"># to True, which an integer weight cannot have.</span>
+                        <span class="n">state_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span>
+                            <span class="n">state_dict</span><span class="p">[</span><span class="n">name</span><span class="p">],</span> <span class="n">requires_grad</span><span class="o">=</span><span class="n">param</span><span class="o">.</span><span class="n">requires_grad</span>
+                        <span class="p">)</span>
                         <span class="k">break</span>
                 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_buffers</span><span class="p">():</span>
                     <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
