@@ -92,6 +92,42 @@ class TestFoldedConstantGraphBreak(TestCase):
         for t in frozen:
             self.assertTrue(torch.equal(t.detach().cpu(), torch.zeros(8)))
 
+    def test_repeated_folded_outputs_preserve_alias(self):
+        """Same folded value returned twice must still share storage (eager semantics)."""
+        g = Graph()
+        with g.inserting_after():
+            values = g.call_function(
+                torch.ops.aten.zeros.default,
+                args=((8,),),
+                kwargs={"dtype": torch.float32},
+            )
+            g.output((values, values))  # same value twice
+
+        gm = GraphModule(torch.nn.Module(), g)
+        gm = constant_fold(gm, CompilationSettings())
+
+        output_node = next(n for n in gm.graph.nodes if n.op == "output")
+        out0, out1 = output_node.args[0]
+        # One clone node reused for both outputs.
+        self.assertIs(out0, out1)
+        self.assertEqual(out0.op, "call_function")
+        self.assertIn(out0.target, (torch.clone, torch.ops.aten.clone.default))
+
+        a, b = gm()
+        self.assertEqual(a.data_ptr(), b.data_ptr())
+        a.add_(1)
+        self.assertTrue(torch.equal(a, b))  # mutation shared across aliases
+
+        frozen = [
+            getattr(gm, name)
+            for name in dir(gm)
+            if name.startswith("_frozen_param")
+            and isinstance(getattr(gm, name), torch.Tensor)
+        ]
+        self.assertGreaterEqual(len(frozen), 1)
+        for t in frozen:
+            self.assertTrue(torch.equal(t.detach().cpu(), torch.zeros(8)))
+
 
 if __name__ == "__main__":
     run_tests()

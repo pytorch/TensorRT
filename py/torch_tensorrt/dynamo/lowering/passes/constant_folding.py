@@ -115,6 +115,7 @@ def _clone_folded_constants_at_outputs(
     if not isinstance(out_args, (tuple, list)):
         out_args = (out_args,)
 
+    clone_cache = {}
     new_outs = []
     changed = False
     for out in out_args:
@@ -123,12 +124,14 @@ def _clone_folded_constants_at_outputs(
             and out.op == "get_attr"
             and str(out.target).startswith("_frozen_param")
         ):
-            with gm.graph.inserting_before(output_node):
-                cloned = gm.graph.call_function(torch.clone, args=(out,))
-                # keep meta if present
-                if hasattr(out, "meta"):
-                    cloned.meta.update(out.meta)
-            new_outs.append(cloned)
+            if out not in clone_cache:
+                with gm.graph.inserting_before(output_node):
+                    cloned = gm.graph.call_function(torch.clone, args=(out,))
+                    # keep meta if present
+                    if hasattr(out, "meta"):
+                        cloned.meta.update(out.meta)
+                clone_cache[out] = cloned
+            new_outs.append(clone_cache[out])
             changed = True
         else:
             new_outs.append(out)
