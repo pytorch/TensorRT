@@ -58,6 +58,8 @@ def constant_fold(
         gm.graph.erase_node(node)
 
     gm = clean_up_graph_after_modifications(gm)
+    gm = _clone_folded_constants_at_outputs(gm)
+
     # Delete the constant folder instance which holds GPU memory
     del cf
 
@@ -97,6 +99,46 @@ def replace_node_with_constant(
     # Needed to suppress `does not reference an nn.Module, nn.Parameter, or buffer` warning
     gm.register_parameter(qualname, constant)
     setattr(gm, qualname, constant)
+
+
+def _clone_folded_constants_at_outputs(
+    gm: torch.fx.GraphModule,
+) -> torch.fx.GraphModule:
+    """If a folded buffer is returned from the graph, return a clone instead.
+
+    Eager code after a graph break may mutate outputs in-place. Without a clone,
+    that mutates self._frozen_param* and poisons later calls.
+    """
+    output_node = next(n for n in gm.graph.nodes if n.op == "output")
+    # FX output args are typically a tuple/list of returned values
+    out_args = output_node.args[0]
+    if not isinstance(out_args, (tuple, list)):
+        out_args = (out_args,)
+
+    new_outs = []
+    changed = False
+    for out in out_args:
+        if (
+            isinstance(out, torch.fx.Node)
+            and out.op == "get_attr"
+            and str(out.target).startswith("_frozen_param")
+        ):
+            with gm.graph.inserting_before(output_node):
+                cloned = gm.graph.call_function(torch.clone, args=(out,))
+                # keep meta if present
+                if hasattr(out, "meta"):
+                    cloned.meta.update(out.meta)
+            new_outs.append(cloned)
+            changed = True
+        else:
+            new_outs.append(out)
+
+    if changed:
+        output_node.args = (tuple(new_outs),)
+        gm.graph.lint()
+        gm.recompile()
+
+    return gm
 
 
 # TODO: Delete this class when the following code is fixed in nightly:
