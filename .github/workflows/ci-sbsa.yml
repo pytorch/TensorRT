@@ -52,6 +52,8 @@ jobs:
 
   # Generate the aarch64 build matrix once (shared by all build channels).
   generate-matrix:
+    needs: decide
+    if: needs.decide.result == 'success' && needs.decide.outputs.lane != 'skip'
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel

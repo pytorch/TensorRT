@@ -8,6 +8,7 @@ import pytest
 import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import FakeTensor
+from torch.export.graph_signature import InputKind
 from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
 
 
@@ -355,7 +356,7 @@ def test_per_partition_distinct_target_devices(monkeypatch):
 # non-fp32 or non-CPU lifted constant silently gets fp32/cpu meta.
 
 
-def _traced_gm_with_parameter(dtype, device):
+def _traced_gm_with_parameter(dtype, device, requires_grad=False):
     """A symbolically-traced GraphModule with one get_attr parameter (`c`) of the
     given dtype/device, plus a stub graph_signature lift() can mutate."""
     from torch._subclasses.fake_tensor import FakeTensorMode
@@ -364,7 +365,8 @@ def _traced_gm_with_parameter(dtype, device):
         def __init__(self):
             super().__init__()
             self.c = torch.nn.Parameter(
-                torch.zeros(3, 3, dtype=dtype, device=device), requires_grad=False
+                torch.zeros(3, 3, dtype=dtype, device=device),
+                requires_grad=requires_grad,
             )
 
         def forward(self, x):
@@ -413,3 +415,34 @@ def test_lift_preserves_constant_dtype_device(dtype, device):
     # The source constant is a contiguous 3x3, so from_tensor must carry its real
     # (3, 1) stride onto the meta, not the old all-ones synthetic stride.
     assert val.stride() == torch.zeros(3, 3).stride()
+
+
+# --- lift() preserves parameter kind and requires_grad -----------------------
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "dtype, requires_grad",
+    [
+        (torch.uint8, False),
+        (torch.int8, False),
+        (torch.float32, False),
+        # A trainable weight, so hardcoding either flag value fails the test.
+        (torch.float32, True),
+    ],
+)
+def test_lift_keeps_parameter_for_any_dtype(dtype, requires_grad):
+    gm, sig = _traced_gm_with_parameter(dtype, "cpu", requires_grad)
+    _, graph_signature, state_dict, constants = lift(gm, sig)
+
+    kinds = [spec.kind for spec in graph_signature.input_specs]
+    assert InputKind.PARAMETER in kinds, f"expected a PARAMETER, got {kinds}"
+
+    # The weight belongs in the state dict as a parameter, not in constants, or a
+    # caller can no longer load a checkpoint into the exported module.
+    assert "c" in state_dict, f"weight missing from state_dict: {list(state_dict)}"
+    assert isinstance(state_dict["c"], torch.nn.Parameter)
+    assert state_dict["c"].dtype == dtype
+    assert "c" not in constants
+
+    assert state_dict["c"].requires_grad is requires_grad

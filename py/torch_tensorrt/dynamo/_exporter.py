@@ -181,10 +181,14 @@ def lift(
                 input_kind = InputKind.CONSTANT_TENSOR
 
                 # state_dict has these parameters/buffers as torch.Tensors. We override them as torch.nn.Parameter/torch.Tensors respectively.
-                for name, _ in gm.named_parameters():
+                for name, param in gm.named_parameters():
                     if node.target == name:
                         input_kind = InputKind.PARAMETER
-                        state_dict[name] = torch.nn.Parameter(state_dict[name])
+                        # state_dict() drops requires_grad and Parameter defaults it
+                        # to True, which an integer weight cannot have.
+                        state_dict[name] = torch.nn.Parameter(
+                            state_dict[name], requires_grad=param.requires_grad
+                        )
                         break
                 for name, _ in gm.named_buffers():
                     if node.target == name:
