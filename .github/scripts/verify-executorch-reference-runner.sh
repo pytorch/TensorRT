@@ -14,16 +14,19 @@ set +x
 #   First argument: path to an existing .pte model.
 #   EXECUTORCH_SOURCE_DIR=/path/to/executorch
 #
-# Optional second argument: path to a caller-owned KV-cache decode .pte (see
-#   examples/torchtrt_executorch_example/export_kv_cache_decode.py). When given,
-#   kv_cache_decode_check is built and run against it as well.
+# Optional trailing arguments: one or more caller-owned KV-cache decode .pte
+#   files (see examples/torchtrt_executorch_example/export_kv_cache_decode.py).
+#   When given, kv_cache_decode_check is built and run against each of them,
+#   staged or zero-copy.
 #
-# Optional third argument: path to a coalesced TensorRT + CUDA .pte (see
+# Optional --coalesced=PATH: path to a coalesced TensorRT + CUDA .pte (see
 #   examples/torchtrt_executorch_example/export_coalesced.py). When given, the
 #   runner built from source here is run against it and its output is compared to
 #   the eager reference that export script wrote next to the model. Only that
 #   runner: the packaged binary links the TensorRT delegate alone, so it has no
-#   CUDA backend for the partition a coalesced program hands to one.
+#   CUDA backend for the partition a coalesced program hands to one. Named rather
+#   than positional because the KV-cache decode models are variadic, so a bare
+#   path after the first argument cannot be told apart from one of those.
 #
 # Optional:
 #   TensorRT_ROOT=/path/to/extracted/TensorRT
@@ -40,21 +43,35 @@ set +x
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
 
-if [[ $# -lt 1 || $# -gt 3 ]]; then
-  echo "Usage: $0 PATH_TO_MODEL.pte [PATH_TO_KV_CACHE_DECODE.pte [PATH_TO_COALESCED.pte]]" >&2
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 PATH_TO_MODEL.pte [--coalesced=PATH_TO_COALESCED.pte]" \
+    "[PATH_TO_KV_CACHE_DECODE.pte ...]" >&2
   exit 1
 fi
 model_path="$1"
+shift
 if [[ ! -f "${model_path}" ]]; then
   echo "ExecuTorch model not found: ${model_path}" >&2
   exit 1
 fi
-kv_model_path="${2:-}"
-if [[ -n "${kv_model_path}" && ! -f "${kv_model_path}" ]]; then
-  echo "KV-cache decode model not found: ${kv_model_path}" >&2
-  exit 1
-fi
-coalesced_model_path="${3:-}"
+coalesced_model_path=""
+kv_model_paths=()
+for arg in "$@"; do
+  case "${arg}" in
+    --coalesced=*)
+      coalesced_model_path="${arg#--coalesced=}"
+      ;;
+    *)
+      kv_model_paths+=("${arg}")
+      ;;
+  esac
+done
+for kv_model_path in "${kv_model_paths[@]:-}"; do
+  if [[ -n "${kv_model_path}" && ! -f "${kv_model_path}" ]]; then
+    echo "KV-cache decode model not found: ${kv_model_path}" >&2
+    exit 1
+  fi
+done
 if [[ -n "${coalesced_model_path}" && ! -f "${coalesced_model_path}" ]]; then
   echo "Coalesced model not found: ${coalesced_model_path}" >&2
   exit 1
@@ -318,7 +335,7 @@ fi
 cmake "${cmake_args[@]}"
 
 build_targets=(example_executorch_runner)
-if [[ -n "${kv_model_path}" ]]; then
+if [[ ${#kv_model_paths[@]} -gt 0 ]]; then
   build_targets+=(kv_cache_decode_check)
 fi
 
@@ -551,11 +568,7 @@ for _log in "${runner_log}" "${packaged_runner_log}"; do
   assert_runner_output "${_log}" "[2,3,4,4]" "2.0000" 0
 done
 
-if [[ -n "${kv_model_path}" ]]; then
-  # kv_cache_decode_check exits non-zero when a decode step does not observe the KV
-  # the previous step wrote; the grep additionally pins the assertion itself, so
-  # weakening the check inside the binary cannot quietly turn this into a no-op.
-  kv_check_log="${verify_root}/kv_cache_decode_check.log"
+if [[ ${#kv_model_paths[@]} -gt 0 ]]; then
   kv_check_path="${verify_root}/build-executorch-reference-runner/kv_cache_decode_check"
   if command -v ldd >/dev/null 2>&1 &&
     ldd "${kv_check_path}" |
@@ -564,8 +577,17 @@ if [[ -n "${kv_model_path}" ]]; then
     exit 1
   fi
 
-  "${kv_check_path}" --model_path="${kv_model_path}" 2>&1 | tee "${kv_check_log}"
-  grep -q "PASS: decode at pos=1 observed the KV written at pos=0" "${kv_check_log}"
+  kv_index=0
+  for kv_model_path in "${kv_model_paths[@]}"; do
+    # kv_cache_decode_check exits non-zero when a decode step does not observe the
+    # KV the previous step wrote; the grep additionally pins the assertion itself,
+    # so weakening the check inside the binary cannot quietly turn this into a
+    # no-op.
+    kv_check_log="${verify_root}/kv_cache_decode_check_${kv_index}.log"
+    "${kv_check_path}" --model_path="${kv_model_path}" 2>&1 | tee "${kv_check_log}"
+    grep -q "PASS: decode at pos=1 observed the KV written at pos=0" "${kv_check_log}"
+    kv_index=$((kv_index + 1))
+  done
 fi
 
 if [[ -n "${coalesced_model_path}" ]]; then

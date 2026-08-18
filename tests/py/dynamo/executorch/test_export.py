@@ -500,6 +500,167 @@ def test_export_returns_edge_and_forwards_all_options(monkeypatch):
     assert compile_specs == [compile_spec]
 
 
+def _patch_declare(monkeypatch):
+    """Record the programs the declaration pass sees, and hand each one back.
+
+    export() imports the symbol inside its own body, so the patch has to land on
+    the module that owns it. The stub takes ``**kw`` because export() passes
+    ``copyback_buffers=``.
+    """
+    import torch_tensorrt.dynamo._exporter as dynamo_exporter
+
+    seen = []
+
+    def _declare(program, **kw):
+        seen.append(program)
+        return program
+
+    monkeypatch.setattr(
+        dynamo_exporter, "_declare_aliased_kv_mutations_on_ep", _declare
+    )
+    return seen
+
+
+def _patch_rewire(monkeypatch, elided_names=("kv",)):
+    import torch_tensorrt.executorch._zero_copy as zero_copy
+
+    seen = []
+
+    def _rewire(program):
+        seen.append(program)
+        return list(elided_names)
+
+    monkeypatch.setattr(zero_copy, "rewire_aliased_mutations_to_buffers", _rewire)
+    return seen
+
+
+@pytest.mark.unit
+def test_export_zero_copy_kv_rewires_every_method(monkeypatch):
+    """The opt-in is what makes the aliased buffers zero-copy; nothing else does.
+
+    It has to run per method and after the declaration, since it works from the
+    mutations that declaration produced.
+    """
+    export_module, lower = _patch_lowering(monkeypatch)
+    declared = _patch_declare(monkeypatch)
+    rewired = _patch_rewire(monkeypatch)
+    prefill = FakeExportedProgram()
+    decode = FakeExportedProgram()
+
+    export_module.export(
+        {"prefill": prefill, "decode": decode},
+        partitioners={"prefill": [object()], "decode": [object()]},
+        zero_copy_kv=True,
+    )
+
+    assert declared == [prefill, decode]
+    assert rewired == [prefill, decode]
+    # The backend rejects a delegate missing its aliased outputs unless it is
+    # told the omission was deliberate, and this spec is the only channel.
+    from torch_tensorrt.executorch.backend import (
+        ZERO_COPY_KV_COMPILE_SPEC_KEY,
+        _elided_output_names,
+    )
+
+    for pipeline in lower.call_args.kwargs["partitioner"].values():
+        assert any(
+            spec.key == ZERO_COPY_KV_COMPILE_SPEC_KEY
+            for spec in pipeline[0].compile_specs
+        )
+        # The spec carries the elided binding names, not a bare flag.
+        assert _elided_output_names(pipeline[0].compile_specs) == {"kv"}
+
+
+@pytest.mark.unit
+def test_export_does_not_exempt_a_method_that_kept_all_its_outputs(monkeypatch):
+    """The exemption is per method and only where an output was actually elided.
+
+    A method that lost an output for some other reason must still be caught by
+    the backend's output-binding check.
+    """
+    from torch_tensorrt.executorch.backend import ZERO_COPY_KV_COMPILE_SPEC_KEY
+
+    export_module, lower = _patch_lowering(monkeypatch)
+    import torch_tensorrt.executorch._zero_copy as zero_copy
+
+    prefill = FakeExportedProgram()
+    decode = FakeExportedProgram()
+    elided = {prefill: [], decode: ["k0", "k1"]}
+    monkeypatch.setattr(
+        zero_copy, "rewire_aliased_mutations_to_buffers", lambda p: elided[p]
+    )
+
+    export_module.export(
+        {"prefill": prefill, "decode": decode},
+        partitioners={"prefill": [object()], "decode": [object()]},
+        zero_copy_kv=True,
+    )
+
+    exempt = {
+        name: any(
+            spec.key == ZERO_COPY_KV_COMPILE_SPEC_KEY
+            for spec in pipeline[0].compile_specs
+        )
+        for name, pipeline in lower.call_args.kwargs["partitioner"].items()
+    }
+    assert exempt == {"prefill": False, "decode": True}
+
+
+@pytest.mark.unit
+def test_export_zero_copy_kv_keeps_the_weight_streaming_spec(monkeypatch):
+    """Both options stamp the same partitioner, and one must not displace the other.
+
+    The zero-copy spec is appended to a copy of the method's compile specs, so a
+    budget baked in earlier has to still reach the delegate.
+    """
+    from torch_tensorrt.executorch.backend import ZERO_COPY_KV_COMPILE_SPEC_KEY
+    from torch_tensorrt.executorch.partitioner import (
+        WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY,
+    )
+
+    export_module, lower = _patch_lowering(monkeypatch)
+    _patch_rewire(monkeypatch)
+
+    export_module.export(
+        FakeExportedProgram(),
+        zero_copy_kv=True,
+        weight_streaming_budget_per_engine=1 << 20,
+    )
+
+    keys = {spec.key for spec in lower.call_args.kwargs["partitioner"][0].compile_specs}
+    assert keys == {
+        WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY,
+        ZERO_COPY_KV_COMPILE_SPEC_KEY,
+    }
+
+
+@pytest.mark.unit
+def test_export_leaves_kv_buffers_staged_by_default(monkeypatch):
+    """Zero-copy is opt-in: a .pte that elides its aliased outputs cannot be run
+    by a runtime that predates the feature, so export must not produce one
+    unasked."""
+    export_module, lower = _patch_lowering(monkeypatch)
+    rewired = _patch_rewire(monkeypatch)
+
+    export_module.export(FakeExportedProgram())
+
+    assert rewired == []
+
+
+@pytest.mark.unit
+def test_export_warns_when_zero_copy_kv_has_nothing_to_do(monkeypatch, caplog):
+    """Asking for zero-copy on a model with no engine-aliased buffer is not an
+    error, but silently doing nothing would leave the caller expecting a speedup
+    that is not coming."""
+    export_module, lower = _patch_lowering(monkeypatch)
+    _patch_rewire(monkeypatch, elided_names=())
+
+    with caplog.at_level("WARNING", logger=export_module.logger.name):
+        export_module.export(FakeExportedProgram(), zero_copy_kv=True)
+
+    assert "no aliased buffer mutation was found" in caplog.text
+
+
 @pytest.mark.unit
 def test_export_preserves_independent_method_mapping(monkeypatch):
     prefill = FakeExportedProgram()
@@ -1677,3 +1838,47 @@ def test_rewrite_reuses_resolved_metadata_instead_of_reading_it_again(monkeypatc
     # is the tensor path fetching the bytes, which it re-resolves rather than trusting
     # the metadata-only record. Without the handoff the first entry would repeat.
     assert calls == [True, False]
+
+
+@pytest.mark.unit
+def test_export_rejects_caller_set_zero_copy_compile_spec(monkeypatch):
+    """The zero-copy key is reserved. export() sets it itself and only for the
+    outputs it elided; a hand-set value would exempt the delegate from the
+    output-binding check and could drop a real KV update silently.
+
+    A bare list of compile specs is one unnamed list, but export() still fans it
+    out per method, so the message names the method it landed on.
+    """
+    from executorch.exir.backend.compile_spec_schema import CompileSpec
+    from torch_tensorrt.executorch.backend import ZERO_COPY_KV_COMPILE_SPEC_KEY
+
+    export_module, lower = _patch_lowering(monkeypatch)
+    with pytest.raises(ValueError, match="reserved key") as excinfo:
+        export_module.export(
+            FakeExportedProgram(),
+            compile_specs=[CompileSpec(ZERO_COPY_KV_COMPILE_SPEC_KEY, b"[]")],
+        )
+    assert "compile_specs for 'forward'" in str(excinfo.value)
+
+
+@pytest.mark.unit
+def test_export_rejects_caller_set_zero_copy_compile_spec_per_method(monkeypatch):
+    """The reserved-key rejection also covers the per-method mapping form, and
+    names the one method whose list carries the key rather than the method the
+    mapping happens to start with."""
+    from executorch.exir.backend.compile_spec_schema import CompileSpec
+    from torch_tensorrt.executorch.backend import ZERO_COPY_KV_COMPILE_SPEC_KEY
+
+    export_module, lower = _patch_lowering(monkeypatch)
+    prefill = FakeExportedProgram()
+    decode = FakeExportedProgram()
+    with pytest.raises(ValueError, match="reserved key") as excinfo:
+        export_module.export(
+            {"prefill": prefill, "decode": decode},
+            partitioners={"prefill": [object()], "decode": [object()]},
+            compile_specs={
+                "prefill": [],
+                "decode": [CompileSpec(ZERO_COPY_KV_COMPILE_SPEC_KEY, b"[]")],
+            },
+        )
+    assert "compile_specs for 'decode'" in str(excinfo.value)

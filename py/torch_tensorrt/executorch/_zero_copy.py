@@ -27,16 +27,20 @@ The two halves are inseparable and run at different times:
 
 Applying only the first would leave the engine writing a discarded staging copy
 with nothing to copy back -- the buffer would simply never update. So neither
-half may be applied alone, and neither is part of the public API on its own: a
-caller opts into both together or into neither.
+pass is public on its own: the rewiring is reached only through
+``export(..., zero_copy_kv=True)``, and the un-staging only through
+:func:`zero_copy_backend_config`, which is this module's one exported name.
 """
 
 import logging
 import operator
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Set
 
 import torch
 from torch.fx import Node
+
+if TYPE_CHECKING:
+    from executorch.exir import ExecutorchBackendConfig
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,9 +74,12 @@ def _aliased_inputs_by_output_index(
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         deserialize_aliased_io,
     )
-    from torch_tensorrt.executorch.backend import _get_engine_info_for_node
+    from torch_tensorrt.executorch._export_utils import _resolve_engine_info
 
-    engine_info = _get_engine_info_for_node(exported_program, engine_node)
+    # Only aliased_io and the binding names are read, never the engine itself.
+    engine_info = _resolve_engine_info(
+        exported_program, engine_node, metadata_only=True
+    )
     aliased_io = deserialize_aliased_io(_engine_info_str(engine_info, ALIASED_IO_IDX))
     if not aliased_io:
         return {}
@@ -97,6 +104,29 @@ def _aliased_inputs_by_output_index(
             continue
         aliased[output_index] = input_nodes[input_index]
     return aliased
+
+
+def _engine_output_binding_names(exported_program: Any, engine_node: Node) -> List[str]:
+    """Return one engine's output binding names, in binding (index) order.
+
+    Resolved metadata-only: reading the record without that costs a full
+    re-serialization of the engine through ``TRTEngine.__getstate__``, and only
+    the binding names are wanted here. Callers that read this repeatedly for the
+    same engine memoize it themselves -- ``_resolve_engine_info`` holds no cache.
+    """
+    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+        OUTPUT_BINDING_NAMES_IDX,
+        deserialize_binding_names,
+    )
+    from torch_tensorrt.executorch._export_utils import _resolve_engine_info
+
+    engine_info = _resolve_engine_info(
+        exported_program, engine_node, metadata_only=True
+    )
+    names: List[str] = deserialize_binding_names(
+        _engine_info_str(engine_info, OUTPUT_BINDING_NAMES_IDX)
+    )
+    return names
 
 
 class _AliasedMutation(NamedTuple):
@@ -165,7 +195,7 @@ def _aliased_buffer_mutations(
     return mutations
 
 
-def rewire_aliased_mutations_to_buffers(exported_program: Any) -> int:
+def rewire_aliased_mutations_to_buffers(exported_program: Any) -> List[str]:
     """Declare that an aliased buffer *is* its own mutation result.
 
     Export declares an aliased KV mutation as a ``getitem`` off the engine node:
@@ -186,7 +216,12 @@ def rewire_aliased_mutations_to_buffers(exported_program: Any) -> int:
     engine's in-place write would land in per-call scratch and, with the
     copy-back gone, be lost. It is only correct paired with the un-staging pass.
 
-    Returns the number of mutations rewired.
+    Returns the engine output binding names of the aliased outputs it elided,
+    one per rewired mutation. Only these names may later be exempted from the
+    backend's output-binding check -- every *other* aliased output (a user alias
+    on a plain, non-buffer input, which export never rewired) must still be a
+    delegate output, so an engine mixing the two is caught rather than silently
+    dropping the un-rewired one's update into scratch.
     """
     from torch.export.graph_signature import (
         ExportGraphSignature,
@@ -200,9 +235,11 @@ def rewire_aliased_mutations_to_buffers(exported_program: Any) -> int:
     mutations = _aliased_buffer_mutations(exported_program)
     if not mutations:
         _LOGGER.debug("no aliased buffer mutations to rewire")
-        return 0
+        return []
 
     elided_by_engine: Dict[Node, List[Node]] = {}
+    output_names_by_engine: Dict[Node, List[str]] = {}
+    elided_output_names: List[str] = []
     output_node = graph_module.graph.output_node()
     output_args = list(output_node.args[0])
     output_specs = list(signature.output_specs)
@@ -218,6 +255,13 @@ def rewire_aliased_mutations_to_buffers(exported_program: Any) -> int:
             output_specs[spec_index].target,
         )
         elided_by_engine.setdefault(mutation.engine, []).append(mutation.aliased_output)
+        names = output_names_by_engine.get(mutation.engine)
+        if names is None:
+            names = _engine_output_binding_names(exported_program, mutation.engine)
+            output_names_by_engine[mutation.engine] = names
+        output_index = mutation.aliased_output.args[1]
+        if 0 <= output_index < len(names):
+            elided_output_names.append(names[output_index])
 
     output_node.args = (tuple(output_args),)
     # Dropping every output of an engine would leave a delegate with no outputs.
@@ -240,11 +284,18 @@ def rewire_aliased_mutations_to_buffers(exported_program: Any) -> int:
     graph_module.graph.eliminate_dead_code()
     graph_module.graph.lint()
     graph_module.recompile()
+    # The signature is replaced in place rather than by rebuilding the program:
+    # the graph has already been edited in place, and every other field would be
+    # copied across unchanged.
     exported_program._graph_signature = ExportGraphSignature(
         input_specs=list(signature.input_specs), output_specs=output_specs
     )
-    _LOGGER.debug("rewired %d aliased mutation(s) to their buffers", len(mutations))
-    return len(mutations)
+    _LOGGER.debug(
+        "rewired %d aliased mutation(s) to their buffers, eliding outputs %s",
+        len(mutations),
+        elided_output_names,
+    )
+    return elided_output_names
 
 
 def _is_tensorrt_delegate(graph_module: torch.fx.GraphModule, node: Node) -> bool:
@@ -265,6 +316,75 @@ def _is_tensorrt_delegate(graph_module: torch.fx.GraphModule, node: Node) -> boo
     return bool(getattr(module, "backend_id", None) == TensorRTBackend.__name__)
 
 
+def _delegate_declares_zero_copy(
+    graph_module: torch.fx.GraphModule, node: Node
+) -> bool:
+    """True when a TensorRT delegate carries the zero-copy KV compile spec.
+
+    ``TensorRTPartitioner`` stamps this spec per partition, onto only the delegate
+    whose own engine had an aliased output elided (derived per engine in
+    ``TensorRTPartitioner._partition_elided_output_names``), so a delegate that
+    declares it must have had a buffer un-staged here. A method that lowers to
+    several TensorRT delegates therefore marks only the KV one, never the plain
+    compute engines beside it -- which is what keeps this cross-check from
+    demanding an aliased buffer from a delegate that never had one. A delegate
+    that declares it but un-staged nothing is a lost KV update -- the mark that
+    would have driven the un-staging did not survive to this pass -- and is caught
+    in :func:`_unstage_aliased_buffers`.
+    """
+    from torch_tensorrt.executorch.backend import ZERO_COPY_KV_COMPILE_SPEC_KEY
+
+    lowered = node.args[0] if node.args else None
+    if not isinstance(lowered, Node) or lowered.op != "get_attr":
+        return False
+    module = getattr(graph_module, lowered.target, None)
+    return any(
+        getattr(spec, "key", None) == ZERO_COPY_KV_COMPILE_SPEC_KEY
+        for spec in (getattr(module, "compile_specs", None) or [])
+    )
+
+
+def _device_move_is_safe(
+    source: Node, h2d_copy: Any, target_device: Any, target_device_index: Any
+) -> bool:
+    """True when moving ``source``'s spec device disturbs no other consumer.
+
+    A placeholder's device is shared by every user, so it can only be retargeted
+    to the delegate's device when nothing *reads* it on another one. ExecuTorch
+    guards the same hazard, more strictly and only under its opt-in
+    ``skip_h2d_for_method_inputs``: it demands the placeholder have exactly one
+    user. The rule here is looser because two kinds of user impose no such
+    constraint and are allowed: the graph ``output`` node -- the buffer is its
+    own BUFFER_MUTATION result, which is exactly what zero-copy sets up and
+    which carries no device of its own -- and another ``_h2d_copy`` staging to
+    the same GPU, superseded by the un-staging when it feeds a TensorRT
+    delegate, and otherwise left in place, still reading a buffer that now lives
+    on the GPU it was copying to. Any other reader (a compute op, or a staging
+    to a different device) makes the move unsafe.
+
+    The index is compared as well as the type, because ``spec.device`` is only
+    ``CUDA``/``CPU``: two engines resolved to ``cuda:0`` and ``cuda:1`` stage the
+    same buffer to different GPUs, and un-staging both would leave whichever ran
+    last owning the buffer while the other engine writes an address on the wrong
+    device.
+    """
+    for user in source.users:
+        if user.op == "output":
+            continue
+        if not (
+            isinstance(user, Node)
+            and user.op == "call_function"
+            and user.target is h2d_copy
+        ):
+            return False
+        spec = user.meta.get("spec")
+        if spec is None or spec.device != target_device:
+            return False
+        if spec.device_index != target_device_index:
+            return False
+    return True
+
+
 def _unstage_aliased_buffers(graph_module: torch.fx.GraphModule) -> int:
     """Route TensorRT delegate inputs from their staging copy back to the buffer.
 
@@ -274,23 +394,43 @@ def _unstage_aliased_buffers(graph_module: torch.fx.GraphModule) -> int:
     not write in place.
 
     The placeholder's spec takes over the staging copy's device, so memory
-    planning puts the buffer in the delegate's device arena instead of a host
-    one -- which is what makes the engine's write land somewhere the caller can
-    still see afterwards.
+    planning puts the buffer in the delegate's device arena rather than a host
+    one. That is what makes handing the buffer straight to the engine valid at
+    all: a host-arena pointer is not something the engine can write. That move is
+    refused when the buffer has another consumer (see
+    :func:`_device_move_is_safe`), which would otherwise have its device silently
+    changed too.
 
-    Raises when a marked buffer cannot be un-staged, because the alternative is
-    silence: its copy-back has already been removed, so leaving the staging in
-    place means the engine writes a scratch tensor and the buffer never updates.
+    A failure here is a lost KV update -- unless the program has already been
+    through this pass, the one case where nothing is lost -- so it is raised
+    rather than logged: export has already removed the copy-back, so a marked
+    buffer left staged has the engine write per-call scratch that is then
+    discarded and the buffer never updates. It raises when the staging copy has
+    no spec or is not on CUDA, when the device move is unsafe, and -- so a
+    discovery miss cannot pass silently -- after the loop when any marked buffer
+    was never un-staged, cross-checked against each delegate's own
+    ``zero_copy_kv`` spec: a TensorRT delegate that declares zero-copy but
+    un-staged nothing is broken and names the buffer.
 
     Returns the number of delegate inputs un-staged.
     """
     from executorch.exir.schema import DeviceType
+    from torch_tensorrt.executorch.backend import ZERO_COPY_KV_COMPILE_SPEC_KEY
 
     h2d_copy = torch.ops.et_copy._h2d_copy.default
     unstaged = 0
+    unstaged_placeholders: Set[Node] = set()
+    orphaned_stagings: List[Node] = []
+    zero_copy_delegates: List[Node] = []
+    unstaged_per_delegate: Dict[Node, int] = {}
+
     for node in list(graph_module.graph.nodes):
         if not _is_tensorrt_delegate(graph_module, node):
             continue
+        declares_zero_copy = _delegate_declares_zero_copy(graph_module, node)
+        if declares_zero_copy:
+            zero_copy_delegates.append(node)
+            unstaged_per_delegate[node] = 0
         new_args = list(node.args)
         for i, arg in enumerate(node.args[1:], start=1):
             if not isinstance(arg, Node) or arg.target is not h2d_copy:
@@ -323,13 +463,79 @@ def _unstage_aliased_buffers(graph_module: torch.fx.GraphModule) -> int:
                     "buffer in place and its copy-back has already been removed, "
                     "so the update would be lost."
                 )
+            already_placed = (source_spec.device, source_spec.device_index) == (
+                staged_spec.device,
+                staged_spec.device_index,
+            )
+            if not already_placed and not _device_move_is_safe(
+                source, h2d_copy, staged_spec.device, staged_spec.device_index
+            ):
+                raise RuntimeError(
+                    "TensorRT zero-copy KV: buffer "
+                    f"'{source.name}' is read by a consumer the move would "
+                    "disturb -- an op outside the delegate, or a staging copy "
+                    "bound for a different GPU -- so placing it on this engine's "
+                    "device would silently change that consumer's device too. "
+                    "Export this method without zero_copy_kv, or stop sharing the "
+                    "aliased buffer."
+                )
             source_spec.device = staged_spec.device
             source_spec.device_index = staged_spec.device_index
             new_args[i] = source
             unstaged += 1
+            unstaged_placeholders.add(source)
+            orphaned_stagings.append(arg)
+            if declares_zero_copy:
+                unstaged_per_delegate[node] += 1
         node.args = tuple(new_args)
+
+    marked_but_unstaged = [
+        node
+        for node in graph_module.graph.nodes
+        if node.op == "placeholder"
+        and node.meta.get("_torch_tensorrt_aliased_buffer")
+        and node not in unstaged_placeholders
+    ]
+    if marked_but_unstaged:
+        names = ", ".join(repr(node.name) for node in marked_but_unstaged)
+        raise RuntimeError(
+            "TensorRT zero-copy KV: buffer(s) "
+            f"{names} were marked for in-place update but no TensorRT delegate "
+            "staging was found to un-stage. Either they never reached a "
+            "TensorRT delegate, which is a broken zero-copy program -- export "
+            "removed their copy-back, so leaving them staged has the engine "
+            "write per-call scratch that is discarded and the buffer never "
+            "updates -- or this pass has already run over the program and they "
+            "are wired straight to the engine already, which happens whenever "
+            "it is installed twice: nesting zero_copy_backend_config, "
+            "finalizing the same program twice, or passing "
+            "save(zero_copy_kv=True) a config that already carries the pass. "
+            "Install it once."
+        )
+    for delegate in zero_copy_delegates:
+        if unstaged_per_delegate[delegate] == 0:
+            staged_inputs = [
+                arg.args[0].name
+                for arg in delegate.args[1:]
+                if isinstance(arg, Node)
+                and arg.target is h2d_copy
+                and isinstance(arg.args[0], Node)
+            ]
+            raise RuntimeError(
+                "TensorRT zero-copy KV: delegate "
+                f"'{delegate.name}' declares zero-copy KV "
+                f"(compile spec '{ZERO_COPY_KV_COMPILE_SPEC_KEY}') but no aliased "
+                f"buffer was un-staged for it (staged inputs: {staged_inputs}). Export "
+                "elided its aliased outputs, so the engine now writes per-call "
+                "scratch that is discarded and the cache never updates."
+            )
+
     if unstaged:
-        graph_module.graph.eliminate_dead_code()
+        # Erase only the stagings we orphaned. A graph-wide eliminate_dead_code()
+        # in a to_out_var_pass could delete another backend's unused delegate.
+        for staging in dict.fromkeys(orphaned_stagings):
+            if not staging.users:
+                graph_module.graph.erase_node(staging)
         graph_module.graph.lint()
         graph_module.recompile()
     return unstaged
@@ -362,3 +568,44 @@ def unstage_aliased_buffers_pass(inner_pass: Optional[Any] = None) -> Any:
             return inner(graph_module)
 
     return _UnstageThenToOutVar()
+
+
+def zero_copy_backend_config(
+    config: Optional["ExecutorchBackendConfig"] = None,
+) -> "ExecutorchBackendConfig":
+    """Build the ``ExecutorchBackendConfig`` a zero-copy KV program needs.
+
+    This is the second half of ``export(..., zero_copy_kv=True)``. Export has
+    already removed ExecuTorch's copy-back of the aliased buffers; this installs
+    the pass that removes their staging, so the engine writes the caller's
+    buffer instead of a scratch copy that is thrown away.
+
+    The feature is split across two calls because ``to_executorch()`` belongs to
+    ExecuTorch, not to Torch-TensorRT: ``export()`` hands back an
+    ``EdgeProgramManager`` at the Edge boundary and never sees the config the
+    program is finalized with.
+
+    ``config`` is your own configuration -- every field is preserved, and a
+    ``to_out_var_pass`` you already set runs after the un-staging. Omit it to
+    start from ExecuTorch's defaults.
+
+    .. warning::
+        Finalizing a ``zero_copy_kv=True`` program *without* this config does
+        not raise. The engine writes a per-call staging copy that is then
+        discarded and the buffer never updates, which for a KV cache is wrong
+        output rather than a crash. Nothing downstream can detect the omission,
+        so pairing the two is the caller's responsibility.
+
+        The opposite mistake does raise. ``save(..., zero_copy_kv=True)``
+        installs this pass itself, so handing it the result of this function as
+        ``backend_config`` applies the pass twice and finalization fails. The
+        two entry points are mutually exclusive: use one or the other.
+    """
+    from dataclasses import replace
+
+    from executorch.exir import ExecutorchBackendConfig
+
+    base = config if config is not None else ExecutorchBackendConfig()
+    return replace(
+        base, to_out_var_pass=unstage_aliased_buffers_pass(base.to_out_var_pass)
+    )

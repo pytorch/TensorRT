@@ -356,6 +356,77 @@ points but does not by itself give them shared mutable state.
     Neither case raises an error or a warning, so treat every shared payload as
     read-only.
 
+.. _executorch_zero_copy_kv:
+
+**Zero-copy KV cache**
+
+When a TensorRT engine has aliased I/O -- a KV cache it updates through an
+aliased binding -- running the engine over the cache already is the update.
+ExecuTorch does not know that, so by default it pays for the update twice per
+execution: it hands the delegate an ``_h2d_copy`` staging copy of the buffer
+instead of the buffer itself, then copies the engine's aliased output back into
+the buffer afterwards. For a KV cache both copies are cache-sized, per token.
+
+``zero_copy_kv=True`` removes them, so the engine writes the caller's buffer
+directly. Through the two-step ``export`` + ``to_executorch`` path it takes two
+calls, one at each end of the Edge boundary:
+
+.. code-block:: python
+
+    from torch_tensorrt.executorch import export, zero_copy_backend_config
+
+    edge = export(
+        {"prefill": prefill_program, "decode": decode_program},
+        partitioners={"prefill": [CudaPartitioner([])], "decode": [CudaPartitioner([])]},
+        zero_copy_kv=True,
+    )
+
+    # zero_copy_backend_config composes onto your own config; every other field
+    # (memory planning, passes) is preserved.
+    program = edge.to_executorch(zero_copy_backend_config(backend_config))
+
+It is opt-in rather than automatic because the resulting ``.pte`` needs a
+runtime that understands a delegate whose aliased outputs are elided. Producing
+one silently would break a runner built before this feature.
+
+.. warning::
+
+    **Both calls are required.** Exporting with ``zero_copy_kv=True`` and then
+    finalizing without ``zero_copy_backend_config`` does not raise: the engine
+    writes a per-call staging copy that is discarded, and the cache never
+    updates. For a KV cache that is wrong output, not a crash. Nothing
+    downstream can detect the omission, so pairing the two is on the caller --
+    unless ``torch_tensorrt.save`` is the one writing the ``.pte``, which owns
+    both ends and leaves nothing to pair.
+
+``torch_tensorrt.save`` finalizes the program itself, so a single
+``zero_copy_kv=True`` covers both steps:
+
+.. code-block:: python
+
+    torch_tensorrt.save(
+        trt_gm, "decode.pte", output_format="executorch",
+        arg_inputs=inputs, retrace=False,
+        zero_copy_kv=True,
+    )
+
+It installs ``zero_copy_backend_config`` for you, so do not hand it one as
+``backend_config`` as well: the pass would be installed twice and finalization
+raises. The two entry points are alternatives, not a pair.
+
+Two further responsibilities are the caller's, and both fail quietly:
+
+* **One CUDA stream for every delegate**, if the ``.pte`` is coalesced -- and the
+  synchronization it calls for, which zero-copy makes load-bearing. See
+  :ref:`Running a coalesced .pte <executorch_single_stream>`.
+
+* **Sharing one cache between methods.** Zero-copy is per method: it makes each
+  method's engine write that method's buffer. Giving a prefill and a decode
+  method *the same* cache is a memory-planning question -- their mutable buffers
+  have to land at the same arena offsets -- which ExecuTorch's memory planner
+  owns and which is deployment-specific. Supply your own
+  ``memory_planning_pass`` for it; ``zero_copy_backend_config`` preserves it.
+
 **Coalesced TensorRT + CUDA .pte**
 
 To run the ops TensorRT does not take on ExecuTorch's CUDA (AOTInductor) backend
@@ -390,6 +461,8 @@ must be pointed at those data files to load them.
     ``.pte`` into the same directory overwrites the blob and the first ``.pte``
     will fail to load. Save each coalesced model into its own directory.
 
+.. _executorch_single_stream:
+
 **Running a coalesced .pte: use a single CUDA stream**
 
 A coalesced ``.pte`` runs on more than one backend delegate (the TensorRT delegate
@@ -404,20 +477,31 @@ illegal memory access.
 The runtime does not impose a shared stream across delegates, so it is the
 **runner's responsibility** to run all delegates on one CUDA stream. Create a
 single stream and, for the duration of execution, direct every backend to use it
-(each backend exposes a caller-stream hook). All GPU work is then enqueued in order
-and every cross-boundary dependency is satisfied, while execution stays
-asynchronous.
+(each backend exposes a caller-stream hook: scope both
+``torch_tensorrt::executorch_backend::CudaStreamGuard`` and
+``executorch::extension::cuda::CallerStreamGuard`` over that stream, since
+installing one of them leaves the other backend on its own). All GPU work is then
+enqueued in order and every cross-boundary dependency is satisfied, while
+execution stays asynchronous.
 
 If the runner reads a delegate's outputs between calls (for example, an
 autoregressive decode loop), synchronize the shared stream before reading: the
 work may still be in flight when ``execute()`` returns, and a host-side copy on
-the default stream will not wait for a non-blocking stream.
+the default stream will not wait for a non-blocking stream. A model that threads
+its aliased outputs through the delegate is insulated from this in practice:
+reflecting each aliased output into its delegate output makes the delegate wait
+for the engine before it returns. Under
+:ref:`zero-copy KV <executorch_zero_copy_kv>` those outputs are elided, so there
+is nothing to reflect and the delegate returns with the engine still running --
+the synchronization is then the only thing making a host read see the new values.
 **ExecuTorch lowering options**
 
-When ``output_format="executorch"``, ``torch_tensorrt.save`` forwards the following
-keyword arguments to ExecuTorch's ``to_edge_transform_and_lower(...)``. They are
-only consulted for the ``executorch`` format; passing them with any other
-``output_format`` logs a warning and is otherwise ignored.
+``torch_tensorrt.save`` takes these extra keyword arguments. They are only
+consulted for the ``executorch`` format; passing them with any other
+``output_format`` logs a warning and is otherwise ignored. ``constant_methods``,
+``transform_passes`` and ``compile_config`` are forwarded to ExecuTorch's
+``to_edge_transform_and_lower(...)``; the rest are consumed at other points in
+``save``.
 
 * ``constant_methods`` — a ``dict`` of extra constant methods to embed in the
   ``.pte`` (e.g. ``{"get_max_seq_len": 2048}`` for an LLM runner).
@@ -430,6 +514,10 @@ only consulted for the ``executorch`` format; passing them with any other
   your graph carries TensorRT engines, set ``_check_ir_validity=False`` explicitly.
 * ``backend_config`` — an ``ExecutorchBackendConfig`` forwarded to
   ``to_executorch(...)``.
+* ``zero_copy_kv`` — a ``bool`` (default ``False``, single-method only). Lets the
+  TensorRT engine update an aliased KV cache in place. ``save`` owns both ends of
+  the Edge boundary, so this one argument covers what the two-call path spells
+  out; see :ref:`Zero-copy KV cache <executorch_zero_copy_kv>`.
 * ``generate_etrecord`` — a ``bool`` (default ``False``). When ``True``, an
   `ETRecord <https://pytorch.org/executorch/stable/etrecord.html>`_ is written
   next to the ``.pte`` as ``<base>_etrecord.bin`` (e.g. ``trt.pte`` →

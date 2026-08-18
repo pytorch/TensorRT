@@ -33,14 +33,17 @@ from torch_tensorrt.executorch.serialization import (
 
 _BINDING_DELIM = "%"
 
-# CompileSpec key by which export() tells this backend which aliased outputs it
-# deliberately took out of the delegate. Its value is the JSON list of those
-# engine output binding names (see _serialize_elided_output_names), NOT a bare
-# flag: export only elides the aliased outputs backed by a registered buffer, so
-# the backend must exempt exactly those and still reject a delegate that dropped
-# any other binding. It travels on the partitioner's DelegationSpec, the only
-# channel from the export call down to preprocess. Without it a delegate short of
-# its aliased outputs is a bug, not a zero-copy program, and stays an error.
+# CompileSpec key naming the aliased outputs a delegate deliberately does not
+# carry. Its value is the JSON list of those engine output binding names (see
+# _serialize_elided_output_names), NOT a bare flag: only the aliased outputs
+# backed by a registered buffer are elided, so the backend must exempt exactly
+# those and still reject a delegate that dropped any other binding. export()
+# appends a method-wide instance to signal the opt-in; TensorRTPartitioner strips
+# that one and re-derives the per-engine value it puts on each delegate's
+# DelegationSpec, the only channel that reaches preprocess (see
+# TensorRTPartitioner._partition_elided_output_names). Without it a delegate
+# short of its aliased outputs is a bug, not a zero-copy program, and stays an
+# error.
 ZERO_COPY_KV_COMPILE_SPEC_KEY = "zero_copy_kv"
 
 
