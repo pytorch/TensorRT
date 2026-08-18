@@ -259,6 +259,16 @@ def replace_execute_engine(
 ) -> Any:
     """Replace execute_engine nodes with ExecuTorch-safe placeholder calls.
 
+    ExecuTorch's lowering runs passes that dispatch through the C++ schema validator, and
+    that validator rejects the engine argument because it arrives as a custom-object
+    placeholder rather than a real script object. The replacement node carries the same
+    engine information as plain strings, so the passes never see a script object.
+
+    The engine bytes are stored as a uint8 buffer on the graph module and referenced
+    through a get_attr node. That keeps the payload out of the Python source the graph
+    emits, because CPython's tokenizer cannot parse a string literal larger than about
+    2 GB, so an inline base64 string breaks recompilation for any engine past that size.
+
     ``resolved`` carries what validate_engine_program already resolved, so the engine is
     not serialized again here.
     """
@@ -309,6 +319,9 @@ def replace_execute_engine(
                 for index, value in enumerate(engine_info[:SERIALIZATION_LEN])
             ]
 
+            # Reuse the graph's existing fake mode. A fresh one fails downstream with
+            # "fake mode from input 0 doesn't match mode from input 1" as soon as a pass
+            # mixes tensors from the two modes.
             from torch._guards import detect_fake_mode
 
             fake_mode = detect_fake_mode(
