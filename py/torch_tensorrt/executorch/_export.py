@@ -313,11 +313,11 @@ def export(
     ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of
     the program including engines.
 
-    Each engine is serialized once, and a method's engine payloads are released as soon
-    as that method is rewritten. While a method is being rewritten, its engines are
-    resident both as the base64 text the serialization produced and as the decoded
-    buffer, so peak memory is roughly 2.3x that method's engine bytes, and briefly 3.3x
-    for the engine being decoded.
+    Each engine is serialized once, into base64 text. Every method is serialized before
+    the first one is rewritten, and a method's text is released once that method is
+    rewritten. So on top of the engine bytes the exported program itself carries, peak
+    memory adds roughly 1.33x the engine bytes of all methods not yet rewritten, which
+    is highest at the start, at 1.33x the engine bytes of every method together.
 
     ``constant_methods`` keys are restricted to valid Python identifiers here, which is
     narrower than ExecuTorch itself accepts.
