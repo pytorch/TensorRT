@@ -201,7 +201,7 @@ if RELEASE:
 else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
-EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
+EXECUTORCH_REQUIREMENT = "executorch>=1.4.0"
 # TODO: Enable this once the runtime wheel is published to the PyTorch index.
 # EXECUTORCH_RUNTIME_REQUIREMENT = (
 #     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"

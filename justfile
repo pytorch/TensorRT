@@ -85,7 +85,7 @@ summary *args:
 # Install optional test deps so model/kernels/quantization/executorch suites run
 install-test-ext:
     uv pip install --group test-ext --group kernels --group quantization
-    uv pip install pyyaml "executorch>=1.3.1"
+    uv pip install pyyaml "executorch>=1.4.0"
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 
