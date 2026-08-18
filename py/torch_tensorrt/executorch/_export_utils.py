@@ -109,6 +109,9 @@ def validate_engine_program(
     resolved here and let the rewrite reuse it instead of serializing a second time.
     """
     count = 0
+    # One engine can feed several execute_engine nodes, and resolving it again would
+    # serialize it again and keep a second copy of the bytes.
+    by_engine_node: dict[Any, list[Any]] = {}
     for node in exported_program.graph_module.graph.nodes:
         if node.op != "call_function":
             continue
@@ -117,7 +120,18 @@ def validate_engine_program(
             and _schema_name(node) != "tensorrt::no_op_placeholder_for_execute_engine"
         ):
             continue
-        engine_info = _resolve_engine_info(exported_program, node)
+        engine_node = (
+            node.args[1]
+            if node.target is torch.ops.tensorrt.execute_engine.default
+            else None
+        )
+        engine_info = (
+            by_engine_node.get(engine_node) if engine_node is not None else None
+        )
+        if engine_info is None:
+            engine_info = _resolve_engine_info(exported_program, node)
+            if engine_node is not None:
+                by_engine_node[engine_node] = engine_info
         validate_engine_info(engine_info, node_name=node.name)
         if resolved is not None:
             resolved[node.name] = engine_info

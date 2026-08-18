@@ -53,6 +53,7 @@ class _EngineState:
     """
 
     def __init__(self, payload=b"engine-bytes", requires_output_allocator=False):
+        self.serializations = 0
         self.info = [""] * SERIALIZATION_LEN
         self.info[ABI_TARGET_IDX] = "10"
         self.info[NAME_IDX] = "tensorrt_engine"
@@ -69,6 +70,7 @@ class _EngineState:
         self.info[ALIASED_IO_IDX] = "output0@x@mutation"
 
     def __getstate__(self):
+        self.serializations += 1
         return (self.info,)
 
 
@@ -301,6 +303,24 @@ def test_replace_execute_engine_cleans_shared_engine_after_last_use(lifted):
         assert program.constants == {}
     else:
         assert not hasattr(program.graph_module, "engine")
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
+def test_validate_engine_program_serializes_a_shared_engine_once():
+    """Serializing an engine costs a copy of its bytes, so do it once per engine."""
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    program, _, _, engine = _engine_program(lifted=True, execute_count=3)
+    resolved = {}
+
+    assert export_utils.validate_engine_program(program, resolved) == 3
+
+    assert engine.serializations == 1
+    assert len(resolved) == 3
+    assert len({id(engine_info) for engine_info in resolved.values()}) == 1
 
 
 @pytest.mark.unit
