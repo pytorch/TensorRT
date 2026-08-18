@@ -19,9 +19,20 @@ from torch.export.graph_signature import (  # noqa: E402
     TensorArgument,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
+    ABI_TARGET_IDX,
+    ALIASED_IO_IDX,
+    DEVICE_IDX,
     ENGINE_IDX,
+    HW_COMPATIBLE_IDX,
+    INPUT_BINDING_NAMES_IDX,
+    NAME_IDX,
+    OUTPUT_BINDING_NAMES_IDX,
+    REQUIRES_NATIVE_MULTIDEVICE_IDX,
     REQUIRES_OUTPUT_ALLOCATOR_IDX,
+    RESOURCE_ALLOCATION_STRATEGY_IDX,
     SERIALIZATION_LEN,
+    SERIALIZED_METADATA_IDX,
+    TARGET_PLATFORM_IDX,
 )
 
 
@@ -35,10 +46,27 @@ class FakeTensorRTPartitioner:
 
 
 class _EngineState:
+    """A stand-in for a serialized engine.
+
+    Every routing field carries a distinct value, because the rewrite copies them into
+    the placeholder node and a blank field would hide one that got dropped.
+    """
+
     def __init__(self, payload=b"engine-bytes", requires_output_allocator=False):
         self.info = [""] * SERIALIZATION_LEN
+        self.info[ABI_TARGET_IDX] = "10"
+        self.info[NAME_IDX] = "tensorrt_engine"
+        self.info[DEVICE_IDX] = "0%8%6%0%NVIDIA A10G"
         self.info[ENGINE_IDX] = payload
+        self.info[INPUT_BINDING_NAMES_IDX] = "x"
+        self.info[OUTPUT_BINDING_NAMES_IDX] = "output0"
+        self.info[HW_COMPATIBLE_IDX] = "0"
+        self.info[SERIALIZED_METADATA_IDX] = "engine-metadata"
+        self.info[TARGET_PLATFORM_IDX] = "linux_x86_64"
         self.info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(int(requires_output_allocator))
+        self.info[RESOURCE_ALLOCATION_STRATEGY_IDX] = "1"
+        self.info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = "0"
+        self.info[ALIASED_IO_IDX] = "output0@x@mutation"
 
     def __getstate__(self):
         return (self.info,)
@@ -200,7 +228,7 @@ def _patch_lowering(monkeypatch, engine_counts=None):
 @pytest.mark.parametrize("lifted", [False, True])
 def test_validate_and_replace_execute_engine(lifted):
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
-    program, engine_node, input_node, _ = _engine_program(lifted=lifted)
+    program, engine_node, input_node, engine = _engine_program(lifted=lifted)
 
     assert export_utils.validate_engine_program(program) == 1
     rewritten = export_utils.replace_execute_engine(program)
@@ -217,7 +245,11 @@ def test_validate_and_replace_execute_engine(lifted):
         is torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
     ]
     assert len(no_op_nodes) == 1
-    buffer_node = no_op_nodes[0].args[1 + ENGINE_IDX]
+    engine_args = no_op_nodes[0].args[1:]
+    assert [arg for index, arg in enumerate(engine_args) if index != ENGINE_IDX] == [
+        value for index, value in enumerate(engine.info) if index != ENGINE_IDX
+    ]
+    buffer_node = engine_args[ENGINE_IDX]
     engine_buffer = getattr(program.graph_module, buffer_node.target)
     assert engine_buffer.dtype == torch.uint8
     assert engine_buffer.device.type == "cpu"
@@ -379,6 +411,7 @@ def test_stage_exported_program_isolates_structure_and_shares_payloads():
     first_node.meta["nested"] = {"items": ["source"]}
     first_node.meta["tensor_meta"] = Metadata((2,), torch.float32)
     program.graph_module.meta["nested"] = {"items": ["source"]}
+    source_input_specs = list(program.graph_signature.input_specs)
     staged = export_utils.stage_exported_program(program)
 
     assert staged is not program
@@ -386,9 +419,13 @@ def test_stage_exported_program_isolates_structure_and_shares_payloads():
     assert staged.graph is not program.graph
     assert staged.state_dict is not program.state_dict
     assert staged.constants is not program.constants
+    assert staged.graph_signature is not program.graph_signature
+    assert staged.graph_signature.input_specs is not program.graph_signature.input_specs
     assert staged.state_dict["weight"] is program.state_dict["weight"]
     assert isinstance(next(iter(staged.graph.nodes)).meta["tensor_meta"], Metadata)
 
+    staged.graph_signature.input_specs.pop()
+    assert program.graph_signature.input_specs == source_input_specs
     staged.state_dict["staged_only"] = torch.zeros(1)
     staged.graph_module.meta["staged_only"] = True
     staged.graph_module.meta["nested"]["items"].append("staged")

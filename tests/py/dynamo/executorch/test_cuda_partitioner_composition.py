@@ -241,12 +241,25 @@ def test_multimethod_trt_export_preserves_methods(tmp_path):
     with out.open("wb") as output:
         edge.to_executorch().write_to_file(output)
 
-    execution_plans = _deserialize_program(out).execution_plan
+    serialized = _deserialize_program(out)
+    execution_plans = serialized.execution_plan
     assert {plan.name for plan in execution_plans} == {"prefill", "decode"}
     assert all(
         any(delegate.id == "TensorRTBackend" for delegate in plan.delegates)
         for plan in execution_plans
     )
+    # deserialize_pte_binary inlines every delegate segment, so processed.index always
+    # indexes backend_delegate_data here.
+    trt_payloads = {
+        plan.name: serialized.backend_delegate_data[delegate.processed.index].data
+        for plan in execution_plans
+        for delegate in plan.delegates
+        if delegate.id == "TensorRTBackend"
+    }
+    assert len(trt_payloads) == 2
+    assert (
+        len(set(trt_payloads.values())) == 2
+    ), "both methods carry the same engine, so one method's payload was reused"
     for name, program in programs.items():
         assert source_snapshots[name] == (
             program.graph_module.code,
