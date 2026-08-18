@@ -277,9 +277,11 @@ manages Edge lowering, finalization, and persistence.
 
 Pass a mapping of method name to ``ExportedProgram`` to keep independent entry
 points, such as a separate prefill and decode, in one program. Give each method
-its own partitioner instances: a partitioner can carry method-specific state (an
-ExecuTorch backend bakes the method name into the delegation spec it builds in
-its constructor), so reusing one instance across methods is rejected.
+its own partitioner instances when a partitioner carries method-specific state: a
+partitioner holds its compile specs from construction, so one instance whose specs
+name a method would tag every method sharing it with that same name. Reusing such
+an instance across methods is rejected. Sharing an instance whose specs name no
+method is allowed.
 
 .. code-block:: python
 

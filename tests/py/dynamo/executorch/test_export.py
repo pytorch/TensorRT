@@ -1,5 +1,4 @@
 import importlib
-import logging
 from types import SimpleNamespace
 from typing import NamedTuple
 from unittest.mock import MagicMock
@@ -819,7 +818,8 @@ def test_export_normalizes_none_per_method_values(monkeypatch):
 
 
 @pytest.mark.unit
-def test_export_warns_for_shared_method_named_partitioner(monkeypatch, caplog):
+@pytest.mark.parametrize("as_mapping", [False, True])
+def test_export_rejects_shared_method_named_partitioner(monkeypatch, as_mapping):
     """Sharing an instance whose specs name a method tags both methods alike.
 
     The partitioner holds its compile specs from construction, so both methods would be
@@ -831,15 +831,17 @@ def test_export_warns_for_shared_method_named_partitioner(monkeypatch, caplog):
             compile_specs=[SimpleNamespace(key="method_name", value=b"prefill")]
         )
     )
+    partitioners = (
+        {"prefill": [shared], "decode": [shared]} if as_mapping else [shared]
+    )
 
-    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.executorch.export"):
+    with pytest.raises(ValueError, match="reuses the same"):
         export_module.export(
             {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
-            partitioners=[shared],
+            partitioners=partitioners,
         )
 
-    assert "reuses the same" in caplog.text
-    lower.assert_called_once()
+    lower.assert_not_called()
 
 
 @pytest.mark.unit
