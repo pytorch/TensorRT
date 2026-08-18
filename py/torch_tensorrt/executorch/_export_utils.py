@@ -92,8 +92,14 @@ def _resolve_engine_info(exported_program: Any, node: Any) -> list[Any]:
     return get_engine_info_from_state(engine_obj)
 
 
-def validate_engine_program(exported_program: Any) -> int:
-    """Validate all TensorRT engine nodes before any input program is mutated."""
+def validate_engine_program(
+    exported_program: Any, resolved: dict[str, list[Any]] | None = None
+) -> int:
+    """Validate all TensorRT engine nodes before any input program is mutated.
+
+    Resolving an engine serializes it, so pass a dict as ``resolved`` to keep what was
+    resolved here and let the rewrite reuse it instead of serializing a second time.
+    """
     count = 0
     for node in exported_program.graph_module.graph.nodes:
         if node.op != "call_function":
@@ -103,9 +109,10 @@ def validate_engine_program(exported_program: Any) -> int:
             and _schema_name(node) != "tensorrt::no_op_placeholder_for_execute_engine"
         ):
             continue
-        validate_engine_info(
-            _resolve_engine_info(exported_program, node), node_name=node.name
-        )
+        engine_info = _resolve_engine_info(exported_program, node)
+        validate_engine_info(engine_info, node_name=node.name)
+        if resolved is not None:
+            resolved[node.name] = engine_info
         count += 1
     return count
 
@@ -229,8 +236,14 @@ def _remove_lifted_engine_placeholder(
         exported_program.constants.pop(engine_target, None)
 
 
-def replace_execute_engine(exported_program: Any) -> Any:
-    """Replace execute_engine nodes with ExecuTorch-safe placeholder calls."""
+def replace_execute_engine(
+    exported_program: Any, resolved: dict[str, list[Any]] | None = None
+) -> Any:
+    """Replace execute_engine nodes with ExecuTorch-safe placeholder calls.
+
+    ``resolved`` carries what validate_engine_program already resolved, so the engine is
+    not serialized again here.
+    """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         ENGINE_IDX,
         SERIALIZATION_LEN,
@@ -253,7 +266,9 @@ def replace_execute_engine(exported_program: Any) -> Any:
         engine_node = node.args[1]
         materialized = materialized_engines.get(engine_node)
         if materialized is None:
-            engine_info = _resolve_engine_info(exported_program, node)
+            engine_info = (resolved or {}).get(node.name)
+            if engine_info is None:
+                engine_info = _resolve_engine_info(exported_program, node)
             engine_bytes = engine_info[ENGINE_IDX]
             if isinstance(engine_bytes, str):
                 import base64

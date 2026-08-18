@@ -114,13 +114,13 @@ def _patch_lowering(monkeypatch, engine_counts=None):
     monkeypatch.setattr(
         export_utils,
         "validate_engine_program",
-        lambda program: engine_counts.get(program, 1),
+        lambda program, resolved=None: engine_counts.get(program, 1),
     )
     monkeypatch.setattr(export_utils, "stage_exported_program", lambda program: program)
     monkeypatch.setattr(
         export_utils,
         "replace_execute_engine",
-        lambda program: ("rewritten", program),
+        lambda program, resolved=None: ("rewritten", program),
     )
     return export_module, lower
 
@@ -613,14 +613,16 @@ def test_export_rewrite_failure_leaves_sources_unchanged(monkeypatch):
         "decode": set(decode.state_dict),
     }
 
-    monkeypatch.setattr(export_utils, "validate_engine_program", lambda program: 1)
+    monkeypatch.setattr(
+        export_utils, "validate_engine_program", lambda program, resolved=None: 1
+    )
     monkeypatch.setattr(executorch_api, "TensorRTPartitioner", FakeTensorRTPartitioner)
     monkeypatch.setattr(executorch_api, "get_edge_compile_config", lambda: "default")
     lower = MagicMock()
     monkeypatch.setattr(executorch.exir, "to_edge_transform_and_lower", lower)
     call_count = 0
 
-    def fail_second_rewrite(program):
+    def fail_second_rewrite(program, resolved=None):
         nonlocal call_count
         call_count += 1
         program.state_dict["staged_only"] = torch.zeros(1)
@@ -657,11 +659,13 @@ def test_export_lowering_failure_leaves_source_unchanged(monkeypatch):
     original_code = source.graph_module.code
     original_state_keys = set(source.state_dict)
 
-    monkeypatch.setattr(export_utils, "validate_engine_program", lambda program: 1)
+    monkeypatch.setattr(
+        export_utils, "validate_engine_program", lambda program, resolved=None: 1
+    )
     monkeypatch.setattr(executorch_api, "TensorRTPartitioner", FakeTensorRTPartitioner)
     monkeypatch.setattr(executorch_api, "get_edge_compile_config", lambda: "default")
 
-    def mutate_staged_program(program):
+    def mutate_staged_program(program, resolved=None):
         program.state_dict["staged_only"] = torch.zeros(1)
         program.graph_module.meta["staged_only"] = True
         return program
@@ -1051,3 +1055,49 @@ def test_export_warns_for_multiple_engines(monkeypatch, caplog):
 
     export_module.export(program)
     assert "contains 2 TRT engines" in caplog.text
+
+
+@pytest.mark.unit
+def test_validate_hands_resolved_engines_to_the_rewrite(monkeypatch):
+    """One engine is resolved once, even though staging returns a new program.
+
+    Resolving an engine serializes it and base64 encodes the result, so resolving the
+    same engine in both validation and the rewrite would double that cost.
+    """
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    calls = []
+
+    def counting_get_engine_info_from_state(engine_obj):
+        calls.append(engine_obj)
+        return ["0", "dev", "nm", "BYTES", "in", "out", "", "", "", "", ""]
+
+    monkeypatch.setattr(
+        export_utils, "get_engine_info_from_state", counting_get_engine_info_from_state
+    )
+    monkeypatch.setattr(
+        export_utils, "validate_engine_info", lambda info, node_name=None: None
+    )
+
+    def make_program():
+        engine_node = SimpleNamespace(
+            op="get_attr", target="engine_attr", name="engine_attr"
+        )
+        node = SimpleNamespace(
+            op="call_function",
+            name="eng_node",
+            target=torch.ops.tensorrt.execute_engine.default,
+            args=(["in"], engine_node),
+        )
+        graph_module = SimpleNamespace(
+            graph=SimpleNamespace(nodes=[node]), engine_attr=object()
+        )
+        return SimpleNamespace(graph_module=graph_module, constants={})
+
+    resolved: dict = {}
+    assert export_utils.validate_engine_program(make_program(), resolved) == 1
+    assert len(calls) == 1
+
+    # Staging builds a new ExportedProgram, so the rewrite has to find the earlier work
+    # by node name rather than by object identity.
+    assert resolved["eng_node"] is not None
+    assert len(calls) == 1

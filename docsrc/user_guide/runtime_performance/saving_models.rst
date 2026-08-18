@@ -283,11 +283,22 @@ its constructor), so reusing one instance across methods is rejected.
 
 .. code-block:: python
 
+    from executorch.backends.cuda.cuda_backend import CudaBackend
+    from executorch.backends.cuda.cuda_partitioner import CudaPartitioner
+
     edge = torch_tensorrt.executorch.export(
         {"prefill": prefill_program, "decode": decode_program},
         partitioners={
-            "prefill": [CudaPartitioner([])],
-            "decode": [CudaPartitioner([])],
+            "prefill": [
+                CudaPartitioner(
+                    [CudaBackend.generate_method_name_compile_spec("prefill")]
+                )
+            ],
+            "decode": [
+                CudaPartitioner(
+                    [CudaBackend.generate_method_name_compile_spec("decode")]
+                )
+            ],
         },
     )
 

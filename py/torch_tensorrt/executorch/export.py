@@ -348,8 +348,12 @@ def export(
         # Mapping that is not a dict silently runs no passes at all.
         transform_passes = dict(transform_passes)
 
+    resolved_engines: dict[str, dict[str, list[Any]]] = {
+        name: {} for name in program_map
+    }
     engine_counts = {
-        name: validate_engine_program(program) for name, program in program_map.items()
+        name: validate_engine_program(program, resolved_engines[name])
+        for name, program in program_map.items()
     }
     # Zero-engine methods are allowed: later partitioners may claim their ops,
     # or portable operators may remain undelegated.
@@ -366,7 +370,7 @@ def export(
                 name,
                 engine_counts[name],
             )
-        rewritten[name] = replace_execute_engine(program)
+        rewritten[name] = replace_execute_engine(program, resolved_engines[name])
         method_partitioners[name] = [
             TensorRTPartitioner(compile_specs=method_compile_specs[name]),
             *extra_partitioners[name],
