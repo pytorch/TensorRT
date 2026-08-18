@@ -190,7 +190,7 @@ def _stage_graph_module(
                     # ShapeEnv, has to be shared rather than lose the graph its guards
                     # refer to. Log it, since sharing a mutable value here is the one
                     # case that breaks the isolation the rest of this function provides.
-                    logger.debug(
+                    logger.warning(
                         "sharing node %r meta %r with the source program: %s",
                         node_name,
                         key,

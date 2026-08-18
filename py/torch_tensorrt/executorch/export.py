@@ -130,6 +130,12 @@ def _prepare_programs(
     dynamic_shapes: Any | None,
     retrace: bool | None,
 ) -> tuple[ExportedProgram | dict[str, ExportedProgram], tuple[str, ...]]:
+    """Normalize the source into the programs to export and their method names.
+
+    Rejecting one ExportedProgram object under two method names is this module's rule,
+    not ExecuTorch's, which accepts it. Every method is staged and rewritten on its own,
+    so passing one object twice shares nothing and is almost always a mistake.
+    """
     source_options_used = (
         arg_inputs is not None
         or kwarg_inputs is not None
