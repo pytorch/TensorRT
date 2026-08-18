@@ -139,5 +139,26 @@ class TestPrepareInputs(unittest.TestCase):
         self.assertIsInstance(bool_result, torch_tensorrt.Input)
 
 
+class TestDeprecatedInputsAlias(unittest.TestCase):
+    @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+    def test_empty_inputs_tuple_with_kwarg_inputs(self):
+        class KwargsOnly(torch.nn.Module):
+            def forward(self, *, x):
+                return x + 1
+
+        model = KwargsOnly().eval().cuda()
+        x = torch.randn(2, 3, device="cuda")
+        ep = torch.export.export(model, (), {"x": x})
+        trt_gm = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=(),
+            kwarg_inputs={"x": x},
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(trt_gm(x=x), model(x=x), rtol=1e-2, atol=1e-2)
+
+
 if __name__ == "__main__":
     unittest.main()

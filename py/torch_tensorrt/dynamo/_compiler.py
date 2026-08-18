@@ -310,7 +310,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -710,7 +710,7 @@ def compile(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -1942,7 +1942,7 @@ def convert_exported_program_to_serialized_trt_engine(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
