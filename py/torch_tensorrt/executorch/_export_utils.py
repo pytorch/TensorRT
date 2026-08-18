@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import copy
+import logging
 from typing import Any, Sequence
 
-import logging
 import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import is_fake

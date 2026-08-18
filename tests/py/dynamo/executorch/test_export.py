@@ -868,9 +868,7 @@ def test_export_rejects_shared_method_named_partitioner(monkeypatch, as_mapping)
             compile_specs=[SimpleNamespace(key="method_name", value=b"prefill")]
         )
     )
-    partitioners = (
-        {"prefill": [shared], "decode": [shared]} if as_mapping else [shared]
-    )
+    partitioners = {"prefill": [shared], "decode": [shared]} if as_mapping else [shared]
 
     with pytest.raises(ValueError, match="reuses the same"):
         export_module.export(
