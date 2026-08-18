@@ -166,6 +166,16 @@ def _stage_graph_module(
         staged_module = staged if not name else staged.get_submodule(name)
         if not isinstance(staged_module, torch.fx.GraphModule):
             continue
+        # Node copying renames placeholders that shadow a Python builtin, so 'input'
+        # comes back as 'input_1'. Put the source names back before anything reads them.
+        source_placeholders = [
+            node for node in source_module.graph.nodes if node.op == "placeholder"
+        ]
+        staged_placeholders = [
+            node for node in staged_module.graph.nodes if node.op == "placeholder"
+        ]
+        for source_node, staged_node in zip(source_placeholders, staged_placeholders):
+            staged_node.name = source_node.name
         staged_nodes = {node.name: node for node in staged_module.graph.nodes}
         source_nodes = {node.name: node for node in source_module.graph.nodes}
         if staged_nodes.keys() != source_nodes.keys():
