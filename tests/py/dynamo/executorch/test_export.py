@@ -1214,8 +1214,8 @@ def test_export_accepts_valid_constant_method_names(monkeypatch):
 def test_export_normalizes_mapping_transform_passes_to_dict(monkeypatch):
     """ExecuTorch dispatches per-method passes on isinstance(passes, dict).
 
-    A Mapping that is not a dict would silently run no passes at all, so it must
-    be normalized before being forwarded.
+    A Mapping that is not a dict matches none of its branches and reaches a KeyError
+    on the first method, so it must be normalized before being forwarded.
     """
     from collections.abc import Mapping as AbcMapping
 
