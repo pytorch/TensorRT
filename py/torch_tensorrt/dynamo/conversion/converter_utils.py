@@ -1181,16 +1181,23 @@ def promote_trt_tensors_to_same_dtype(
         A tuple of (lhs_cast, rhs_cast) TensorRT tensors, both cast to the promoted dtype.
     """
 
-    # Define supported float types (TensorRT supports float16 and float32)
-    float_types = {trt.float16, trt.float32}
+    # bfloat16 must be treated as float; omitting it sends bf16 pairs to int32.
+    float_types = {trt.float16, trt.bfloat16, trt.float32}
+
+    lhs_is_float = lhs.dtype in float_types
+    rhs_is_float = rhs.dtype in float_types
 
     # Case 1: If either tensor is a float, promote to the wider float type
-    if lhs.dtype in float_types or rhs.dtype in float_types:
+    if lhs_is_float or rhs_is_float:
         # Prefer float32 if either tensor is float32
         if lhs.dtype == trt.float32 or rhs.dtype == trt.float32:
             promoted_dtype = trt.float32
+        elif lhs_is_float and rhs_is_float and lhs.dtype != rhs.dtype:
+            # float16/bfloat16: neither contains the other; widen like torch.
+            promoted_dtype = trt.float32
         else:
-            promoted_dtype = trt.float16
+            # Same float dtype, or float vs int: keep the float.
+            promoted_dtype = lhs.dtype if lhs_is_float else rhs.dtype
     else:
         # Case 2: If both tensors are int types (e.g., int32, int64), promote to int32
         # (Note: TensorRT does not support int64 for many ops like select/where)
