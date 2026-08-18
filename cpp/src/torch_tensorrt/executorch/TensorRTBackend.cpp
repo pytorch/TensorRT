@@ -540,10 +540,17 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     for (int d = 0; d < actual_dims.nbDims; ++d) {
       new_sizes[d] = static_cast<SizesType>(actual_dims.d[d]);
     }
-    Error resize_err = executorch::runtime::resize_tensor(et_out, {new_sizes, static_cast<size_t>(actual_dims.nbDims)});
-    if (resize_err != Error::Ok) {
-      ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for output '%s'", name.c_str());
-      return resize_err;
+    // A 0-d output has an immutable rank of zero, and TensorRT reports it as a
+    // 1-element 1-D shape, so resizing would be rejected. Skip it when the
+    // element count already agrees.
+    const bool scalar_output = et_out.dim() == 0 && actual_dims.nbDims == 1 && actual_dims.d[0] == 1;
+    if (!scalar_output) {
+      Error resize_err =
+          executorch::runtime::resize_tensor(et_out, {new_sizes, static_cast<size_t>(actual_dims.nbDims)});
+      if (resize_err != Error::Ok) {
+        ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for output '%s'", name.c_str());
+        return resize_err;
+      }
     }
 
     void* bind_ptr = nullptr;
