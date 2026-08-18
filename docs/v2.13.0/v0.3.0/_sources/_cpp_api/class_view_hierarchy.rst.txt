@@ -1,0 +1,18 @@
+
+Class Hierarchy
+---------------
+
+
+.. raw:: html
+
+   <ul class="treeView" id="class-treeView">
+     <li>
+       <ul class="collapsibleList">
+         <li class="lastChild">Namespace <a href="namespace_trtorch.html#namespace-trtorch">trtorch</a><ul><li>Namespace <a href="namespace_trtorch__logging.html#namespace-trtorch-logging">trtorch::logging</a><ul><li class="lastChild">Enum <a href="enum_logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4.html#exhale-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4">Level</a></li></ul></li><li>Namespace <a href="namespace_trtorch__ptq.html#namespace-trtorch-ptq">trtorch::ptq</a><ul><li>Template Class <a href="classtrtorch_1_1ptq_1_1Int8CacheCalibrator.html#exhale-class-classtrtorch-1-1ptq-1-1Int8CacheCalibrator">Int8CacheCalibrator</a></li><li class="lastChild">Template Class <a href="classtrtorch_1_1ptq_1_1Int8Calibrator.html#exhale-class-classtrtorch-1-1ptq-1-1Int8Calibrator">Int8Calibrator</a></li></ul></li><li class="lastChild">Struct <a href="structtrtorch_1_1CompileSpec.html#exhale-struct-structtrtorch-1-1CompileSpec">CompileSpec</a><ul><li>Struct <a href="structtrtorch_1_1CompileSpec_1_1Device.html#exhale-struct-structtrtorch-1-1CompileSpec-1-1Device">CompileSpec::Device</a><ul><li class="lastChild">Class <a href="classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType.html#exhale-class-classtrtorch-1-1CompileSpec-1-1Device-1-1DeviceType">Device::DeviceType</a></li></ul></li><li>Struct <a href="structtrtorch_1_1CompileSpec_1_1InputRange.html#exhale-struct-structtrtorch-1-1CompileSpec-1-1InputRange">CompileSpec::InputRange</a></li><li>Struct <a href="structtrtorch_1_1CompileSpec_1_1TorchFallback.html#exhale-struct-structtrtorch-1-1CompileSpec-1-1TorchFallback">CompileSpec::TorchFallback</a></li><li class="lastChild">Class <a href="classtrtorch_1_1CompileSpec_1_1DataType.html#exhale-class-classtrtorch-1-1CompileSpec-1-1DataType">CompileSpec::DataType</a></li></ul></li></ul></li>
+       </ul>
+     </li><!-- only tree view element -->
+   </ul><!-- /treeView class-treeView -->
+
+.. end raw html for treeView
+
+

@@ -1,0 +1,828 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Deploying a Torch-TensorRT model (to Triton) &mdash; Torch-TensorRT master documentation</title>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Torch-TensorRT Getting Started - CitriNet" href="../_notebooks/CitriNet-example.html" />
+    <link rel="prev" title="DLA" href="using_dla.html" />
+  <!-- Google Analytics -->
+
+  <!-- End Google Analytics -->
+
+
+
+  <script src="../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-orange-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/audio/stable/index.html">
+                  <span class="dropdown-title">torchaudio</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/text/stable/index.html">
+                  <span class="dropdown-title">torchtext</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/vision/stable/index.html">
+                  <span class="dropdown-title">torchvision</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
+                  <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
+                  <span class="dropdown-title">TorchServe</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchx/">
+                  <span class="dropdown-title">TorchX</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/xla">
+                  <span class="dropdown-title">PyTorch on XLA Devices</span>
+                  <p></p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                Resources
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/features">
+                  <span class="dropdown-title">About</span>
+                  <p>Learn about PyTorch’s features and capabilities</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class="dropdown-title">Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class="dropdown-title">Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class="dropdown-title">Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/hub">
+                  <span class="dropdown-title">Models (Beta)</span>
+                  <p>Discover, publish, and reuse pre-trained models</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">GitHub</a>
+          </li>
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+
+
+
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+
+
+
+
+
+                <div class="version">
+                  master (1.2.0a0+2585b77)
+                </div>
+
+
+
+
+
+
+
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+
+          </div>
+
+
+
+
+
+
+
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started_with_cpp_api.html">Getting Started with C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torchtrtc.html">torchtrtc</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="using_dla.html">DLA</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Deploying a Torch-TensorRT model (to Triton)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/CitriNet-example.html">Torch-TensorRT Getting Started - CitriNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/dynamic-shapes.html">Torch-TensorRT - Using Dynamic Shapes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/EfficientNet-example.html">Torch-TensorRT Getting Started - EfficientNet-B0</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/Hugging-Face-BERT.html">Masked Language Modeling (MLM) with Hugging Face BERT Transformer</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/lenet-getting-started.html">Torch-TensorRT Getting Started - LeNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/Resnet50-example.html">Torch-TensorRT Getting Started - ResNet 50</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/ssd-object-detection-demo.html">Object Detection with Torch-TensorRT (SSD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/vgg-qat.html">Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+
+
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+
+      <li>
+        <a href="../index.html">
+
+            Docs
+
+        </a> &gt;
+      </li>
+
+
+      <li>Deploying a Torch-TensorRT model (to Triton)</li>
+
+
+      <li class="pytorch-breadcrumbs-aside">
+
+
+            <a href="../_sources/tutorials/deploy_torch_tensorrt_to_triton.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+
+
+      </li>
+
+  </ul>
+
+
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+
+
+          <div class="rst-content">
+
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+
+  <section id="deploying-a-torch-tensorrt-model-to-triton">
+<h1>Deploying a Torch-TensorRT model (to Triton)<a class="headerlink" href="#deploying-a-torch-tensorrt-model-to-triton" title="Permalink to this headline">¶</a></h1>
+<p>Optimization and deployment go hand in hand in a discussion about Machine
+Learning infrastructure. Once network level optimzation are done
+to get the maximum performance, the next step would be to deploy it.</p>
+<p>However, serving this optimized model comes with it’s own set of considerations
+and challenges like: building an infrastructure to support concorrent model
+executions, supporting clients over HTTP or gRPC and more.</p>
+<p>The <a class="reference external" href="https://github.com/triton-inference-server/server">Triton Inference Server</a>
+solves the aforementioned and more. Let’s discuss step-by-step, the process of
+optimizing a model with Torch-TensorRT, deploying it on Triton Inference
+Server, and building a client to query the model.</p>
+<section id="step-1-optimize-your-model-with-torch-tensorrt">
+<h2>Step 1: Optimize your model with Torch-TensorRT<a class="headerlink" href="#step-1-optimize-your-model-with-torch-tensorrt" title="Permalink to this headline">¶</a></h2>
+<p>Most Torch-TensorRT users will be familiar with this step. For the purpose of
+this demonstration, we will be using a ResNet50 model from Torchhub.</p>
+<p>Let’s first pull the <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch">NGC PyTorch Docker container</a>. You may need to create
+an account and get the API key from <a class="reference external" href="https://ngc.nvidia.com/setup/">here</a>.
+Sign up and login with your key (follow the instructions
+<a class="reference external" href="https://ngc.nvidia.com/setup/api-key">here</a> after signing up).</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># &lt;xx.xx&gt; is the yy:mm for the publishing tag for NVIDIA&#39;s Pytorch</span>
+<span class="cp"># container; eg. 22.04</span>
+
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">gpus</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">scratch_space</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">pytorch</span><span class="o">:&lt;</span><span class="n">xx</span><span class="p">.</span><span class="n">xx</span><span class="o">&gt;-</span><span class="n">py3</span><span class="w"></span>
+<span class="n">cd</span><span class="w"> </span><span class="o">/</span><span class="n">scratch_space</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Once inside the container, we can proceed to download a ResNet model from
+Torchhub and optimize it with Torch-TensorRT.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>import torch
+import torch_tensorrt
+torch.hub._validate_not_a_forked_repo=lambda a,b,c: True
+
+# load model
+model = torch.hub.load(&#39;pytorch/vision:v0.10.0&#39;, &#39;resnet50&#39;, pretrained=True).eval().to(&quot;cuda&quot;)
+
+# Compile with Torch TensorRT;
+trt_model = torch_tensorrt.compile(model,
+    inputs= [torch_tensorrt.Input((1, 3, 224, 224))],
+    enabled_precisions= { torch.half} # Run with FP32
+)
+
+# Save the model
+torch.jit.save(trt_model, &quot;model.pt&quot;)
+</pre></div>
+</div>
+<p>After copying the model, exit the container. The next step in the process
+is to set up a Triton Inference Server.</p>
+</section>
+<section id="step-2-set-up-triton-inference-server">
+<h2>Step 2: Set Up Triton Inference Server<a class="headerlink" href="#step-2-set-up-triton-inference-server" title="Permalink to this headline">¶</a></h2>
+<p>If you are new to the Triton Inference Server and want to learn more, we
+highly recommend to checking our <a class="reference external" href="https://github.com/triton-inference-server">Github
+Repository</a>.</p>
+<p>To use Triton, we need to make a model repository. A model repository, as the
+name suggested, is a repository of the models the Inference server hosts. While
+Triton can serve models from multiple repositories, in this example, we will
+discuss the simplest possible form of the model repository.</p>
+<p>The structure of this repository should look something like this:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">model_repository</span><span class="w"></span>
+<span class="o">|</span><span class="w"></span>
+<span class="o">+--</span><span class="w"> </span><span class="n">resnet50</span><span class="w"></span>
+<span class="w">    </span><span class="o">|</span><span class="w"></span>
+<span class="w">    </span><span class="o">+--</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="n">pbtxt</span><span class="w"></span>
+<span class="w">    </span><span class="o">+--</span><span class="w"> </span><span class="mi">1</span><span class="w"></span>
+<span class="w">        </span><span class="o">|</span><span class="w"></span>
+<span class="w">        </span><span class="o">+--</span><span class="w"> </span><span class="n">model</span><span class="p">.</span><span class="n">pt</span><span class="w"></span>
+</pre></div>
+</div>
+<p>There are two files that Triton requires to serve the model: the model itself
+and a model configuration file which is typically provided in <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code>.
+For the model we prepared in step 1, the following configuration can be used:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;resnet50&quot;</span><span class="w"></span>
+<span class="nl">platform</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pytorch_libtorch&quot;</span><span class="w"></span>
+<span class="nl">max_batch_size</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="n">input</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">  </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;input__0&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nl">data_type</span><span class="p">:</span><span class="w"> </span><span class="n">TYPE_FP32</span><span class="w"></span>
+<span class="w">    </span><span class="nl">dims</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="w"> </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="n">reshape</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">shape</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">]</span><span class="w"></span>
+<span class="n">output</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">  </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output__0&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nl">data_type</span><span class="p">:</span><span class="w"> </span><span class="n">TYPE_FP32</span><span class="w"></span>
+<span class="w">    </span><span class="nl">dims</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="w"> </span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="n">reshape</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">shape</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">]</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code> file is used to describe the exact model configuration
+with details like the names and shapes of the input and output layer(s),
+datatypes, scheduling and batching details and more. If you are new to Triton,
+we highly encourage you to check out this <a class="reference external" href="https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md">section of our
+documentation</a>
+for more details.</p>
+<p>With the model repository setup, we can proceed to launch the Triton server
+with the docker command below. Refer <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver">this page</a> for the pull tag for the container.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Make sure that the TensorRT version in the Triton container</span>
+<span class="cp"># and TensorRT version in the environment used to optimize the model</span>
+<span class="cp"># are the same.</span>
+
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">gpus</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8000</span><span class="o">:</span><span class="mi">8000</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8001</span><span class="o">:</span><span class="mi">8001</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8002</span><span class="o">:</span><span class="mi">8002</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="o">/</span><span class="n">full</span><span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">the_model_repository</span><span class="o">/</span><span class="n">model_repository</span><span class="o">:/</span><span class="n">models</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">tritonserver</span><span class="o">:&lt;</span><span class="n">xx</span><span class="p">.</span><span class="n">yy</span><span class="o">&gt;-</span><span class="n">py3</span><span class="w"> </span><span class="n">tritonserver</span><span class="w"> </span><span class="o">--</span><span class="n">model</span><span class="o">-</span><span class="n">repository</span><span class="o">=/</span><span class="n">models</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This should spin up a Triton Inference server. Next step, building a simple
+http client to query the server.</p>
+</section>
+<section id="step-3-building-a-triton-client-to-query-the-server">
+<h2>Step 3: Building a Triton Client to Query the Server<a class="headerlink" href="#step-3-building-a-triton-client-to-query-the-server" title="Permalink to this headline">¶</a></h2>
+<p>Before proceeding, make sure to have a sample image on hand. If you don’t
+have one, download an example image to test inference. In this section, we
+will be going over a very basic client. For a variety of more fleshed out
+examples, refer to the <a class="reference external" href="https://github.com/triton-inference-server/client/tree/main/src/python/examples">Triton Client Repository</a></p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">wget</span><span class="w">  </span><span class="o">-</span><span class="n">O</span><span class="w"> </span><span class="n">img1</span><span class="p">.</span><span class="n">jpg</span><span class="w"> </span><span class="s">&quot;https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg&quot;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>We then need to install dependencies for building a python client. These will
+change from client to client. For a full list of all languages supported by Triton,
+please refer to <a class="reference external" href="https://github.com/triton-inference-server/client">Triton’s client repository</a>.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">torchvision</span><span class="w"></span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">attrdict</span><span class="w"></span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">nvidia</span><span class="o">-</span><span class="n">pyindex</span><span class="w"></span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">[</span><span class="n">all</span><span class="p">]</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Let’s jump into the client. Firstly, we write a small preprocessing function to
+resize and normalize the query image.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="n">numpy</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">np</span><span class="w"></span>
+<span class="n">from</span><span class="w"> </span><span class="n">torchvision</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">transforms</span><span class="w"></span>
+<span class="n">from</span><span class="w"> </span><span class="n">PIL</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">Image</span><span class="w"></span>
+<span class="k">import</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">.</span><span class="n">http</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">httpclient</span><span class="w"></span>
+<span class="n">from</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">.</span><span class="n">utils</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">triton_to_np_dtype</span><span class="w"></span>
+
+<span class="cp"># preprocessing function</span>
+<span class="n">def</span><span class="w"> </span><span class="n">rn50_preprocess</span><span class="p">(</span><span class="n">img_path</span><span class="o">=</span><span class="s">&quot;img1.jpg&quot;</span><span class="p">)</span><span class="o">:</span><span class="w"></span>
+<span class="w">    </span><span class="n">img</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Image</span><span class="p">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">preprocess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transforms</span><span class="p">.</span><span class="n">Compose</span><span class="p">([</span><span class="w"></span>
+<span class="w">        </span><span class="n">transforms</span><span class="p">.</span><span class="n">Resize</span><span class="p">(</span><span class="mi">256</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="n">transforms</span><span class="p">.</span><span class="n">CenterCrop</span><span class="p">(</span><span class="mi">224</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="n">transforms</span><span class="p">.</span><span class="n">ToTensor</span><span class="p">(),</span><span class="w"></span>
+<span class="w">        </span><span class="n">transforms</span><span class="p">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">mean</span><span class="o">=</span><span class="p">[</span><span class="mf">0.485</span><span class="p">,</span><span class="w"> </span><span class="mf">0.456</span><span class="p">,</span><span class="w"> </span><span class="mf">0.406</span><span class="p">],</span><span class="w"> </span><span class="n">std</span><span class="o">=</span><span class="p">[</span><span class="mf">0.229</span><span class="p">,</span><span class="w"> </span><span class="mf">0.224</span><span class="p">,</span><span class="w"> </span><span class="mf">0.225</span><span class="p">]),</span><span class="w"></span>
+<span class="w">    </span><span class="p">])</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">preprocess</span><span class="p">(</span><span class="n">img</span><span class="p">).</span><span class="n">numpy</span><span class="p">()</span><span class="w"></span>
+
+<span class="n">transformed_img</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rn50_preprocess</span><span class="p">()</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Building a client requires three basic points. Firstly, we setup a connection
+with the Triton Inference Server.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Setting up client</span>
+<span class="n">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferenceServerClient</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s">&quot;localhost:8000&quot;</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Secondly, we specify the names of the input and output layer(s) of our model.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferInput</span><span class="p">(</span><span class="s">&quot;input__0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">transformed_img</span><span class="p">.</span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">datatype</span><span class="o">=</span><span class="s">&quot;FP32&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="n">inputs</span><span class="p">.</span><span class="n">set_data_from_numpy</span><span class="p">(</span><span class="n">transformed_img</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">)</span><span class="w"></span>
+
+<span class="n">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferRequestedOutput</span><span class="p">(</span><span class="s">&quot;output__0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">,</span><span class="w"> </span><span class="n">class_count</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Lastly, we send an inference request to the Triton Inference Server.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span># Querying the server
+results = client.infer(model_name=&quot;resnet50&quot;, inputs=[inputs], outputs=[outputs])
+inference_output = results.as_numpy(&#39;output__0&#39;)
+print(inference_output[:5])
+</pre></div>
+</div>
+<p>The output of the same should look like below:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>[b&#39;12.468750:90&#39; b&#39;11.523438:92&#39; b&#39;9.664062:14&#39; b&#39;8.429688:136&#39;
+ b&#39;8.234375:11&#39;]
+</pre></div>
+</div>
+<p>The output format here is <code class="docutils literal notranslate"><span class="pre">&lt;confidence_score&gt;:&lt;classification_index&gt;</span></code>.
+To learn how to map these to the label names and more, refer to our
+<a class="reference external" href="https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_classification.md">documentation</a>.</p>
+</section>
+</section>
+
+
+             </article>
+
+            </div>
+            <footer>
+
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+
+        <a href="../_notebooks/CitriNet-example.html" class="btn btn-neutral float-right" title="Torch-TensorRT Getting Started - CitriNet" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+
+
+        <a href="using_dla.html" class="btn btn-neutral" title="DLA" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+
+    </div>
+
+
+
+
+    <hr>
+
+
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2021, NVIDIA Corporation.
+
+    </p>
+  </div>
+
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">Deploying a Torch-TensorRT model (to Triton)</a><ul>
+<li><a class="reference internal" href="#step-1-optimize-your-model-with-torch-tensorrt">Step 1: Optimize your model with Torch-TensorRT</a></li>
+<li><a class="reference internal" href="#step-2-set-up-triton-inference-server">Step 2: Set Up Triton Inference Server</a></li>
+<li><a class="reference internal" href="#step-3-building-a-triton-client-to-query-the-server">Step 3: Building a Triton Client to Query the Server</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+
+
+
+
+
+
+       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+         <script src="../_static/jquery.js"></script>
+         <script src="../_static/underscore.js"></script>
+         <script src="../_static/doctools.js"></script>
+         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+
+
+
+
+  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col follow-us-col">
+          <ul>
+            <li class="list-title">Stay Connected</li>
+          </ul>
+
+          <div class="footer-social-icons">
+            <a href="https://www.facebook.com/pytorch" target="_blank" class="facebook"></a>
+            <a href="https://twitter.com/pytorch" target="_blank" class="twitter"></a>
+            <a href="https://www.youtube.com/pytorch" target="_blank" class="youtube"></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/hub">PyTorch Hub</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li class="resources-mobile-menu-title">
+            Docs
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/audio/stable/index.html">torchaudio</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/text/stable/index.html">torchtext</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/vision/stable/index.html">torchvision</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/serve/">TorchServe</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchx/">TorchX</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/xla">PyTorch on XLA Devices</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            Resources
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/features">About</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/#community-module">Community</a>
+            </li>
+
+            <li>
+              <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+          </ul>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">Github</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+.. _exhale_function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384:
+
+Function torch_tensorrt::set_device
+===================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::set_device(const int)
+   :project: Torch-TensorRT
