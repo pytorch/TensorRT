@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import torch_tensorrt
 from torch_tensorrt._compile import (
     _save_as_executorch,
     _write_external_tensor_data,
@@ -24,6 +25,10 @@ def test_validate_executorch_engine_info_rejects_output_allocator():
 
 
 @pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
 def test_save_as_executorch_uses_public_lowering_and_persists_data(
     monkeypatch, tmp_path
 ):
@@ -62,6 +67,10 @@ def test_save_as_executorch_uses_public_lowering_and_persists_data(
 
 
 @pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
 @pytest.mark.parametrize("option", ["partitioners", "compile_specs"])
 def test_save_as_executorch_rejects_per_method_mapping(monkeypatch, tmp_path, option):
     import torch_tensorrt.executorch as executorch_api
