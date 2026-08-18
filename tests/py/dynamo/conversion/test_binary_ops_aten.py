@@ -257,5 +257,23 @@ class TestBinaryOpConverters(DispatchTestCase):
         self.run_test(m, inputs)
 
 
+class TestScalarTensorDtypePromotion(DispatchTestCase):
+    def test_int_tensor_times_float_scalar_promotes_to_float(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return x * 8.2
+
+        inputs = [torch.tensor([1, 2, 3, 4], dtype=torch.int64)]
+        self.run_test(TestModule(), inputs)
+
+    def test_float_scalar_times_int_tensor_promotes_to_float(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return 8.2 * x
+
+        inputs = [torch.tensor([1, 2, 3, 4], dtype=torch.int64)]
+        self.run_test(TestModule(), inputs)
+
+
 if __name__ == "__main__":
     run_tests()
