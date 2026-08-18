@@ -98,6 +98,45 @@ class TestLiftMutatedBuffers(TestCase):
         for node in new_gm.graph.nodes:
             self.assertNotEqual(node.target, torch.ops.aten.copy_.default)
 
+    def test_nested_buffer_lifted(self):
+        """A buffer owned by a submodule should be lifted too.
+
+        ``get_attr`` targets are fully qualified, so this one arrives as
+        ``inner.cache``. Resolving it with ``getattr`` reports it as missing and
+        skips the rewrite, which leaves the mutation in place."""
+
+        class Inner(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 4, 16, 8))
+
+            def forward(self, x):
+                self.cache[:, :, 3:4, :] = x
+                return self.cache.sum()
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.inner = Inner()
+
+            def forward(self, x):
+                return self.inner(x)
+
+        gm = _ep_module_decomposed(M(), (torch.ones(2, 4, 1, 8),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+
+        self.assertEqual(len(lifted), 1)
+        ph_name, buf_name, tensor = lifted[0]
+        self.assertEqual(buf_name, "inner.cache")
+        self.assertEqual(tuple(tensor.shape), (2, 4, 16, 8))
+        self.assertEqual(ph_name, "buf_inner_cache")
+
+        sig = inspect.signature(new_gm.forward)
+        self.assertEqual(list(sig.parameters.keys()), ["x", "buf_inner_cache"])
+
+        for node in new_gm.graph.nodes:
+            self.assertNotEqual(node.target, torch.ops.aten.copy_.default)
+
     def test_paired_buffers_lifted(self):
         """Two mutated buffers are both lifted; placeholders appear in a
         stable order so callers can match them positionally."""
