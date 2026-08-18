@@ -1125,10 +1125,57 @@ def test_export_rejects_shared_method_named_partitioner(monkeypatch, as_mapping)
     )
     partitioners = {"prefill": [shared], "decode": [shared]} if as_mapping else [shared]
 
-    with pytest.raises(ValueError, match="reuses the same"):
+    # Sharing it puts it under 'decode' too, where its declared name no longer
+    # matches, so the mismatch is what reports first.
+    with pytest.raises(ValueError, match="name method 'prefill'"):
         export_module.export(
             {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
             partitioners=partitioners,
+        )
+
+    lower.assert_not_called()
+
+
+@pytest.mark.unit
+def test_export_rejects_a_partitioner_naming_another_method(monkeypatch):
+    """A partitioner filed under one method must not name a different one.
+
+    Its compile specs decide the label the delegate carries, so a mismatch emits a
+    program whose delegate looks up the wrong compiled method at runtime.
+    """
+    export_module, lower = _patch_lowering(monkeypatch)
+
+    def named(method):
+        return SimpleNamespace(
+            delegation_spec=SimpleNamespace(
+                compile_specs=[
+                    SimpleNamespace(key="method_name", value=method.encode())
+                ]
+            )
+        )
+
+    with pytest.raises(ValueError, match="name method 'decode'"):
+        export_module.export(
+            {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
+            partitioners={"prefill": [named("decode")], "decode": [named("decode")]},
+        )
+
+    lower.assert_not_called()
+
+
+@pytest.mark.unit
+def test_export_rejects_a_mismatched_partitioner_for_a_single_method(monkeypatch):
+    """One method can be mis-wired too, so the check must not need two methods."""
+    export_module, lower = _patch_lowering(monkeypatch)
+    wrong = SimpleNamespace(
+        delegation_spec=SimpleNamespace(
+            compile_specs=[SimpleNamespace(key="method_name", value=b"decode")]
+        )
+    )
+
+    with pytest.raises(ValueError, match="name method 'decode'"):
+        export_module.export(
+            {"prefill": FakeExportedProgram()}, partitioners={"prefill": [wrong]}
         )
 
     lower.assert_not_called()

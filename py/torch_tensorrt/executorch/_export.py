@@ -204,14 +204,19 @@ def _reject_shared_method_named_partitioners(per_method: dict[str, list[Any]]) -
     whose specs carry no method name is fine, and ExecuTorch's own multi-method examples
     do it, so only the naming case is an error.
     """
-    if len(per_method) < 2:
-        return
-
     owner_by_id: dict[int, str] = {}
     for name, partitioners in per_method.items():
         for partitioner in partitioners:
-            if not _carries_method_name(partitioner):
+            declared = _declared_method_name(partitioner)
+            if declared is None:
                 continue
+            if declared != name:
+                raise ValueError(
+                    f"partitioners[{name!r}] holds a {type(partitioner).__name__} whose "
+                    f"compile specs name method {declared!r}. The delegate would be "
+                    f"labelled {declared!r} and look up the wrong compiled method at "
+                    f"runtime. Build it with the spec for {name!r}."
+                )
             previous = owner_by_id.setdefault(id(partitioner), name)
             if previous != name:
                 raise ValueError(
@@ -224,17 +229,21 @@ def _reject_shared_method_named_partitioners(per_method: dict[str, list[Any]]) -
                 )
 
 
-def _carries_method_name(partitioner: Any) -> bool:
-    """Whether a partitioner's compile specs name a specific method.
+def _declared_method_name(partitioner: Any) -> str | None:
+    """The method a partitioner's compile specs name, if they name one.
 
     Only the specs the partitioner holds from construction are visible here. A
     partitioner that builds its DelegationSpec inside partition() is not detected.
     """
     spec = getattr(partitioner, "delegation_spec", None)
     for compile_spec in getattr(spec, "compile_specs", None) or ():
-        if getattr(compile_spec, "key", None) == "method_name":
-            return True
-    return False
+        if getattr(compile_spec, "key", None) != "method_name":
+            continue
+        value = getattr(compile_spec, "value", None)
+        if isinstance(value, (bytes, bytearray)):
+            return value.decode()
+        return None if value is None else str(value)
+    return None
 
 
 def _per_method_values(
