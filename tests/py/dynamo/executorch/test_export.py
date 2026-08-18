@@ -590,6 +590,10 @@ def test_stage_exported_program_isolates_structure_and_shares_payloads():
     first_node = next(iter(program.graph.nodes))
     first_node.meta["nested"] = {"items": ["source"]}
     first_node.meta["tensor_meta"] = Metadata((2,), torch.float32)
+    # A real tensor in node metadata is a payload, so it must survive staging as the
+    # same object even though the dict around it is copied.
+    payload = torch.ones(3)
+    first_node.meta["payload"] = {"tensor": payload}
     program.graph_module.meta["nested"] = {"items": ["source"]}
     source_input_specs = list(program.graph_signature.input_specs)
     staged = export_utils.stage_exported_program(program)
@@ -603,6 +607,9 @@ def test_stage_exported_program_isolates_structure_and_shares_payloads():
     assert staged.graph_signature.input_specs is not program.graph_signature.input_specs
     assert staged.state_dict["weight"] is program.state_dict["weight"]
     assert isinstance(next(iter(staged.graph.nodes)).meta["tensor_meta"], Metadata)
+    staged_payload = next(iter(staged.graph.nodes)).meta["payload"]
+    assert staged_payload is not first_node.meta["payload"]
+    assert staged_payload["tensor"] is payload
 
     staged.graph_signature.input_specs.pop()
     assert program.graph_signature.input_specs == source_input_specs
