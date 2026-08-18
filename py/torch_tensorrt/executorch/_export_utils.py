@@ -249,17 +249,20 @@ def stage_exported_program(exported_program: Any) -> Any:
 def _unique_engine_buffer_name(
     exported_program: Any, graph_module: torch.fx.GraphModule
 ) -> str:
-    """Pick an engine buffer name free on the module and on the lifted state dict.
+    """Pick an engine buffer name free on the module and on both lifted namespaces.
 
-    torch.export lifts buffers out of the module and into ``state_dict``, so a name can
-    be taken there while ``hasattr`` on the module reports nothing.
+    torch.export lifts buffers into ``state_dict`` and script objects and non-persistent
+    tensors into ``constants``, so a name can be taken in either while ``hasattr`` on the
+    module reports nothing.
     """
     from torch.fx.experimental.const_fold import get_unique_attr_name_in_module
 
     index = 0
     while True:
         name: str = get_unique_attr_name_in_module(graph_module, f"_trt_engine_{index}")
-        if name not in exported_program.state_dict:
+        if name not in exported_program.state_dict and name not in (
+            exported_program.constants
+        ):
             return name
         index += 1
 

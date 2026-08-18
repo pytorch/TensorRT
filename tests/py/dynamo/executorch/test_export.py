@@ -362,6 +362,25 @@ def test_replace_execute_engine_keeps_a_lifted_buffer_of_the_same_name():
     not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
     reason="Torch-TensorRT runtime operators are not available",
 )
+def test_replace_execute_engine_keeps_a_constant_of_the_same_name():
+    """torch.export lifts into constants too, and hasattr cannot see those either."""
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    program, _, _, _ = _engine_program(lifted=True)
+    lifted_constant = torch.ones(1)
+    program.constants["_trt_engine_0"] = lifted_constant
+
+    export_utils.replace_execute_engine(program)
+
+    assert program.constants["_trt_engine_0"] is lifted_constant
+    assert "_trt_engine_0" not in program.state_dict
+    assert len(program.state_dict) == 1
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
 def test_validate_engine_program_counts_both_engine_ops_and_nothing_else():
     """A graph an earlier rewrite already touched carries engine info as node args."""
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
