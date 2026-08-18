@@ -126,24 +126,17 @@ def convert_binary_elementwise(
     # into [], meaning that the result will have shape [], which is what we
     # expect.
     #
-    # Note that the dtype here is supposed to be the same as the scalar
-    # dtype but we don't have a way to detect whether it makes sense for the
-    # scalar to be float or half. Hence we go with the lhs dtype.
+    # Wrap Python scalars using PyTorch's weak scalar-promotion rules. This
+    # preserves low-precision floating-point tensors while allowing mixed
+    # integer/float and bool/numeric expressions to promote when required.
     def _scalar_wrap_dtype(
         tensor_dtype: TRTDataType, scalar: Union[float, int, bool]
     ) -> TRTDataType:
-        # bool combined with a non-bool scalar promotes to numeric (e.g.
-        # bool * int -> int64), not bool -- wrapping the scalar as bool
-        # here would make the later promotion step a no-op bool/bool match.
-        # Hit by PyTorch's upstream complex-acos decomposition, which computes
-        # sign(x) as signbit(x) * 2 - 1 (see complex_decomposition_adapter.py).
-        if tensor_dtype == trt.DataType.BOOL and not isinstance(scalar, bool):
-            torch_tensor_dtype = _enums.dtype._from(tensor_dtype).to(torch.dtype)
-            promoted = torch.result_type(
-                torch.empty([1], dtype=torch_tensor_dtype), scalar
-            )
-            return _enums.dtype._from(promoted).to(trt.DataType)
-        return tensor_dtype
+        torch_tensor_dtype = _enums.dtype._from(tensor_dtype).to(torch.dtype)
+        promoted = torch.result_type(
+            torch.empty([1], dtype=torch_tensor_dtype), scalar
+        )
+        return _enums.dtype._from(promoted).to(trt.DataType)
 
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
         rhs_val = to_torch(rhs_val, dtype=_scalar_wrap_dtype(lhs_dtype, rhs_val))
