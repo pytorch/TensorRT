@@ -299,8 +299,13 @@ points, such as a separate prefill and decode, in one program. Give each method
 its own partitioner instances when a partitioner carries method-specific state: a
 partitioner holds its compile specs from construction, so one instance whose specs
 name a method would tag every method sharing it with that same name. Reusing such
-an instance across methods is rejected. Sharing an instance whose specs name no
-method is allowed.
+an instance across methods is rejected.
+
+Sharing an instance whose specs name no method is not rejected, because some
+backends are built to share one. A backend that instead reads its own method name
+from its specs, such as the CUDA backend below, raises
+``Could not find method name in compile specs`` during lowering, so give it one
+instance per method carrying that method's name spec.
 
 .. code-block:: python
 

@@ -195,37 +195,29 @@ def _prepare_programs(
     )
 
 
-def _reject_shared_method_named_partitioners(per_method: dict[str, list[Any]]) -> None:
-    """Reject one partitioner instance carrying a method name serving several methods.
+def _reject_misnamed_partitioners(per_method: dict[str, list[Any]]) -> None:
+    """Reject a partitioner whose compile specs name a method other than its own.
 
-    A partitioner holds its compile specs from construction. When those specs name a
-    method, every method sharing that instance is tagged with the same name, and the
-    delegates then look up the wrong compiled method at runtime. Sharing an instance
-    whose specs carry no method name is fine, and ExecuTorch's own multi-method examples
-    do it, so only the naming case is an error.
+    A partitioner holds its compile specs from construction, so the name in those specs
+    is the name its delegates carry. When that is not the method the partitioner was
+    given, the delegates look up the wrong compiled method at runtime. Sharing one
+    named instance across methods is the common way to hit this, since at most one of
+    those methods can match.
+
+    An instance whose specs carry no method name is not rejected, because some backends
+    are built to share one across methods. A backend that instead reads its method name
+    from its specs raises during ExecuTorch's own lowering, so this is not a case that
+    can be decided here.
     """
-    owner_by_id: dict[int, str] = {}
     for name, partitioners in per_method.items():
         for partitioner in partitioners:
             declared = _declared_method_name(partitioner)
-            if declared is None:
-                continue
-            if declared != name:
+            if declared is not None and declared != name:
                 raise ValueError(
                     f"partitioners[{name!r}] holds a {type(partitioner).__name__} whose "
                     f"compile specs name method {declared!r}. The delegate would be "
                     f"labelled {declared!r} and look up the wrong compiled method at "
                     f"runtime. Build it with the spec for {name!r}."
-                )
-            previous = owner_by_id.setdefault(id(partitioner), name)
-            if previous != name:
-                raise ValueError(
-                    f"partitioners reuses the same {type(partitioner).__name__} "
-                    f"instance for {previous!r} and {name!r}, and its compile specs "
-                    "name a method, so both methods would be tagged with the same "
-                    "name. Give each method its own instance: "
-                    'partitioners={"prefill": [MyPartitioner(...)], "decode": '
-                    "[MyPartitioner(...)]}."
                 )
 
 
@@ -318,7 +310,8 @@ def export(
     since a backend that reads its method name from the specs cannot find it otherwise.
     Sharing one instance across methods is rejected when its specs name a method, because
     every method sharing it would be tagged with the same name. Sharing an instance whose
-    specs name no method is allowed.
+    specs name no method is not rejected here, but a backend that reads its own method
+    name from its specs, such as the CUDA backend, then raises during lowering.
 
     ``generate_etrecord=True`` is outside the payload sharing described above. It makes
     ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of
@@ -408,7 +401,7 @@ def export(
     )
     program_map = {"forward": programs} if not isinstance(programs, dict) else programs
     extra_partitioners = _per_method_values(partitioners, method_names, "partitioners")
-    _reject_shared_method_named_partitioners(extra_partitioners)
+    _reject_misnamed_partitioners(extra_partitioners)
     method_compile_specs = _per_method_values(
         compile_specs, method_names, "compile_specs"
     )
