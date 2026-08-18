@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion.impl import (
     index_copy,
     linear,
     matmul,
+    moe,
     nccl_ops,
     normalization,
     pad,
