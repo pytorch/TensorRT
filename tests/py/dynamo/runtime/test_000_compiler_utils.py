@@ -3,6 +3,7 @@ import unittest
 import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo.utils import (
+    get_torch_tensor,
     prepare_inputs,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -55,6 +56,21 @@ class TestToTorchTRTDevice(unittest.TestCase):
         prepared_device = to_torch_tensorrt_device(device)
         self.assertTrue(isinstance(prepared_device, torch_tensorrt.Device))
         self.assertTrue(prepared_device.gpu_id == gpu_id)
+
+
+class TestGetTorchTensor(unittest.TestCase):
+    def test_shape_tensor_preserves_multiple_values(self):
+        shape = torch_tensorrt.Input(
+            min_shape=(3, 5),
+            opt_shape=(3, 7),
+            max_shape=(4, 10),
+            dtype=torch.int64,
+            is_shape_tensor=True,
+        )
+
+        value = get_torch_tensor(shape, torch.device("cpu"))
+
+        self.assertEqual(value, [3, 7])
 
 
 class TestPrepareInputs(unittest.TestCase):
