@@ -12,7 +12,7 @@ from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
-from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
+from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, COMPLEX_TO_REAL_DTYPE
 
 logger = logging.getLogger(__name__)
 
@@ -1282,6 +1282,25 @@ class ComplexGraphRewriter:
             self.gm.graph.erase_node(node)
             return True
 
+    @_complex_unpacker(torch.ops.aten._to_copy.default)
+    def _rewrite_to_copy(self, node: Node) -> bool:
+        # In the [..., 2] real layout the copy is unchanged; only a complex
+        # dtype request needs remapping to its real counterpart.
+        kwargs = dict(node.kwargs)
+        dtype = kwargs.get("dtype")
+        if dtype is not None and dtype not in COMPLEX_DTYPES:
+            # complex -> real changes meaning, not layout; use the fallback.
+            return False
+        if dtype is not None:
+            kwargs["dtype"] = COMPLEX_TO_REAL_DTYPE[dtype]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten._to_copy.default, node.args[0])
+            out.kwargs = kwargs
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
     # ------------------------------------------------------------------
     # Shape-manipulation handlers
     #
@@ -1297,6 +1316,7 @@ class ComplexGraphRewriter:
         torch.ops.aten.reshape.default,
         torch.ops.aten.view.default,
         torch.ops.aten._unsafe_view.default,
+        torch.ops.aten._reshape_copy.default,
     )
     def _rewrite_reshape_view(self, node: Node) -> bool:
         # Append 2 to the target shape so the trailing real/imag dim is

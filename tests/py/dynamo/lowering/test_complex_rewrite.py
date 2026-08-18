@@ -595,6 +595,36 @@ def test_reshape():
 
 
 @pytest.mark.unit
+def test_reshape_copy():
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._reshape_copy.default(z, [12])
+
+    gm = _export_and_lower(M(), (_z(),))
+    targets = {
+        n.target for n in gm.graph.nodes if n.op == "call_function"
+    }
+    assert torch.ops.aten.view_as_complex.default not in targets
+    assert torch.ops.aten.view_as_real.default not in targets
+    _check_op(M(), (_z(),), "reshape_copy")
+
+
+@pytest.mark.unit
+def test_to_copy_complex_dtype():
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._to_copy.default(z, dtype=torch.complex128)
+
+    gm = _export_and_lower(M(), (_z(),))
+    targets = {
+        n.target for n in gm.graph.nodes if n.op == "call_function"
+    }
+    assert torch.ops.aten.view_as_complex.default not in targets
+    assert torch.ops.aten.view_as_real.default not in targets
+    _check_op(M(), (_z(),), "to_copy_complex_dtype")
+
+
+@pytest.mark.unit
 def test_reshape_batch():
     class M(nn.Module):
         def forward(self, z):
