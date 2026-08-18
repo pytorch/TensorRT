@@ -5,7 +5,7 @@ Runtime loading is provided by the optional
 ``torch_tensorrt.load(..., format="executorch")``.
 """
 
-import importlib
+import importlib.util
 from typing import TYPE_CHECKING, NoReturn
 
 if TYPE_CHECKING:

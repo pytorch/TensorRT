@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 _SHARED_PAYLOAD_TYPES = (torch.Tensor, torch.ScriptObject, FakeScriptObject)
 
 
-def _seed_graph_bound_leaves(value: Any, memo: dict[int, Any]) -> bool:
+def _seed_graph_bound_leaves(value: Any, memo: dict[int, Any]) -> None:
     """Seed shape-environment-bound leaves into ``memo`` so deepcopy shares them.
 
     Fake tensors and symbolic sizes reach back to a live ``ShapeEnv`` that owns
@@ -24,18 +24,12 @@ def _seed_graph_bound_leaves(value: Any, memo: dict[int, Any]) -> bool:
     from the symbols the graph is guarded on. Seeding only the leaves lets the
     surrounding container still be copied, so a container such as the ``list`` a
     multi-output op stores in ``meta["val"]`` is not shared with the caller.
-
-    Returns True if the value has to be shared wholesale because deepcopy cannot
-    reach its leaves through pytree.
     """
-    found = False
     for leaf in torch.utils._pytree.tree_leaves(value):
         if isinstance(leaf, (torch.SymInt, torch.SymFloat, torch.SymBool)) or (
             isinstance(leaf, torch.Tensor) and is_fake(leaf)
         ):
             memo[id(leaf)] = leaf
-            found = True
-    return found
 
 
 def get_engine_info_from_state(engine_obj: Any) -> list[Any]:

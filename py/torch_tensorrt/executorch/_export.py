@@ -383,10 +383,10 @@ def export(
             raise ValueError(
                 f"transform_passes contains unknown methods: {sorted(unknown)}"
             )
-        # ExecuTorch dispatches per-method passes on isinstance(passes, dict), so a
-        # Mapping that is not a dict silently runs no passes at all. An empty mapping
-        # reaches it as a dict and then raises KeyError for the first method, so treat
-        # it as no passes at all.
+        # ExecuTorch dispatches per-method passes on isinstance(passes, dict), and a
+        # Mapping that is not a dict matches none of its branches, so it reaches a
+        # KeyError on the first method. An empty dict fails the same way, so treat it
+        # as no passes at all.
         transform_passes = dict(transform_passes) or None
 
     resolved_engines: dict[str, dict[str, list[Any]]] = {
