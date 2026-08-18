@@ -550,6 +550,38 @@ def test_stage_exported_program_copies_containers_holding_symbolic_leaves():
 
 
 @pytest.mark.unit
+def test_stage_exported_program_discards_a_failed_copy_from_the_memo():
+    """A meta value deepcopy gives up on must not corrupt the next value.
+
+    deepcopy registers a copy in the memo before it fills the copy in, so a value
+    that raises halfway leaves a truncated copy behind. Any later value reaching the
+    same object would then get that truncated copy instead of a faithful one.
+    """
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+
+    class Uncopyable:
+        def __deepcopy__(self, memo):
+            raise RuntimeError("this value cannot be copied")
+
+    graph = torch.fx.Graph()
+    first = graph.placeholder("first")
+    second = graph.placeholder("second")
+    graph.output(first)
+    graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
+    shared = ["kept", Uncopyable()]
+    nodes = {node.name: node for node in graph_module.graph.nodes}
+    nodes["first"].meta["shared"] = shared
+    nodes["second"].meta["holder"] = {"shared": shared}
+
+    staged = export_utils._stage_graph_module(graph_module, {})
+
+    staged_nodes = {node.name: node for node in staged.graph.nodes}
+    # Both values reach the Uncopyable, so both fall back to sharing the source.
+    assert staged_nodes["first"].meta["shared"] is shared
+    assert staged_nodes["second"].meta["holder"]["shared"] is shared
+
+
+@pytest.mark.unit
 def test_stage_exported_program_clones_nested_graph_modules():
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
 

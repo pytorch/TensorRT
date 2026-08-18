@@ -188,6 +188,11 @@ def _stage_graph_module(
                 # Seed the shape-bound leaves first so the container around them
                 # is still copied while the leaves stay shared.
                 _seed_graph_bound_leaves(value, payload_memo)
+                # deepcopy records a copy in the memo before filling it, so a failed
+                # attempt leaves half-built copies that a later value sharing the same
+                # object would silently reuse. Everything added after this mark belongs
+                # to this attempt, because deepcopy only ever appends to the memo.
+                memo_mark = len(payload_memo)
                 try:
                     staged_meta[key] = copy.deepcopy(value, payload_memo)
                 except (
@@ -196,6 +201,8 @@ def _stage_graph_module(
                     ValueError,
                     NotImplementedError,
                 ) as exc:
+                    for stale in list(payload_memo)[memo_mark:]:
+                        del payload_memo[stale]
                     # A value deepcopy cannot reach through, for example a live
                     # ShapeEnv, has to be shared rather than lose the graph its guards
                     # refer to. Log it, since sharing a mutable value here is the one
