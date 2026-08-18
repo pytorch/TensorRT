@@ -305,10 +305,12 @@ def export(
     on it when ready to perform final memory planning and serialization.
 
     Export stages independent graph and metadata containers while sharing tensor
-    and engine payload storage, avoiding copies of potentially multi-gigabyte
-    TensorRT engines. Transform passes must treat shared payload values as
-    immutable. Method mappings preserve independent entry points but do not imply
-    shared mutable state between them.
+    payload storage with the source programs, so transform passes must treat a
+    shared payload value as immutable. Engines are never deep copied, since that
+    would serialize and deserialize them, but each one is decoded into a byte
+    buffer the returned program owns, so the bytes of a multi-gigabyte engine are
+    resident twice while both programs are alive. Method mappings preserve
+    independent entry points but do not imply shared mutable state between them.
 
     When exporting more than one method, give each method its own partitioner
     instances via ``partitioners={"method": [...]}``. A partitioner may carry

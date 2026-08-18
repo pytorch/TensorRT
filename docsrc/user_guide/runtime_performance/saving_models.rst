@@ -328,11 +328,15 @@ points but does not by itself give them shared mutable state.
 
 .. warning::
 
-    **The returned Edge program shares weight and engine storage with the
-    programs you passed in.** Only structure is copied: the graph, the graph
-    signature, the ``state_dict`` keys, and node metadata. Tensor and TensorRT
-    engine contents are shared by reference, which is what keeps a multi-gigabyte
-    engine from being duplicated.
+    **The returned Edge program shares tensor storage with the programs you
+    passed in.** Only structure is copied: the graph, the graph signature, the
+    ``state_dict`` keys, and node metadata. Weights and every other tensor
+    payload are shared by reference.
+
+    TensorRT engines are not shared. Export never deep copies an engine object,
+    since that would serialize and deserialize it, but every engine is decoded
+    once into a byte buffer the returned program owns. Plan for the bytes of a
+    multi-gigabyte engine to be resident twice while both programs are alive.
 
     Two consequences to plan for:
 
