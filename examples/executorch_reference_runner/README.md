@@ -42,8 +42,9 @@ torch_tensorrt/bin/example_executorch_runner
 ```
 
 ```bash
-# Get the ExecuTorch release/1.4 source snapshot used by this package.
-EXECUTORCH_REF="${EXECUTORCH_REF:-cd380e7aefd18c171271cc228d3a155455095219}"
+# Get the ExecuTorch source snapshot this package is built against. Keep this in sync
+# with the executorch commit pinned in MODULE.bazel.
+EXECUTORCH_REF="${EXECUTORCH_REF:-e4d02f41f7909e8ed5bf4a14ffc520d733453d9f}"
 git clone --filter=blob:none --no-checkout \
   https://github.com/pytorch/executorch.git executorch
 pushd executorch
@@ -141,7 +142,8 @@ TensorRT and CUDA/AOTI delegates on one ordinary caller-owned CUDA stream. On th
 discrete-GPU CI configuration, this runner's host-backed inputs and outputs take
 the synchronized staging path; that test exercises guarded inference and checks the
 output values, not the device-resident asynchronous fast path. Integrated GPUs may bind
-host-backed storage directly and can follow the asynchronous contract below.
+host-backed storage directly and can follow the asynchronous contract documented in
+[the backend README](../../cpp/src/torch_tensorrt/executorch/README.md).
 Green-context streams are not yet in the validated support matrix. The Python
 `torch_tensorrt` package is needed when exporting the `.pte`; it is not needed
 by this native runner at inference time.
