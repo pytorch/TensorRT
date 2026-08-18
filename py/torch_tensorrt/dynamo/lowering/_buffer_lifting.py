@@ -157,7 +157,10 @@ def _kv_write_will_alias(
     raises for the rest (a ``slice_scatter`` with dynamic bounds or a bad ``dim``, an
     ``index_copy`` its fallback cannot express). The first two both have a write-back
     to preserve -- for a full overwrite the source *is* the buffer's new contents --
-    and the ones that raise never get as far as needing one.
+    and the ones that raise never get as far as needing one. A ``slice_scatter``
+    whose bounds need the size of a dynamic dim reaches no converter at all: its
+    capability validator runs it in PyTorch, where the write happens in place and the
+    copy-back this returns ``False`` for is what carries it out of the graph.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
@@ -201,8 +204,10 @@ def _kv_write_will_alias(
         # Returning False routes the write to copy-back -- the copy_ is erased
         # either way, and the new value is re-attached as a graph output instead. A
         # full overwrite needs that: it returns the source, emits no KV layer, and
-        # its write still has to be recorded. The other two statuses raise out of the
-        # converter, so the compile aborts and the output is never reached.
+        # its write still has to be recorded. Of the rest, the two dim/bounds statuses
+        # raise out of the converter, so the compile aborts and the output is never
+        # reached, and a bound that needs a dynamic dim's size is validated away to
+        # PyTorch, which writes the buffer in place and hands the copy-back its value.
         dim = args[2] if len(args) > 2 else 0
         start, end, _step, status = resolve_slice_scatter_write(
             tuple(cache_shape),

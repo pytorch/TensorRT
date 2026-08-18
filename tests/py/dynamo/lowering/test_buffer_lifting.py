@@ -25,6 +25,7 @@ These tests verify:
 """
 
 import inspect
+import sys
 import unittest
 from unittest import mock
 
@@ -587,14 +588,21 @@ class TestSliceScatterDerivationIsShared(TestCase):
         # Same slice written implicitly (no start/end args).
         self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 16, 8), 2))
 
-    def test_open_ended_slice_is_not_kv(self):
-        """``cache[:, :, 3:, :]`` lowers with ``end == INT64_MAX``. The converter
-        takes its write length from ``end - start``, which fails the ``start +
-        update_len <= s_max`` bound, so the predictor has to read the length the
-        same way rather than from the source's extent along the dim."""
-        self.assertFalse(
-            self._classify((2, 4, 16, 8), (2, 4, 13, 8), 2, 3, 9223372036854775807)
-        )
+    def test_open_ended_slice_is_clamped_to_the_dim(self):
+        """``cache[:, :, 3:, :]`` lowers with ``end == INT64_MAX``, which aten clamps
+        to the dim before slicing and so does the shared derivation. Clamped, the write
+        is the 13 slots from 3 to s_max and is KV-eligible.
+
+        Both sides have to clamp, and identically. The converter builds its fallback
+        index range with ``np.arange``, which cannot allocate INT64_MAX entries; the
+        predictor takes the write length from ``end - start``, so an unclamped end
+        fails the ``start + update_len <= s_max`` bound and files copy-back for a write
+        the converter goes on to alias in place -- the disagreement
+        ``assert_predicted_kv_aliased`` raises on."""
+        for open_end in (sys.maxsize, 9223372036854775807):
+            self.assertTrue(
+                self._classify((2, 4, 16, 8), (2, 4, 13, 8), 2, 3, open_end)
+            )
 
     def test_negative_start_is_normalised(self):
         """A negative ``start`` counts from the end for the converter, so the
@@ -679,6 +687,43 @@ class TestSliceScatterDerivationIsShared(TestCase):
             resolve_slice_scatter_write(shape, 9, 0, 4, 1),
             (None, None, None, KVWriteStatus.BAD_DIM),
         )
+
+    def test_a_dynamic_dim_leaves_relative_bounds_unresolved(self):
+        """A bound stated relative to the dim being written -- an open end, ``None``, or
+        a negative index -- has nothing to resolve against when that dim is dynamic, and
+        the derivation says so rather than folding a stand-in size into an index.
+        Reading TensorRT's -1 as a size is how ``cache[:, :, 3:, :]`` on a dynamic dim
+        used to resolve to ``arange(3, -2)``: an empty index range, and a write that
+        silently did nothing.
+
+        The two callers see the same dynamic dim in two shapes -- -1 from TensorRT, a
+        ``SymInt`` from the fx graph -- so both are checked here, the ``SymInt`` stood
+        in for by a value that is merely not an ``int``, which is all either check asks.
+        Bounds that stand on their own still resolve, and index a dynamic dim as given.
+        """
+        from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
+            KVWriteStatus,
+            resolve_slice_scatter_write,
+        )
+
+        unresolved = (None, None, None, KVWriteStatus.DYNAMIC_DIM_SIZE)
+        for dynamic_size in (-1, "sym"):
+            shape = (2, 4, dynamic_size, 8)
+            for start, end in (
+                (3, sys.maxsize),
+                (3, 9223372036854775807),
+                (3, None),
+                (None, None),
+                (-4, None),
+                (-4, 12),
+            ):
+                self.assertEqual(
+                    resolve_slice_scatter_write(shape, 2, start, end, 1), unresolved
+                )
+            self.assertEqual(
+                resolve_slice_scatter_write(shape, 2, 1, 5, 1),
+                (1, 5, 1, KVWriteStatus.OK),
+            )
 
 
 class TestCacheMustReachTheConverterAsANetworkInput(TestCase):

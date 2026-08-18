@@ -19,6 +19,7 @@ table; this converter is the single place that handles it.
 from __future__ import annotations
 
 import logging
+import sys
 from enum import Enum, auto
 from typing import Any, Optional, Tuple
 
@@ -79,7 +80,30 @@ class KVWriteStatus(Enum):
     OK = auto()
     FULL_OVERWRITE = auto()
     DYNAMIC_BOUNDS = auto()
+    DYNAMIC_DIM_SIZE = auto()
     BAD_DIM = auto()
+
+
+# torch.export writes INT64_MAX in place of the dim size for an open-ended slice
+# (``x[..., start:]``), and aten clamps it to the dim before slicing. On a 64-bit host
+# ``sys.maxsize`` is that same value, and is what the ``aten.slice`` converter already
+# matches an open end on, so both are accepted here.
+_OPEN_END = (sys.maxsize, 2**63 - 1)
+
+
+def _needs_dim_size(bound: Any) -> bool:
+    """Whether ``bound`` is stated relative to the dim being written rather than
+    standing on its own.
+
+    ``None`` and a negative index both are -- one runs to the end of the dim, the
+    other counts back from it -- and so is the open end above, which has to be clamped
+    down to the dim before it can index anything. A non-``int`` bound is not this
+    predicate's business: a symbolic bound is reported as ``DYNAMIC_BOUNDS`` whatever
+    dim it is written on, so it passes here and is caught below.
+    """
+    if bound is None:
+        return True
+    return isinstance(bound, int) and (bound < 0 or bound in _OPEN_END)
 
 
 def resolve_slice_scatter_write(
@@ -92,9 +116,10 @@ def resolve_slice_scatter_write(
     """Resolve ``slice_scatter``'s slice bounds into the form ``_kv_eligible`` takes.
 
     Returns ``(start, end, step, status)``. Under ``OK`` and ``FULL_OVERWRITE`` the
-    three bounds are Python ``int``s, with the op's defaults filled in and negative
-    indices counted from the end; under ``DYNAMIC_BOUNDS`` and ``BAD_DIM`` all three
-    are ``None``, since nothing resolved. ``status`` is one of:
+    three bounds are Python ``int``s, with the op's defaults filled in, negative
+    indices counted from the end and the whole slice clamped to the dim; under the
+    other statuses all three are ``None``, since nothing resolved. ``status`` is one
+    of:
 
     * ``OK`` — the bounds are concrete, and the caller goes on to
       ``_kv_eligible(cache_shape, dim, start, end - start)``.
@@ -105,6 +130,12 @@ def resolve_slice_scatter_write(
       under this status.
     * ``DYNAMIC_BOUNDS`` — a bound is not a Python ``int``, so the converter
       raises ``NotImplementedError``.
+    * ``DYNAMIC_DIM_SIZE`` — a bound is stated relative to the dim being written (see
+      :func:`_needs_dim_size`) and that dim is dynamic, so there is no size to resolve
+      it against. ``aten_ops_slice_scatter``'s capability validator rejects these
+      nodes so the partitioner runs them in PyTorch, which is the only lowering they
+      have until the converter gains dynamic bounds; the converter raises if one
+      reaches it anyway.
     * ``BAD_DIM`` — ``dim`` is either not a Python ``int`` or does not index
       ``cache_shape``; the converter raises ``IndexError`` for both. A
       ``numpy.int64`` is rejected on the type check even when its value is in range.
@@ -123,17 +154,35 @@ def resolve_slice_scatter_write(
     if not isinstance(dim, int) or not -len(cache_shape) <= dim < len(cache_shape):
         return None, None, None, KVWriteStatus.BAD_DIM
     dim_size = cache_shape[dim]
+    # The same dynamic dim reaches the two callers in two shapes: TensorRT reports it
+    # as ``DYNAMIC_DIM`` (-1) and the fx graph carries a ``SymInt`` for it. Neither
+    # gives a size to resolve a bound against, so both have to be read as dynamic --
+    # folding the -1 into an index is how a dynamic dim used to produce an empty
+    # index range and a write that silently did nothing.
+    dim_is_static = isinstance(dim_size, int) and dim_size >= 0
 
     if start is None:
         start = 0
-    if isinstance(start, int) and start < 0 and isinstance(dim_size, int):
-        start = dim_size + start
-    if end is None:
-        end = dim_size
-    if isinstance(end, int) and end < 0 and isinstance(dim_size, int):
-        end = dim_size + end
     if step is None:
         step = 1
+
+    if not dim_is_static and (_needs_dim_size(start) or _needs_dim_size(end)):
+        return None, None, None, KVWriteStatus.DYNAMIC_DIM_SIZE
+
+    if end is None:
+        end = dim_size
+    if dim_is_static:
+        if isinstance(start, int) and start < 0:
+            start = dim_size + start
+        if isinstance(end, int) and end < 0:
+            end = dim_size + end
+        # aten clamps a slice to the dim it is taken from, and so must this: the open
+        # end arrives as INT64_MAX, and the scatter fallback would hand it to
+        # ``np.arange`` as the length of the index range to build.
+        if isinstance(start, int):
+            start = min(max(start, 0), dim_size)
+        if isinstance(end, int):
+            end = min(max(end, 0), dim_size)
 
     # A slice covering the whole dim is a plain copy of the source whatever `step` is
     # made of, so it is settled before the bounds are required to be concrete: `step`
@@ -141,7 +190,7 @@ def resolve_slice_scatter_write(
     if (
         isinstance(start, int)
         and isinstance(end, int)
-        and isinstance(dim_size, int)
+        and dim_is_static
         and start == 0
         and end == dim_size
         and step == 1
@@ -284,6 +333,15 @@ def slice_scatter(
     if status is KVWriteStatus.DYNAMIC_BOUNDS:
         raise NotImplementedError(
             "slice_scatter with dynamic start/end/step is not yet supported"
+        )
+
+    if status is KVWriteStatus.DYNAMIC_DIM_SIZE:
+        raise NotImplementedError(
+            f"slice_scatter: dim {dim} of the input is dynamic, and this write's "
+            "bounds cannot be resolved without its size. "
+            "`aten_ops_slice_scatter`'s capability validator keeps these writes out "
+            "of TensorRT, so reaching here means the fx node carried no shape "
+            "metadata for the validator to read."
         )
     # OK is the only status left, and it resolves all three bounds to Python ints.
     assert start is not None and end is not None and step is not None
