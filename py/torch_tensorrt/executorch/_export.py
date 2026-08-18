@@ -321,6 +321,45 @@ def export(
 
     ``constant_methods`` keys are restricted to valid Python identifiers here, which is
     narrower than ExecuTorch itself accepts.
+
+    Arguments:
+        source (Union(torch.export.ExportedProgram, torch.fx.GraphModule, Dict[str, torch.export.ExportedProgram])):
+            A TensorRT-compiled source. A GraphModule is exported first, and a mapping
+            becomes one method per key. An ExportedProgram and a mapping both need their
+            engines already compiled, so ``inputs``, ``arg_inputs``, ``kwarg_inputs``,
+            ``dynamic_shapes`` and ``retrace=True`` are rejected for them.
+
+    Keyword Arguments:
+        inputs (Sequence[Union(torch_tensorrt.Input, torch.Tensor)]): Example positional
+            inputs used to export a GraphModule source. Mutually exclusive with
+            ``arg_inputs``, which is the same argument under the newer name.
+        arg_inputs (Sequence[Union(torch_tensorrt.Input, torch.Tensor)]): See ``inputs``.
+        kwarg_inputs (Dict[str, Any]): Example keyword inputs used to export a
+            GraphModule source.
+        dynamic_shapes (Any): Dynamic shape specification passed through to
+            ``torch.export``. Inferred from any ``torch_tensorrt.Input`` in the example
+            inputs when omitted, which requires every input to be an ``Input``.
+        retrace (bool): Re-trace a GraphModule source instead of wrapping its existing
+            graph. Unset behaves as False, and True requires example inputs.
+        transform_passes (Union(Sequence[Any], Dict[str, Sequence[Any]], PassManager)):
+            ExecuTorch transform passes, either for every method or per method.
+        partitioners (Union(Sequence[Partitioner], Dict[str, Sequence[Partitioner]])):
+            Extra partitioners to run after the TensorRT one, either for every method or
+            per method. Give each method its own instances.
+        compile_specs (Union(Sequence[CompileSpec], Dict[str, Sequence[CompileSpec]])):
+            Compile specs for the TensorRT partitioner, either for every method or per
+            method.
+        compile_config (executorch.exir.EdgeCompileConfig): Edge compile config.
+            Defaults to :func:`get_edge_compile_config`.
+        constant_methods (Dict[str, Any]): Methods returning a constant, such as a vocab
+            size. Keys must be valid Python identifiers and must not name a method of
+            ``source``.
+        generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.
+            This copies the whole program, engines included.
+
+    Returns:
+        executorch.exir.EdgeProgramManager: The Edge program, ready for inspection,
+        further transformation, or ``to_executorch()``.
     """
     from torch_tensorrt._features import ENABLED_FEATURES
 
