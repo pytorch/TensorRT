@@ -138,6 +138,61 @@ class TestPrepareInputs(unittest.TestCase):
         bool_result = prepare_inputs(True)
         self.assertIsInstance(bool_result, torch_tensorrt.Input)
 
+    def test_prepare_noncontiguous_requires_flag(self):
+        x = torch.randn(1, 4, 8).transpose(1, 2)
+        self.assertFalse(x.is_contiguous())
+        with self.assertRaises(ValueError):
+            prepare_inputs([x])
+        prepared = prepare_inputs([x], disable_memory_format_check=True)
+        self.assertEqual(tuple(prepared[0].shape), tuple(x.shape))
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA is not available")
+class TestNoncontiguousArgInputs(unittest.TestCase):
+    def test_dynamo_compile_accepts_transposed_view(self):
+        class M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        x = torch.randn(1, 4, 8, device="cuda").transpose(1, 2)
+        self.assertFalse(x.is_contiguous())
+        ep = torch.export.export(M(), (x,))
+        trt_mod = torch_tensorrt.dynamo.compile(
+            ep, arg_inputs=[x], min_block_size=1, use_python_runtime=True
+        )
+        with torch.no_grad():
+            torch.testing.assert_close(trt_mod(x), M().cuda()(x), rtol=1e-2, atol=1e-2)
+
+    def test_top_level_compile_accepts_transposed_view(self):
+        class M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        x = torch.randn(1, 4, 8, device="cuda").transpose(1, 2)
+        self.assertFalse(x.is_contiguous())
+        trt_mod = torch_tensorrt.compile(
+            M().eval().cuda(),
+            ir="dynamo",
+            arg_inputs=[x],
+            min_block_size=1,
+            use_python_runtime=True,
+        )
+        with torch.no_grad():
+            torch.testing.assert_close(trt_mod(x), M().cuda()(x), rtol=1e-2, atol=1e-2)
+
+    def test_convert_method_to_trt_engine_accepts_transposed_view(self):
+        class M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        x = torch.randn(1, 4, 8, device="cuda").transpose(1, 2)
+        self.assertFalse(x.is_contiguous())
+        engine = torch_tensorrt.convert_method_to_trt_engine(
+            M().eval().cuda(), "forward", arg_inputs=[x], ir="dynamo"
+        )
+        self.assertIsInstance(engine, bytes)
+        self.assertGreater(len(engine), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

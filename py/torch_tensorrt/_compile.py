@@ -337,8 +337,12 @@ def compile(
         elif not isinstance(arg_inputs, collections.abc.Sequence):
             arg_inputs = [arg_inputs]
 
-        torchtrt_arg_inputs = prepare_inputs(arg_inputs)
-        torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
+        torchtrt_arg_inputs = prepare_inputs(
+            arg_inputs, disable_memory_format_check=True
+        )
+        torchtrt_kwarg_inputs = prepare_inputs(
+            kwarg_inputs, disable_memory_format_check=True
+        )
 
         if module_type == _ModuleType.ep:
             exp_program = module
@@ -435,8 +439,10 @@ def cross_compile_for_windows(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Export the module
-    torchtrt_arg_inputs = prepare_inputs(arg_inputs)
-    torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
+    torchtrt_arg_inputs = prepare_inputs(arg_inputs, disable_memory_format_check=True)
+    torchtrt_kwarg_inputs = prepare_inputs(
+        kwarg_inputs, disable_memory_format_check=True
+    )
 
     exp_program = dynamo_trace(
         module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
@@ -561,8 +567,12 @@ def convert_method_to_trt_engine(
             normalized_arg_inputs = [arg_inputs]
 
         # Export the module
-        torchtrt_arg_inputs = prepare_inputs(normalized_arg_inputs)
-        torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
+        torchtrt_arg_inputs = prepare_inputs(
+            normalized_arg_inputs, disable_memory_format_check=True
+        )
+        torchtrt_kwarg_inputs = prepare_inputs(
+            kwarg_inputs, disable_memory_format_check=True
+        )
 
         exp_program = torch_tensorrt.dynamo.trace(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
