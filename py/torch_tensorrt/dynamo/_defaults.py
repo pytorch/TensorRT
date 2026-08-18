@@ -97,4 +97,6 @@ RUNTIME_CACHE_PATH = os.path.join(
 
 
 def default_device() -> Device:
+    if not torch.cuda.is_available():
+        return Device(gpu_id=0)
     return Device(gpu_id=torch.cuda.current_device())
