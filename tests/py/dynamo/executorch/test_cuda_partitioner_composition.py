@@ -200,6 +200,7 @@ def test_weighted_partition_persists_external_data(tmp_path):
 def test_multimethod_trt_export_preserves_methods(tmp_path):
     """Independent TRT programs remain separate delegated methods after lowering."""
     import torch_tensorrt
+    import torch_tensorrt.executorch
 
     class Prefill(torch.nn.Module):
         def forward(self, x):
@@ -272,6 +273,7 @@ def test_multimethod_trt_export_preserves_methods(tmp_path):
 
 def test_graph_module_export_preserves_source(tmp_path):
     import torch_tensorrt
+    import torch_tensorrt.executorch
 
     class Model(torch.nn.Module):
         def forward(self, x):
