@@ -185,6 +185,12 @@ def slice_scatter(
         end = dim_size
     if isinstance(end, int) and end < 0 and isinstance(dim_size, int):
         end = dim_size + end
+    # torch.export uses 2**63-1 as "open end". Aten clamps that to the dim size.
+    if isinstance(dim_size, int) and dim_size != DYNAMIC_DIM:
+        if isinstance(start, int):
+            start = min(max(start, 0), dim_size)
+        if isinstance(end, int):
+            end = min(max(end, 0), dim_size)
     if step is None:
         step = 1
 
