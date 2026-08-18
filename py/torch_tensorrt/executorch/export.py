@@ -281,7 +281,16 @@ def export(
 
     When exporting more than one method, give each method its own partitioner
     instances via ``partitioners={"method": [...]}``. A partitioner may carry
-    method-specific state, so reusing one instance across methods is rejected.
+    method-specific state, so reusing one instance across methods is rejected. Give
+    each instance the compile spec for the method it serves, since a backend that reads
+    its method name from the specs cannot find it otherwise.
+
+    ``generate_etrecord=True`` is outside the payload sharing described above. It makes
+    ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of
+    the program including engines.
+
+    ``constant_methods`` keys are restricted to valid Python identifiers here, which is
+    narrower than ExecuTorch itself accepts.
     """
     from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -345,8 +354,10 @@ def export(
                 f"transform_passes contains unknown methods: {sorted(unknown)}"
             )
         # ExecuTorch dispatches per-method passes on isinstance(passes, dict), so a
-        # Mapping that is not a dict silently runs no passes at all.
-        transform_passes = dict(transform_passes)
+        # Mapping that is not a dict silently runs no passes at all. An empty mapping
+        # reaches it as a dict and then raises KeyError for the first method, so treat
+        # it as no passes at all.
+        transform_passes = dict(transform_passes) or None
 
     resolved_engines: dict[str, dict[str, list[Any]]] = {
         name: {} for name in program_map

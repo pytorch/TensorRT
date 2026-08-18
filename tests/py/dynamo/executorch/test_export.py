@@ -853,6 +853,20 @@ def test_export_normalizes_mapping_transform_passes_to_dict(monkeypatch):
 
 
 @pytest.mark.unit
+def test_export_normalizes_empty_transform_passes_to_none(monkeypatch):
+    """An empty mapping means no passes, so it must not reach ExecuTorch as a dict.
+
+    ExecuTorch dispatches per-method passes on a dict and then looks up every method,
+    so an empty dict raises KeyError for the first method instead of running no passes.
+    """
+    export_module, lower = _patch_lowering(monkeypatch)
+
+    export_module.export({"forward": FakeExportedProgram()}, transform_passes={})
+
+    assert lower.call_args.kwargs["transform_passes"] is None
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("container_type", [list, tuple])
 def test_prepare_graph_module_infers_nested_dynamic_shapes(monkeypatch, container_type):
     export_module = importlib.import_module("torch_tensorrt.executorch.export")
