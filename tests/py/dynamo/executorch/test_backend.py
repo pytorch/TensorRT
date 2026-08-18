@@ -437,3 +437,72 @@ def test_validate_output_binding_order_accepts_unwrapped_single_output():
     g.output((engine,))
     ep = SimpleNamespace(graph_module=torch.fx.GraphModule(torch.nn.Module(), g))
     _validate_output_binding_order(ep, engine, ["out"])
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_accepts_elided_aliased_outputs():
+    """Zero-copy KV drops the in-place outputs from the delegate entirely.
+
+    The engine still declares them as bindings -- the runtime binds them to
+    their aliased input's tensor -- but no delegate argument is passed for them.
+    """
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0])
+    _validate_output_binding_order(ep, engine, ["out0", "kv0", "kv1"], {"kv0", "kv1"})
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_rejects_elision_that_was_not_requested():
+    """The same graph is a bug unless the caller asked for zero-copy.
+
+    Aliased outputs missing because nothing declared them as buffer mutations
+    look identical to aliased outputs deliberately elided, here and at runtime.
+    So the default stays strict and only an explicit opt-in relaxes it.
+
+    It is also the shape a zero-copy export produces when the aliased-buffer mark
+    never reaches the partitioner: nothing is stamped, so nothing is exempt. The
+    message names the feature, because that failure has no other symptom.
+    """
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0])
+    with pytest.raises(ValueError, match="engine output indices") as excinfo:
+        _validate_output_binding_order(ep, engine, ["out0", "kv0", "kv1"])
+    assert "zero_copy_kv" in str(excinfo.value)
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_still_accepts_aliased_outputs_threaded():
+    """Not eliding is the pre-existing shape and stays legal: without zero-copy
+    each aliased output is a delegate output like any other."""
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0, 1, 2])
+    _validate_output_binding_order(ep, engine, ["out0", "kv0", "kv1"], {"kv0", "kv1"})
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_rejects_partially_elided_outputs():
+    """Half-elision is a lost buffer update, and the runtime cannot express it:
+    it infers elision from one argument count, so it is all-or-nothing."""
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0, 1])
+    with pytest.raises(ValueError, match="engine output indices") as excinfo:
+        _validate_output_binding_order(
+            ep, engine, ["out0", "kv0", "kv1"], {"kv0", "kv1"}
+        )
+    # The mark plainly did survive -- these bindings were declared elidable -- so
+    # the lost-mark hint would be a wrong lead here.
+    assert "zero_copy_kv" not in str(excinfo.value)
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_rejects_permutation_of_elided_outputs():
+    """Elision removes outputs; it does not license reordering the survivors."""
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([2, 0])
+    with pytest.raises(ValueError, match="engine output indices"):
+        _validate_output_binding_order(ep, engine, ["out0", "kv0", "out2"], {"kv0"})
