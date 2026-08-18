@@ -14,6 +14,7 @@ Core
    logging
    runtime
    kernels
+   executorch
    ../cli/torchtrtc
    ../indices/supported_ops
 

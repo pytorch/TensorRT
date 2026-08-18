@@ -3,9 +3,12 @@ from __future__ import annotations
 import copy
 from typing import Any, Sequence
 
+import logging
 import torch
 from torch._subclasses.fake_tensor import is_fake
 from torch.export.graph_signature import InputKind
+
+logger = logging.getLogger(__name__)
 
 
 def _seed_graph_bound_leaves(value: Any, memo: dict[int, Any]) -> bool:
@@ -123,7 +126,10 @@ def _payload_sharing_memo(exported_program: Any) -> dict[int, Any]:
         *exported_program.state_dict.values(),
         *exported_program.constants.values(),
     ):
-        memo[id(value)] = value
+        # Match the checks below: only tensors and engine objects are documented as
+        # shared, so a custom-object constant is copied like any other value.
+        if isinstance(value, (torch.Tensor, torch.ScriptObject)):
+            memo[id(value)] = value
     for module in exported_program.graph_module.modules():
         for value in (
             *module.parameters(recurse=False),
@@ -171,10 +177,22 @@ def _stage_graph_module(
                 _seed_graph_bound_leaves(value, payload_memo)
                 try:
                     staged_meta[key] = copy.deepcopy(value, payload_memo)
-                except Exception:
-                    # A value deepcopy cannot reach through pytree (for example a
-                    # live ShapeEnv) has to be shared rather than lose the graph
-                    # its guards refer to.
+                except (
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                    NotImplementedError,
+                ) as exc:
+                    # A value deepcopy cannot reach through, for example a live
+                    # ShapeEnv, has to be shared rather than lose the graph its guards
+                    # refer to. Log it, since sharing a mutable value here is the one
+                    # case that breaks the isolation the rest of this function provides.
+                    logger.debug(
+                        "sharing node %r meta %r with the source program: %s",
+                        node_name,
+                        key,
+                        exc,
+                    )
                     staged_meta[key] = value
             staged_nodes[node_name].meta = staged_meta
     return staged
