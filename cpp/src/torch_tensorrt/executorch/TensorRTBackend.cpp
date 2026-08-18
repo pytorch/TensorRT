@@ -614,6 +614,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
   const bool must_sync = output_staged_to_host || input_staged_from_host || !g_user_stream_set;
   if (must_sync) {
+    Error copy_err = Error::Ok;
     for (auto& output : outputs_needing_copy) {
       exec_aten::Tensor et_out = args[num_inputs + output.first]->toTensor();
       cuda_err =
@@ -624,7 +625,11 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
             "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
             output.first,
             cudaGetErrorString(cuda_err));
-        return Error::InvalidProgram;
+        // The enqueue already succeeded, so the engine is still running on the
+        // stream. Drain below before returning, or the next call mutates a live
+        // execution context, which TensorRT forbids.
+        copy_err = Error::InvalidProgram;
+        break;
       }
     }
     cuda_err = cudaStreamSynchronize(stream);
@@ -632,6 +637,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (cuda_err != cudaSuccess) {
       ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
       return Error::InvalidProgram;
+    }
+    if (copy_err != Error::Ok) {
+      return copy_err;
     }
   } else {
     cuda_err = cudaEventRecord(engine->inflight_event, stream);
