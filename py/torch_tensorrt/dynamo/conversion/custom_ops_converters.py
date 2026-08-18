@@ -48,7 +48,7 @@ def conv_asym_pad(
         weight=weight,
         bias=bias,
         stride=stride,
-        padding=[0] * len(pre_padding),
+        padding=[],
         dilation=dilation,
         groups=groups,
         pre_padding=pre_padding,

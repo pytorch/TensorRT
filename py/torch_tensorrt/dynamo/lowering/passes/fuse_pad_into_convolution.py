@@ -1,11 +1,11 @@
 # mypy: disallow-untyped-decorators=False
 
-"""Fold ``constant_pad_nd -> convolution`` into a single asymmetric-padded conv.
+"""Fold constant_pad_nd -> convolution into a single asymmetric-padded conv.
 
-Torch-TensorRT's convolution converter only sets symmetric ``padding_nd``. When a
+Torch-TensorRT's convolution converter only sets symmetric padding_nd. When a
 model applies padding itself (common for causal 3D convolutions that need
-``(2 * pad_t, 0)`` in time), that pad stays a materialized copy. TensorRT's ONNX
-parser folds the same pattern into ``pre_padding``/``post_padding``; this pass
+(2 * pad_t, 0) in time), that pad stays a materialized copy. TensorRT's ONNX
+parser folds the same pattern into pre_padding/post_padding; this pass
 recovers the equivalent for the Dynamo path.
 """
 
@@ -74,10 +74,10 @@ tensorrt_conv_asym_pad_op = torch.ops.tensorrt.conv_asym_pad.default
 def _split_pad(
     pad: List[int], num_spatial: int
 ) -> Optional[Tuple[List[int], List[int]]]:
-    """Convert ``constant_pad_nd`` amounts into per-spatial-dim pre/post lists.
+    """Convert constant_pad_nd amounts into per-spatial-dim pre/post lists.
 
-    ``constant_pad_nd`` pads trailing dimensions first, so ``pad`` is ordered
-    ``[last_pre, last_post, second_last_pre, ...]``. Returns ``None`` when the
+    constant_pad_nd pads trailing dimensions first, so pad is ordered
+    [last_pre, last_post, second_last_pre, ...]. Returns None when the
     pad reaches past the spatial dims into channels or batch.
     """
     if len(pad) % 2 or len(pad) > 2 * num_spatial:
@@ -94,7 +94,7 @@ def _split_pad(
 def fuse_pad_into_convolution(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
-    """Rewrite ``constant_pad_nd -> convolution`` into ``tensorrt::conv_asym_pad``."""
+    """Rewrite constant_pad_nd -> convolution into tensorrt::conv_asym_pad."""
     del settings
     fused = 0
 

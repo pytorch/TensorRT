@@ -39,6 +39,12 @@ def convNd(
     pre_padding: Optional[Sequence[int]] = None,
     post_padding: Optional[Sequence[int]] = None,
 ) -> TRTTensor:
+    # Fail fast: asymmetric padding requires both sides before any layer work.
+    if (pre_padding is None) != (post_padding is None):
+        raise ValueError(
+            f"Convolution {name}: pre_padding and post_padding must both be set"
+        )
+
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for convolution."
 
@@ -161,13 +167,10 @@ def convNd(
         dilation = (dilation[0], 1) if dilation is not None else dilation
 
     # Set relevant attributes of convolution layer
-    if pre_padding is not None or post_padding is not None:
+    if pre_padding is not None:
         # Asymmetric padding (e.g. causal 3D conv) must use pre/post padding.
         # Symmetric padding_nd cannot express (pad_before, 0) on a spatial dim.
-        if pre_padding is None or post_padding is None:
-            raise ValueError(
-                f"Convolution {name}: pre_padding and post_padding must both be set"
-            )
+        # Both sides are guaranteed non-None by the entry check above.
         conv_layer.pre_padding = tuple(pre_padding)
         conv_layer.post_padding = tuple(post_padding)
     elif padding is not None:
