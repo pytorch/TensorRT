@@ -230,6 +230,20 @@ The ``executorch`` output format lowers the compiled module to an ExecuTorch
 backend. It requires the ``executorch`` package (``pip install
 "torch_tensorrt[executorch]"``) and is Linux-only.
 
+There are two ways to produce a ``.pte``, and they suit different needs:
+
+* **Use** ``torch_tensorrt.save()``. This is the default, and the right choice
+  whenever a ``.pte`` file is all that is needed. It runs the whole pipeline in one
+  call and writes the file.
+* **Use** ``torch_tensorrt.executorch.export()`` only when the program has to be
+  changed before it is written to disk. It stops at the Edge program, hands it back
+  for inspection or customization, and leaves serialization to the caller.
+
+Start with ``save()``. Reach for ``export()`` when something below is required.
+
+Default: ``save()``
+"""""""""""""""""""
+
 .. code-block:: python
 
     import torch
@@ -245,8 +259,12 @@ backend. It requires the ``executorch`` package (``pip install
     )
 
 ``save`` writes both the ``.pte`` and any external ``.ptd`` tensor-data files.
-Advanced ExecuTorch users can stop at the standard Edge program boundary to
-inspect the delegated graph, add metadata, or control final memory planning:
+Advanced: ``export()``
+""""""""""""""""""""""
+
+Stop at the standard Edge program boundary when the program needs work before it is
+serialized: inspecting the delegated graph, adding metadata, controlling final memory
+planning, or carrying more than one method. The caller then serializes it:
 
 .. code-block:: python
 
