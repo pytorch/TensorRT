@@ -518,7 +518,7 @@ def scatter(
         else:
             # Static shape: use numpy to create the filled tensor
             src_tensor = get_trt_tensor(
-                ctx, src * np.ones(index_shape_list), name + "_value_tensor"
+                ctx, np.full(index_shape_list, src), name + "_value_tensor"
             )
             src_tensor = cast_trt_tensor(
                 ctx, src_tensor, input.dtype, name + "_cast_value_tensor"
@@ -526,6 +526,11 @@ def scatter(
     # scatter.src
     elif not (isinstance(src, TRTTensor)):
         src_tensor = get_trt_tensor(ctx, src, name + "_src_tensor")
+
+    if isinstance(src_tensor, TRTTensor) and src_tensor.dtype != input.dtype:
+        src_tensor = cast_trt_tensor(
+            ctx, src_tensor, input.dtype, name + "_cast_src_tensor"
+        )
 
     scatter_layer = ctx.net.add_scatter(
         input, index, src_tensor, trt.ScatterMode.ELEMENT
