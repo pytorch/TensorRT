@@ -194,26 +194,47 @@ def topk(
     sorted: Optional[bool],
     return_indices: bool = True,
 ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
+    # Resolve dim on the original shape before any potential reshape.
+    positive_dim = get_positive_dim(dim, len(input.shape))
+
+    # ITopKLayer requires >= 2 dims; reshape (N,) -> (N, 1), run topk, then squeeze back.
+    squeezed_1d = len(input.shape) == 1
+    if squeezed_1d:
+        input = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_unsqueeze1d", input, (*input.shape, 1)
+        )
+
     if largest:
         topk_layer = ctx.net.add_topk(
             input,
             trt.TopKOperation.MAX,
             k,
-            get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
+            get_axes_for_reduce_op(positive_dim),
         )
     else:
         topk_layer = ctx.net.add_topk(
             input,
             trt.TopKOperation.MIN,
             k,
-            get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
+            get_axes_for_reduce_op(positive_dim),
         )
 
     # TensorRT ITopKLayer does not have a sorted flag, it is always returning the sorted topk elements
     # so here no matter sorted is True or False the returned the topk Tensor object is always sorted
     set_layer_name(topk_layer, target, f"{name}_topk", source_ir)
 
+    values = topk_layer.get_output(0)
+    indices = topk_layer.get_output(1)
+
+    if squeezed_1d:
+        values = impl.squeeze.squeeze(
+            ctx, target, source_ir, f"{name}_squeeze_values", values, 1
+        )
+        indices = impl.squeeze.squeeze(
+            ctx, target, source_ir, f"{name}_squeeze_indices", indices, 1
+        )
+
     if return_indices:
-        return topk_layer.get_output(0), topk_layer.get_output(1)
+        return values, indices
     else:
-        return topk_layer.get_output(0)
+        return values
