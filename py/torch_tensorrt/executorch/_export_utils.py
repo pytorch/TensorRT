@@ -246,6 +246,24 @@ def stage_exported_program(exported_program: Any) -> Any:
     )
 
 
+def _unique_engine_buffer_name(
+    exported_program: Any, graph_module: torch.fx.GraphModule
+) -> str:
+    """Pick an engine buffer name free on the module and on the lifted state dict.
+
+    torch.export lifts buffers out of the module and into ``state_dict``, so a name can
+    be taken there while ``hasattr`` on the module reports nothing.
+    """
+    from torch.fx.experimental.const_fold import get_unique_attr_name_in_module
+
+    index = 0
+    while True:
+        name: str = get_unique_attr_name_in_module(graph_module, f"_trt_engine_{index}")
+        if name not in exported_program.state_dict:
+            return name
+        index += 1
+
+
 def _remove_lifted_engine_placeholder(
     exported_program: Any, engine_node: torch.fx.Node
 ) -> None:
@@ -343,9 +361,7 @@ def replace_execute_engine(
             engine_bytes = bytearray(engine_bytes)
             engine_tensor = torch.frombuffer(engine_bytes, dtype=torch.uint8)
 
-            from torch.fx.experimental.const_fold import get_unique_attr_name_in_module
-
-            buffer_name = get_unique_attr_name_in_module(graph_module, "_trt_engine_0")
+            buffer_name = _unique_engine_buffer_name(exported_program, graph_module)
             graph_module.register_buffer(buffer_name, engine_tensor, persistent=True)
             exported_program.state_dict[buffer_name] = engine_tensor
             # The engine slot is replaced by engine_attr_node below, so skip it:

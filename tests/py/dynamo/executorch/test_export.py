@@ -312,6 +312,30 @@ def test_replace_execute_engine_cleans_shared_engine_after_last_use(lifted):
     not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
     reason="Torch-TensorRT runtime operators are not available",
 )
+def test_replace_execute_engine_keeps_a_lifted_buffer_of_the_same_name():
+    """A lifted buffer lives in state_dict, where hasattr on the module cannot see it."""
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    program, _, _, _ = _engine_program(lifted=True)
+    lifted_buffer = torch.ones(1)
+    program.state_dict["_trt_engine_0"] = lifted_buffer
+
+    export_utils.replace_execute_engine(program)
+
+    assert program.state_dict["_trt_engine_0"] is lifted_buffer
+    engine_buffers = set(program.state_dict) - {"_trt_engine_0"}
+    assert len(engine_buffers) == 1
+    engine_buffer_name = next(iter(engine_buffers))
+    assert (
+        program.graph_module.get_buffer(engine_buffer_name)
+        is program.state_dict[engine_buffer_name]
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
 def test_validate_engine_program_serializes_a_shared_engine_once():
     """Serializing an engine costs a copy of its bytes, so do it once per engine."""
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
