@@ -443,7 +443,7 @@ def export(
     resolved_engines: dict[str, dict[str, list[Any]]] = {
         name: {} for name in program_map
     }
-    engine_counts = {
+    engine_call_counts = {
         name: validate_engine_program(program, resolved_engines[name])
         for name, program in program_map.items()
     }
@@ -455,12 +455,12 @@ def export(
     rewritten: dict[str, ExportedProgram] = {}
     method_partitioners: dict[str, list[Partitioner]] = {}
     for name, program in staged_programs.items():
-        if engine_counts[name] > 1:
+        if engine_call_counts[name] > 1:
             logger.warning(
-                "%s contains %d TRT engines. Multi-engine .pte exports can incur "
-                "extra delegate boundary overhead.",
+                "%s contains %d TRT engine calls. Each one becomes its own delegate, "
+                "so the boundary overhead is paid that many times.",
                 name,
-                engine_counts[name],
+                engine_call_counts[name],
             )
         # Drop this method's engine payloads as soon as they are in the graph.
         rewritten[name] = replace_execute_engine(program, resolved_engines.pop(name))

@@ -1549,7 +1549,7 @@ def test_export_warns_for_multiple_engines(monkeypatch, caplog):
     export_module, _ = _patch_lowering(monkeypatch, {program: 2})
 
     export_module.export(program)
-    assert "contains 2 TRT engines" in caplog.text
+    assert "contains 2 TRT engine calls" in caplog.text
 
 
 @pytest.mark.unit

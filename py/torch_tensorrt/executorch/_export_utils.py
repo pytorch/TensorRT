@@ -367,9 +367,8 @@ def replace_execute_engine(
             buffer_name = _unique_engine_buffer_name(exported_program, graph_module)
             graph_module.register_buffer(buffer_name, engine_tensor, persistent=True)
             exported_program.state_dict[buffer_name] = engine_tensor
-            # The engine slot is replaced by engine_attr_node below, so skip it:
-            # str() on multi-gigabyte engine bytes would build a throwaway string
-            # roughly four times their size.
+            # Nothing reads the engine slot: engine_attr_node takes that position in
+            # no_op_args below. Keep the slot so the indices around it still line up.
             str_args = [
                 ("" if index == ENGINE_IDX else str(value) if value is not None else "")
                 for index, value in enumerate(engine_info[:SERIALIZATION_LEN])
