@@ -87,16 +87,21 @@ bool get_int_flag(int argc, char** argv, const char* flag, int def, int min, int
 // One [1, seq] index tensor. The dtype comes from the .pte's method signature
 // rather than being assumed: the backend binds tensor pointers straight to
 // TensorRT without converting, so a mismatch here is silent corruption.
+//
+// Token ids stay inside [1, vocab). An id past the end of the embedding table
+// is not an error in TensorRT -- it gathers zero -- so it would not perturb the
+// timings measured here, but it would make this workload unrepresentative of
+// the one it is meant to stand in for.
 class IndexTensor {
  public:
-  IndexTensor(int32_t seq, exec_aten::ScalarType dtype, bool positions)
+  IndexTensor(int32_t seq, exec_aten::ScalarType dtype, bool positions, int64_t vocab)
       : sizes_{1, seq},
         dim_order_{0, 1},
         strides_{seq, 1},
         data_(static_cast<size_t>(seq) * (dtype == exec_aten::ScalarType::Long ? 8 : 4)),
         impl_(dtype, 2, sizes_.data(), data_.data(), dim_order_.data(), strides_.data()) {
     for (int32_t i = 0; i < seq; ++i) {
-      const int64_t v = positions ? i : (1 + (static_cast<int64_t>(i) * 7919) % 9000);
+      const int64_t v = positions ? i : (1 + (static_cast<int64_t>(i) * 7919) % (vocab - 1));
       if (dtype == exec_aten::ScalarType::Long) {
         reinterpret_cast<int64_t*>(data_.data())[i] = v;
       } else {
@@ -121,8 +126,10 @@ class IndexTensor {
 // EValue vector handed to forward() can be reused without reallocating.
 class Step {
  public:
-  Step(int32_t seq, exec_aten::ScalarType dtype)
-      : ids_(seq, dtype, false), positions_(seq, dtype, true), args_{ids_.evalue(), positions_.evalue()} {}
+  Step(int32_t seq, exec_aten::ScalarType dtype, int64_t vocab)
+      : ids_(seq, dtype, false, vocab),
+        positions_(seq, dtype, true, vocab),
+        args_{ids_.evalue(), positions_.evalue()} {}
 
   const std::vector<EValue>& args() const {
     return args_;
@@ -279,8 +286,22 @@ int main(int argc, char** argv) {
   }
   const exec_aten::ScalarType dtype = input0->scalar_type();
 
-  Step prefill(prefill_seq, dtype);
-  Step decode(1, dtype);
+  // The method returns the last position's logits, so the width of its output is
+  // the vocabulary the token ids below have to stay inside.
+  const auto output0 = meta->output_tensor_meta(0);
+  if (!output0.ok() || output0->sizes().empty()) {
+    ET_LOG(Error, "could not read output 0 metadata");
+    return 1;
+  }
+  const auto logits_sizes = output0->sizes();
+  const int64_t vocab = logits_sizes[logits_sizes.size() - 1];
+  if (vocab < 2) {
+    ET_LOG(Error, "logits width %" PRId64 " is too small to draw token ids from", vocab);
+    return 1;
+  }
+
+  Step prefill(prefill_seq, dtype, vocab);
+  Step decode(1, dtype, vocab);
 
   printf("model      : %s\n", model_path);
   printf("inputs     : 2 x [1, seq] %s\n", dtype == exec_aten::ScalarType::Long ? "int64" : "int32");
@@ -329,7 +350,8 @@ int main(int argc, char** argv) {
       "wall time (see note)",
       prefill_only.wall_ms,
       switching.wall_ms,
-      100.0 * (switching.wall_ms - prefill_only.wall_ms) / prefill_only.wall_ms);
+      // Same orientation as compare(): positive means switching came out ahead.
+      100.0 * (prefill_only.wall_ms - switching.wall_ms) / prefill_only.wall_ms);
   printf(
       "\nnote: wall time is contention-prone, and interleaving charges each prefill-only block\n"
       "      one switch back that a single-profile engine would never pay, so it reads a little\n"

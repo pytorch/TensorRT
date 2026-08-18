@@ -695,17 +695,28 @@ void TRTEngine::set_active_profile(int64_t profile_index) {
 }
 
 void TRTEngine::set_active_profile_with_stream(int64_t profile_index, const c10::cuda::CUDAStream& stream) {
-  // An index this engine does not have is a request that cannot be honored, so
-  // say so rather than no-op quietly. Covers the single-profile engine too, where
-  // 0 is the only valid index. Reachable only by driving the engine directly; the
-  // Python wrapper validates the index against the profile count first.
-  if (profile_index < 0 || profile_index >= num_optimization_profiles) {
+  // An index this engine does not have cannot be honored. A single-profile engine
+  // is the one case where that is not a mistake to fail on: it has profile 0 and
+  // nothing to switch to, so a pin aimed at some other engine is ignored with a
+  // warning rather than raising. A multi-profile engine handed an index it lacks
+  // could have done something different, and a negative index is a computed value
+  // gone wrong on any engine, so both stay hard errors -- silently running on
+  // mistuned kernels is worse than stopping. Same split as the ExecuTorch backend
+  // (kPinIgnoredSingleProfile vs kRequestedProfileUnavailable).
+  //
+  // Reachable only by driving the engine directly; the Python wrapper validates
+  // the index against the profile count first.
+  if (num_optimization_profiles <= 1 && profile_index > 0) {
     LOG_WARNING(
         "Ignoring optimization profile index " << profile_index << ": this engine has " << num_optimization_profiles
                                                << " optimization profile(s), so it stays on profile "
                                                << active_profile_index << ".");
     return;
   }
+  TORCHTRT_CHECK(
+      profile_index >= 0 && profile_index < num_optimization_profiles,
+      "Optimization profile index " << profile_index << " is out of range: this engine has "
+                                    << num_optimization_profiles << " optimization profile(s).");
   if (profile_index == active_profile_index) {
     return;
   }

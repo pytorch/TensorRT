@@ -71,16 +71,22 @@ const char* get_flag(int argc, char** argv, const char* flag, const char* def) {
 // One [1, seq] index tensor. The dtype comes from the .pte's method signature
 // rather than being assumed: the backend binds tensor pointers straight to
 // TensorRT without converting, so a mismatch here is silent corruption.
+//
+// Token ids stay inside [1, vocab): TensorRT stores zero for an out-of-bounds
+// gather instead of failing, so an id past the end of the embedding table would
+// quietly substitute a zero embedding and make the predictions below
+// meaningless. `vocab` comes from the model, so this holds for the small
+// exported default as much as for the real 1B one.
 class IndexTensor {
  public:
-  IndexTensor(int32_t seq, exec_aten::ScalarType dtype, bool positions)
+  IndexTensor(int32_t seq, exec_aten::ScalarType dtype, bool positions, int64_t vocab)
       : sizes_{1, seq},
         dim_order_{0, 1},
         strides_{seq, 1},
         data_(static_cast<size_t>(seq) * (dtype == exec_aten::ScalarType::Long ? 8 : 4)),
         impl_(dtype, 2, sizes_.data(), data_.data(), dim_order_.data(), strides_.data()) {
     for (int32_t i = 0; i < seq; ++i) {
-      const int64_t v = positions ? i : (1 + (static_cast<int64_t>(i) * 7919) % 9000);
+      const int64_t v = positions ? i : (1 + (static_cast<int64_t>(i) * 7919) % (vocab - 1));
       if (dtype == exec_aten::ScalarType::Long) {
         reinterpret_cast<int64_t*>(data_.data())[i] = v;
       } else {
@@ -104,8 +110,10 @@ class IndexTensor {
 // Owns the (input_ids, position_ids) pair for one sequence length.
 class Step {
  public:
-  Step(int32_t seq, exec_aten::ScalarType dtype)
-      : ids_(seq, dtype, false), positions_(seq, dtype, true), args_{ids_.evalue(), positions_.evalue()} {}
+  Step(int32_t seq, exec_aten::ScalarType dtype, int64_t vocab)
+      : ids_(seq, dtype, false, vocab),
+        positions_(seq, dtype, true, vocab),
+        args_{ids_.evalue(), positions_.evalue()} {}
 
   const std::vector<EValue>& args() const {
     return args_;
@@ -261,9 +269,23 @@ int main(int argc, char** argv) {
   }
   const exec_aten::ScalarType dtype = input0->scalar_type();
 
-  Step prefill(kPrefillSeq, dtype);
-  Step long_prefill(kMaxSeq, dtype);
-  Step decode(1, dtype);
+  // The method returns the last position's logits, so the width of its output is
+  // the vocabulary the token ids below have to stay inside.
+  const auto output0 = meta->output_tensor_meta(0);
+  if (!output0.ok() || output0->sizes().empty()) {
+    ET_LOG(Error, "could not read output 0 metadata");
+    return 1;
+  }
+  const auto logits_sizes = output0->sizes();
+  const int64_t vocab = logits_sizes[logits_sizes.size() - 1];
+  if (vocab < 2) {
+    ET_LOG(Error, "logits width %" PRId64 " is too small to draw token ids from", vocab);
+    return 1;
+  }
+
+  Step prefill(kPrefillSeq, dtype, vocab);
+  Step long_prefill(kMaxSeq, dtype, vocab);
+  Step decode(1, dtype, vocab);
 
   // Long prompt: pin the prefill profile, whose kernels TensorRT tuned at a
   // 128-token sequence.

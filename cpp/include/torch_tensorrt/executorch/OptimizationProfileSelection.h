@@ -3,8 +3,11 @@
  *
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
- *
- * Which TensorRT optimization profile an execution runs under.
+ */
+
+/**
+ * @file OptimizationProfileSelection.h
+ * @brief Which TensorRT optimization profile an execution runs under.
  *
  * Kept free of ExecuTorch, CUDA, and the engine itself so the policy can be
  * exercised without a GPU; reporting the outcome is left to the caller.
@@ -19,62 +22,79 @@
 namespace torch_tensorrt {
 namespace executorch_backend {
 
-// The [min, max] dim envelope one optimization profile allows for one input.
+/// @brief The [min, max] dim envelope one optimization profile allows for one input.
 struct InputProfileBounds {
-  nvinfer1::Dims min{};
-  nvinfer1::Dims max{};
+  nvinfer1::Dims min{}; ///< Smallest shape the profile accepts.
+  nvinfer1::Dims max{}; ///< Largest shape the profile accepts.
 };
 
-// Everything a profile decision depends on, read from the engine once at init().
+/// @brief Everything a profile decision depends on, read from the engine once at init().
 struct ProfileTable {
-  // Indexed [profile][input]. The outer size is the engine's optimization
-  // profile count, which is at least 1; a single-profile engine keeps exactly
-  // one row and never switches.
+  /**
+   * @brief Bounds indexed [profile][input].
+   *
+   * The outer size is the engine's optimization profile count, which is at
+   * least 1; a single-profile engine keeps exactly one row and never switches.
+   */
   std::vector<std::vector<InputProfileBounds>> bounds;
-  // The profile currently loaded into the execution context.
+  /// @brief The profile currently loaded into the execution context.
   int32_t active = 0;
 
+  /// @return The engine's optimization profile count.
   int32_t size() const {
     return static_cast<int32_t>(bounds.size());
   }
 };
 
-// What the calling thread asked for, as resolved from OptimizationProfileGuard.
+/// @brief What the calling thread asked for, as resolved from OptimizationProfileGuard.
 enum class ProfileRequest {
-  kUnset, // no guard in scope
-  kPinned, // an exact index
-  kAuto, // choose from the input shapes
+  kUnset, ///< No guard in scope.
+  kPinned, ///< An exact index.
+  kAuto, ///< Choose from the input shapes.
 };
 
-// Its own enum rather than executorch's Error so that this header stays
-// independent of executorch and can be tested separately.
-//
-// Two axes: whether execution continues, and which message the caller prints.
-// The two failure values stay apart rather than being merged and re-derived from
-// the request kind, because the empty-table guard in select_profile() returns
-// kNoProfileMatchesInputs for every request kind -- so one merged value would put
-// the message back at the mercy of which branches each request can reach.
+/**
+ * @brief The outcome of one profile decision.
+ *
+ * Its own enum rather than executorch's Error so that this header stays
+ * independent of executorch and can be tested separately.
+ *
+ * Two axes: whether execution continues, and which message the caller prints.
+ * The two failure values stay apart rather than being merged and re-derived from
+ * the request kind, because the empty-table guard in select_profile() returns
+ * kNoProfileMatchesInputs for every request kind -- so one merged value would put
+ * the message back at the mercy of which branches each request can reach.
+ */
 enum class ProfileSelection {
-  kOk,
-  // Succeeded, but the pin could not be honored and profile 0 was used instead.
-  // Distinct from kOk so the caller can warn that the pin did nothing here.
+  kOk, ///< The selected profile is usable.
+  /**
+   * @brief Succeeded, but the pin could not be honored and profile 0 was used instead.
+   *
+   * Distinct from kOk so the caller can warn that the pin did nothing here.
+   */
   kPinIgnoredSingleProfile,
-  // A pinned index this engine does not have and cannot substitute for.
-  //
-  // Fatal here, where TRTEngine::set_active_profile_with_stream only warns for the
-  // same mistake. That is deliberate, not an oversight: each runtime is strict at
-  // its outermost validating layer and lenient below it. The standard runtime
-  // rejects an out-of-range index in TorchTensorRTModule.set_optimization_profile
-  // before the engine is reached, so its engine-level check is a backstop.
-  // OptimizationProfileGuard cannot validate anything -- it never sees an engine,
-  // by design -- so execute() is the only place an ExecuTorch caller's bad index
-  // can be caught at all. Downgrading this to a warning would leave the whole
-  // ExecuTorch path with no index validation anywhere.
+  /**
+   * @brief A pinned index this engine does not have and cannot substitute for.
+   *
+   * Fatal, on the same split the standard runtime uses in
+   * TRTEngine::set_active_profile_with_stream: an engine that had profiles to
+   * choose between must not quietly run on one the caller did not ask for.
+   * OptimizationProfileGuard cannot validate anything -- it never sees an
+   * engine, by design -- so execute() is the only place an ExecuTorch caller's
+   * bad index can be caught at all.
+   */
   kRequestedProfileUnavailable,
-  // Auto-selection ran out of profiles.
+  /// @brief Auto-selection ran out of profiles.
   kNoProfileMatchesInputs,
 };
 
+/**
+ * @brief Whether one input shape falls inside one profile's envelope.
+ *
+ * @param dims The runtime shape of the input.
+ * @param bounds The profile's [min, max] envelope for that input.
+ * @return true when the ranks match and every extent is in range.
+ */
 inline bool dims_fit(const nvinfer1::Dims& dims, const InputProfileBounds& bounds) {
   if (dims.nbDims != bounds.min.nbDims) {
     return false;
@@ -87,8 +107,30 @@ inline bool dims_fit(const nvinfer1::Dims& dims, const InputProfileBounds& bound
   return true;
 }
 
+/**
+ * @brief Whether one profile accepts every input shape of an execution.
+ *
+ * A profile index or bounds row that cannot describe these inputs answers "does
+ * not fit" rather than indexing past the end of the table. Neither is reachable
+ * from the backend, which builds one row of num_inputs bounds per profile and
+ * only ever stores an index this function approved -- but this is installed
+ * public API, and on the auto path the answer also happens to be the useful one:
+ * a ProfileTable carrying a stale ProfileTable::active rescans from 0 instead of
+ * crashing.
+ *
+ * @param table The engine's profile bounds.
+ * @param profile Index of the profile to test.
+ * @param input_dims Runtime shape of each input, in binding order.
+ * @return true when the profile accepts all of them.
+ */
 inline bool profile_fits(const ProfileTable& table, int32_t profile, const std::vector<nvinfer1::Dims>& input_dims) {
+  if (profile < 0 || profile >= table.size()) {
+    return false;
+  }
   const auto& bounds = table.bounds[static_cast<size_t>(profile)];
+  if (bounds.size() < input_dims.size()) {
+    return false;
+  }
   for (size_t i = 0; i < input_dims.size(); ++i) {
     if (!dims_fit(input_dims[i], bounds[i])) {
       return false;
@@ -97,8 +139,18 @@ inline bool profile_fits(const ProfileTable& table, int32_t profile, const std::
   return true;
 }
 
-// Resolves one thread's profile request against one engine. `index` is read
-// only for ProfileRequest::kPinned.
+/**
+ * @brief Resolves one thread's profile request against one engine.
+ *
+ * @param table The engine's profile bounds and currently loaded profile.
+ * @param request What the calling thread asked for.
+ * @param index The pinned profile index; read only for ProfileRequest::kPinned.
+ * @param input_dims Runtime shape of each input, in binding order.
+ * @param[out] selected The profile to run, written only when the result allows
+ *   execution to continue (ProfileSelection::kOk or
+ *   ProfileSelection::kPinIgnoredSingleProfile).
+ * @return What the caller should do, and which message it should print.
+ */
 inline ProfileSelection select_profile(
     const ProfileTable& table,
     ProfileRequest request,

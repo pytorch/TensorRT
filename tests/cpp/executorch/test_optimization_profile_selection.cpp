@@ -9,10 +9,15 @@
  * profile bounds table, so it runs here without a GPU, a TensorRT engine, or an
  * ExecuTorch method.
  *
- * Deliberately out of scope, because all of it needs a live engine: applying the
- * decision (setOptimizationProfileAsync), writing profiles.active back, the
- * ordering that puts the switch before setInputShape, and mark_inflight. Those
- * belong to the end-to-end ExecuTorch tests.
+ * Applying the decision is not covered here or anywhere else yet, because all of
+ * it needs a live engine: setOptimizationProfileAsync, writing profiles.active
+ * back, the ordering that puts the switch before setInputShape, and
+ * mark_inflight. The one automated live-engine job,
+ * .github/scripts/verify-executorch-reference-runner.sh, exports a
+ * single-profile static model and installs no guard, so it never switches.
+ * example_executorch_multi_profile_runner does exercise all of it and returns
+ * nonzero on failure, so pointing that job at a multi-profile .pte is the cheap
+ * way to close the gap.
  */
 
 #include "torch_tensorrt/executorch/OptimizationProfileSelection.h"
@@ -263,6 +268,33 @@ TEST(ExecuTorchOptimizationProfileSelection, EmptyTableIsRejectedRatherThanIndex
   EXPECT_EQ(
       select_profile(empty, ProfileRequest::kPinned, 0, decode_input(), selected),
       ProfileSelection::kNoProfileMatchesInputs);
+}
+
+// The other two ways a hand-built table can point outside itself. The backend
+// cannot produce either, but the header is installed, so the policy treats both
+// as "this profile does not fit" instead of reading past the end: an `active`
+// naming a profile the table does not have, and a bounds row describing fewer
+// inputs than the engine was handed.
+TEST(ExecuTorchOptimizationProfileSelection, AutoRescansPastAnActiveIndexTheTableDoesNotHave) {
+  ProfileTable table = decode_and_prefill();
+  table.active = 7;
+  int32_t selected = -1;
+
+  EXPECT_EQ(select_profile(table, ProfileRequest::kAuto, 0, prefill_input(), selected), ProfileSelection::kOk);
+  EXPECT_EQ(selected, 1);
+}
+
+TEST(ExecuTorchOptimizationProfileSelection, ProfileWithFewerBoundsThanInputsDoesNotFit) {
+  ProfileTable table;
+  table.bounds = {
+      {bounds({1, 1}, {1, 128})}, // profile 0: describes only the first input
+      {bounds({1, 1}, {1, 128}), bounds({1, 1}, {1, 128})}, // profile 1: complete
+  };
+  const std::vector<nvinfer1::Dims> two_inputs{dims({1, 8}), dims({1, 8})};
+  int32_t selected = -1;
+
+  EXPECT_EQ(select_profile(table, ProfileRequest::kAuto, 0, two_inputs, selected), ProfileSelection::kOk);
+  EXPECT_EQ(selected, 1);
 }
 
 } // namespace

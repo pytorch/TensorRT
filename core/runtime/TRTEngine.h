@@ -293,7 +293,7 @@ struct TRTEngine : torch::CustomClassHolder {
   // method names are exposed via torchbind in register_jit_hooks.cpp
   // (``num_optimization_profiles``, ``_active_profile_index``,
   // ``_auto_select_profiles``, ``set_active_profile``). Index validation lives
-  // in the runtime-agnostic TorchTensorRTModule.resolve_profile_index.
+  // in the runtime-agnostic TorchTensorRTModule.set_optimization_profile.
   int64_t num_optimization_profiles = 1; // cuda_engine->getNbOptimizationProfiles()
   int64_t active_profile_index = 0; // profile currently loaded in exec_ctx
   bool auto_select_profiles = false; // opt-in shape-based selection (per call)
