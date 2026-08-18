@@ -672,30 +672,27 @@ def test_stage_exported_program_supports_dynamic_shapes():
 
 
 @pytest.mark.unit
-def test_stage_exported_program_keeps_placeholders_shadowing_builtins():
-    """Node copying renames a placeholder named after a Python builtin.
+def test_stage_exported_program_keeps_names_shadowing_builtins():
+    """Node copying renames any node named after a Python builtin.
 
     ``input`` is a common forward argument name, and losing it would desynchronize
-    the staged graph from its signature.
+    the staged graph from its signature. The rename also cascades: a placeholder
+    named ``sum`` becomes ``sum_1``, which pushes the ``torch.sum`` node that already
+    holds ``sum_1`` to ``sum_2``, so restoring placeholders alone is not enough.
     """
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
 
     class Model(torch.nn.Module):
-        def forward(self, input, list):
-            return input + list
+        def forward(self, input, sum):
+            return torch.sum(input) + sum
 
     program = torch.export.export(Model(), (torch.randn(4), torch.randn(4)))
-    source_placeholders = [
-        node.name for node in program.graph.nodes if node.op == "placeholder"
-    ]
-    assert "input" in source_placeholders and "list" in source_placeholders
+    source_names = [node.name for node in program.graph.nodes]
+    assert {"input", "sum", "sum_1"} <= set(source_names)
 
     staged = export_utils.stage_exported_program(program)
-    staged_placeholders = [
-        node.name for node in staged.graph.nodes if node.op == "placeholder"
-    ]
-    assert staged_placeholders == source_placeholders
-    assert staged_placeholders == [
+    assert [node.name for node in staged.graph.nodes] == source_names
+    assert [node.name for node in staged.graph.nodes if node.op == "placeholder"] == [
         spec.arg.name for spec in staged.graph_signature.input_specs
     ]
 

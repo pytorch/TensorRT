@@ -174,15 +174,21 @@ def _stage_graph_module(
         staged_module = staged if not name else staged.get_submodule(name)
         if not isinstance(staged_module, torch.fx.GraphModule):
             continue
-        # Node copying renames placeholders that shadow a Python builtin, so 'input'
-        # comes back as 'input_1'. Put the source names back before anything reads them.
-        source_placeholders = [
-            node for node in source_module.graph.nodes if node.op == "placeholder"
-        ]
-        staged_placeholders = [
-            node for node in staged_module.graph.nodes if node.op == "placeholder"
-        ]
-        for source_node, staged_node in zip(source_placeholders, staged_placeholders):
+        # Node copying renames any node whose name shadows a Python builtin, so 'sum'
+        # comes back as 'sum_1', which in turn pushes an existing 'sum_1' to 'sum_2'.
+        # Copying preserves node order, so put the source names back position by
+        # position before anything reads them. Renaming is what makes the name check
+        # below pass, so pair the nodes on what copying does keep.
+        for source_node, staged_node in zip(
+            source_module.graph.nodes, staged_module.graph.nodes
+        ):
+            if (staged_node.op, staged_node.target) != (
+                source_node.op,
+                source_node.target,
+            ):
+                raise RuntimeError(
+                    f"Staged GraphModule {name or '<root>'!r} reordered its nodes."
+                )
             staged_node.name = source_node.name
         staged_nodes = {node.name: node for node in staged_module.graph.nodes}
         source_nodes = {node.name: node for node in source_module.graph.nodes}
