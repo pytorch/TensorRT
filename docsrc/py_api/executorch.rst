@@ -21,6 +21,8 @@ single ``.pte`` has to carry more than one method.
 
 .. code-block:: python
 
+    import torch_tensorrt.executorch
+
     edge = torch_tensorrt.executorch.export({"forward": exported_program})
     program = edge.to_executorch()
 
