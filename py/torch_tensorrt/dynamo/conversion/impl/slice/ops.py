@@ -4,13 +4,16 @@ from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
+import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     calculate_strides,
+    cast_trt_tensor,
     flatten_dims,
     get_positive_dim,
     get_trt_tensor,
@@ -366,7 +369,21 @@ def cumsum(
     name: str,
     input: TRTTensor,
     dim: int,
+    dtype: Optional[torch.dtype] = None,
 ) -> TRTTensor:
+    # aten widens integer cumsum to int64 unless dtype is set; floats keep their type.
+    input_dtype = _enums.dtype._from(input.dtype).to(torch.dtype)
+    if dtype is not None:
+        acc_dtype = dtype
+    elif not input_dtype.is_floating_point:
+        acc_dtype = torch.int64
+    else:
+        acc_dtype = input_dtype
+    acc_np_dtype = _enums.dtype._from(acc_dtype).to(np.dtype)
+
+    if input_dtype != acc_dtype:
+        input = cast_trt_tensor(ctx, input, acc_dtype, f"{name}_input_cast")
+
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
     if input_shape[dim] < 0:
@@ -400,11 +417,11 @@ def cumsum(
                 else:
                     data_shape.append(input_shape[i])
         zero_trttensor = impl.full.full(
-            ctx, target, source_ir, name + "_full", data_shape, 0.0
+            ctx, target, source_ir, name + "_full", data_shape, 0, dtype=acc_dtype
         )
     else:
         new_dims = tuple(data.shape)
-        zeros = np.zeros(new_dims, dtype=np.float32)
+        zeros = np.zeros(new_dims, dtype=acc_np_dtype)
         zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
 
     running_sum = loop.add_recurrence(zero_trttensor)
@@ -424,7 +441,10 @@ def cumsum(
     loop_output = loop.add_loop_output(current_sum, trt.LoopOutput.CONCATENATE, dim)
     set_layer_name(loop_output, target, f"{name}_loop_output", source_ir)
     loop_output.set_input(1, trip_limit)
-    return loop_output.get_output(0)
+    out = loop_output.get_output(0)
+    if _enums.dtype._from(out.dtype).to(torch.dtype) != acc_dtype:
+        out = cast_trt_tensor(ctx, out, acc_dtype, f"{name}_output_cast")
+    return out
 
 
 def tile(

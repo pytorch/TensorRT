@@ -98,6 +98,29 @@ class TestCumsumConverter(DispatchTestCase):
             immutable_weights=False,
         )
 
+    @parameterized.expand(
+        [
+            (torch.int32, torch.int32),
+            (torch.int32, None),
+            (torch.float16, None),
+            (torch.float32, torch.float16),
+        ]
+    )
+    def test_cumsum_dtype(self, input_dtype, out_dtype):
+        class Cumsum(nn.Module):
+            def forward(self, x):
+                if out_dtype is None:
+                    return torch.ops.aten.cumsum.default(x, 0)
+                return torch.ops.aten.cumsum.default(x, 0, dtype=out_dtype)
+
+        inputs = [torch.tensor([1, 2, 3, 4], dtype=input_dtype)]
+        self.run_test(
+            Cumsum(),
+            inputs,
+            use_dynamo_tracer=True,
+            immutable_weights=False,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
