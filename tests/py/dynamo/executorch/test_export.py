@@ -1,3 +1,4 @@
+import base64
 import gc
 import importlib
 import weakref
@@ -37,6 +38,11 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
     TARGET_PLATFORM_IDX,
 )
 
+ENGINE_BYTES = b"engine-bytes"
+# _TRTEngine.__getstate__ base64-encodes the engine into a str, so that is the shape
+# the rewrite sees in production; raw bytes only come from an in-memory engine info.
+ENGINE_BASE64 = base64.b64encode(ENGINE_BYTES).decode("utf-8")
+
 
 class FakeExportedProgram:
     pass
@@ -54,7 +60,7 @@ class _EngineState:
     the placeholder node and a blank field would hide one that got dropped.
     """
 
-    def __init__(self, payload=b"engine-bytes", requires_output_allocator=False):
+    def __init__(self, payload=ENGINE_BYTES, requires_output_allocator=False):
         self.serializations = 0
         self.info = [""] * SERIALIZATION_LEN
         self.info[ABI_TARGET_IDX] = "10"
@@ -76,9 +82,17 @@ class _EngineState:
         return (self.info,)
 
 
-def _engine_program(*, lifted, execute_count=1, requires_output_allocator=False):
+def _engine_program(
+    *,
+    lifted,
+    execute_count=1,
+    requires_output_allocator=False,
+    payload=ENGINE_BYTES,
+):
     graph = torch.fx.Graph()
-    engine = _EngineState(requires_output_allocator=requires_output_allocator)
+    engine = _EngineState(
+        payload=payload, requires_output_allocator=requires_output_allocator
+    )
     if lifted:
         engine_node = graph.placeholder("obj_engine")
         root = torch.nn.Module()
@@ -237,9 +251,14 @@ def _patch_lowering(monkeypatch, engine_counts=None):
     reason="Torch-TensorRT runtime operators are not available",
 )
 @pytest.mark.parametrize("lifted", [False, True])
-def test_validate_and_replace_execute_engine(lifted):
+@pytest.mark.parametrize(
+    "payload", [ENGINE_BYTES, ENGINE_BASE64], ids=["bytes", "base64"]
+)
+def test_validate_and_replace_execute_engine(lifted, payload):
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
-    program, engine_node, input_node, engine = _engine_program(lifted=lifted)
+    program, engine_node, input_node, engine = _engine_program(
+        lifted=lifted, payload=payload
+    )
 
     assert export_utils.validate_engine_program(program) == 1
     rewritten = export_utils.replace_execute_engine(program)
@@ -264,7 +283,7 @@ def test_validate_and_replace_execute_engine(lifted):
     engine_buffer = getattr(program.graph_module, buffer_node.target)
     assert engine_buffer.dtype == torch.uint8
     assert engine_buffer.device.type == "cpu"
-    assert bytes(engine_buffer.tolist()) == b"engine-bytes"
+    assert bytes(engine_buffer.tolist()) == ENGINE_BYTES
     assert program.state_dict[buffer_node.target] is engine_buffer
     assert engine_node not in nodes
     assert input_node in nodes
