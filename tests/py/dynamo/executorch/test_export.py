@@ -462,6 +462,38 @@ def test_export_preserves_independent_method_mapping(monkeypatch):
 
 
 @pytest.mark.unit
+def test_export_hands_each_method_its_own_resolved_engines(monkeypatch):
+    """Validation resolves every method up front, so the handoff can be misrouted.
+
+    A swap would write one method's engine into another method's graph, and the .pte
+    would still look well formed, so pin the pairing here rather than downstream.
+    """
+    export_module, _ = _patch_lowering(monkeypatch)
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+
+    prefill = FakeExportedProgram()
+    decode = FakeExportedProgram()
+    method_names = {id(prefill): "prefill", id(decode): "decode"}
+
+    def validate(program, resolved=None):
+        resolved["engine_node"] = method_names[id(program)]
+        return 1
+
+    handoffs = {}
+
+    def rewrite(program, resolved=None):
+        handoffs[method_names[id(program)]] = resolved["engine_node"]
+        return ("rewritten", program)
+
+    monkeypatch.setattr(export_utils, "validate_engine_program", validate)
+    monkeypatch.setattr(export_utils, "replace_execute_engine", rewrite)
+
+    export_module.export({"prefill": prefill, "decode": decode})
+
+    assert handoffs == {"prefill": "prefill", "decode": "decode"}
+
+
+@pytest.mark.unit
 def test_export_releases_a_methods_engines_once_it_is_rewritten(monkeypatch):
     """Engine payloads are the largest values here, so a rewritten method must free them."""
     export_module, _ = _patch_lowering(monkeypatch)
