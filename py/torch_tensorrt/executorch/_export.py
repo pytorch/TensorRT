@@ -386,8 +386,14 @@ def export(
         # ExecuTorch dispatches per-method passes on isinstance(passes, dict), and a
         # Mapping that is not a dict matches none of its branches, so it reaches a
         # KeyError on the first method. An empty dict fails the same way, so treat it
-        # as no passes at all.
-        transform_passes = dict(transform_passes) or None
+        # as no passes at all. Every method the dict omits is deep-copied instead,
+        # which copies that method's whole engine buffer, so give the omitted ones an
+        # empty pass list: it runs nothing and hands back the same program.
+        transform_passes = (
+            {name: list(transform_passes.get(name, ())) for name in method_names}
+            if transform_passes
+            else None
+        )
 
     resolved_engines: dict[str, dict[str, list[Any]]] = {
         name: {} for name in program_map

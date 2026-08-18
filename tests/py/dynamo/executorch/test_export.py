@@ -1242,7 +1242,8 @@ def test_export_normalizes_mapping_transform_passes_to_dict(monkeypatch):
 
     forwarded = lower.call_args.kwargs["transform_passes"]
     assert type(forwarded) is dict
-    assert forwarded == {"prefill": passes}
+    # "decode" is filled in because ExecuTorch deep-copies every omitted method.
+    assert forwarded == {"prefill": passes, "decode": []}
 
 
 @pytest.mark.unit
@@ -1257,6 +1258,27 @@ def test_export_normalizes_empty_transform_passes_to_none(monkeypatch):
     export_module.export({"forward": FakeExportedProgram()}, transform_passes={})
 
     assert lower.call_args.kwargs["transform_passes"] is None
+
+
+@pytest.mark.unit
+def test_export_fills_in_transform_passes_for_omitted_methods(monkeypatch):
+    """ExecuTorch deep-copies every method a per-method pass dict leaves out.
+
+    That copy duplicates the method's whole engine buffer. An empty pass list runs
+    nothing and returns the same program, so the gaps are filled in here.
+    """
+    export_module, lower = _patch_lowering(monkeypatch)
+    passes = ["a-pass"]
+
+    export_module.export(
+        {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
+        transform_passes={"prefill": passes},
+    )
+
+    assert lower.call_args.kwargs["transform_passes"] == {
+        "prefill": passes,
+        "decode": [],
+    }
 
 
 @pytest.mark.unit
