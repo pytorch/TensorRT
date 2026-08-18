@@ -313,9 +313,11 @@ def export(
     ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of
     the program including engines.
 
-    Every method's engine payload stays resident until all methods are rewritten, at
-    roughly 1.33x the engine bytes because the payload is base64 encoded. This trades
-    memory for serializing each engine only once.
+    Each engine is serialized once, and a method's engine payloads are released as soon
+    as that method is rewritten. While a method is being rewritten, its engines are
+    resident both as the base64 text the serialization produced and as the decoded
+    buffer, so peak memory is roughly 2.3x that method's engine bytes, and briefly 3.3x
+    for the engine being decoded.
 
     ``constant_methods`` keys are restricted to valid Python identifiers here, which is
     narrower than ExecuTorch itself accepts.
@@ -409,7 +411,8 @@ def export(
                 name,
                 engine_counts[name],
             )
-        rewritten[name] = replace_execute_engine(program, resolved_engines[name])
+        # Drop this method's engine payloads as soon as they are in the graph.
+        rewritten[name] = replace_execute_engine(program, resolved_engines.pop(name))
         method_partitioners[name] = [
             TensorRTPartitioner(compile_specs=method_compile_specs[name]),
             *extra_partitioners[name],

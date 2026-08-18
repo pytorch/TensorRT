@@ -1,4 +1,6 @@
+import gc
 import importlib
+import weakref
 from types import SimpleNamespace
 from typing import NamedTuple
 from unittest.mock import MagicMock
@@ -407,6 +409,51 @@ def test_export_preserves_independent_method_mapping(monkeypatch):
     assert pipelines["prefill"][1:] == [prefill_extra]
     assert pipelines["decode"][0].compile_specs == [decode_spec]
     assert pipelines["decode"][1:] == [decode_extra]
+
+
+@pytest.mark.unit
+def test_export_releases_a_methods_engines_once_it_is_rewritten(monkeypatch):
+    """Engine payloads are the largest values here, so a rewritten method must free them."""
+    export_module, _ = _patch_lowering(monkeypatch)
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+
+    class Payload:
+        """A weak-referenceable stand-in for one method's engine bytes."""
+
+    first = FakeExportedProgram()
+    second = FakeExportedProgram()
+    method_names = {id(first): "first", id(second): "second"}
+    payloads = {}
+
+    def validate(program, resolved=None):
+        payload = Payload()
+        payloads[method_names[id(program)]] = weakref.ref(payload)
+        resolved["engine"] = payload
+        return 1
+
+    live_payloads = []
+
+    def rewrite(program, resolved=None):
+        gc.collect()
+        live_payloads.append(
+            (
+                method_names[id(program)],
+                sorted(name for name, ref in payloads.items() if ref() is not None),
+            )
+        )
+        return ("rewritten", program)
+
+    monkeypatch.setattr(export_utils, "validate_engine_program", validate)
+    monkeypatch.setattr(export_utils, "replace_execute_engine", rewrite)
+
+    export_module.export({"first": first, "second": second})
+
+    # Every method is validated before any is rewritten, so both payloads are live
+    # for the first rewrite; the first one must be gone before the second rewrite.
+    assert live_payloads == [
+        ("first", ["first", "second"]),
+        ("second", ["second"]),
+    ]
 
 
 @pytest.mark.unit

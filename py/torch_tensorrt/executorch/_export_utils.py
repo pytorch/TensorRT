@@ -338,7 +338,10 @@ def replace_execute_engine(
                 engine_bytes = base64.b64decode(engine_bytes)
             elif not isinstance(engine_bytes, (bytes, bytearray)):
                 engine_bytes = bytes(engine_bytes)
-            engine_tensor = torch.frombuffer(bytearray(engine_bytes), dtype=torch.uint8)
+            # frombuffer needs a writable buffer, and rebinding here releases the
+            # read-only copy instead of holding both for the rest of the loop.
+            engine_bytes = bytearray(engine_bytes)
+            engine_tensor = torch.frombuffer(engine_bytes, dtype=torch.uint8)
 
             from torch.fx.experimental.const_fold import get_unique_attr_name_in_module
 
