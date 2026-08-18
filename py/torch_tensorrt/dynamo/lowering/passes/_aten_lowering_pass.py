@@ -14,6 +14,7 @@ from .annotate_fp8_sdpa import annotate_fp8_sdpa
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
+from .decompose_unsupported_attention import decompose_unsupported_attention
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_prims_broadcast import fuse_prims_broadcast
@@ -45,6 +46,7 @@ post_lowering_pass_list = [
     remove_num_users_is_0_nodes,
     complex_graph_detection,
     force_causal_efficient_attention,
+    decompose_unsupported_attention,
     eliminate_sym_min_int64_max,
     normalize_negative_slice_stop,
     annotate_fp8_sdpa,
