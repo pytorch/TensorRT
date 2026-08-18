@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -521,31 +521,31 @@ will take a dictionary which maps names of functions to compile to Compilation S
 sort of dictionary you would provide to <code class="docutils literal notranslate"><span class="pre">compile</span></code>. For more information on the compile spec dictionary take a look
 at the documentation for the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">TensorRTCompileSpec</span></code> API.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;forward&quot;</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">(</span>
+    <span class="s2">"forward"</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">(</span>
         <span class="o">**</span><span class="p">{</span>
-            <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">])],</span>
-            <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
-            <span class="s2">&quot;refit&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-            <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-            <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="p">{</span>
-                <span class="s2">&quot;device_type&quot;</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
-                <span class="s2">&quot;gpu_id&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-                <span class="s2">&quot;dla_core&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-                <span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">])],</span>
+            <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
+            <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
+                <span class="s2">"gpu_id"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
             <span class="p">},</span>
-            <span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
-            <span class="s2">&quot;num_avg_timing_iters&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s2">"capability"</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+            <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
         <span class="p">}</span>
     <span class="p">)</span>
 <span class="p">}</span>
 </pre></div>
 </div>
 <p>Now to compile with Torch-TensorRT, provide the target module objects and the spec dictionary to <code class="docutils literal notranslate"><span class="pre">torch._C._jit_to_backend(&quot;tensorrt&quot;,</span> <span class="pre">...)</span></code></p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_jit_to_backend</span><span class="p">(</span><span class="s2">&quot;tensorrt&quot;</span><span class="p">,</span> <span class="n">script_model</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_jit_to_backend</span><span class="p">(</span><span class="s2">"tensorrt"</span><span class="p">,</span> <span class="n">script_model</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>To run explicitly call the function of the method you want to run (vs. how you can just call on the module itself in standard PyTorch)</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">trt_model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
 </pre></div>
 </div>

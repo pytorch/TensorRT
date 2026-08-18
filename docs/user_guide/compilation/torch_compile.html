@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -534,7 +534,7 @@ document.write(`
 <p>The primary goal of the Torch-TensorRT <cite>torch.compile</cite> backend is to enable Just-In-Time compilation workflows by combining the simplicity of <cite>torch.compile</cite> API with the performance of TensorRT. Invoking the <cite>torch.compile</cite> backend is as simple as importing the <cite>torch_tensorrt</cite> package and specifying the backend:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
-<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"torch_tensorrt"</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -619,12 +619,12 @@ the final output back to FP16.</p></li>
 <h3>Custom Setting Usage<a class="headerlink" href="#custom-setting-usage" title="Link to this heading">#</a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
-<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                                <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-                                         <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-                                         <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-                                         <span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;torch.ops.aten.sub.Tensor&quot;</span><span class="p">},</span>
-                                         <span class="s2">&quot;optimization_level&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,})</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"torch_tensorrt"</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">"truncate_long_and_double"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                         <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                         <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                                         <span class="s2">"torch_executed_ops"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"torch.ops.aten.sub.Tensor"</span><span class="p">},</span>
+                                         <span class="s2">"optimization_level"</span><span class="p">:</span> <span class="mi">4</span><span class="p">,})</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -642,7 +642,7 @@ the final output back to FP16.</p></li>
 <span class="n">first_outputs</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Subsequent inference runs with the same, or similar inputs will not cause recompilation</span>
-<span class="c1"># For a full discussion of this, see &quot;Recompilation Conditions&quot; below</span>
+<span class="c1"># For a full discussion of this, see "Recompilation Conditions" below</span>
 <span class="n">second_outputs</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -659,9 +659,9 @@ the final output back to FP16.</p></li>
 <p>Compilation is also a useful tool in determining operator coverage for a particular model. For instance, the following compilation command will display the operator coverage for each graph, but will not compile the model - effectively providing a “dryrun” mechanism:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
-<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                                <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-                                         <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">),})</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"torch_tensorrt"</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">"debug"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                         <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">),})</span>
 </pre></div>
 </div>
 <p>If key operators for your model are unsupported, see <span class="xref std std-ref">dynamo_conversion</span> to contribute your own converters, or file an issue here: <a class="github reference external" href="https://github.com/pytorch/TensorRT/issues">pytorch/TensorRT#issues</a>.</p>
@@ -673,8 +673,8 @@ the final output back to FP16.</p></li>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
 <span class="n">explanation</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_dynamo</span><span class="o">.</span><span class="n">explain</span><span class="p">(</span><span class="n">model</span><span class="p">)(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Graph breaks: </span><span class="si">{</span><span class="n">explanation</span><span class="o">.</span><span class="n">graph_break_count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Graph breaks: </span><span class="si">{</span><span class="n">explanation</span><span class="o">.</span><span class="n">graph_break_count</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"torch_tensorrt"</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">"truncate_long_and_double"</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
 </pre></div>
 </div>
 </section>

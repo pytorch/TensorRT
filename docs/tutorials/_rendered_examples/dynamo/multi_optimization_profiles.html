@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -627,10 +627,10 @@ import torch
 import torch_tensorrt
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / &quot;tools&quot; / &quot;llm&quot;))
+sys.path.insert(0, str(REPO_ROOT / "tools" / "llm"))
 
-MODEL_ID = &quot;google/gemma-3-1b-it&quot;
-DEVICE = torch.device(&quot;cuda:0&quot;)
+MODEL_ID = "google/gemma-3-1b-it"
+DEVICE = torch.device("cuda:0")
 
 # The two regimes we benchmark.
 MAX_SEQ = 256  # largest prompt the engine must support
@@ -656,7 +656,7 @@ DECODE_IDX, PREFILL_IDX = 0, 1
             AutoModelForCausalLM.from_pretrained(
                 MODEL_ID,
                 use_cache=False,
-                attn_implementation=&quot;sdpa&quot;,
+                attn_implementation="sdpa",
                 ignore_mismatched_sizes=True,
             )
             .eval()
@@ -672,8 +672,8 @@ DECODE_IDX, PREFILL_IDX = 0, 1
 try:
     model = load_model()
 except Exception as e:  # gated/no-auth/no-GPU environments (e.g. CI docs build)
-    print(f&quot;Skipping example: could not load {MODEL_ID} ({type(e).__name__}: {e}).&quot;)
-    print(&quot;Accept the license and authenticate (hf auth login / HF_TOKEN) to run.&quot;)
+    print(f"Skipping example: could not load {MODEL_ID} ({type(e).__name__}: {e}).")
+    print("Accept the license and authenticate (hf auth login / HF_TOKEN) to run.")
     sys.exit(0)
 
 
@@ -698,11 +698,11 @@ def make_inputs(seq_len: int):
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>profiles = [
-    {&quot;min_shape&quot;: (1, 1), &quot;opt_shape&quot;: (1, 1), &quot;max_shape&quot;: (1, 1)},  # decode
+    {"min_shape": (1, 1), "opt_shape": (1, 1), "max_shape": (1, 1)},  # decode
     {
-        &quot;min_shape&quot;: (1, 1),
-        &quot;opt_shape&quot;: (1, PREFILL_SEQ),
-        &quot;max_shape&quot;: (1, MAX_SEQ),
+        "min_shape": (1, 1),
+        "opt_shape": (1, PREFILL_SEQ),
+        "max_shape": (1, MAX_SEQ),
     },  # prefill
 ]
 multi_profile_inputs = [
@@ -737,13 +737,13 @@ common = dict(
     device=DEVICE,
 )
 
-print(&quot;Compiling single-profile engine (tuned at prefill length) ...&quot;)
+print("Compiling single-profile engine (tuned at prefill length) ...")
 bench_ids, bench_pos = make_inputs(PREFILL_SEQ)
 trt_single = torch_tensorrt.dynamo.compile(
     exported, inputs=[bench_ids, bench_pos], **common
 )
 
-print(&quot;Compiling multi-profile engine (decode + prefill) ...&quot;)
+print("Compiling multi-profile engine (decode + prefill) ...")
 trt_multi = torch_tensorrt.dynamo.compile(
     exported, arg_inputs=multi_profile_inputs, **common
 )
@@ -759,7 +759,7 @@ trt_multi = torch_tensorrt.dynamo.compile(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def logits(out):
-    return (out.logits if hasattr(out, &quot;logits&quot;) else out).float()
+    return (out.logits if hasattr(out, "logits") else out).float()
 
 
 from torch_tensorrt.runtime import optimization_profile  # noqa: E402
@@ -781,8 +781,8 @@ def top1_match(a, b):
     return (a.argmax(-1) == b.argmax(-1)).float().mean().item()
 
 
-print(f&quot;decode  top-1 token match vs eager: {top1_match(trt_decode, ref_decode):.1%}&quot;)
-print(f&quot;prefill top-1 token match vs eager: {top1_match(trt_prefill, ref_prefill):.1%}&quot;)
+print(f"decode  top-1 token match vs eager: {top1_match(trt_decode, ref_decode):.1%}")
+print(f"prefill top-1 token match vs eager: {top1_match(trt_prefill, ref_prefill):.1%}")
 </pre></div>
 </div>
 </div>
@@ -798,7 +798,7 @@ print(f&quot;prefill top-1 token match vs eager: {top1_match(trt_prefill, ref_pr
     for _ in range(warmup):
         run()
     torch.cuda.synchronize()
-    best = float(&quot;inf&quot;)
+    best = float("inf")
     for _ in range(rounds):
         start = timeit.default_timer()
         for _ in range(iters):
@@ -823,16 +823,16 @@ with torch.inference_mode():
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(&quot;\nPer-call latency (ms), batch=1&quot;)
-print(f&quot;{&#39;regime&#39;:&lt;20}{&#39;single-profile&#39;:&gt;16}{&#39;multi-profile&#39;:&gt;16}{&#39;speedup&#39;:&gt;10}&quot;)
-print(&quot;-&quot; * 62)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print("\nPer-call latency (ms), batch=1")
+print(f"{'regime':&lt;20}{'single-profile':&gt;16}{'multi-profile':&gt;16}{'speedup':&gt;10}")
+print("-" * 62)
 print(
-    f&quot;{f&#39;decode (seq={DECODE_SEQ})&#39;:&lt;20}{single_decode:&gt;16.3f}&quot;
-    f&quot;{multi_decode:&gt;16.3f}{single_decode / multi_decode:&gt;9.2f}x&quot;
+    f"{f'decode (seq={DECODE_SEQ})':&lt;20}{single_decode:&gt;16.3f}"
+    f"{multi_decode:&gt;16.3f}{single_decode / multi_decode:&gt;9.2f}x"
 )
 print(
-    f&quot;{f&#39;prefill (seq={PREFILL_SEQ})&#39;:&lt;20}{single_prefill:&gt;16.3f}&quot;
-    f&quot;{multi_prefill:&gt;16.3f}{single_prefill / multi_prefill:&gt;9.2f}x&quot;
+    f"{f'prefill (seq={PREFILL_SEQ})':&lt;20}{single_prefill:&gt;16.3f}"
+    f"{multi_prefill:&gt;16.3f}{single_prefill / multi_prefill:&gt;9.2f}x"
 )
 </pre></div>
 </div>
@@ -850,7 +850,7 @@ print(
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(&quot;Done.&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print("Done.")
 </pre></div>
 </div>
 </div>

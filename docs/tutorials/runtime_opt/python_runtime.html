@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -650,10 +650,10 @@ The engine file format and all core metadata are fully compatible across runtime
 <ul>
 <li><p><strong>Build and serialize in Python</strong>, then deploy by loading the module in a C++-enabled environment (e.g. in TorchScript or when the C++ extension is present):</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># In an environment with only Python runtime (PYTHON_ONLY=1)</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_module</span><span class="p">,</span> <span class="s2">&quot;trt_module.ep&quot;</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_module</span><span class="p">,</span> <span class="s2">"trt_module.ep"</span><span class="p">)</span>
 
 <span class="c1"># --- Later, or on a different machine with C++ runtime enabled ---</span>
-<span class="n">trt_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_module.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">trt_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"trt_module.ep"</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 <span class="n">output</span> <span class="o">=</span> <span class="n">trt_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -681,14 +681,14 @@ produced outside Torch-TensorRT):</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompilationSettings</span>
 
-<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;model.engine&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"model.engine"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
 
 <span class="n">module</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="p">(</span>
     <span class="n">serialized_engine</span><span class="o">=</span><span class="n">engine_bytes</span><span class="p">,</span>
-    <span class="n">input_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span>
-    <span class="n">output_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;output&quot;</span><span class="p">],</span>
-    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;my_engine&quot;</span><span class="p">,</span>
+    <span class="n">input_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"x"</span><span class="p">],</span>
+    <span class="n">output_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"output"</span><span class="p">],</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"my_engine"</span><span class="p">,</span>
     <span class="n">settings</span><span class="o">=</span><span class="n">CompilationSettings</span><span class="p">(),</span>
 <span class="p">)</span>
 

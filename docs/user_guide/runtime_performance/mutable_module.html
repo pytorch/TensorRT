@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -545,9 +545,9 @@ stays identical:</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">diffusers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffusionPipeline</span>
 
 <span class="n">pipe</span> <span class="o">=</span> <span class="n">DiffusionPipeline</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
-    <span class="s2">&quot;stabilityai/stable-diffusion-xl-base-1.0&quot;</span><span class="p">,</span>
+    <span class="s2">"stabilityai/stable-diffusion-xl-base-1.0"</span><span class="p">,</span>
     <span class="n">torch_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
-<span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
 
 <span class="c1"># The only extra line you need</span>
 <span class="n">pipe</span><span class="o">.</span><span class="n">unet</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span>
@@ -560,41 +560,41 @@ stays identical:</p>
 triggers compilation; subsequent calls run the cached engine.</p>
 <p><strong>Dynamic shapes</strong> are required for diffusion pipelines because batch size and image
 dimensions vary. Set the ranges before the first call:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">BATCH</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;BATCH&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
-<span class="n">_H</span>    <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;_H&quot;</span><span class="p">,</span>    <span class="nb">min</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
-<span class="n">_W</span>    <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;_W&quot;</span><span class="p">,</span>    <span class="nb">min</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">BATCH</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"BATCH"</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
+<span class="n">_H</span>    <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"_H"</span><span class="p">,</span>    <span class="nb">min</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<span class="n">_W</span>    <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"_W"</span><span class="p">,</span>    <span class="nb">min</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
 
 <span class="n">pipe</span><span class="o">.</span><span class="n">unet</span><span class="o">.</span><span class="n">set_expected_dynamic_shape_range</span><span class="p">(</span>
     <span class="n">args_dynamic_shape</span><span class="o">=</span><span class="p">({</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">_H</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">_W</span><span class="p">},</span> <span class="p">{}),</span>
     <span class="n">kwargs_dynamic_shape</span><span class="o">=</span><span class="p">{</span>
-        <span class="s2">&quot;encoder_hidden_states&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
-        <span class="s2">&quot;added_cond_kwargs&quot;</span><span class="p">:</span> <span class="p">{</span>
-            <span class="s2">&quot;text_embeds&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
-            <span class="s2">&quot;time_ids&quot;</span><span class="p">:</span>    <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
+        <span class="s2">"encoder_hidden_states"</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
+        <span class="s2">"added_cond_kwargs"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"text_embeds"</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
+            <span class="s2">"time_ids"</span><span class="p">:</span>    <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
         <span class="p">},</span>
-        <span class="s2">&quot;return_dict&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>   <span class="c1"># None-valued kwargs are excluded</span>
+        <span class="s2">"return_dict"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>   <span class="c1"># None-valued kwargs are excluded</span>
     <span class="p">},</span>
 <span class="p">)</span>
 
-<span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="s2">&quot;cinematic photo, 4k&quot;</span><span class="p">,</span> <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;without_lora.jpg&quot;</span><span class="p">)</span>
+<span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="s2">"cinematic photo, 4k"</span><span class="p">,</span> <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"without_lora.jpg"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p><strong>Loading a LoRA adapter</strong> uses the standard HuggingFace API — no Torch-TensorRT
 calls required. <code class="docutils literal notranslate"><span class="pre">MutableTorchTensorRTModule</span></code> detects the weight change and refits
 automatically on the next forward call:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span><span class="o">.</span><span class="n">load_lora_weights</span><span class="p">(</span>
-    <span class="s2">&quot;stablediffusionapi/load_lora_embeddings&quot;</span><span class="p">,</span>
-    <span class="n">weight_name</span><span class="o">=</span><span class="s2">&quot;all-disney-princess-xl-lo.safetensors&quot;</span><span class="p">,</span>
-    <span class="n">adapter_name</span><span class="o">=</span><span class="s2">&quot;lora1&quot;</span><span class="p">,</span>
+    <span class="s2">"stablediffusionapi/load_lora_embeddings"</span><span class="p">,</span>
+    <span class="n">weight_name</span><span class="o">=</span><span class="s2">"all-disney-princess-xl-lo.safetensors"</span><span class="p">,</span>
+    <span class="n">adapter_name</span><span class="o">=</span><span class="s2">"lora1"</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">pipe</span><span class="o">.</span><span class="n">set_adapters</span><span class="p">([</span><span class="s2">&quot;lora1&quot;</span><span class="p">],</span> <span class="n">adapter_weights</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">pipe</span><span class="o">.</span><span class="n">set_adapters</span><span class="p">([</span><span class="s2">"lora1"</span><span class="p">],</span> <span class="n">adapter_weights</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 <span class="n">pipe</span><span class="o">.</span><span class="n">fuse_lora</span><span class="p">()</span>
 <span class="n">pipe</span><span class="o">.</span><span class="n">unload_lora_weights</span><span class="p">()</span>
 
 <span class="c1"># Refit is triggered automatically here — much faster than recompilation</span>
-<span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="s2">&quot;cinematic photo, princess&quot;</span><span class="p">,</span> <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;with_lora.jpg&quot;</span><span class="p">)</span>
+<span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="s2">"cinematic photo, princess"</span><span class="p">,</span> <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"with_lora.jpg"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -629,8 +629,8 @@ automatically on the next forward call:</p>
 argument. Use <code class="docutils literal notranslate"><span class="pre">{}</span></code> for inputs whose shapes are static, and a <code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code>
 for each dynamic axis. Nested dict/list structures (common in diffusion models) are
 fully supported — the hint structure must mirror the input structure exactly:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dim_0</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;dim_0&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
-<span class="n">dim_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;dim_1&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dim_0</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"dim_0"</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<span class="n">dim_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"dim_1"</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
 
 <span class="n">mutable_module</span><span class="o">.</span><span class="n">set_expected_dynamic_shape_range</span><span class="p">(</span>
     <span class="n">args_dynamic_shape</span><span class="o">=</span><span class="p">({</span><span class="mi">0</span><span class="p">:</span> <span class="n">dim_0</span><span class="p">},</span> <span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">dim_1</span><span class="p">}),</span>
@@ -661,8 +661,8 @@ recompiling on subsequent process starts:</p>
 <h2>Saving and Loading<a class="headerlink" href="#saving-and-loading" title="Link to this heading">#</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">MutableTorchTensorRTModule</span></code> uses its own save/load API (not <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code>)
 because it carries extra state — dynamic-shape descriptors, refit state, etc.:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">mutable_module</span><span class="p">,</span> <span class="s2">&quot;module.pkl&quot;</span><span class="p">)</span>
-<span class="n">mutable_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;module.pkl&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">mutable_module</span><span class="p">,</span> <span class="s2">"module.pkl"</span><span class="p">)</span>
+<span class="n">mutable_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"module.pkl"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -591,22 +591,22 @@ model = SharedDimEncoder().cuda().eval()
         opt_shape=(4, 16),
         max_shape=(8, 16),
         dtype=torch.int64,
-        name=&quot;input_ids&quot;,
-        shared_dims={0: &quot;B&quot;},
+        name="input_ids",
+        shared_dims={0: "B"},
     ),
     torch_tensorrt.Input(
         min_shape=(1, 16),
         opt_shape=(4, 16),
         max_shape=(8, 16),
         dtype=torch.int64,
-        name=&quot;attention_mask&quot;,
-        shared_dims={0: &quot;B&quot;},
+        name="attention_mask",
+        shared_dims={0: "B"},
     ),
 ]
 
 trt_model = torch_tensorrt.compile(
     model,
-    ir=&quot;dynamo&quot;,
+    ir="dynamo",
     inputs=inputs,
     min_block_size=1,
     cache_built_engines=False,
@@ -621,8 +621,8 @@ trt_model = torch_tensorrt.compile(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>for batch_size in (4, 2, 1):
-    ids = torch.randint(0, 1024, (batch_size, 16), dtype=torch.int64, device=&quot;cuda&quot;)
-    mask = torch.ones((batch_size, 16), dtype=torch.int64, device=&quot;cuda&quot;)
+    ids = torch.randint(0, 1024, (batch_size, 16), dtype=torch.int64, device="cuda")
+    mask = torch.ones((batch_size, 16), dtype=torch.int64, device="cuda")
 
     with torch.no_grad():
         ref = model(ids, mask)
@@ -631,8 +631,8 @@ trt_model = torch_tensorrt.compile(
     cos_sim = cosine_similarity(ref, out)
     assert (
         cos_sim &gt; COSINE_THRESHOLD
-    ), f&quot;Numerical mismatch at batch_size={batch_size}: cos_sim={cos_sim:.4f}&quot;
-    print(f&quot;batch_size={batch_size}  cos_sim={cos_sim:.6f}  ✓&quot;)
+    ), f"Numerical mismatch at batch_size={batch_size}: cos_sim={cos_sim:.4f}"
+    print(f"batch_size={batch_size}  cos_sim={cos_sim:.6f}  ✓")
 </pre></div>
 </div>
 </div>
@@ -645,43 +645,43 @@ trt_model = torch_tensorrt.compile(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>kwarg_inputs = {
-    &quot;input_ids&quot;: torch_tensorrt.Input(
+    "input_ids": torch_tensorrt.Input(
         min_shape=(1, 16),
         opt_shape=(4, 16),
         max_shape=(8, 16),
         dtype=torch.int64,
-        name=&quot;input_ids&quot;,
-        shared_dims={0: &quot;B&quot;},
+        name="input_ids",
+        shared_dims={0: "B"},
     ),
-    &quot;attention_mask&quot;: torch_tensorrt.Input(
+    "attention_mask": torch_tensorrt.Input(
         min_shape=(1, 16),
         opt_shape=(4, 16),
         max_shape=(8, 16),
         dtype=torch.int64,
-        name=&quot;attention_mask&quot;,
-        shared_dims={0: &quot;B&quot;},
+        name="attention_mask",
+        shared_dims={0: "B"},
     ),
 }
 
 trt_model_kwargs = torch_tensorrt.compile(
     model,
-    ir=&quot;dynamo&quot;,
+    ir="dynamo",
     kwarg_inputs=kwarg_inputs,
     min_block_size=1,
     cache_built_engines=False,
     reuse_cached_engines=False,
 )
 
-ids = torch.randint(0, 1024, (4, 16), dtype=torch.int64, device=&quot;cuda&quot;)
-mask = torch.ones((4, 16), dtype=torch.int64, device=&quot;cuda&quot;)
+ids = torch.randint(0, 1024, (4, 16), dtype=torch.int64, device="cuda")
+mask = torch.ones((4, 16), dtype=torch.int64, device="cuda")
 
 with torch.no_grad():
     ref = model(input_ids=ids, attention_mask=mask)
     out = trt_model_kwargs(input_ids=ids, attention_mask=mask)
 
 cos_sim = cosine_similarity(ref, out)
-assert cos_sim &gt; COSINE_THRESHOLD, f&quot;kwarg path mismatch: cos_sim={cos_sim:.4f}&quot;
-print(f&quot;kwarg_inputs path  cos_sim={cos_sim:.6f}  ✓&quot;)
+assert cos_sim &gt; COSINE_THRESHOLD, f"kwarg path mismatch: cos_sim={cos_sim:.4f}"
+print(f"kwarg_inputs path  cos_sim={cos_sim:.6f}  ✓")
 </pre></div>
 </div>
 </div>
@@ -689,7 +689,7 @@ print(f&quot;kwarg_inputs path  cos_sim={cos_sim:.6f}  ✓&quot;)
 <section id="Sharing-multiple-axes">
 <h2>Sharing multiple axes<a class="headerlink" href="#Sharing-multiple-axes" title="Link to this heading">#</a></h2>
 <p>If both batch and sequence length are dynamic and must be shared, annotate both axes on each input:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">shared_dims</span><span class="o">=</span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;S&quot;</span><span class="p">}</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">shared_dims</span><span class="o">=</span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">"B"</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s2">"S"</span><span class="p">}</span>
 </pre></div>
 </div>
 <p>The same name on the same axis across different inputs produces one shared <code class="docutils literal notranslate"><span class="pre">Dim</span></code>; different names on different axes produce independent <code class="docutils literal notranslate"><span class="pre">Dim</span></code><span class="math">\s</span>.</p>
@@ -697,7 +697,7 @@ print(f&quot;kwarg_inputs path  cos_sim={cos_sim:.6f}  ✓&quot;)
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(&quot;\nAll checks passed.&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print("\nAll checks passed.")
 </pre></div>
 </div>
 </div>
