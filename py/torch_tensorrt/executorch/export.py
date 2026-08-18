@@ -189,30 +189,44 @@ def _prepare_programs(
     )
 
 
-def _reject_shared_partitioners(per_method: dict[str, list[Any]]) -> None:
-    """Reject one partitioner instance serving several methods.
+def _warn_shared_method_named_partitioners(per_method: dict[str, list[Any]]) -> None:
+    """Warn when one partitioner instance carrying a method name serves several methods.
 
-    A partitioner can carry method-specific state: ExecuTorch backends bake the
-    method name into the DelegationSpec built in the constructor, so a reused
-    instance tags every method with the first method's name and each delegate
-    then looks up the wrong compiled method at runtime.
+    A partitioner holds its compile specs from construction. When those specs name a
+    method, every method sharing that instance is tagged with the same name and the
+    delegates then look up the wrong compiled method at runtime. Sharing an instance
+    whose specs carry no method name is fine, and ExecuTorch's own multi-method examples
+    do it, so this warns rather than rejects.
     """
     if len(per_method) < 2:
         return
+
     owner_by_id: dict[int, str] = {}
     for name, partitioners in per_method.items():
         for partitioner in partitioners:
+            if not _carries_method_name(partitioner):
+                continue
             previous = owner_by_id.setdefault(id(partitioner), name)
             if previous != name:
-                raise ValueError(
-                    f"partitioners reuses the same "
-                    f"{type(partitioner).__name__} instance for {previous!r} and "
-                    f"{name!r}. A partitioner may carry method-specific state, "
-                    "such as a method name baked into its delegation spec, so "
-                    "each method needs its own instance. For example: "
+                logger.warning(
+                    "partitioners reuses the same %s instance for %r and %r, and its "
+                    "compile specs name a method, so both methods are tagged with the "
+                    "same name. Give each method its own instance: "
                     'partitioners={"prefill": [MyPartitioner(...)], "decode": '
-                    "[MyPartitioner(...)]}."
+                    "[MyPartitioner(...)]}.",
+                    type(partitioner).__name__,
+                    previous,
+                    name,
                 )
+
+
+def _carries_method_name(partitioner: Any) -> bool:
+    """Whether a partitioner's compile specs name a specific method."""
+    spec = getattr(partitioner, "delegation_spec", None)
+    for compile_spec in getattr(spec, "compile_specs", None) or ():
+        if getattr(compile_spec, "key", None) == "method_name":
+            return True
+    return False
 
 
 def _per_method_values(
@@ -281,9 +295,10 @@ def export(
 
     When exporting more than one method, give each method its own partitioner
     instances via ``partitioners={"method": [...]}``. A partitioner may carry
-    method-specific state, so reusing one instance across methods is rejected. Give
-    each instance the compile spec for the method it serves, since a backend that reads
-    its method name from the specs cannot find it otherwise.
+    method-specific state. Give each instance the compile spec for the method it serves,
+    since a backend that reads its method name from the specs cannot find it otherwise.
+    Sharing one instance across methods warns when its specs name a method, because every
+    method sharing it would be tagged with the same name.
 
     ``generate_etrecord=True`` is outside the payload sharing described above. It makes
     ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of
@@ -326,7 +341,7 @@ def export(
     )
     program_map = {"forward": programs} if not isinstance(programs, dict) else programs
     extra_partitioners = _per_method_values(partitioners, method_names, "partitioners")
-    _reject_shared_partitioners(extra_partitioners)
+    _warn_shared_method_named_partitioners(extra_partitioners)
     method_compile_specs = _per_method_values(
         compile_specs, method_names, "compile_specs"
     )

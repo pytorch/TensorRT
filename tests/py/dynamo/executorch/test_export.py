@@ -1,4 +1,5 @@
 import importlib
+import logging
 from types import SimpleNamespace
 from typing import NamedTuple
 from unittest.mock import MagicMock
@@ -726,37 +727,45 @@ def test_export_normalizes_none_per_method_values(monkeypatch):
 
 
 @pytest.mark.unit
-def test_export_rejects_shared_partitioners_across_methods(monkeypatch):
-    """One partitioner instance cannot serve several methods.
+def test_export_warns_for_shared_method_named_partitioner(monkeypatch, caplog):
+    """Sharing an instance whose specs name a method tags both methods alike.
 
-    ExecuTorch backends bake the method name into the delegation spec built in
-    the partitioner constructor, so a shared instance would tag every method
-    with the first method's name.
+    The partitioner holds its compile specs from construction, so both methods would be
+    tagged with the same method name and the delegates would look up the wrong one.
     """
     export_module, lower = _patch_lowering(monkeypatch)
+    shared = SimpleNamespace(
+        delegation_spec=SimpleNamespace(
+            compile_specs=[SimpleNamespace(key="method_name", value=b"prefill")]
+        )
+    )
 
-    with pytest.raises(ValueError, match="reuses the same"):
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.executorch.export"):
         export_module.export(
             {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
-            partitioners=[object()],
+            partitioners=[shared],
         )
 
-    lower.assert_not_called()
+    assert "reuses the same" in caplog.text
+    lower.assert_called_once()
 
 
 @pytest.mark.unit
-def test_export_rejects_shared_partitioner_inside_mapping(monkeypatch):
-    """The same instance listed under two method keys is rejected too."""
+def test_export_allows_shared_partitioner_without_a_method_name(monkeypatch):
+    """A shared instance with no method name in its specs is allowed.
+
+    ExecuTorch's own multi-method examples pass a single partitioner for several methods,
+    so this must not be an error.
+    """
     export_module, lower = _patch_lowering(monkeypatch)
     shared = object()
 
-    with pytest.raises(ValueError, match="reuses the same"):
-        export_module.export(
-            {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
-            partitioners={"prefill": [shared], "decode": [shared]},
-        )
+    export_module.export(
+        {"prefill": FakeExportedProgram(), "decode": FakeExportedProgram()},
+        partitioners={"prefill": [shared], "decode": [shared]},
+    )
 
-    lower.assert_not_called()
+    lower.assert_called_once()
 
 
 @pytest.mark.unit
