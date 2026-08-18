@@ -6,4 +6,4 @@ pandas
 transformers>=5.4.0
 diffusers==0.34.0
 timm==0.9.8
-monai==1.5.2rc1
+monai==1.6.0
