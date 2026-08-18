@@ -308,9 +308,7 @@ def lift_mutated_buffers(
         # BUFFER_MUTATION output below, then drop the (now input-target) copy_.
         new_value = copy_node.args[1] if len(copy_node.args) > 1 else None
         if isinstance(new_value, torch.fx.Node):
-            if _kv_write_will_alias(
-                new_value, tuple(buffer_tensor.shape), settings
-            ):
+            if _kv_write_will_alias(new_value, tuple(buffer_tensor.shape), settings):
                 predicted_kv_bindings.add(replacement.name)
             else:
                 copyback.append((new_value, buffer_name))
