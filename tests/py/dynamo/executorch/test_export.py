@@ -192,6 +192,13 @@ def _lifted_engine_program():
     return program, engine_node, engine, fake_engine
 
 
+def _use_cpu_default_device(monkeypatch):
+    """Materialize Input specs on the CPU so a test unrelated to devices needs no GPU."""
+    monkeypatch.setattr(
+        "torch_tensorrt.dynamo._defaults.default_device", lambda: torch.device("cpu")
+    )
+
+
 def _patch_lowering(monkeypatch, engine_counts=None):
     import executorch.exir
     import torch_tensorrt._features as features
@@ -802,6 +809,10 @@ def test_export_rejects_non_linux_platform(monkeypatch):
 
 @pytest.mark.unit
 def test_prepare_graph_module_preserves_tensor_keyword_inputs(monkeypatch):
+    # Runtime gate (not a module-level skipif, which resolves at collection time and is
+    # fragile on remote-GPU runners): this one needs a tensor already on the GPU.
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA required")
     export_module = importlib.import_module("torch_tensorrt.executorch._export")
     graph_module = torch.fx.GraphModule(torch.nn.Module(), torch.fx.Graph())
     exported = FakeExportedProgram()
@@ -1163,6 +1174,7 @@ def test_export_normalizes_empty_transform_passes_to_none(monkeypatch):
 @pytest.mark.parametrize("container_type", [list, tuple])
 def test_prepare_graph_module_infers_nested_dynamic_shapes(monkeypatch, container_type):
     export_module = importlib.import_module("torch_tensorrt.executorch._export")
+    _use_cpu_default_device(monkeypatch)
 
     class NestedModule(torch.nn.Module):
         def forward(self, nested):
@@ -1198,6 +1210,7 @@ def test_prepare_graph_module_infers_nested_dynamic_shapes(monkeypatch, containe
 @pytest.mark.unit
 def test_prepare_graph_module_preserves_shared_dynamic_dimensions(monkeypatch):
     export_module = importlib.import_module("torch_tensorrt.executorch._export")
+    _use_cpu_default_device(monkeypatch)
 
     class SharedBatchModule(torch.nn.Module):
         def forward(self, left, right):
@@ -1235,6 +1248,7 @@ def test_prepare_graph_module_preserves_shared_dynamic_dimensions(monkeypatch):
 @pytest.mark.unit
 def test_prepare_graph_module_requires_shapes_for_mixed_dynamic_inputs(monkeypatch):
     export_module = importlib.import_module("torch_tensorrt.executorch._export")
+    _use_cpu_default_device(monkeypatch)
 
     class MixedModule(torch.nn.Module):
         def forward(self, dynamic, static):
