@@ -1072,46 +1072,44 @@ def test_export_warns_for_multiple_engines(monkeypatch, caplog):
 
 
 @pytest.mark.unit
-def test_validate_hands_resolved_engines_to_the_rewrite(monkeypatch):
-    """One engine is resolved once, even though staging returns a new program.
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
+def test_rewrite_reuses_resolved_engines_instead_of_serializing_again(monkeypatch):
+    """The rewrite consumes what validation resolved instead of resolving again.
 
-    Resolving an engine serializes it and base64 encodes the result, so resolving the
-    same engine in both validation and the rewrite would double that cost.
+    Reading an engine's state serializes it and base64 encodes the result, so resolving
+    the same engine in both steps doubles that cost. Staging hands the rewrite a
+    different program object holding the same node names, so the two programs here are
+    separate instances to match that.
     """
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    source, _, _, _ = _engine_program(lifted=False)
+    staged, _, _, _ = _engine_program(lifted=False)
+
     calls = []
+    real_resolve = export_utils.get_engine_info_from_state
 
     def counting_get_engine_info_from_state(engine_obj):
         calls.append(engine_obj)
-        return ["0", "dev", "nm", "BYTES", "in", "out", "", "", "", "", ""]
+        return real_resolve(engine_obj)
 
     monkeypatch.setattr(
         export_utils, "get_engine_info_from_state", counting_get_engine_info_from_state
     )
-    monkeypatch.setattr(
-        export_utils, "validate_engine_info", lambda info, node_name=None: None
-    )
-
-    def make_program():
-        engine_node = SimpleNamespace(
-            op="get_attr", target="engine_attr", name="engine_attr"
-        )
-        node = SimpleNamespace(
-            op="call_function",
-            name="eng_node",
-            target=torch.ops.tensorrt.execute_engine.default,
-            args=(["in"], engine_node),
-        )
-        graph_module = SimpleNamespace(
-            graph=SimpleNamespace(nodes=[node]), engine_attr=object()
-        )
-        return SimpleNamespace(graph_module=graph_module, constants={})
 
     resolved: dict = {}
-    assert export_utils.validate_engine_program(make_program(), resolved) == 1
+    assert export_utils.validate_engine_program(source, resolved) == 1
     assert len(calls) == 1
 
-    # Staging builds a new ExportedProgram, so the rewrite has to find the earlier work
-    # by node name rather than by object identity.
-    assert resolved["eng_node"] is not None
+    # Staging preserves node identities, which is what lets the rewrite find the earlier
+    # work on a different program object.
+    assert [node.name for node in staged.graph_module.graph.nodes] == [
+        node.name for node in source.graph_module.graph.nodes
+    ]
+
+    export_utils.replace_execute_engine(staged, resolved)
+
+    # Without the handoff the rewrite resolves the engine again and this becomes 2.
     assert len(calls) == 1
