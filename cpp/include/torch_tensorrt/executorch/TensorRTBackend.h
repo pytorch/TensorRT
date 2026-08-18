@@ -82,6 +82,14 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
       ::executorch::runtime::FreeableBuffer* processed,
       ::executorch::runtime::ArrayRef<::executorch::runtime::CompileSpec> compile_specs) const override;
 
+  // Runs the engine. With an executorch::extension::cuda::CallerStreamGuard active and
+  // no host staging required, this may return while the enqueue is still in flight on
+  // the selected stream, so the caller must keep device buffers alive and unmodified
+  // past return, order any other stream against this one, and synchronize the stream
+  // before reading device-resident outputs. The selected stream must be on the engine's
+  // device, and calls on one handle must not overlap each other or its destruction.
+  // Note that other CUDA delegates sharing the same guard may instead synchronize before
+  // returning, so do not assume results are ready on return from this one.
   ::executorch::runtime::Error execute(
       ::executorch::runtime::BackendExecutionContext& context,
       ::executorch::runtime::DelegateHandle* handle,

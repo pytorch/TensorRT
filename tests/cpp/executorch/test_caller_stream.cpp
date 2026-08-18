@@ -5,10 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-// Pins the caller-stream properties the TensorRT backend relies on. The backend
-// derives both the stream it enqueues on and whether it may return with work
-// still in flight from one getCallerStream() read, so a change to any property
-// below would silently change delegate behavior.
+// Pins the caller-stream properties the TensorRT backend relies on. The backend derives
+// both the stream it enqueues on and whether it may return with work still in flight from
+// one getCallerStream() read, so a change to any property below would silently change
+// delegate behavior.
+//
+// This exercises the dependency, not the backend: it does not link the delegate, so it
+// cannot catch the delegate ceasing to consult getCallerStream().
 
 #include <cuda_runtime.h>
 #include <executorch/extension/cuda/caller_stream.h>

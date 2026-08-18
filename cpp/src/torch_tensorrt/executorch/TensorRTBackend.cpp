@@ -589,7 +589,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     ET_LOG(
         Error,
         "TensorRTBackend::execute: enqueueV3 failed. Verify that the selected "
-        "CallerStreamGuard stream belongs to the TensorRT engine device.");
+        "CallerStreamGuard stream belongs to the TensorRT engine device. If a CUDA "
+        "green context is current, scope a CallerStreamGuard with a green-context "
+        "stream: cudaStreamPerThread is invalid while a green context is current.");
     return Error::InvalidState;
   }
 
