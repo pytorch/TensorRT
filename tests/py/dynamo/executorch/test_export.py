@@ -10,6 +10,7 @@ pytest.importorskip("executorch.exir")
 
 import torch  # noqa: E402
 import torch_tensorrt  # noqa: E402
+from torch._library.fake_class_registry import FakeScriptObject  # noqa: E402
 from torch._subclasses.fake_tensor import is_fake  # noqa: E402
 from torch.export.graph_signature import (  # noqa: E402
     CustomObjArgument,
@@ -92,6 +93,72 @@ def _engine_program(*, lifted, execute_count=1, requires_output_allocator=False)
         constants=constants,
     )
     return program, engine_node, input_node, engine
+
+
+class _SerializingEngine:
+    """A stand-in for a TensorRT engine, whose deepcopy serializes the payload."""
+
+    def __init__(self):
+        self.serializations = 0
+
+    def __getstate__(self):
+        self.serializations += 1
+        return {}
+
+
+class _StageableProgram(SimpleNamespace):
+    """The parts of ExportedProgram that stage_exported_program uses."""
+
+    def _update(self, graph_module, graph_signature, *, state_dict, constants):
+        return _StageableProgram(
+            graph_module=graph_module,
+            graph_signature=graph_signature,
+            state_dict=state_dict,
+            constants=constants,
+        )
+
+
+def _lifted_engine_program():
+    """A program whose engine is lifted, so it arrives as a FakeScriptObject."""
+    engine = _SerializingEngine()
+    fake_engine = FakeScriptObject(
+        wrapped_obj=object(), script_class_name="tensorrt.Engine", x=None
+    )
+    object.__setattr__(fake_engine, "real_obj", engine)
+
+    graph = torch.fx.Graph()
+    engine_node = graph.placeholder("obj_engine")
+    engine_node.meta["val"] = fake_engine
+    input_node = graph.placeholder("x")
+    graph.output(input_node)
+    graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
+
+    signature = ExportGraphSignature(
+        input_specs=[
+            InputSpec(
+                kind=InputKind.CUSTOM_OBJ,
+                arg=CustomObjArgument(
+                    name=engine_node.name,
+                    class_fqn="tensorrt.Engine",
+                    fake_val=fake_engine,
+                ),
+                target="engine_fqn",
+            ),
+            InputSpec(
+                kind=InputKind.USER_INPUT,
+                arg=TensorArgument(name=input_node.name),
+                target=None,
+            ),
+        ],
+        output_specs=[],
+    )
+    program = _StageableProgram(
+        graph_module=graph_module,
+        graph_signature=signature,
+        state_dict={},
+        constants={"engine_fqn": fake_engine},
+    )
+    return program, engine_node, engine, fake_engine
 
 
 def _patch_lowering(monkeypatch, engine_counts=None):
@@ -446,6 +513,31 @@ def test_stage_exported_program_clones_nested_graph_modules():
     assert staged_nested_meta["payload"] is nested_payload
     assert "staged_only" not in graph_module.nested.meta
     assert nested_node.meta["nested"]["items"] == ["source"]
+
+
+@pytest.mark.unit
+def test_stage_exported_program_shares_a_lifted_engine():
+    """A lifted engine reaches both the graph and the signature, and must be shared.
+
+    It arrives as a FakeScriptObject, which is not a torch.ScriptObject, and copying
+    one reaches the engine it wraps: a serialize plus a deserialize per copy.
+    """
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    program, engine_node, engine, fake_engine = _lifted_engine_program()
+
+    staged = export_utils.stage_exported_program(program)
+
+    staged_nodes = {node.name: node for node in staged.graph_module.graph.nodes}
+    assert staged_nodes[engine_node.name].meta["val"] is fake_engine
+    custom_obj_specs = [
+        spec
+        for spec in staged.graph_signature.input_specs
+        if spec.kind == InputKind.CUSTOM_OBJ
+    ]
+    assert len(custom_obj_specs) == 1
+    assert custom_obj_specs[0].arg.fake_val is fake_engine
+    assert staged.constants["engine_fqn"] is fake_engine
+    assert engine.serializations == 0
 
 
 @pytest.mark.unit

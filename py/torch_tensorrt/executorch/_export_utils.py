@@ -5,10 +5,15 @@ from typing import Any, Sequence
 
 import logging
 import torch
+from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import is_fake
 from torch.export.graph_signature import InputKind
 
 logger = logging.getLogger(__name__)
+
+# A lifted engine reaches the graph as a FakeScriptObject holding the real engine on
+# .real_obj, and deepcopy of a real engine is a serialize plus a deserialize.
+_SHARED_PAYLOAD_TYPES = (torch.Tensor, torch.ScriptObject, FakeScriptObject)
 
 
 def _seed_graph_bound_leaves(value: Any, memo: dict[int, Any]) -> bool:
@@ -126,9 +131,7 @@ def _payload_sharing_memo(exported_program: Any) -> dict[int, Any]:
         *exported_program.state_dict.values(),
         *exported_program.constants.values(),
     ):
-        # Match the checks below: only tensors and engine objects are documented as
-        # shared, so a custom-object constant is copied like any other value.
-        if isinstance(value, (torch.Tensor, torch.ScriptObject)):
+        if isinstance(value, _SHARED_PAYLOAD_TYPES):
             memo[id(value)] = value
     for module in exported_program.graph_module.modules():
         for value in (
@@ -137,7 +140,7 @@ def _payload_sharing_memo(exported_program: Any) -> dict[int, Any]:
         ):
             memo[id(value)] = value
         for value in module.__dict__.values():
-            if isinstance(value, (torch.Tensor, torch.ScriptObject)):
+            if isinstance(value, _SHARED_PAYLOAD_TYPES):
                 memo[id(value)] = value
     for module in exported_program.graph_module.modules():
         if not isinstance(module, torch.fx.GraphModule):
@@ -145,7 +148,7 @@ def _payload_sharing_memo(exported_program: Any) -> dict[int, Any]:
         for node in module.graph.nodes:
             for value in node.meta.values():
                 for leaf in torch.utils._pytree.tree_leaves(value):
-                    if isinstance(leaf, (torch.Tensor, torch.ScriptObject)):
+                    if isinstance(leaf, _SHARED_PAYLOAD_TYPES):
                         memo[id(leaf)] = leaf
     return memo
 
@@ -200,13 +203,13 @@ def _stage_graph_module(
 
 def stage_exported_program(exported_program: Any) -> Any:
     """Copy program structure while sharing immutable tensor and engine payloads."""
-    graph_module = _stage_graph_module(
-        exported_program.graph_module,
-        _payload_sharing_memo(exported_program),
-    )
+    payload_memo = _payload_sharing_memo(exported_program)
+    graph_module = _stage_graph_module(exported_program.graph_module, payload_memo)
     return exported_program._update(
         graph_module,
-        copy.deepcopy(exported_program.graph_signature),
+        # The signature holds the lifted engine on CustomObjArgument.fake_val, so it
+        # needs the same memo or the copy reaches the engine the graph shares.
+        copy.deepcopy(exported_program.graph_signature, payload_memo),
         state_dict=dict(exported_program.state_dict),
         constants=dict(exported_program.constants),
     )
