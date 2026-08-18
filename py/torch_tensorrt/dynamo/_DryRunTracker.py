@@ -9,6 +9,7 @@ import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
 from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
+from torch_tensorrt.dynamo.observer import observable
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ class DryRunTracker:
     to_run_in_torch: List[str] = field(default_factory=list)
 
 
+@observable()
 def dryrun_stats_display(
     dryrun_tracker: DryRunTracker, dryrun_enabled: Union[bool, str]
 ) -> None:
