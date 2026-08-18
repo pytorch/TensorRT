@@ -362,6 +362,37 @@ def test_replace_execute_engine_keeps_a_lifted_buffer_of_the_same_name():
     not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
     reason="Torch-TensorRT runtime operators are not available",
 )
+def test_validate_engine_program_counts_both_engine_ops_and_nothing_else():
+    """A graph an earlier rewrite already touched carries engine info as node args."""
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    program, _, input_node, engine = _engine_program(lifted=False)
+    graph = program.graph_module.graph
+    execute_node = next(
+        node
+        for node in graph.nodes
+        if node.target is torch.ops.tensorrt.execute_engine.default
+    )
+    rewritten_info = _EngineState().info
+    with graph.inserting_before(execute_node):
+        no_op_node = graph.call_function(
+            torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
+            ([input_node], *rewritten_info),
+        )
+        graph.call_function(torch.ops.aten.relu.default, (input_node,))
+    resolved = {}
+
+    assert export_utils.validate_engine_program(program, resolved) == 2
+
+    assert set(resolved) == {execute_node.name, no_op_node.name}
+    assert resolved[no_op_node.name] == rewritten_info
+    assert resolved[execute_node.name] == engine.info
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
 def test_validate_engine_program_serializes_a_shared_engine_once():
     """Serializing an engine costs a copy of its bytes, so do it once per engine."""
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
