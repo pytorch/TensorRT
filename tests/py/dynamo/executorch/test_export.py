@@ -203,7 +203,7 @@ def _patch_lowering(monkeypatch, engine_counts=None):
         "ENABLED_FEATURES",
         features.ENABLED_FEATURES._replace(torch_tensorrt_runtime=True),
     )
-    export_module = importlib.import_module("torch_tensorrt.executorch.export")
+    export_module = importlib.import_module("torch_tensorrt.executorch._export")
     engine_counts = engine_counts or {}
     lower = MagicMock(return_value=object())
     monkeypatch.setattr(executorch.exir, "to_edge_transform_and_lower", lower)
@@ -802,7 +802,7 @@ def test_export_rejects_non_linux_platform(monkeypatch):
 
 @pytest.mark.unit
 def test_prepare_graph_module_preserves_tensor_keyword_inputs(monkeypatch):
-    export_module = importlib.import_module("torch_tensorrt.executorch.export")
+    export_module = importlib.import_module("torch_tensorrt.executorch._export")
     graph_module = torch.fx.GraphModule(torch.nn.Module(), torch.fx.Graph())
     exported = FakeExportedProgram()
     export_graph_module = MagicMock(return_value=exported)
@@ -1162,7 +1162,7 @@ def test_export_normalizes_empty_transform_passes_to_none(monkeypatch):
 @pytest.mark.unit
 @pytest.mark.parametrize("container_type", [list, tuple])
 def test_prepare_graph_module_infers_nested_dynamic_shapes(monkeypatch, container_type):
-    export_module = importlib.import_module("torch_tensorrt.executorch.export")
+    export_module = importlib.import_module("torch_tensorrt.executorch._export")
 
     class NestedModule(torch.nn.Module):
         def forward(self, nested):
@@ -1197,7 +1197,7 @@ def test_prepare_graph_module_infers_nested_dynamic_shapes(monkeypatch, containe
 
 @pytest.mark.unit
 def test_prepare_graph_module_preserves_shared_dynamic_dimensions(monkeypatch):
-    export_module = importlib.import_module("torch_tensorrt.executorch.export")
+    export_module = importlib.import_module("torch_tensorrt.executorch._export")
 
     class SharedBatchModule(torch.nn.Module):
         def forward(self, left, right):
@@ -1234,7 +1234,7 @@ def test_prepare_graph_module_preserves_shared_dynamic_dimensions(monkeypatch):
 
 @pytest.mark.unit
 def test_prepare_graph_module_requires_shapes_for_mixed_dynamic_inputs(monkeypatch):
-    export_module = importlib.import_module("torch_tensorrt.executorch.export")
+    export_module = importlib.import_module("torch_tensorrt.executorch._export")
 
     class MixedModule(torch.nn.Module):
         def forward(self, dynamic, static):
@@ -1274,7 +1274,7 @@ def test_prepare_graph_module_requires_shapes_for_mixed_dynamic_inputs(monkeypat
 
 @pytest.mark.unit
 def test_prepare_graph_module_does_not_infer_shapes_without_inputs(monkeypatch):
-    export_module = importlib.import_module("torch_tensorrt.executorch.export")
+    export_module = importlib.import_module("torch_tensorrt.executorch._export")
     graph_module = torch.fx.GraphModule(torch.nn.Module(), torch.fx.Graph())
     exported = FakeExportedProgram()
     export_graph_module = MagicMock(return_value=exported)
@@ -1335,7 +1335,7 @@ def test_export_rejects_string_option_sequences(monkeypatch, option_name):
 
 @pytest.mark.unit
 def test_prepare_graph_module_rejects_argument_mismatch(monkeypatch):
-    export_module = importlib.import_module("torch_tensorrt.executorch.export")
+    export_module = importlib.import_module("torch_tensorrt.executorch._export")
 
     class OneInput(torch.nn.Module):
         def forward(self, x):
