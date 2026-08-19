@@ -1406,6 +1406,17 @@ def repeat_validator(
     # fall back to PyTorch instead of failing at engine build time.
     repeats = node.args[1]
     if "val" not in node.args[0].meta:
+        # Without input_rank we can't compute the exact output_rank, but
+        # output_rank = max(len(repeats), input_rank) is always >= len(repeats),
+        # so len(repeats) alone already proves it exceeds 8 here regardless of
+        # input_rank.
+        if len(repeats) > 8:
+            _LOGGER.debug(
+                f"aten.repeat node {node.name} has {len(repeats)} repeat dims, "
+                "which alone exceeds TensorRT's maximum supported tensor rank "
+                "of 8. Falling back to PyTorch for this node."
+            )
+            return False
         return True
 
     input_rank = len(node.args[0].meta["val"].shape)
