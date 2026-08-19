@@ -35,6 +35,54 @@ find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 
+# ExecuTorch declares every pybind module with pybind11_add_module(<target> SHARED
+# ...). pybind11 maps a non-MODULE type onto pybind11::embed, and CMake's
+# python_add_library then requires the Python::Python target, so the first module
+# ExecuTorch declares (codegen/tools/selective_build) aborts the configure with:
+#
+#   Python_ADD_LIBRARY: dependent target 'Python::Python' is not defined.
+#      Did you miss to request COMPONENT 'Development.Embed'?
+#
+# Do NOT take that hint literally. Development.Embed needs a libpython, and the
+# manylinux CPython in the release image is built without one, so requesting it
+# just fails the whole find_package instead:
+#
+#   Could NOT find Python (missing: Python_INCLUDE_DIRS Python_LIBRARIES ...)
+#
+# pybind11 hit this and deliberately made the component optional for manylinux
+# (pybind11NewTools.cmake: "Development.Module support (required for manylinux)"),
+# so match that: Module required, Embed optional. Finding Python before pybind11
+# is the override pybind11 documents.
+#
+# PYTHON_EXECUTABLE is bridged first because the build passes the interpreter
+# under that name while FindPython reads Python_EXECUTABLE. ExecuTorch does the
+# same bridge, but only after this point, so without it this call could resolve a
+# different interpreter than the rest of the build.
+if(PYTHON_EXECUTABLE AND NOT Python_EXECUTABLE)
+  set(Python_EXECUTABLE "${PYTHON_EXECUTABLE}")
+endif()
+find_package(Python REQUIRED COMPONENTS Interpreter Development.Module
+             OPTIONAL_COMPONENTS Development.Embed)
+
+# With Embed optional, Python::Python does not exist on manylinux, and the SHARED
+# declaration above still demands it. Supply an empty stand-in for that case only.
+# It links nothing, which is what an extension module needs: Python symbols
+# resolve from the interpreter that loads the module, never from a linked
+# libpython. Where the image does provide a usable libpython, the real imported
+# target is used instead.
+#
+# This is a workaround for a defect upstream, not the root fix. Those three
+# modules should be declared MODULE rather than SHARED: CMake skips this check
+# entirely for MODULE, and MODULE is what a Python extension is. Filed upstream.
+if(NOT TARGET Python::Python)
+  add_library(Python::Python INTERFACE IMPORTED)
+  # The real Python::Python carries INTERFACE_INCLUDE_DIRECTORIES. Forward those
+  # through Python::Module so the stand-in is not silently header-less if a
+  # consumer ever relies on them. Python::Module links no libpython.
+  set_target_properties(Python::Python PROPERTIES
+    INTERFACE_LINK_LIBRARIES Python::Module)
+endif()
+
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_PYBIND ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_MODULE ON CACHE BOOL "" FORCE)
@@ -133,6 +181,7 @@ foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
   target_link_options(${_torch_tensorrt_executorch_runtime_target} PRIVATE
     -static-libstdc++
     -static-libgcc)
+
 endforeach()
 
 # The runtime wheel intentionally does not bundle PyTorch, TensorRT, or CUDA.
@@ -156,3 +205,4 @@ set_target_properties(data_loader PROPERTIES SUFFIX ".so")
 install(TARGETS portable_lib data_loader LIBRARY DESTINATION lib)
 
 add_custom_target(torch_tensorrt_executorch_portable_lib DEPENDS portable_lib data_loader)
+
