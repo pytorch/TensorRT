@@ -85,6 +85,14 @@ the removed `CudaStreamGuard`:
   complete, order any cross-stream producers/consumers with their own events,
   and synchronize the stream before reading outputs on the host.
 - With no guard active, the backend falls back to `cudaStreamPerThread`.
+- With the `use_shared_activation_scratch` backend option enabled, one buffer per
+  device backs the activation scratch of every execution context created while it
+  was on, so an enqueue against that buffer must not overlap another one. The
+  backend orders consecutive enqueues itself, whether they run on one stream or
+  on two. What it cannot order is two `execute()` calls submitted concurrently on
+  one device: the caller must submit them one at a time, whether or not they
+  share a stream. Contexts created while the option was off keep their own
+  scratch and are unaffected.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
   the discrete-GPU CI configuration, where all inputs and outputs are host-backed
   and therefore take the synchronized staging path. CI separately asserts that the
@@ -103,6 +111,34 @@ the removed `CudaStreamGuard`:
   the method inputs and outputs are host-backed, so the device-resident
   asynchronous return described above is still uncovered and the interaction
   between a green context and the internal completion event remains untested.
+
+## Shared activation scratch
+
+A TensorRT execution context allocates its own activation scratch and holds it
+for as long as the context lives, so a model lowered to N single-layer engines
+pays N copies and can run out of device memory on the layer count alone. The
+`use_shared_activation_scratch` backend option — a boolean, off by default —
+instead backs every context on a device from one buffer, grown to the largest
+engine's requirement:
+
+```cpp
+#include <executorch/runtime/backend/interface.h>
+
+executorch::runtime::BackendOptions<1> options;
+options.set_option("use_shared_activation_scratch", true);
+executorch::runtime::set_option("TensorRTBackend", options.view());
+```
+
+Check what `executorch::runtime::set_option` returns: `Error::NotFound` means no
+backend is registered under that name, which is what a binary that has not linked
+the backend archive gets.
+
+N per-engine copies collapse to one, so the reclaimed memory is `(N-1)` times the
+per-engine scratch. Set the option before loading the methods whose engines
+should use the pool, and read the `use_shared_activation_scratch` bullet of the
+caller-stream contract above first: the pool carries an ordering obligation the
+backend cannot discharge for you. The buffer is never released, so the device
+keeps the largest scratch it was ever asked for until the process exits.
 
 ## Standalone Backend Archive
 

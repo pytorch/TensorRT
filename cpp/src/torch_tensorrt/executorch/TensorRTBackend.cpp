@@ -6,17 +6,21 @@
  */
 
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
+#include "torch_tensorrt/executorch/SharedScratchPool.h"
 #include "torch_tensorrt/executorch/TensorRTBindingNames.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 #include "torch_tensorrt/executorch/WeightStreamingBudget.h"
 
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <NvInfer.h>
@@ -34,6 +38,8 @@ using ::executorch::aten::SizesType;
 using ::executorch::runtime::ArrayRef;
 using ::executorch::runtime::BackendExecutionContext;
 using ::executorch::runtime::BackendInitContext;
+using ::executorch::runtime::BackendOption;
+using ::executorch::runtime::BackendOptionContext;
 using ::executorch::runtime::CompileSpec;
 using ::executorch::runtime::DelegateHandle;
 using ::executorch::runtime::Error;
@@ -151,6 +157,13 @@ bool infer_binding_names(
   return true;
 }
 
+// The setting behind kSharedActivationScratchKey: whether an execution context
+// created subsequently draws its activation scratch from the shared per-device
+// pool rather than allocating its own.
+//
+// execute() must read EngineHandle::shared_scratch, never this.
+std::atomic<bool> scratch_enabled{false};
+
 Error initialize_engine_io(EngineHandle& handle) {
   if (handle.input_binding_names.empty() && handle.output_binding_names.empty() &&
       !infer_binding_names(handle.engine.get(), handle.input_binding_names, handle.output_binding_names)) {
@@ -161,7 +174,13 @@ Error initialize_engine_io(EngineHandle& handle) {
   handle.num_inputs = handle.input_binding_names.size();
   handle.num_outputs = handle.output_binding_names.size();
 
-  handle.exec_ctx.reset(handle.engine->createExecutionContext());
+  // kSTATIC gives the context its own activation scratch; kUSER_MANAGED makes it
+  // allocate none and take a buffer from execute() instead. The strategy is fixed
+  // at creation, so it is captured on the handle here rather than read per call.
+  handle.shared_scratch = scratch_enabled.load(std::memory_order_relaxed);
+  const auto strategy = handle.shared_scratch ? nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED
+                                              : nvinfer1::ExecutionContextAllocationStrategy::kSTATIC;
+  handle.exec_ctx.reset(handle.engine->createExecutionContext(strategy));
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle.exec_ctx, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT execution context");
 
@@ -202,6 +221,124 @@ bool is_cuda_accessible_ptr(const void* ptr) {
     return false;
   }
   return attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
+}
+
+// Process-wide per-device pool for TensorRT execution-context activation scratch.
+// One buffer sized to the largest engine's need serves every context on a device,
+// instead of each of N layer-engines pinning its own scratch, which makes device
+// memory scale with the layer count and OOMs multi-layer models.
+//
+// ORDERING: a context reads and writes its scratch for the whole enqueue, which
+// can still be in flight when execute() returns, so two enqueues must never hold
+// this buffer at the same time.
+//
+// What the pool's event handoff does NOT cover is concurrent execute() on one
+// device: scratch_pool_mu guards the two maps only, and is released before either
+// enqueue is submitted, so two threads can interleave their waits and records.
+// The requirement is therefore that delegate enqueues on a device are submitted
+// one at a time -- they need not share a stream, but they must not be submitted
+// concurrently. That is why the pool is opt-in.
+//
+// The buffers and the events are intentionally never freed. Nothing here runs a
+// CUDA call at process exit, which also keeps the pool clear of teardown-order
+// hazards against anything else holding device memory.
+std::mutex scratch_pool_mu;
+std::unordered_map<int, std::pair<void*, size_t>> scratch_pool;
+std::unordered_map<int, SharedScratchMarker> scratch_pool_markers;
+
+// Sets out_ptr to a buffer of at least `need` bytes on `device_id` and out_size to
+// its capacity, with `stream` ordered after the enqueue that last used the buffer.
+// The caller must call mark_shared_scratch_in_flight once it has submitted its own
+// enqueue.
+//
+// Must be called with `device_id` already current: cudaEventCreateWithFlags,
+// cudaMalloc, cudaFree and cudaDeviceSynchronize all act on the *current* device
+// and nothing in here sets it.
+Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream, void*& out_ptr, size_t& out_size) {
+  std::lock_guard<std::mutex> lk(scratch_pool_mu);
+
+  const SharedScratchHandoff handoff = shared_scratch_claim_event(scratch_pool_markers, device_id, []() -> cudaEvent_t {
+    cudaEvent_t event = nullptr;
+    if (cudaEventCreateWithFlags(&event, cudaEventDisableTiming) != cudaSuccess) {
+      return nullptr;
+    }
+    return event;
+  });
+  if (handoff.event == nullptr) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: failed to create the shared activation scratch handoff event on device %d",
+        device_id);
+    return Error::Internal;
+  }
+  if (handoff.needs_wait) {
+    const cudaError_t err = cudaStreamWaitEvent(stream, handoff.event, 0);
+    if (err != cudaSuccess) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: waiting for the enqueue that last used the shared activation scratch failed: %s",
+          cudaGetErrorString(err));
+      return Error::InvalidState;
+    }
+  }
+
+  const auto slot = scratch_pool.find(device_id);
+  const bool first_buffer = slot == scratch_pool.end() || slot->second.first == nullptr;
+  void* const buffer = shared_scratch_get_or_grow(
+      scratch_pool,
+      device_id,
+      need,
+      out_size,
+      [device_id, first_buffer](size_t bytes) -> void* {
+        void* p = nullptr;
+        if (cudaMalloc(&p, bytes) != cudaSuccess) {
+          return nullptr;
+        }
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: shared scratch pool (device %d) %s %zu bytes",
+            device_id,
+            first_buffer ? "allocated" : "grew to",
+            bytes);
+        return p;
+      },
+      [](void* old) {
+        // Sync before free so no in-flight enqueue points at the old buffer.
+        cudaDeviceSynchronize();
+        cudaFree(old);
+      });
+  if (buffer == nullptr) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: failed to allocate %zu bytes of shared activation scratch on device %d",
+        need,
+        device_id);
+    return Error::MemoryAllocationFailed;
+  }
+
+  out_ptr = buffer;
+  return Error::Ok;
+}
+
+// Records the enqueue now in flight on `stream` against `device_id`'s shared
+// scratch, so the next call to get_or_grow_shared_scratch waits for it.
+Error mark_shared_scratch_in_flight(int device_id, cudaStream_t stream) {
+  std::lock_guard<std::mutex> lk(scratch_pool_mu);
+
+  const cudaEvent_t event = shared_scratch_mark_in_flight(scratch_pool_markers, device_id);
+  if (event == nullptr) {
+    ET_LOG(Error, "TensorRTBackend::execute: shared activation scratch on device %d has no handoff event", device_id);
+    return Error::Internal;
+  }
+  const cudaError_t err = cudaEventRecord(event, stream);
+  if (err != cudaSuccess) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: recording the completion event for the shared activation scratch enqueue failed: %s",
+        cudaGetErrorString(err));
+    return Error::InvalidState;
+  }
+  return Error::Ok;
 }
 
 } // namespace
@@ -906,7 +1043,34 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 4. Enqueue inference on the current CUDA stream
+  // 4. Back activation scratch with the shared per-device pool
+  // ------------------------------------------------------------------
+  // All input shapes are bound by now, so the exact scratch requirement for this
+  // call is known. The buffer is installed on every call, not once, because a
+  // larger engine may have grown the pool and moved it since the last one. A
+  // kSTATIC context owns its private scratch, so setDeviceMemoryV2 must not be
+  // called on one.
+  bool scratch_from_pool = false;
+  if (engine->shared_scratch) {
+    const size_t need = ctx->updateDeviceMemorySizeForShapes();
+    void* pool = nullptr;
+    size_t pool_size = 0;
+    // Zero means this call needs no scratch: nothing to claim, and nothing to
+    // order against the previous user of the buffer. Zero is also what a failed
+    // query returns; on this context's first call that is caught, because
+    // enqueueV3 refuses an engine it has never been given scratch for.
+    if (need > 0) {
+      const Error scratch_err = get_or_grow_shared_scratch(engine->device_id, need, stream, pool, pool_size);
+      if (scratch_err != Error::Ok) {
+        return scratch_err;
+      }
+      scratch_from_pool = true;
+    }
+    ctx->setDeviceMemoryV2(pool, static_cast<int64_t>(pool_size));
+  }
+
+  // ------------------------------------------------------------------
+  // 5. Enqueue inference on the current CUDA stream
   // ------------------------------------------------------------------
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(
@@ -916,6 +1080,18 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         "green context is current, scope a CallerStreamGuard with a green-context "
         "stream: cudaStreamPerThread is invalid while a green context is current.");
     return Error::InvalidState;
+  }
+
+  // Pairs with get_or_grow_shared_scratch: the next claimant waits on this event.
+  if (scratch_from_pool) {
+    const Error mark_err = mark_shared_scratch_in_flight(engine->device_id, stream);
+    if (mark_err != Error::Ok) {
+      // Nothing will wait for this enqueue, so wait for it here instead of
+      // leaving the next user of the buffer to overwrite live scratch.
+      (void)cudaStreamSynchronize(stream);
+      engine->inflight_pending = false;
+      return mark_err;
+    }
   }
 
   // Caller-owned KV: reflect each engine in-place update into its delegate output
@@ -992,6 +1168,26 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
     engine->inflight_pending = true;
   }
+  return Error::Ok;
+}
+
+// ---------------------------------------------------------------------------
+// set_option
+// ---------------------------------------------------------------------------
+Error TensorRTBackend::set_option(ET_UNUSED BackendOptionContext& context, const Span<BackendOption>& backend_options) {
+  for (const auto& option : backend_options) {
+    // A caller may address one option span to several backends, so a key this
+    // backend does not read is skipped rather than refused.
+    if (std::strcmp(option.key, kSharedActivationScratchKey) == 0) {
+      if (const bool* const val = std::get_if<bool>(&option.value)) {
+        scratch_enabled.store(*val, std::memory_order_relaxed);
+      } else {
+        ET_LOG(Error, "TensorRTBackend::set_option: option '%s' must be a boolean", kSharedActivationScratchKey);
+        return Error::InvalidArgument;
+      }
+    }
+  }
+
   return Error::Ok;
 }
 

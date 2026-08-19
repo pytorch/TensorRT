@@ -18,6 +18,17 @@ config_setting(
 )
 
 cc_library(
+    name = "cuda_headers",
+    hdrs = glob([
+        "include/**/*.h",
+        "include/**/*.hpp",
+        "include/**/*.inl",
+        "include/**/*",
+    ]),
+    includes = ["include/"],
+)
+
+cc_library(
     name = "cudart",
     srcs = select({
         ":windows": [

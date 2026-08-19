@@ -192,6 +192,28 @@ cc_library(
 )
 
 cc_library(
+    name = "tensorrt_executorch_shared_scratch_pool",
+    hdrs = [
+        "include/torch_tensorrt/executorch/SharedScratchPool.h",
+    ],
+    strip_include_prefix = "include",
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = select({
+        ":linux_x86_64": [
+            "@cuda//:cuda_headers",
+        ],
+        ":sbsa": [
+            "@cuda//:cuda_headers",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
@@ -211,6 +233,7 @@ cc_library(
     deps = [
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
+        ":tensorrt_executorch_shared_scratch_pool",
         ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
         ":linux_x86_64": [
@@ -254,6 +277,7 @@ filegroup(
 filegroup(
     name = "executorch_api_headers",
     srcs = [
+        "include/torch_tensorrt/executorch/SharedScratchPool.h",
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",

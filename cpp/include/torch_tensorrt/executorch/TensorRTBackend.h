@@ -75,6 +75,10 @@ struct EngineHandle {
   size_t num_aliased_outputs = 0;
   int device_id = 0;
   bool unified_memory = false;
+  // Whether exec_ctx was created kUSER_MANAGED and draws its activation scratch
+  // from the shared per-device pool (kSharedActivationScratchKey,
+  // SharedScratchPool.h).
+  bool shared_scratch = false;
   std::mutex mu;
   // Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or
   // destroying an execution context while one of its enqueues is in flight, so when
@@ -108,6 +112,13 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
       ::executorch::runtime::BackendExecutionContext& context,
       ::executorch::runtime::DelegateHandle* handle,
       ::executorch::runtime::Span<::executorch::runtime::EValue*> args) const override;
+
+  // Applies the runtime backend options a caller passes to
+  // executorch::runtime::set_option("TensorRTBackend", ...). The only key read is
+  // kSharedActivationScratchKey (SharedScratchPool.h), a boolean.
+  ::executorch::runtime::Error set_option(
+      ET_UNUSED ::executorch::runtime::BackendOptionContext& context,
+      const ::executorch::runtime::Span<::executorch::runtime::BackendOption>& backend_options) override;
 
   void destroy(::executorch::runtime::DelegateHandle* handle) const override;
 };

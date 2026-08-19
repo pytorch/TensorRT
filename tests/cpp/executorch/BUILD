@@ -9,6 +9,7 @@ test_suite(
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
         ":test_executorch_weight_streaming_budget",
+        ":test_shared_scratch_pool",
     ],
 )
 
@@ -44,6 +45,15 @@ cc_test(
     srcs = ["test_executorch_weight_streaming_budget.cpp"],
     deps = [
         "//cpp:tensorrt_executorch_weight_streaming_budget",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "test_shared_scratch_pool",
+    srcs = ["test_shared_scratch_pool.cpp"],
+    deps = [
+        "//cpp:tensorrt_executorch_shared_scratch_pool",
         "@googletest//:gtest_main",
     ],
 )
