@@ -1,0 +1,14 @@
+.. _exhale_define_macros_8h_1ad19939408f7be171a74a89928b36eb59:
+
+Define TORCHTRT_HIDDEN
+======================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_macros.h`
+
+
+Define Documentation
+--------------------
+
+
+.. doxygendefine:: TORCHTRT_HIDDEN
+   :project: Torch-TensorRT

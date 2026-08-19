@@ -540,10 +540,17 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     for (int d = 0; d < actual_dims.nbDims; ++d) {
       new_sizes[d] = static_cast<SizesType>(actual_dims.d[d]);
     }
-    Error resize_err = executorch::runtime::resize_tensor(et_out, {new_sizes, static_cast<size_t>(actual_dims.nbDims)});
-    if (resize_err != Error::Ok) {
-      ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for output '%s'", name.c_str());
-      return resize_err;
+    // A 0-d output has an immutable rank of zero, and TensorRT reports it as a
+    // 1-element 1-D shape, so resizing would be rejected. Skip it when the
+    // element count already agrees.
+    const bool scalar_output = et_out.dim() == 0 && actual_dims.nbDims == 1 && actual_dims.d[0] == 1;
+    if (!scalar_output) {
+      Error resize_err =
+          executorch::runtime::resize_tensor(et_out, {new_sizes, static_cast<size_t>(actual_dims.nbDims)});
+      if (resize_err != Error::Ok) {
+        ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for output '%s'", name.c_str());
+        return resize_err;
+      }
     }
 
     void* bind_ptr = nullptr;
@@ -607,6 +614,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
   const bool must_sync = output_staged_to_host || input_staged_from_host || !g_user_stream_set;
   if (must_sync) {
+    Error copy_err = Error::Ok;
     for (auto& output : outputs_needing_copy) {
       exec_aten::Tensor et_out = args[num_inputs + output.first]->toTensor();
       cuda_err =
@@ -617,7 +625,11 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
             "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
             output.first,
             cudaGetErrorString(cuda_err));
-        return Error::InvalidProgram;
+        // The enqueue already succeeded, so the engine is still running on the
+        // stream. Drain below before returning, or the next call mutates a live
+        // execution context, which TensorRT forbids.
+        copy_err = Error::InvalidProgram;
+        break;
       }
     }
     cuda_err = cudaStreamSynchronize(stream);
@@ -625,6 +637,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (cuda_err != cudaSuccess) {
       ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
       return Error::InvalidProgram;
+    }
+    if (copy_err != Error::Ok) {
+      return copy_err;
     }
   } else {
     cuda_err = cudaEventRecord(engine->inflight_event, stream);

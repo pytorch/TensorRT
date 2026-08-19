@@ -1,0 +1,912 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Torch-TensorRT (FX Frontend) User Guide &mdash; Torch-TensorRT master documentation</title>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Post Training Quantization (PTQ)" href="ptq.html" />
+    <link rel="prev" title="Creating a TorchScript Module" href="creating_torchscript_module_in_python.html" />
+  <!-- Google Analytics -->
+
+  <!-- End Google Analytics -->
+
+
+
+  <script src="../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-orange-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/audio/stable/index.html">
+                  <span class="dropdown-title">torchaudio</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/text/stable/index.html">
+                  <span class="dropdown-title">torchtext</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/vision/stable/index.html">
+                  <span class="dropdown-title">torchvision</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
+                  <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
+                  <span class="dropdown-title">TorchServe</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchx/">
+                  <span class="dropdown-title">TorchX</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/xla">
+                  <span class="dropdown-title">PyTorch on XLA Devices</span>
+                  <p></p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                Resources
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/features">
+                  <span class="dropdown-title">About</span>
+                  <p>Learn about PyTorch’s features and capabilities</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class="dropdown-title">Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class="dropdown-title">Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class="dropdown-title">Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/hub">
+                  <span class="dropdown-title">Models (Beta)</span>
+                  <p>Discover, publish, and reuse pre-trained models</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">GitHub</a>
+          </li>
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+
+
+
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+
+
+
+
+
+                <div class="version">
+                  master (1.2.0a0+2fc413b3)
+                </div>
+
+
+
+
+
+
+
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+
+          </div>
+
+
+
+
+
+
+
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks.html">Example notebooks</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+
+
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+
+      <li>
+        <a href="../index.html">
+
+            Docs
+
+        </a> &gt;
+      </li>
+
+
+      <li>Torch-TensorRT (FX Frontend) User Guide</li>
+
+
+      <li class="pytorch-breadcrumbs-aside">
+
+
+            <a href="../_sources/tutorials/getting_started_with_fx_path.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+
+
+      </li>
+
+  </ul>
+
+
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+
+
+          <div class="rst-content">
+
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+
+  <section id="torch-tensorrt-fx-frontend-user-guide">
+<span id="getting-started-with-fx"></span><h1>Torch-TensorRT (FX Frontend) User Guide<a class="headerlink" href="#torch-tensorrt-fx-frontend-user-guide" title="Permalink to this headline">¶</a></h1>
+<p>Torch-TensorRT (FX Frontend) is a tool that can convert a PyTorch model through <code class="docutils literal notranslate"><span class="pre">torch.fx</span></code> to an
+TensorRT engine optimized targeting running on Nvidia GPUs. TensorRT is the inference engine
+developed by NVIDIA which composed of various kinds of optimization including kernel fusion,
+graph optimization, low precision, etc.. This tool is developed in Python environment which allows this
+workflow to be very accessible to researchers and engineers. There are a few stages that a
+user want to use this tool and we will introduce them here.</p>
+<p>&gt; Torch-TensorRT (FX Frontend) is in <code class="docutils literal notranslate"><span class="pre">Beta</span></code> and currently it is recommended to work with PyTorch nightly.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># Test an example by</span>
+$ python py/torch_tensorrt/fx/example/lower_example.py
+</pre></div>
+</div>
+<section id="converting-a-pytorch-model-to-tensorrt-engine">
+<h2>Converting a PyTorch Model to TensorRT Engine<a class="headerlink" href="#converting-a-pytorch-model-to-tensorrt-engine" title="Permalink to this headline">¶</a></h2>
+<p>In general, users are welcome to use the <code class="docutils literal notranslate"><span class="pre">compile()</span></code> to finish the conversion from a model to tensorRT engine. It is a
+wrapper API that consists of the major steps needed to finish this converison. Please refer to <code class="docutils literal notranslate"><span class="pre">lower_example.py</span></code> file in <code class="docutils literal notranslate"><span class="pre">examples/fx</span></code>.</p>
+<p>In this section, we will go through an example to illustrate the major steps that fx path uses.
+Users can refer to <code class="docutils literal notranslate"><span class="pre">fx2trt_example.py</span></code> file in <code class="docutils literal notranslate"><span class="pre">examples/fx</span></code>.</p>
+<ul class="simple">
+<li><p><strong>Step 1: Trace the model with acc_tracer</strong></p></li>
+</ul>
+<p>Acc_tracer is a tracer inheritated from FX tracer. It comes with args normalizer to convert all args to kwargs and pass to TRT converters.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
+
+<span class="c1"># Build the model which needs to be a PyTorch nn.Module.</span>
+<span class="nv">my_pytorch_model</span> <span class="o">=</span> build_model<span class="o">()</span>
+
+<span class="c1"># Prepare inputs to the model. Inputs have to be a List of Tensors</span>
+<span class="nv">inputs</span> <span class="o">=</span> <span class="o">[</span>Tensor, Tensor, ...<span class="o">]</span>
+
+<span class="c1"># Trace the model with acc_tracer.</span>
+<span class="nv">acc_mod</span> <span class="o">=</span> acc_tracer.trace<span class="o">(</span>my_pytorch_model, inputs<span class="o">)</span>
+</pre></div>
+</div>
+<p><em>Common Errors:</em></p>
+<p>symbolically traced variables cannot be used as inputs to control flow
+This means the model contains dynamic control flow. Please refer to section “Dynamic Control Flow” in <a class="reference external" href="https://pytorch.org/docs/stable/fx.html#dynamic-control-flow">FX guide</a>.</p>
+<ul class="simple">
+<li><p><strong>Step 2: Build TensorRT engine</strong></p></li>
+</ul>
+<p>There are <a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#explicit-implicit-batch">two different modes</a> for how TensorRT handles batch dimension, explicit batch dimension and implicit batch dimension. This mode was used by early versions of TensorRT, and is now deprecated but continues to be supported for backwards compatibility. In explicit batch mode, all dimensions are explicit and can be dynamic, that is their length can change at execution time. Many new features, such as dynamic shapes and loops, are available only in this mode. User can still choose to use implicit batch mode when they set <code class="docutils literal notranslate"><span class="pre">explicit_batch_dimension=False</span></code> in <code class="docutils literal notranslate"><span class="pre">compile()</span></code>. We do not recommend to use it since it will lack of support in future TensorRT versions.</p>
+<p>Explicit batch is the default mode and it must be set for dynamic shape. For most of vision task, user can choose to enable <code class="docutils literal notranslate"><span class="pre">dynamic_batch</span></code> in <code class="docutils literal notranslate"><span class="pre">compile()</span></code> if they want to get the similar effects as implicit mode where only batch dimension changes. It has some requirements:
+1. Shapes of inputs, outputs and activations are fixed except batch dimension.
+2. Inputs, outputs and activations have batch dimension as the major dimension.
+3. All the operators in the model do not modify batch dimension (permute, transpose, split, etc.) or compute over batch dimension (sum, softmax, etc.).</p>
+<p>For examples of the last path, if we have a 3D tensor t shaped as (batch, sequence, dimension), operations such as torch.transpose(0, 2). If any of these three are not satisfied, we’ll need to specify InputTensorSpec as inputs with dynamic range.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>import deeplearning.trt.fx2trt.converter.converters
+from torch.fx.experimental.fx2trt.fx2trt import InputTensorSpec, TRTInterpreter
+
+<span class="c1"># InputTensorSpec is a dataclass we use to store input information.</span>
+<span class="c1"># There&#39;re two ways we can build input_specs.</span>
+<span class="c1"># Option 1, build it manually.</span>
+<span class="nv">input_specs</span> <span class="o">=</span> <span class="o">[</span>
+  InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>, <span class="m">2</span>, <span class="m">3</span><span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+  InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>, <span class="m">4</span>, <span class="m">5</span><span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+<span class="o">]</span>
+<span class="c1"># Option 2, build it using sample_inputs where user provide a sample</span>
+<span class="nv">inputs</span> <span class="o">=</span> <span class="o">[</span>
+torch.rand<span class="o">((</span><span class="m">1</span>,2,3<span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+torch.rand<span class="o">((</span><span class="m">1</span>,4,5<span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+<span class="o">]</span>
+<span class="nv">input_specs</span> <span class="o">=</span> InputTensorSpec.from_tensors<span class="o">(</span>inputs<span class="o">)</span>
+
+<span class="c1"># IMPORTANT: If dynamic shape is needed, we need to build it slightly differently.</span>
+<span class="nv">input_specs</span> <span class="o">=</span> <span class="o">[</span>
+    InputTensorSpec<span class="o">(</span>
+        <span class="nv">shape</span><span class="o">=(</span>-1, <span class="m">2</span>, <span class="m">3</span><span class="o">)</span>,
+        <span class="nv">dtype</span><span class="o">=</span>torch.float32,
+        <span class="c1"># Currently we only support one set of dynamic range. User may set other dimensions but it is not promised to work for any models</span>
+        <span class="c1"># (min_shape, optimize_target_shape, max_shape)</span>
+        <span class="c1"># For more information refer to fx/input_tensor_spec.py</span>
+        <span class="nv">shape_ranges</span> <span class="o">=</span> <span class="o">[</span>
+            <span class="o">((</span><span class="m">1</span>, <span class="m">2</span>, <span class="m">3</span><span class="o">)</span>, <span class="o">(</span><span class="m">4</span>, <span class="m">2</span>, <span class="m">3</span><span class="o">)</span>, <span class="o">(</span><span class="m">100</span>, <span class="m">2</span>, <span class="m">3</span><span class="o">))</span>,
+        <span class="o">]</span>,
+    <span class="o">)</span>,
+    InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>, <span class="m">4</span>, <span class="m">5</span><span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+<span class="o">]</span>
+
+<span class="c1"># Build a TRT interpreter. Set explicit_batch_dimension accordingly.</span>
+<span class="nv">interpreter</span> <span class="o">=</span> TRTInterpreter<span class="o">(</span>
+    acc_mod, input_specs, <span class="nv">explicit_batch_dimension</span><span class="o">=</span>True/False
+<span class="o">)</span>
+
+<span class="c1"># The output of TRTInterpreter run() is wrapped as TRTInterpreterResult.</span>
+<span class="c1"># The TRTInterpreterResult contains required parameter to build TRTModule,</span>
+<span class="c1"># and other informational output from TRTInterpreter run.</span>
+class TRTInterpreterResult<span class="o">(</span>NamedTuple<span class="o">)</span>:
+    engine: Any
+    input_names: Sequence<span class="o">[</span>str<span class="o">]</span>
+    output_names: Sequence<span class="o">[</span>str<span class="o">]</span>
+    serialized_cache: bytearray
+
+<span class="c1">#max_batch_size: set accordingly for maximum batch size you will use.</span>
+<span class="c1">#max_workspace_size: set to the maximum size we can afford for temporary buffer</span>
+<span class="c1">#lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).</span>
+<span class="c1">#sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity</span>
+<span class="c1">#force_fp32_output: force output to be fp32</span>
+<span class="c1">#strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric #reasons.</span>
+<span class="c1">#algorithm_selector: set up algorithm selection for certain layer</span>
+<span class="c1">#timing_cache: enable timing cache for TensorRT</span>
+<span class="c1">#profiling_verbosity: TensorRT logging level</span>
+<span class="nv">trt_interpreter_result</span> <span class="o">=</span> interpreter.run<span class="o">(</span>
+    <span class="nv">max_batch_size</span><span class="o">=</span><span class="m">64</span>,
+    <span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">1</span> <span class="s">&lt;&lt; 25,</span>
+<span class="s">    sparse_weights=False,</span>
+<span class="s">    force_fp32</span>_output<span class="o">=</span>False,
+    <span class="nv">strict_type_constraints</span><span class="o">=</span>False,
+    <span class="nv">algorithm_selector</span><span class="o">=</span>None,
+    <span class="nv">timing_cache</span><span class="o">=</span>None,
+    <span class="nv">profiling_verbosity</span><span class="o">=</span>None,
+<span class="o">)</span>
+</pre></div>
+</div>
+<p><em>Common Errors:</em></p>
+<p>RuntimeError: Conversion of function xxx not currently supported!
+- This means we don’t have the support for this xxx operator. Please refer to section “How to add a missing op” below for further instructions.</p>
+<ul class="simple">
+<li><p><strong>Step 3: Run the model</strong></p></li>
+</ul>
+<p>One way is using TRTModule, which is basically a PyTorch nn.Module.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>from torch_tensorrt.fx import TRTModule
+<span class="nv">mod</span> <span class="o">=</span> TRTModule<span class="o">(</span>
+    trt_interpreter_result.engine,
+    trt_interpreter_result.input_names,
+    trt_interpreter_result.output_names<span class="o">)</span>
+<span class="c1"># Just like all other PyTorch modules</span>
+<span class="nv">outputs</span> <span class="o">=</span> mod<span class="o">(</span>*inputs<span class="o">)</span>
+torch.save<span class="o">(</span>mod, <span class="s2">&quot;trt.pt&quot;</span><span class="o">)</span>
+<span class="nv">reload_trt_mod</span> <span class="o">=</span> torch.load<span class="o">(</span><span class="s2">&quot;trt.pt&quot;</span><span class="o">)</span>
+<span class="nv">reload_model_output</span> <span class="o">=</span> reload_trt_mod<span class="o">(</span>*inputs<span class="o">)</span>
+</pre></div>
+</div>
+<p>So far, we give a detailed explanation of major steps in convterting a PyTorch model into TensorRT engine. Users are welcome to refer to the source code for some parameters explanations. In the converting scheme, there are two important actions in it. One is acc tracer which helps us to convert a PyTorch model to acc graph. The other is FX path converter which helps to convert the acc graph’s operation to corresponding TensorRT operation and build up the TensoRT engine for it.</p>
+</section>
+<section id="acc-tracer">
+<h2>Acc Tracer<a class="headerlink" href="#acc-tracer" title="Permalink to this headline">¶</a></h2>
+<p>Acc tracer is a custom FX symbolic tracer. It does a couple more things compare to the vanilla FX symbolic tracer. We mainly depend on it to convert PyTorch ops or builtin ops to acc ops. There are two main purposes for fx2trt to use acc ops:</p>
+<ol class="arabic simple">
+<li><p>there’re many ops that do similar things in PyTorch ops and builtin ops such like torch.add, builtin.add and torch.Tensor.add. Using acc tracer, we normalize these three ops to a single acc_ops.add. This helps reduce the number of converters we need to write.</p></li>
+<li><p>acc ops only have kwargs which makes writing converter easier as we don’t need to add additional logic to find arguments in args and kwargs.</p></li>
+</ol>
+</section>
+<section id="fx2trt">
+<h2>FX2TRT<a class="headerlink" href="#fx2trt" title="Permalink to this headline">¶</a></h2>
+<p>After symbolic tracing, we have the graph representation of a PyTorch model. fx2trt leverages the power of fx.Interpreter. fx.Interpreter goes through the whole graph node by node and calls the function that node represents. fx2trt overrides the original behavior of calling the function with invoking corresponding converts for each node. Each converter function adds corresponding TensorRT layer(s).</p>
+<p>Below is an example of a converter function. The decorator is used to register this converter function with the corresponding node. In this example, we register this converter to a fx node whose target is acc_ops.sigmoid.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>@tensorrt_converter<span class="o">(</span>acc_ops.sigmoid<span class="o">)</span>
+def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<span class="o">)</span>:
+    <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    network: TensorRT network. We&#39;ll be adding layers to it.</span>
+
+<span class="s2">    The rest arguments are attributes of fx node.</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+    <span class="nv">input_val</span> <span class="o">=</span> kwargs<span class="o">[</span><span class="s1">&#39;input&#39;</span><span class="o">]</span>
+
+    <span class="k">if</span> not isinstance<span class="o">(</span>input_val, trt.tensorrt.ITensor<span class="o">)</span>:
+        raise RuntimeError<span class="o">(</span>f<span class="s1">&#39;Sigmoid received input {input_val} that is not part &#39;</span>
+                        <span class="s1">&#39;of the TensorRT region!&#39;</span><span class="o">)</span>
+
+    <span class="nv">layer</span> <span class="o">=</span> network.add_activation<span class="o">(</span><span class="nv">input</span><span class="o">=</span>input_val, <span class="nv">type</span><span class="o">=</span>trt.ActivationType.SIGMOID<span class="o">)</span>
+    layer.name <span class="o">=</span> name
+    <span class="k">return</span> layer.get_output<span class="o">(</span><span class="m">0</span><span class="o">)</span>
+</pre></div>
+</div>
+<section id="how-to-add-a-missing-op">
+<h3>How to Add a Missing Op<a class="headerlink" href="#how-to-add-a-missing-op" title="Permalink to this headline">¶</a></h3>
+<p>You can actually add it wherever you want just need to remember import the file so that all acc ops and mapper will be registered before tracing with acc_tracer.</p>
+<ul class="simple">
+<li><p><strong>Step 1. Add a new acc op</strong></p></li>
+</ul>
+<p>TODO: Need to explain more on the logistic of acc op like when we want to break down an op and when we want to reuse other ops.</p>
+<p>In <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/py/torch_tensorrt/fx/tracer/acc_tracer/acc_tracer.py">acc tracer</a>, we convert nodes in the graph to acc ops if there’s a mapping registered for the node to an acc op.</p>
+<p>In order to make the conversion to acc ops to happen, there’re two things required. One is that there should be an acc op function defined and the other is there should be a mapping registered.</p>
+<p>Defining an acc op is simple, we first just need a function and register the function as an acc op via this decorator <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/py/torch_tensorrt/fx/tracer/acc_tracer/acc_normalizer.py">acc_normalizer.py</a>. e.g. the following code adds an acc op named foo() which adds two given inputs.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># NOTE: all acc ops should only take kwargs as inputs, therefore we need the &quot;*&quot;</span>
+<span class="c1"># at the beginning.</span>
+@register_acc_op
+def foo<span class="o">(</span>*, input, other, alpha<span class="o">)</span>:
+    <span class="k">return</span> input + alpha * other
+</pre></div>
+</div>
+<p>There’re two ways to register a mapping. One is <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/1a22204fecec690bc3c2a318dab4f57b98c57f05/py/torch_tensorrt/fx/tracer/acc_tracer/acc_normalizer.py#L164">register_acc_op_mapping()</a>. Let’s register a mapping from torch.add to foo() we just created above. We need to add decorator register_acc_op_mapping to it.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nv">this_arg_is_optional</span> <span class="o">=</span> True
+
+@register_acc_op_mapping<span class="o">(</span>
+    <span class="nv">op_and_target</span><span class="o">=(</span><span class="s2">&quot;call_function&quot;</span>, torch.add<span class="o">)</span>,
+    <span class="nv">arg_replacement_tuples</span><span class="o">=[</span>
+        <span class="o">(</span><span class="s2">&quot;input&quot;</span>, <span class="s2">&quot;input&quot;</span><span class="o">)</span>,
+        <span class="o">(</span><span class="s2">&quot;other&quot;</span>, <span class="s2">&quot;other&quot;</span><span class="o">)</span>,
+        <span class="o">(</span><span class="s2">&quot;alpha&quot;</span>, <span class="s2">&quot;alpha&quot;</span>, this_arg_is_optional<span class="o">)</span>,
+    <span class="o">]</span>,
+<span class="o">)</span>
+@register_acc_op
+def foo<span class="o">(</span>*, input, other, <span class="nv">alpha</span><span class="o">=</span><span class="m">1</span>.0<span class="o">)</span>:
+    <span class="k">return</span> input + alpha * other
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">op_and_target</span></code> determines which node will trigger this mapping. op and target are the attributes of FX node. In acc_normalization when we see a node with the same op and target as set in the <code class="docutils literal notranslate"><span class="pre">op_and_target</span></code>, we will trigger the mapping. Since we want to map from <code class="docutils literal notranslate"><span class="pre">torch.add</span></code>, then op would be call_function and target would be <code class="docutils literal notranslate"><span class="pre">torch.add</span></code>. <code class="docutils literal notranslate"><span class="pre">arg_replacement_tuples</span></code> determines how we construct kwargs for new acc op node using args and kwargs from original node. Each tuple in <code class="docutils literal notranslate"><span class="pre">arg_replacement_tuples</span></code> represents one argument mapping rule. It contains two or three elements. The third element is a boolean variable that determines whether this kwarg is optional in <em>original node</em>. We only need to specify the third element if it’s True. The first element is the argument name in original node which will be used as the acc op node’s argument whose name is the second element in the tuple. The sequence of the tuples does matter because the position of the tuple determines where the argument is in original node’s args. We use this information to map args from original node to kwargs in acc op node.
+We don’t have to specify arg_replacement_tuples if none of the followings are true.</p>
+<ol class="arabic simple">
+<li><p>kwargs of original nodes and acc op nodes have different name.</p></li>
+<li><p>there’re optional arguments.</p></li>
+</ol>
+<p>The other way to register a mapping is through <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/1a22204fecec690bc3c2a318dab4f57b98c57f05/py/torch_tensorrt/fx/tracer/acc_tracer/acc_normalizer.py#L206">register_custom_acc_mapper_fn()</a>. This one is designed to reduce the redundant op registration as it allows you to use a function to map to one or more existing acc ops throught some combinations. In the function, you can do basically whatever you want. Let’s use an example to explain how it works.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>@register_acc_op
+def foo<span class="o">(</span>*, input, other, <span class="nv">alpha</span><span class="o">=</span><span class="m">1</span>.0<span class="o">)</span>:
+    <span class="k">return</span> input + alpha * other
+
+@register_custom_acc_mapper_fn<span class="o">(</span>
+    <span class="nv">op_and_target</span><span class="o">=(</span><span class="s2">&quot;call_function&quot;</span>, torch.add<span class="o">)</span>,
+    <span class="nv">arg_replacement_tuples</span><span class="o">=[</span>
+        <span class="o">(</span><span class="s2">&quot;input&quot;</span>, <span class="s2">&quot;input&quot;</span><span class="o">)</span>,
+        <span class="o">(</span><span class="s2">&quot;other&quot;</span>, <span class="s2">&quot;other&quot;</span><span class="o">)</span>,
+        <span class="o">(</span><span class="s2">&quot;alpha&quot;</span>, <span class="s2">&quot;alpha&quot;</span>, this_arg_is_optional<span class="o">)</span>,
+    <span class="o">]</span>,
+<span class="o">)</span>
+def custom_mapper<span class="o">(</span>node: torch.fx.Node, _: nn.Module<span class="o">)</span> -&gt; torch.fx.Node:
+    <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    `node` is original node, which is a call_function node with target</span>
+<span class="s2">    being torch.add.</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+    <span class="nv">alpha</span> <span class="o">=</span> <span class="m">1</span>
+    <span class="k">if</span> <span class="s2">&quot;alpha&quot;</span> <span class="k">in</span> node.kwargs:
+        <span class="nv">alpha</span> <span class="o">=</span> node.kwargs<span class="o">[</span><span class="s2">&quot;alpha&quot;</span><span class="o">]</span>
+    <span class="nv">foo_kwargs</span> <span class="o">=</span> <span class="o">{</span><span class="s2">&quot;input&quot;</span>: node<span class="o">[</span><span class="s2">&quot;input&quot;</span><span class="o">]</span>, <span class="s2">&quot;other&quot;</span>: node<span class="o">[</span><span class="s2">&quot;other&quot;</span><span class="o">]</span>, <span class="s2">&quot;alpha&quot;</span>: alpha<span class="o">}</span>
+    with node.graph.inserting_before<span class="o">(</span>node<span class="o">)</span>:
+        <span class="nv">foo_node</span> <span class="o">=</span> node.graph.call_function<span class="o">(</span>foo, <span class="nv">kwargs</span><span class="o">=</span>foo_kwargs<span class="o">)</span>
+        foo_node.meta <span class="o">=</span> node.meta.copy<span class="o">()</span>
+        <span class="k">return</span> foo_node
+</pre></div>
+</div>
+<p>In the custom mapper function, we construct an acc op node and return it. The node we returns here would take over all the children nodes of original nodes <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/1a22204fecec690bc3c2a318dab4f57b98c57f05/py/torch_tensorrt/fx/tracer/acc_tracer/acc_normalizer.py#L379">acc_normalizer.py</a>.</p>
+<p>The last step would be <em>adding unit test</em> for the new acc op or mapper function we added. The place to add the unit test is here <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/py/torch_tensorrt/fx/test/tracer/test_acc_tracer.py">test_acc_tracer.py</a>.</p>
+<ul class="simple">
+<li><p><strong>Step 2. Add a new converter</strong></p></li>
+</ul>
+<p>All the developed converters for acc ops are all in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/py/torch_tensorrt/fx/converters/acc_ops_converters.py">acc_op_converter.py</a>. It could give you a good example of how the converter is added.</p>
+<p>Essentially, the converter is the mapping mechanism that maps the acc ops to a TensorRT layer. If we are able to find all the TensorRT layers we need we can get start to add a converter for the node using <a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/infer/Graph/Network.html">TensorRT APIs</a>.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>@tensorrt_converter<span class="o">(</span>acc_ops.sigmoid<span class="o">)</span>
+def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<span class="o">)</span>:
+    <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    network: TensorRT network. We&#39;ll be adding layers to it.</span>
+
+<span class="s2">    The rest arguments are attributes of fx node.</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+    <span class="nv">input_val</span> <span class="o">=</span> kwargs<span class="o">[</span><span class="s1">&#39;input&#39;</span><span class="o">]</span>
+
+    <span class="k">if</span> not isinstance<span class="o">(</span>input_val, trt.tensorrt.ITensor<span class="o">)</span>:
+        raise RuntimeError<span class="o">(</span>f<span class="s1">&#39;Sigmoid received input {input_val} that is not part &#39;</span>
+                        <span class="s1">&#39;of the TensorRT region!&#39;</span><span class="o">)</span>
+
+    <span class="nv">layer</span> <span class="o">=</span> network.add_activation<span class="o">(</span><span class="nv">input</span><span class="o">=</span>input_val, <span class="nv">type</span><span class="o">=</span>trt.ActivationType.SIGMOID<span class="o">)</span>
+    layer.name <span class="o">=</span> name
+    <span class="k">return</span> layer.get_output<span class="o">(</span><span class="m">0</span><span class="o">)</span>
+</pre></div>
+</div>
+<p>We need to use <code class="docutils literal notranslate"><span class="pre">tensorrt_converter</span></code> decorator to register the converter. The argument for the decorator is the target of the fx node that we need to convert. In the converter, we can find the inputs to the fx node in kwargs. As in the example, the original node is <cite>acc_ops.sigmoid</cite> which only has one argument “input” in acc_ops.py. We get the input and check if it’s a TensorRT tensor. After that, we add a sigmoid layer to TensorRT network and return the output of the layer. The output we returned will be passed to the children nodes of acc_ops.sigmoid by fx.Interpreter.</p>
+<p><strong>What if we can not find corresponding layers in TensorRT that do the same thing as the node.</strong></p>
+<p>In this case, we would need to do a bit more work. TensorRT provides plugins which serves as custom layers. <em>We have not implement this feature yet. We will update once it is enabled</em>.</p>
+<p>Last step would be adding the unit test for the new converter we added. User could add corresponding unit test in this <a class="reference external" href="https://github.com/pytorch/TensorRT/tree/master/py/torch_tensorrt/fx/test/converters/acc_op">folder</a>.</p>
+</section>
+</section>
+</section>
+
+
+             </article>
+
+            </div>
+            <footer>
+
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+
+        <a href="ptq.html" class="btn btn-neutral float-right" title="Post Training Quantization (PTQ)" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+
+
+        <a href="creating_torchscript_module_in_python.html" class="btn btn-neutral" title="Creating a TorchScript Module" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+
+    </div>
+
+
+
+
+    <hr>
+
+
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2021, NVIDIA Corporation.
+
+    </p>
+  </div>
+
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">Torch-TensorRT (FX Frontend) User Guide</a><ul>
+<li><a class="reference internal" href="#converting-a-pytorch-model-to-tensorrt-engine">Converting a PyTorch Model to TensorRT Engine</a></li>
+<li><a class="reference internal" href="#acc-tracer">Acc Tracer</a></li>
+<li><a class="reference internal" href="#fx2trt">FX2TRT</a><ul>
+<li><a class="reference internal" href="#how-to-add-a-missing-op">How to Add a Missing Op</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+
+
+
+
+
+
+       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+         <script src="../_static/jquery.js"></script>
+         <script src="../_static/underscore.js"></script>
+         <script src="../_static/doctools.js"></script>
+         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+
+
+
+
+  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col follow-us-col">
+          <ul>
+            <li class="list-title">Stay Connected</li>
+          </ul>
+
+          <div class="footer-social-icons">
+            <a href="https://www.facebook.com/pytorch" target="_blank" class="facebook"></a>
+            <a href="https://twitter.com/pytorch" target="_blank" class="twitter"></a>
+            <a href="https://www.youtube.com/pytorch" target="_blank" class="youtube"></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/hub">PyTorch Hub</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li class="resources-mobile-menu-title">
+            Docs
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/audio/stable/index.html">torchaudio</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/text/stable/index.html">torchtext</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/vision/stable/index.html">torchvision</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/serve/">TorchServe</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchx/">TorchX</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/xla">PyTorch on XLA Devices</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            Resources
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/features">About</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/#community-module">Community</a>
+            </li>
+
+            <li>
+              <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+          </ul>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">Github</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

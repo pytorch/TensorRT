@@ -2,6 +2,8 @@ import ast
 from pathlib import Path
 from types import SimpleNamespace
 
+import struct
+
 import pytest
 
 executorch = pytest.importorskip("executorch.exir")
@@ -23,6 +25,8 @@ from torch_tensorrt.executorch.backend import (  # noqa: E402
 )
 from torch_tensorrt.executorch.serialization import (  # noqa: E402
     deserialize_engine,
+    HEADER_FORMAT,
+    HEADER_SIZE,
     TENSORRT_MAGIC,
 )
 
@@ -177,6 +181,32 @@ def test_preprocess_serializes_engine_blob():
     assert metadata.device_id == 2
     assert [binding.name for binding in metadata.io_bindings] == ["x", "y"]
     assert [binding.is_input for binding in metadata.io_bindings] == [True, False]
+
+
+@pytest.mark.unit
+def test_preprocess_serializes_only_the_engine_tensors_extent():
+    # A tensor that views part of a larger buffer. Serializing the whole storage
+    # instead of the tensor's own extent pads the engine with the trailing bytes.
+    # The recorded engine size is what exposes it: deserialize_engine trims the
+    # blob back to that size, so an over-long engine still round-trips and only
+    # the size gives it away.
+    payload = b"engine-bytes"
+    backing = torch.frombuffer(bytearray(payload + b"TRAILING"), dtype=torch.uint8)
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = backing[: len(payload)]
+    engine_info[DEVICE_IDX] = "0%8%0%0%GPU"
+    engine_info[INPUT_BINDING_NAMES_IDX] = "x"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"
+    edge_program = _build_edge_program(engine_info)
+
+    result = TensorRTBackend.preprocess(edge_program, [])
+
+    _, _, _, _, engine_size, _ = struct.unpack(
+        HEADER_FORMAT, result.processed_bytes[:HEADER_SIZE]
+    )
+    assert engine_size == len(payload)
+    engine, _ = deserialize_engine(result.processed_bytes)
+    assert engine == payload
 
 
 @pytest.mark.unit

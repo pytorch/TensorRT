@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -520,8 +520,8 @@ from torch.export import export
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>class StreamingKV(torch.nn.Module):
     def __init__(self, b=1, h=4, s_max=16, d=8):
         super().__init__()
-        self.register_buffer(&quot;cache_k&quot;, torch.zeros(b, h, s_max, d))
-        self.register_buffer(&quot;cache_v&quot;, torch.zeros(b, h, s_max, d))
+        self.register_buffer("cache_k", torch.zeros(b, h, s_max, d))
+        self.register_buffer("cache_v", torch.zeros(b, h, s_max, d))
 
     def forward(self, x_k, x_v):
         self.cache_k[:, :, 3:4, :] = x_k
@@ -538,22 +538,22 @@ from torch.export import export
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model = StreamingKV().cuda()
-x_k = torch.ones(1, 4, 1, 8, device=&quot;cuda&quot;) * 3.0
-x_v = torch.ones(1, 4, 1, 8, device=&quot;cuda&quot;) * 5.0
+x_k = torch.ones(1, 4, 1, 8, device="cuda") * 3.0
+x_v = torch.ones(1, 4, 1, 8, device="cuda") * 5.0
 
 ep = export(model, (x_k.clone(), x_v.clone()))
 
 # Show how torch.export sees the model:
-print(&quot;graph_signature.input_specs:&quot;)
+print("graph_signature.input_specs:")
 for s in ep.graph_signature.input_specs:
-    print(f&quot;  {s}&quot;)
-print(&quot;graph_signature.output_specs:&quot;)
+    print(f"  {s}")
+print("graph_signature.output_specs:")
 for s in ep.graph_signature.output_specs:
-    print(f&quot;  {s}&quot;)
+    print(f"  {s}")
 
 compiled = torch_tensorrt.compile(
     ep,
-    ir=&quot;dynamo&quot;,
+    ir="dynamo",
     inputs=[x_k.clone(), x_v.clone()],
     enabled_precisions={torch.float32},
     min_block_size=1,
@@ -570,10 +570,10 @@ compiled = torch_tensorrt.compile(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>for _, mod in compiled.named_modules():
-    if hasattr(mod, &quot;aliased_io&quot;) and mod.aliased_io:
-        print(f&quot;\nEngine input bindings: {list(mod.input_binding_names)}&quot;)
+    if hasattr(mod, "aliased_io") and mod.aliased_io:
+        print(f"\nEngine input bindings: {list(mod.input_binding_names)}")
         for out, (inp, kind) in mod.aliased_io.items():
-            print(f&quot;  {out}  &lt;-aliased-&gt;  {inp}  (kind={kind})&quot;)
+            print(f"  {out}  &lt;-aliased-&gt;  {inp}  (kind={kind})")
 </pre></div>
 </div>
 </div>
@@ -592,9 +592,9 @@ returned_val = returned[0] if isinstance(returned, tuple) else returned
 eager = StreamingKV().cuda()
 eager_returned = eager(x_k.clone(), x_v.clone())
 
-print(f&quot;\nreturn matches eager:    {torch.allclose(returned_val, eager_returned)}&quot;)
-print(f&quot;cache_k matches eager:   {torch.allclose(compiled.cache_k, eager.cache_k)}&quot;)
-print(f&quot;cache_v matches eager:   {torch.allclose(compiled.cache_v, eager.cache_v)}&quot;)
+print(f"\nreturn matches eager:    {torch.allclose(returned_val, eager_returned)}")
+print(f"cache_k matches eager:   {torch.allclose(compiled.cache_k, eager.cache_k)}")
+print(f"cache_v matches eager:   {torch.allclose(compiled.cache_v, eager.cache_v)}")
 </pre></div>
 </div>
 </div>
@@ -609,11 +609,11 @@ print(f&quot;cache_v matches eager:   {torch.allclose(compiled.cache_v, eager.ca
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>compiled.cache_k.zero_()
 compiled.cache_v.zero_()
 for step, val in enumerate([1.0, 5.0, 0.0]):
-    x = torch.ones(1, 4, 1, 8, device=&quot;cuda&quot;) * val
+    x = torch.ones(1, 4, 1, 8, device="cuda") * val
     compiled(x, x)
     print(
-        f&quot;step {step}: cache_k.sum()={compiled.cache_k.sum().item():.1f}, &quot;
-        f&quot;cache_v.sum()={compiled.cache_v.sum().item():.1f}&quot;
+        f"step {step}: cache_k.sum()={compiled.cache_k.sum().item():.1f}, "
+        f"cache_v.sum()={compiled.cache_v.sum().item():.1f}"
     )
 </pre></div>
 </div>

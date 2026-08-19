@@ -1,0 +1,32 @@
+
+.. _program_listing_file_cpp_api_include_trtorch_macros.h:
+
+Program Listing for File macros.h
+=================================
+
+|exhale_lsh| :ref:`Return to documentation for file <file_cpp_api_include_trtorch_macros.h>` (``cpp/api/include/trtorch/macros.h``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. code-block:: cpp
+
+   #pragma once
+
+   #if defined(__GNUC__)
+   #define TRTORCH_API __attribute__((__visibility__("default")))
+   #define TRTORCH_HIDDEN __attribute__((__visibility__("hidden")))
+   #else
+   #define TRTORCH_API
+   #define TRTORCH_HIDDEN
+   #endif // defined(__GNUC__)
+
+   // Does this need to be gaurded or something?
+   #define XSTR(x) #x
+   #define STR(x) XSTR(x)
+
+   #define TRTORCH_MAJOR_VERSION 0
+   #define TRTORCH_MINOR_VERSION 0
+   #define TRTORCH_PATCH_VERSION 1
+   #define TRTORCH_VERSION STR(TRTORCH_MAJOR_VERSION) \
+                           "." STR(TRTORCH_MINOR_VERSION) \
+                           "." STR(TRTORCH_PATCH_VERSION)

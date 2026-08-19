@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -575,7 +575,7 @@ cp<span class="w"> </span>output/bazel<span class="w"> </span>/usr/local/bin/
 <li><p><code class="docutils literal notranslate"><span class="pre">python3</span></code> / <code class="docutils literal notranslate"><span class="pre">python</span></code> on <code class="docutils literal notranslate"><span class="pre">PATH</span></code> — system Python fallback.</p></li>
 </ol>
 <p>If auto-detection fails, set <code class="docutils literal notranslate"><span class="pre">TORCH_PATH</span></code> explicitly:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">TORCH_PATH</span><span class="o">=</span><span class="k">$(</span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch, os; print(os.path.dirname(torch.__file__))&quot;</span><span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">TORCH_PATH</span><span class="o">=</span><span class="k">$(</span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import torch, os; print(os.path.dirname(torch.__file__))"</span><span class="k">)</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>bazelisk<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>-c<span class="w"> </span>opt
 </pre></div>
 </div>
@@ -597,14 +597,14 @@ point the WORKSPACE file to the URL of the tarball or download the tarball for T
 <blockquote>
 <div><p>For example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">http_archive</span><span class="p">(</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;tensorrt&quot;</span><span class="p">,</span>
-    <span class="n">build_file</span> <span class="o">=</span> <span class="s2">&quot;@//third_party/tensorrt/archive:BUILD&quot;</span><span class="p">,</span>
-    <span class="n">sha256</span> <span class="o">=</span> <span class="s2">&quot;&lt;TENSORRT SHA256&gt;&quot;</span><span class="p">,</span> <span class="c1"># Optional but recommended</span>
-    <span class="n">strip_prefix</span> <span class="o">=</span> <span class="s2">&quot;TensorRT-&lt;TENSORRT VERSION&gt;&quot;</span><span class="p">,</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"tensorrt"</span><span class="p">,</span>
+    <span class="n">build_file</span> <span class="o">=</span> <span class="s2">"@//third_party/tensorrt/archive:BUILD"</span><span class="p">,</span>
+    <span class="n">sha256</span> <span class="o">=</span> <span class="s2">"&lt;TENSORRT SHA256&gt;"</span><span class="p">,</span> <span class="c1"># Optional but recommended</span>
+    <span class="n">strip_prefix</span> <span class="o">=</span> <span class="s2">"TensorRT-&lt;TENSORRT VERSION&gt;"</span><span class="p">,</span>
     <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="s2">&quot;https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/&lt;TENSORRT DOWNLOAD PATH&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/&lt;TENSORRT DOWNLOAD PATH&gt;"</span><span class="p">,</span>
         <span class="c1"># OR</span>
-        <span class="s2">&quot;file:///&lt;ABSOLUTE PATH TO FILE&gt;/TensorRT-&lt;TENSORRT VERSION&gt;.Linux.x86_64-gnu.cuda-&lt;CUDA VERSION&gt;.tar.gz&quot;</span>
+        <span class="s2">"file:///&lt;ABSOLUTE PATH TO FILE&gt;/TensorRT-&lt;TENSORRT VERSION&gt;.Linux.x86_64-gnu.cuda-&lt;CUDA VERSION&gt;.tar.gz"</span>
     <span class="p">],</span>
 <span class="p">)</span>
 </pre></div>
@@ -814,9 +814,9 @@ In the case you installed with <code class="docutils literal notranslate"><span 
 </li>
 </ol>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>new_local_repository<span class="o">(</span>
-<span class="w">    </span><span class="nv">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;libtorch&quot;</span>,
-<span class="w">    </span><span class="nv">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/usr/local/lib/python3.8/dist-packages/torch&quot;</span>,
-<span class="w">    </span><span class="nv">build_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;third_party/libtorch/BUILD&quot;</span>
+<span class="w">    </span><span class="nv">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"libtorch"</span>,
+<span class="w">    </span><span class="nv">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/usr/local/lib/python3.8/dist-packages/torch"</span>,
+<span class="w">    </span><span class="nv">build_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"third_party/libtorch/BUILD"</span>
 <span class="o">)</span>
 </pre></div>
 </div>

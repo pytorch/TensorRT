@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -556,11 +556,11 @@ specifying the <cite>output_format</cite> flag. Here are the options <cite>outpu
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="c1"># trt_ep is a torch.fx.GraphModule object</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.ep&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.ep"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"trt.ep"</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -577,8 +577,8 @@ the dynamic shape specifications:</p>
 <span class="n">example_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 
 <span class="c1"># Define dynamic batch dimension</span>
-<span class="n">dyn_batch</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
-<span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">dyn_batch</span><span class="p">}}</span>
+<span class="n">dyn_batch</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"batch"</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">dyn_batch</span><span class="p">}}</span>
 
 <span class="c1"># Export with dynamic shapes</span>
 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
@@ -600,13 +600,13 @@ the dynamic shape specifications:</p>
 <span class="c1"># Save with dynamic_shapes to preserve dynamic behavior</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
     <span class="n">trt_gm</span><span class="p">,</span>
-    <span class="s2">&quot;trt_dynamic.ep&quot;</span><span class="p">,</span>
+    <span class="s2">"trt_dynamic.ep"</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="n">example_input</span><span class="p">],</span>
     <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span>  <span class="c1"># Same as used during export</span>
 <span class="p">)</span>
 
 <span class="c1"># Load and use with different batch sizes</span>
-<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_dynamic.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"trt_dynamic.ep"</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 <span class="n">output_bs4</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 <span class="n">output_bs16</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 </pre></div>
@@ -626,22 +626,22 @@ dynamic shapes will be inferred automatically:</p>
         <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
         <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
         <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
-        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;x&quot;</span>  <span class="c1"># Optional: provides better dimension naming</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">"x"</span>  <span class="c1"># Optional: provides better dimension naming</span>
     <span class="p">)</span>
 <span class="p">]</span>
 
 <span class="c1"># Compile with Torch-TensorRT</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Save with Input objects - dynamic_shapes inferred automatically!</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
     <span class="n">trt_gm</span><span class="p">,</span>
-    <span class="s2">&quot;trt_dynamic.ep&quot;</span><span class="p">,</span>
+    <span class="s2">"trt_dynamic.ep"</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span>  <span class="c1"># Dynamic shapes inferred from Input objects</span>
 <span class="p">)</span>
 
 <span class="c1"># Load and use with different batch sizes</span>
-<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_dynamic.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"trt_dynamic.ep"</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 <span class="n">output_bs4</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 <span class="n">output_bs16</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 </pre></div>
@@ -656,11 +656,11 @@ dynamic shapes will be inferred automatically:</p>
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="c1"># trt_gm is a torch.fx.GraphModule object</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.ts&quot;</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;torchscript&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.ts"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"torchscript"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt.ts&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"trt.ts"</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -675,11 +675,11 @@ For <cite>ir=ts</cite>, this behavior stays the same in 2.X versions as well.</p
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
-<span class="n">trt_ts</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;ts&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a ScriptModule object</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts</span><span class="p">,</span> <span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span>
+<span class="n">trt_ts</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"ts"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a ScriptModule object</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts</span><span class="p">,</span> <span class="s2">"trt_model.ts"</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"trt_model.ts"</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -708,12 +708,12 @@ can be loaded in Python or C++ without a Torch-TensorRT runtime dependency.</p>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.pt2&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-                    <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;aot_inductor&quot;</span><span class="p">,</span> <span class="n">retrace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.pt2"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+                    <span class="n">output_format</span><span class="o">=</span><span class="s2">"aot_inductor"</span><span class="p">,</span> <span class="n">retrace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
 <span class="c1"># Load without Torch-TensorRT at inference time</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_inductor</span><span class="o">.</span><span class="n">aoti_load_package</span><span class="p">(</span><span class="s2">&quot;trt.pt2&quot;</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_inductor</span><span class="o">.</span><span class="n">aoti_load_package</span><span class="p">(</span><span class="s2">"trt.pt2"</span><span class="p">)</span>
 <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -731,9 +731,9 @@ backend. It requires the <code class="docutils literal notranslate"><span class=
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.pte&quot;</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;executorch&quot;</span><span class="p">,</span>
+    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
     <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
@@ -747,11 +747,11 @@ claims what it can and the <code class="docutils literal notranslate"><span clas
 <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaPartitioner</span>
 
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.pte&quot;</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;executorch&quot;</span><span class="p">,</span>
+    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
     <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">partitioners</span><span class="o">=</span><span class="p">[</span>
         <span class="n">CudaPartitioner</span><span class="p">(</span>
-            <span class="p">[</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">&quot;forward&quot;</span><span class="p">)]</span>
+            <span class="p">[</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"forward"</span><span class="p">)]</span>
         <span class="p">)</span>
     <span class="p">],</span>
 <span class="p">)</span>
@@ -768,6 +768,25 @@ must be pointed at those data files to load them.</p>
 <code class="docutils literal notranslate"><span class="pre">.pte</span></code> into the same directory overwrites the blob and the first <code class="docutils literal notranslate"><span class="pre">.pte</span></code>
 will fail to load. Save each coalesced model into its own directory.</p>
 </div>
+<p><strong>Running a coalesced .pte: use a single CUDA stream</strong></p>
+<p>A coalesced <code class="docutils literal notranslate"><span class="pre">.pte</span></code> runs on more than one backend delegate (the TensorRT delegate
+plus the CUDA backend). By default each backend enqueues its GPU work on its <em>own</em>
+CUDA stream, and delegate execution is asynchronous – a delegate returns after
+<em>enqueuing</em> its work, not after it completes. Because separate CUDA streams are not
+ordered relative to one another, at a delegate boundary the consuming delegate can
+begin before the producing delegate’s writes have finished, reading incomplete
+data. This is a race: it is intermittent and can surface as wrong results or an
+illegal memory access.</p>
+<p>The runtime does not impose a shared stream across delegates, so it is the
+<strong>runner’s responsibility</strong> to run all delegates on one CUDA stream. Create a
+single stream and, for the duration of execution, direct every backend to use it
+(each backend exposes a caller-stream hook). All GPU work is then enqueued in order
+and every cross-boundary dependency is satisfied, while execution stays
+asynchronous.</p>
+<p>If the runner reads a delegate’s outputs between calls (for example, an
+autoregressive decode loop), synchronize the shared stream before reading: the
+work may still be in flight when <code class="docutils literal notranslate"><span class="pre">execute()</span></code> returns, and a host-side copy on
+the default stream will not wait for a non-blocking stream.</p>
 </section>
 </section>
 <section id="saving-torch-compile-models">
@@ -785,20 +804,20 @@ serializable <code class="docutils literal notranslate"><span class="pre">torch.
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 
 <span class="c1"># JIT path — NOT serializable</span>
-<span class="c1"># jit_model = torch.compile(model, backend=&quot;torch_tensorrt&quot;, ...)</span>
+<span class="c1"># jit_model = torch.compile(model, backend="torch_tensorrt", ...)</span>
 
 <span class="c1"># AOT path — produces a serializable GraphModule</span>
 <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
-    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="c1"># Save to disk</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;model.ep&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"model.ep"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Reload and run — no recompilation needed</span>
-<span class="n">loaded</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;model.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model.ep"</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 <span class="n">output</span> <span class="o">=</span> <span class="n">loaded</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>

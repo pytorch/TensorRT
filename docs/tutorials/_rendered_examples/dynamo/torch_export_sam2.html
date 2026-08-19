@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -537,7 +537,7 @@ from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam_components import SAM2FullModel
 
-matplotlib.use(&quot;Agg&quot;)
+matplotlib.use("Agg")
 </pre></div>
 </div>
 </div>
@@ -549,7 +549,7 @@ matplotlib.use(&quot;Agg&quot;)
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>predictor = SAM2ImagePredictor.from_pretrained(&quot;facebook/sam2-hiera-large&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
 </pre></div>
 </div>
 </div>
@@ -583,10 +583,10 @@ matplotlib.use(&quot;Agg&quot;)
             feat.permute(1, 2, 0).view(1, -1, *feat_size)
             for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
         ][::-1]
-        features = {&quot;image_embed&quot;: feats[-1], &quot;high_res_feats&quot;: feats[:-1]}
+        features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
 
         high_res_features = [
-            feat_level[-1].unsqueeze(0) for feat_level in features[&quot;high_res_feats&quot;]
+            feat_level[-1].unsqueeze(0) for feat_level in features["high_res_feats"]
         ]
 
         sparse_embeddings, dense_embeddings = self.prompt_encoder(
@@ -594,7 +594,7 @@ matplotlib.use(&quot;Agg&quot;)
         )
 
         low_res_masks, iou_predictions, _, _ = self.mask_decoder(
-            image_embeddings=features[&quot;image_embed&quot;][-1].unsqueeze(0),
+            image_embeddings=features["image_embed"][-1].unsqueeze(0),
             image_pe=self.prompt_encoder.get_dense_pe(),
             sparse_prompt_embeddings=sparse_embeddings,
             dense_prompt_embeddings=dense_embeddings,
@@ -603,7 +603,7 @@ matplotlib.use(&quot;Agg&quot;)
             high_res_features=high_res_features,
         )
 
-        out = {&quot;low_res_masks&quot;: low_res_masks, &quot;iou_predictions&quot;: iou_predictions}
+        out = {"low_res_masks": low_res_masks, "iou_predictions": iou_predictions}
         return out
 </pre></div>
 </div>
@@ -626,7 +626,7 @@ sam_model = SAM2FullModel(encoder.half()).cuda().eval()
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>input_image = Image.open(&quot;./truck.jpg&quot;).convert(&quot;RGB&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>input_image = Image.open("./truck.jpg").convert("RGB")
 </pre></div>
 </div>
 </div>
@@ -634,12 +634,12 @@ sam_model = SAM2FullModel(encoder.half()).cuda().eval()
 <section id="Load-an-input-image">
 <h2>Load an input image<a class="headerlink" href="#Load-an-input-image" title="Link to this heading">#</a></h2>
 <p>Here’s the input image we are going to use</p>
-<p><img alt="fec28fb601c54adcad7c39e304c28f9d" src="file://./truck.jpg" /></p>
+<p><img alt="41a849bd862e427595520e53a604c958" src="file://./truck.jpg" /></p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>input_image = Image.open(&quot;./truck.jpg&quot;).convert(&quot;RGB&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>input_image = Image.open("./truck.jpg").convert("RGB")
 </pre></div>
 </div>
 </div>
@@ -655,10 +655,10 @@ sam_model = SAM2FullModel(encoder.half()).cuda().eval()
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def preprocess_inputs(image, predictor):
     w, h = image.size
     orig_hw = [(h, w)]
-    input_image = predictor._transforms(np.array(image))[None, ...].to(&quot;cuda:0&quot;)
+    input_image = predictor._transforms(np.array(image))[None, ...].to("cuda:0")
 
-    point_coords = torch.tensor([[500, 375]], dtype=torch.float).to(&quot;cuda:0&quot;)
-    point_labels = torch.tensor([1], dtype=torch.int).to(&quot;cuda:0&quot;)
+    point_coords = torch.tensor([[500, 375]], dtype=torch.float).to("cuda:0")
+    point_labels = torch.tensor([1], dtype=torch.int).to("cuda:0")
 
     point_coords = torch.as_tensor(
         point_coords, dtype=torch.float, device=predictor.device
@@ -686,11 +686,11 @@ sam_model = SAM2FullModel(encoder.half()).cuda().eval()
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def postprocess_masks(out, predictor, image):
-    &quot;&quot;&quot;Postprocess low-resolution masks and convert them for visualization.&quot;&quot;&quot;
+    """Postprocess low-resolution masks and convert them for visualization."""
     orig_hw = (image.size[1], image.size[0])  # (height, width)
-    masks = predictor._transforms.postprocess_masks(out[&quot;low_res_masks&quot;], orig_hw)
+    masks = predictor._transforms.postprocess_masks(out["low_res_masks"], orig_hw)
     masks = (masks &gt; 0.0).squeeze(0).cpu().numpy()
-    scores = out[&quot;iou_predictions&quot;].squeeze(0).cpu().numpy()
+    scores = out["iou_predictions"].squeeze(0).cpu().numpy()
     sorted_indices = np.argsort(scores)[::-1]
     return masks[sorted_indices], scores[sorted_indices]
 
@@ -723,35 +723,35 @@ def show_points(coords, labels, ax, marker_size=375):
     ax.scatter(
         pos_points[:, 0],
         pos_points[:, 1],
-        color=&quot;green&quot;,
-        marker=&quot;*&quot;,
+        color="green",
+        marker="*",
         s=marker_size,
-        edgecolor=&quot;white&quot;,
+        edgecolor="white",
         linewidth=1.25,
     )
     ax.scatter(
         neg_points[:, 0],
         neg_points[:, 1],
-        color=&quot;red&quot;,
-        marker=&quot;*&quot;,
+        color="red",
+        marker="*",
         s=marker_size,
-        edgecolor=&quot;white&quot;,
+        edgecolor="white",
         linewidth=1.25,
     )
 
 
 def visualize_masks(
-    image, masks, scores, point_coords, point_labels, title_prefix=&quot;&quot;, save=True
+    image, masks, scores, point_coords, point_labels, title_prefix="", save=True
 ):
-    &quot;&quot;&quot;Visualize and save masks overlaid on the original image.&quot;&quot;&quot;
+    """Visualize and save masks overlaid on the original image."""
     for i, (mask, score) in enumerate(zip(masks, scores)):
         plt.figure(figsize=(10, 10))
         plt.imshow(image)
         show_mask(mask, plt.gca())
         show_points(point_coords, point_labels, plt.gca())
-        plt.title(f&quot;{title_prefix} Mask {i + 1}, Score: {score:.3f}&quot;, fontsize=18)
-        plt.axis(&quot;off&quot;)
-        plt.savefig(f&quot;{title_prefix}_output_mask_{i + 1}.png&quot;)
+        plt.title(f"{title_prefix} Mask {i + 1}, Score: {score:.3f}", fontsize=18)
+        plt.axis("off")
+        plt.savefig(f"{title_prefix}_output_mask_{i + 1}.png")
         plt.close()
 </pre></div>
 </div>
@@ -804,7 +804,7 @@ visualize_masks(
     trt_scores,
     torch.tensor([[500, 375]]),
     torch.tensor([1]),
-    title_prefix=&quot;Torch-TRT&quot;,
+    title_prefix="Torch-TRT",
 )
 </pre></div>
 </div>

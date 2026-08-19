@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -490,15 +490,15 @@ document.write(`
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">_MultiDeviceSafeModeContextManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper class used in conjunction with `set_multi_device_safe_mode`</span>
+<span class="w">    </span><span class="sd">"""Helper class used in conjunction with `set_multi_device_safe_mode`</span>
 
 <span class="sd">    Used to enable `set_multi_device_safe_mode` as a dual-purpose context manager</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span> <span class="o">=</span> <span class="n">old_mode</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;_MultiDeviceSafeModeContextManager&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"_MultiDeviceSafeModeContextManager"</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -514,7 +514,7 @@ document.write(`
 <div class="viewcode-block" id="set_multi_device_safe_mode">
 <a class="viewcode-back" href="../../../py_api/runtime.html#torch_tensorrt.runtime.set_multi_device_safe_mode">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">set_multi_device_safe_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_MultiDeviceSafeModeContextManager</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sets the runtime (Python-only and default) into multi-device safe mode</span>
+<span class="w">    </span><span class="sd">"""Sets the runtime (Python-only and default) into multi-device safe mode</span>
 
 <span class="sd">    In the case that multiple devices are available on the system, in order for the</span>
 <span class="sd">    runtime to execute safely, additional device checks are necessary. These checks</span>
@@ -531,7 +531,7 @@ document.write(`
 <span class="sd">            with torch_tensorrt.runtime.set_multi_device_safe_mode(True):</span>
 <span class="sd">                results = trt_compiled_module(*inputs)</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Fetch existing safe mode and set new mode for Python</span>
     <span class="k">global</span> <span class="n">_PY_RT_MULTI_DEVICE_SAFE_MODE</span>
     <span class="n">old_mode</span> <span class="o">=</span> <span class="n">_PY_RT_MULTI_DEVICE_SAFE_MODE</span>
@@ -541,7 +541,7 @@ document.write(`
     <span class="k">if</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_multi_device_safe_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
 
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set multi-device safe mode to </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Set multi-device safe mode to </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="c1"># Return context manager in case the function is used in a `with` call</span>
     <span class="k">return</span> <span class="n">_MultiDeviceSafeModeContextManager</span><span class="p">(</span><span class="n">old_mode</span><span class="p">)</span></div>

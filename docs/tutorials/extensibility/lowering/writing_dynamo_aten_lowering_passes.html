@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -612,10 +612,10 @@ document.write(`
 <section id="example-lowering-pass">
 <h2>Example Lowering Pass<a class="headerlink" href="#example-lowering-pass" title="Link to this heading">#</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">repair_input_as_output</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">sample_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Repair scenarios where inputs are also outputs of the graph</span>
+<span class="w">    </span><span class="sd">"""Repair scenarios where inputs are also outputs of the graph</span>
 
 <span class="sd">    TRT does not allow such cases, so we insert a clone (identity) layer</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">modified_graph</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="c1"># Extract graph placeholder Tensors</span>
@@ -623,7 +623,7 @@ document.write(`
         <span class="n">node</span>
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
         <span class="k">if</span> <span class="p">(</span>
-            <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span>
             <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span>
             <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
         <span class="p">)</span>
@@ -632,12 +632,12 @@ document.write(`
     <span class="k">for</span> <span class="n">placeholder</span> <span class="ow">in</span> <span class="n">placeholders</span><span class="p">:</span>
         <span class="c1"># If any placeholder has any users which are direct graph outputs</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">placeholder</span><span class="o">.</span><span class="n">users</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
-            <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;output&quot;</span> <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">placeholder</span><span class="o">.</span><span class="n">users</span>
+            <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"output"</span> <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">placeholder</span><span class="o">.</span><span class="n">users</span>
         <span class="p">):</span>
             <span class="n">modified_graph</span> <span class="o">=</span> <span class="kc">True</span>
 
             <span class="c1"># Get direct graph outputs which are direct uses of placeholders</span>
-            <span class="n">direct_outputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">user</span> <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">placeholder</span><span class="o">.</span><span class="n">users</span> <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;output&quot;</span><span class="p">]</span>
+            <span class="n">direct_outputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">user</span> <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">placeholder</span><span class="o">.</span><span class="n">users</span> <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"output"</span><span class="p">]</span>
 
             <span class="c1"># Insert clone node for placeholder to ensure</span>
             <span class="c1"># placeholder is not a direct output</span>
@@ -656,7 +656,7 @@ document.write(`
         <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">eliminate_dead_code</span><span class="p">()</span>
         <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
         <span class="n">gm</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Graph after repair_input_as_output:</span><span class="se">\n</span><span class="si">{</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Graph after repair_input_as_output:</span><span class="se">\n</span><span class="si">{</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">gm</span>
 </pre></div>

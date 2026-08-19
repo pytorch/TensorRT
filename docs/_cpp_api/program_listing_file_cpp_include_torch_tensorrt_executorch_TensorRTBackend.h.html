@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -583,14 +583,14 @@ document.write(`
 <span class="c1">// Selects, for the calling thread, the CUDA stream the delegate runs TensorRT on;</span>
 <span class="c1">// scope it around execution.</span>
 <span class="c1">//</span>
-<span class="c1">// Confines inference to a CUDA green context&#39;s SM partition when the caller</span>
+<span class="c1">// Confines inference to a CUDA green context's SM partition when the caller</span>
 <span class="c1">// passes a cuGreenCtxStreamCreate stream: confinement rides the stream (the green</span>
 <span class="c1">// context need not be current), and cudaStreamPerThread — the no-guard default —</span>
 <span class="c1">// is rejected while a green context is current. While active, device-resident</span>
 <span class="c1">// outputs are left enqueued on the stream (no end sync) to compose with later GPU</span>
 <span class="c1">// work.</span>
 <span class="c1">//</span>
-<span class="c1">// Contract: the stream is on the engine&#39;s device and outlives the guard; a handle</span>
+<span class="c1">// Contract: the stream is on the engine's device and outlives the guard; a handle</span>
 <span class="c1">// is executed by one thread at a time. On the no-end-sync path (guard active, all</span>
 <span class="c1">// I/O device-resident) execute() returns with the TensorRT enqueue still in flight</span>
 <span class="c1">// on the stream; the delegate itself orders the next execute() on, and the</span>

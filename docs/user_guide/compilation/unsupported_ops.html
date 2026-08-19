@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=aae00853"></script>
+    <script src="../../_static/documentation_options.js?v=6ddce912"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -538,7 +538,7 @@ subgraphs. Ops with no converter fall back to <strong>PyTorch</strong> automatic
 eager mode as part of a <code class="docutils literal notranslate"><span class="pre">PyTorch</span></code> subgraph between two TRT subgraphs.</p>
 <p>Use <a class="reference internal" href="../../tutorials/compilation_analysis/dryrun.html#dryrun"><span class="std std-ref">Dryrun Mode</span></a> to see the partition layout before committing to a full compile:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
@@ -568,7 +568,7 @@ to PyTorch, while the rest of the model (embeddings, FFN layers, etc.) runs in T
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ffn</span><span class="p">(</span><span class="n">attn_out</span> <span class="o">+</span> <span class="n">x</span><span class="p">)</span>
 
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
@@ -576,9 +576,9 @@ to PyTorch, while the rest of the model (embeddings, FFN layers, etc.) runs in T
 <p>If you want to explicitly list ops that should always fall back to PyTorch (to prevent
 them from being incorrectly converted), use <code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="o">=</span><span class="p">{</span>
-        <span class="s2">&quot;torch.ops.flash_attn.flash_attn_func&quot;</span><span class="p">,</span>
+        <span class="s2">"torch.ops.flash_attn.flash_attn_func"</span><span class="p">,</span>
     <span class="p">},</span>
 <span class="p">)</span>
 </pre></div>
@@ -594,7 +594,7 @@ from a PyTorch op registration:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion.converter_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">auto_generate_converter</span>
 
-<span class="c1"># Automatically creates a converter using TRT&#39;s standard layer set</span>
+<span class="c1"># Automatically creates a converter using TRT's standard layer set</span>
 <span class="nd">@torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">dynamo_tensorrt_converter</span><span class="p">(</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">my_package</span><span class="o">.</span><span class="n">my_op</span><span class="o">.</span><span class="n">default</span>
 <span class="p">)</span>
@@ -658,13 +658,13 @@ in <code class="docutils literal notranslate"><span class="pre">tools/llm/run_ll
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass</span><span class="w"> </span><span class="kn">import</span> <span class="n">_aten_lowering_pass</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompilationSettings</span>
 
-<span class="c1"># 1. Load the model using PyTorch&#39;s built-in SDPA (not flash_attn)</span>
+<span class="c1"># 1. Load the model using PyTorch's built-in SDPA (not flash_attn)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
-    <span class="s2">&quot;meta-llama/Llama-3.2-1B-Instruct&quot;</span><span class="p">,</span>
-    <span class="n">attn_implementation</span><span class="o">=</span><span class="s2">&quot;sdpa&quot;</span><span class="p">,</span>
+    <span class="s2">"meta-llama/Llama-3.2-1B-Instruct"</span><span class="p">,</span>
+    <span class="n">attn_implementation</span><span class="o">=</span><span class="s2">"sdpa"</span><span class="p">,</span>
 <span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 
-<span class="c1"># 2. Remove Torch-TensorRT&#39;s SDPA decompositions so the op reaches the converter</span>
+<span class="c1"># 2. Remove Torch-TensorRT's SDPA decompositions so the op reaches the converter</span>
 <span class="n">_SDPA_VARIANTS</span> <span class="o">=</span> <span class="p">[</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">_scaled_dot_product_flash_attention</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">_scaled_dot_product_efficient_attention</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
@@ -679,13 +679,13 @@ in <code class="docutils literal notranslate"><span class="pre">tools/llm/run_ll
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_function&quot;</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="ow">in</span> <span class="n">_SDPA_VARIANTS</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_function"</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="ow">in</span> <span class="n">_SDPA_VARIANTS</span><span class="p">:</span>
             <span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
             <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
                 <span class="n">new_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
                     <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">scaled_dot_product_attention</span><span class="p">,</span>
                     <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">),</span>
-                    <span class="n">kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;is_causal&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+                    <span class="n">kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"is_causal"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
                 <span class="p">)</span>
             <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">new_node</span><span class="p">)</span>
             <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
@@ -715,7 +715,7 @@ all have converters.</p></li>
 <h2>Checking Coverage Before Compilation<a class="headerlink" href="#checking-coverage-before-compilation" title="Link to this heading">#</a></h2>
 <p>Use <code class="docutils literal notranslate"><span class="pre">dryrun=True</span></code> to see a report of what will fall back without triggering a full TRT
 engine build:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Use <a class="reference internal" href="../../indices/supported_ops.html#supported-ops"><span class="std std-ref">Operators Supported</span></a> for a full list of ATen ops with TRT converters.</p>
