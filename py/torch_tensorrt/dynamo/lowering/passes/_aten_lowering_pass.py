@@ -7,23 +7,23 @@ from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    flush_deferred_graph_cleanup,
+    set_defer_graph_cleanup,
     trace_intermediate_node_outputs,
 )
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
+from .batch_cheap_fx_cleanups import batch_cheap_fx_cleanups
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
-from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
-from .normalize_negative_slice_stop import normalize_negative_slice_stop
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
-from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
@@ -43,12 +43,10 @@ post_lowering_pass_list = [
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
     fuse_pad_into_convolution,
-    remove_assert_nodes,
-    remove_num_users_is_0_nodes,
+    # One cleanup cycle for non-conflicting node repairs.
+    batch_cheap_fx_cleanups,
     complex_graph_detection,
     force_causal_efficient_attention,
-    eliminate_sym_min_int64_max,
-    normalize_negative_slice_stop,
     annotate_fp8_sdpa,
     decompose_dynamic_slice_scatter,
 ]
@@ -146,7 +144,14 @@ def post_lowering(
     )
     fake_mode = torch._export.utils._detect_fake_mode_from_gm(gm)
     fake_tensor_updater = FakeTensorUpdater(gm)
-    gm = ATEN_POST_LOWERING_PASSES(gm, settings)
+    # Batch DCE/lint/recompile across passes: each pass may still call
+    # clean_up_graph_after_modifications, but only the final flush pays for it.
+    set_defer_graph_cleanup(True)
+    try:
+        gm = ATEN_POST_LOWERING_PASSES(gm, settings)
+        gm = flush_deferred_graph_cleanup(gm)
+    finally:
+        set_defer_graph_cleanup(False)
     if fake_mode is not None:
         fake_tensor_updater.incremental_update(fake_mode)
 

@@ -1,10 +1,9 @@
 import operator
 from typing import Optional, cast
 
-from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
-
 import torch
 from torch.fx import GraphModule, Node
+from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 
 from .pass_utils import clean_up_graph_after_modifications
 
@@ -31,14 +30,8 @@ def _rank(x: Node) -> Optional[int]:
     return None
 
 
-def normalize_negative_slice_stop(
-    gm: GraphModule, settings: object = None
-) -> GraphModule:
-    """Normalize negative symbolic slice bounds to positive dim-relative bounds.
-
-    Python slicing accepts negative bounds such as x[-n:] or x[:-n]. TensorRT
-    shape expressions need the equivalent positive bound, dim_size - n.
-    """
+def apply_normalize_negative_slice_stop(gm: GraphModule) -> bool:
+    """Normalize negative symbolic slice bounds in-place. Returns if changed."""
     modified = False
 
     for node in list(gm.graph.nodes):
@@ -83,4 +76,18 @@ def normalize_negative_slice_stop(
             node.args = tuple(args)
             modified = True
 
-    return clean_up_graph_after_modifications(gm) if modified else gm
+    return modified
+
+
+def normalize_negative_slice_stop(
+    gm: GraphModule, settings: object = None
+) -> GraphModule:
+    """Normalize negative symbolic slice bounds to positive dim-relative bounds.
+
+    Python slicing accepts negative bounds such as x[-n:] or x[:-n]. TensorRT
+    shape expressions need the equivalent positive bound, dim_size - n.
+    """
+    del settings
+    if apply_normalize_negative_slice_stop(gm):
+        return clean_up_graph_after_modifications(gm)
+    return gm
