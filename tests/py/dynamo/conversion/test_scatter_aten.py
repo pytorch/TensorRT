@@ -316,5 +316,26 @@ class TestScatterSrcDynamicShapeConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
 
+class TestScatterDtypeFixConverter(DispatchTestCase):
+    def test_scatter_value_bool_scalar_no_float64_promotion(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                index = torch.tensor([[0, 1], [1, 0]], dtype=torch.int64)
+                return torch.ops.aten.scatter.value(x, 1, index, True)
+
+        inputs = [torch.zeros(2, 4, dtype=torch.float32)]
+        self.run_test(TestModule(), inputs)
+
+    def test_scatter_src_dtype_mismatch_after_argmax(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                index = torch.tensor([[0, 1], [1, 0]], dtype=torch.int64)
+                src = torch.argmax(x, dim=1, keepdim=True).expand(2, 2)
+                return torch.ops.aten.scatter.src(x, 1, index, src)
+
+        inputs = [torch.arange(8, dtype=torch.int64).reshape(2, 4)]
+        self.run_test(TestModule(), inputs)
+
+
 if __name__ == "__main__":
     run_tests()
