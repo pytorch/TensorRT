@@ -16,6 +16,7 @@ the dynamic-shape intent lives on the ``Input`` objects -- no separate
 call site.
 """
 
+import logging
 import unittest
 from collections import namedtuple
 
@@ -399,6 +400,110 @@ def test_namedtuple_and_shared_dims_together_raises():
             name="x",
             shared_dims={0: "b"},
         )
+
+
+@pytest.mark.unit
+def test_namedtuple_requires_all_three_namedtuples():
+    """A namedtuple min_shape with plain-tuple opt/max_shape is rejected."""
+    S = namedtuple("shape", ["batch", "seq"])
+    with assertions.assertRaises(TypeError):
+        torchtrt.Input(
+            min_shape=S(1, 16),
+            opt_shape=(4, 16),  # plain tuple -- no field names to cross-check
+            max_shape=(4, 16),
+            dtype=torch.int64,
+            name="x",
+        )
+
+
+@pytest.mark.unit
+def test_conflicting_ranges_error_names_the_inputs():
+    """The conflict message identifies which input holds which range, not just
+    the two ranges -- otherwise it is unusable beyond two inputs."""
+    from torch_tensorrt.dynamo._tracer import build_dim_registry
+
+    S = namedtuple("shape", ["batch", "seq"])
+    inputs = {
+        "input_ids": torchtrt.Input(
+            min_shape=S(1, 16),
+            opt_shape=S(4, 16),
+            max_shape=S(4, 16),  # batch 1..4
+            dtype=torch.int64,
+            name="input_ids",
+        ),
+        "attention_mask": torchtrt.Input(
+            min_shape=S(1, 16),
+            opt_shape=S(8, 16),
+            max_shape=S(8, 16),  # batch 1..8 -- conflicts
+            dtype=torch.int64,
+            name="attention_mask",
+        ),
+    }
+    with assertions.assertRaises(ValueError) as ctx:
+        build_dim_registry((), inputs)
+
+    message = str(ctx.exception)
+    assertions.assertIn("input_ids[0]", message)
+    assertions.assertIn("attention_mask[0]", message)
+
+
+@pytest.mark.unit
+def test_disjoint_names_produce_independent_dims():
+    """Different names never fuse -- even with identical (min, max). The name
+    drives sharing, not the range."""
+    from torch_tensorrt.dynamo._tracer import build_dim_registry
+
+    S_image = namedtuple("shape", ["n", "c", "h", "w"])
+    S_text = namedtuple("shape", ["batch", "seq"])
+
+    inputs = [
+        torchtrt.Input(
+            min_shape=S_image(1, 3, 224, 224),
+            opt_shape=S_image(4, 3, 224, 224),
+            max_shape=S_image(8, 3, 224, 224),  # n 1..8; c/h/w static
+            dtype=torch.float32,
+            name="image",
+        ),
+        torchtrt.Input(
+            min_shape=S_text(1, 16),
+            opt_shape=S_text(4, 16),
+            max_shape=S_text(8, 16),  # batch 1..8 -- same range as n
+            dtype=torch.int64,
+            name="text",
+        ),
+    ]
+    registry = build_dim_registry(inputs, {})
+
+    assertions.assertEqual(set(registry), {"n", "batch"})
+    assertions.assertIsNot(registry["n"], registry["batch"])
+
+
+@pytest.mark.unit
+def test_shared_dims_resolution_is_logged(caplog):
+    """The resolved registry is reported, so a fusion that was not intended is
+    visible rather than silent."""
+    from torch_tensorrt.dynamo._tracer import build_dim_registry
+
+    S = namedtuple("shape", ["batch", "seq"])
+    inputs = {
+        name: torchtrt.Input(
+            min_shape=S(1, 16),
+            opt_shape=S(4, 16),
+            max_shape=S(4, 16),
+            dtype=torch.int64,
+            name=name,
+        )
+        for name in ("input_ids", "attention_mask")
+    }
+
+    with caplog.at_level(logging.INFO, logger="torch_tensorrt.dynamo._tracer"):
+        build_dim_registry((), inputs)
+
+    # Both contributing axes are named under the one shared dim -- that listing
+    # is what makes an accidental fuse spottable.
+    assertions.assertIn("'batch'", caplog.text)
+    assertions.assertIn("input_ids[0]", caplog.text)
+    assertions.assertIn("attention_mask[0]", caplog.text)
 
 
 if __name__ == "__main__":
