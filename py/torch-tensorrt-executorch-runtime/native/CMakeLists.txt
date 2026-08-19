@@ -165,13 +165,37 @@ if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
   message(FATAL_ERROR "A static C++ runtime is required to build the ExecuTorch runtime wheel")
 endif()
 
-# rules_foreign_cc injects an explicit dynamic -lstdc++ into module and shared
-# linker flags. Remove only that scoped fragment: the driver flags below select the
-# static runtime, and retaining this injected library makes the wheel depend on the
-# build host's CXXABI version.
-foreach(_torch_tensorrt_linker_flags CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS)
-  string(REPLACE "-Wl,--push-state,-as-needed -lstdc++ -Wl,--pop-state" ""
-    ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
+# rules_foreign_cc injects an explicit dynamic -lstdc++ from the Bazel toolchain.
+# Retaining it makes the wheel depend on the build host's CXXABI version, so drop it
+# wherever it lands.
+#
+# Position on the link line is what decides whether it matters, measured in the
+# release image with a shared object that uses std::string and exceptions:
+#
+#   -static-libstdc++ -static-libgcc                       -> no libstdc++ NEEDED
+#   ... plus -lstdc++ BEFORE the objects                    -> no libstdc++ NEEDED
+#   ... plus -lstdc++ AFTER the objects                     -> libstdc++.so.6 NEEDED
+#
+# Before the objects nothing is undefined yet, so --as-needed drops it. After them the
+# libstdc++ symbols are still unresolved, because -static-libstdc++ makes the driver
+# append libstdc++.a at the very end, so --as-needed keeps it and the NEEDED sticks.
+# CMake puts CMAKE_*_LINKER_FLAGS before the objects and CMAKE_*_STANDARD_LIBRARIES
+# after them, so the standard-libraries variables are the ones that can actually hurt.
+#
+# Matched by regex rather than as one exact string: the previous exact-string match
+# covered only the flags variables and would also miss a spacing change silently.
+foreach(_torch_tensorrt_linker_flags
+        CMAKE_MODULE_LINKER_FLAGS
+        CMAKE_SHARED_LINKER_FLAGS
+        CMAKE_EXE_LINKER_FLAGS
+        CMAKE_CXX_STANDARD_LIBRARIES
+        CMAKE_C_STANDARD_LIBRARIES)
+  string(REGEX REPLACE "(-Wl,--push-state,-as-needed +)?-lstdc\\+\\+( +-Wl,--pop-state)?"
+    "" ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
+  # Reported unconditionally: when the check at the end of this file trips, the first
+  # question is always what ended up on the link line.
+  message(STATUS "torch_tensorrt: ${_torch_tensorrt_linker_flags} = "
+    "[${${_torch_tensorrt_linker_flags}}]")
 endforeach()
 
 foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
@@ -235,8 +259,9 @@ add_custom_target(torch_tensorrt_executorch_portable_lib ALL DEPENDS portable_li
 # directly, because add_custom_command(TARGET) only accepts targets created in this
 # directory and those two come from ExecuTorch's subdirectory.
 #
-# The predicate captures readelf's output and checks its status before inspecting it,
-# so an unreadable artifact fails the build instead of passing quietly.
+# The check lives in a script rather than an inline shell string so it can report what
+# it saw. A bare "has a dynamic libstdc++ dependency" does not say which input added
+# it, and the build logs do not print link lines, so the script prints both.
 find_program(TORCH_TENSORRT_READELF NAMES readelf llvm-readelf)
 if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR
@@ -248,10 +273,11 @@ if(TORCH_TENSORRT_READELF)
     add_custom_command(TARGET torch_tensorrt_executorch_portable_lib POST_BUILD
       COMMAND "${CMAKE_COMMAND}" -E echo
         "checking $<TARGET_FILE_NAME:${_torch_tensorrt_checked_target}> links the C++ runtime statically"
-      COMMAND sh -c
-        "dyn=$(\"$0\" -d \"$1\") || { echo \"FATAL: could not inspect $1 with $0\" >&2; exit 1; }; printf %s \"$dyn\" | grep -qE 'NEEDED.*libstdc\\+\\+' && { echo \"FATAL: $1 has a dynamic libstdc++ dependency\" >&2; exit 1; }; syms=$(\"$0\" -Ws \"$1\") || { echo \"FATAL: could not read symbols of $1\" >&2; exit 1; }; printf %s \"$syms\" | grep -qE 'UND .*_M_addref' && { echo \"FATAL: $1 has an undefined exception_ptr::_M_addref\" >&2; exit 1; }; exit 0"
+      COMMAND sh
+        "${CMAKE_CURRENT_LIST_DIR}/check_static_cxx_runtime.sh"
         "${TORCH_TENSORRT_READELF}"
         "$<TARGET_FILE:${_torch_tensorrt_checked_target}>"
+        "$<TARGET_PROPERTY:${_torch_tensorrt_checked_target},BINARY_DIR>/CMakeFiles/${_torch_tensorrt_checked_target}.dir/link.txt"
       VERBATIM)
   endforeach()
 endif()
