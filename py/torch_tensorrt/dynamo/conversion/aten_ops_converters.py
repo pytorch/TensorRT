@@ -3124,6 +3124,15 @@ def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -
     if meta_data is None:
         return False
     shape = meta_data.shape
+    if len(shape) == 0:
+        # A 0-D (scalar) input has no dim to normalize -- get_positive_dim
+        # would compute dim % 0 (ZeroDivisionError). Fall back to PyTorch
+        # rather than crash the partitioner; sorting a scalar is a no-op.
+        _LOGGER.debug(
+            f"[sort validator] Skipping node {node.name} with 0-D (scalar) "
+            "input; aten.sort will run in PyTorch."
+        )
+        return False
     dim = args_bounds_check(node.args, 1, -1)
     dim = get_positive_dim(dim, len(shape))
     k = shape[dim]

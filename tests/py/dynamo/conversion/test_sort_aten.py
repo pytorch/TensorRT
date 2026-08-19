@@ -116,6 +116,28 @@ class TestSortValidatorDefaultDim(TestCase):
         self.assertEqual(acc_count, 1)
         torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
 
+    def test_sort_scalar_input_falls_back(self):
+        """A 0-D (scalar) input has no dim to normalize: get_positive_dim
+        computes dim % rank, and rank=0 for a scalar raises ZeroDivisionError.
+        sort_validator must reject scalar inputs before reaching that call so
+        the node falls back to PyTorch instead of crashing the partitioner."""
+
+        class Sort(nn.Module):
+            def forward(self, x):
+                values, _ = torch.sort(x)
+                return values
+
+        mod = Sort().eval().cuda()
+        inputs = [torch.tensor(5.0).cuda()]
+        trt_mod = torch_tensorrt.compile(
+            mod, ir="dynamo", inputs=inputs, min_block_size=1
+        )
+        acc_count = sum(
+            1 for name, _ in trt_mod.named_children() if "_run_on_acc" in name
+        )
+        self.assertEqual(acc_count, 0)
+        torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
 
 if __name__ == "__main__":
     run_tests()
