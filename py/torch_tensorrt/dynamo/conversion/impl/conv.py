@@ -30,7 +30,7 @@ def convNd(
     weight: Union[TRTTensor, torch.Tensor, np.ndarray],
     bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
     stride: Union[int, Sequence[int]],
-    padding: Union[int, Sequence[int]],
+    padding: Optional[Union[int, Sequence[int]]],
     dilation: Union[int, Sequence[int]],
     groups: Optional[int],
     output_padding: Union[int, Sequence[int]] = 0,
@@ -43,6 +43,10 @@ def convNd(
     if (pre_padding is None) != (post_padding is None):
         raise ValueError(
             f"Convolution {name}: pre_padding and post_padding must both be set"
+        )
+    if pre_padding is not None and padding is not None:
+        raise ValueError(
+            f"Convolution {name}: cannot specify both pre_padding/post_padding and padding"
         )
 
     if has_dynamic_shape(input.shape):
