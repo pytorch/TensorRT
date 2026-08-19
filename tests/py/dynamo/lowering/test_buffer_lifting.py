@@ -29,6 +29,7 @@ import inspect
 import torch
 from torch.export import export
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     assert_predicted_kv_aliased,
     inline_lifted_buffers_into_gm,
@@ -499,6 +500,51 @@ class TestCopyBackClassification(TestCase):
         new_gm, lifted = lift_mutated_buffers(gm)
         self.assertEqual(len(lifted), 1)
         self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["cache"])
+
+    def test_torch_executed_write_is_copyback_not_kv(self):
+        """A KV-shaped write whose op the caller excluded from TensorRT cannot reach a
+        converter, so no IKVCacheUpdateLayer can alias it.
+
+        It must still be lifted and copied back. Dropping the buffer instead would
+        leave the copy_ with no users, and post_lowering's dead-node pass would erase
+        it, silently losing the write."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 4, 16, 8))
+
+            def forward(self, x):
+                self.cache[:, :, 3:4, :] = x
+                return self.cache.sum()
+
+        args = (torch.ones(2, 4, 1, 8),)
+        # Without the exclusion the same write is predicted to alias inside the engine.
+        gm = _ep_module_decomposed(M(), args)
+        baseline_gm, baseline_lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(baseline_lifted), 1)
+        self.assertEqual(baseline_gm.meta["_copyback_mutation_buffers"], [])
+        self.assertEqual(len(baseline_gm.meta["_predicted_kv_bindings"]), 1)
+
+        gm = _ep_module_decomposed(M(), args)
+        settings = CompilationSettings(
+            torch_executed_ops={"torch.ops.aten.slice_scatter.default"}
+        )
+        new_gm, lifted = lift_mutated_buffers(gm, settings)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["cache"])
+        self.assertEqual(new_gm.meta["_predicted_kv_bindings"], [])
+
+        # The write survives as a real graph output, so it cannot be dead-code
+        # eliminated the way an orphaned copy_ would be.
+        out_node = next(n for n in new_gm.graph.nodes if n.op == "output")
+        self.assertEqual(len(out_node.args[0]), 2)
+        erasable = [
+            n
+            for n in new_gm.graph.nodes
+            if n is not out_node and not n.users and n.all_input_nodes
+        ]
+        self.assertEqual(erasable, [])
 
 
 class _FakeEngine:
