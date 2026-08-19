@@ -266,7 +266,7 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
     ),
     Suite(
-        # Standard: the automatic-plugin pair. RTX: the whole automatic_plugin
+        # Standard: the automatic-plugin trio. RTX: the whole automatic_plugin
         # directory, except the Linux-only FlashInfer test below.
         # (The redundant conversion/ re-run from the old l2_plugin is dropped.)
         "plugins-automatic",
@@ -276,6 +276,7 @@ _L2: list[Suite] = [
         paths=(
             "automatic_plugin/test_automatic_plugin.py",
             "automatic_plugin/test_automatic_plugin_with_attrs.py",
+            "automatic_plugin/test_plugin_attr_annotations.py",
         ),
         overrides={
             "rtx": {
