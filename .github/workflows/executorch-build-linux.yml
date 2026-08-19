@@ -82,5 +82,13 @@ jobs:
         python -m pip install pyyaml "executorch==1.4.1"
         export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
 
+        # Bazel truncates a failing action's output at 1 MB by default and then
+        # prints nothing but the size, which hid the real error behind
+        #   stdout ... exceeds maximum size of
+        #     --experimental_ui_max_stdouterr_bytes=1048576 bytes; skipping
+        # setup.py already forwards BAZEL_ARGS, so raise the limit rather than
+        # debugging blind.
+        export BAZEL_ARGS="--experimental_ui_max_stdouterr_bytes=33554432"
+
         # Build the no-compile-for-users Python runtime wheel.
         python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime
