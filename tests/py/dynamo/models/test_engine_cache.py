@@ -1079,7 +1079,12 @@ class TestAliasedIOCacheRoundTrip(TestCase):
                 inputs=list(args),
                 enabled_precisions={torch.float32},
                 min_block_size=1,
-                use_python_runtime=False,
+                # Required, not incidental: both cache paths are gated on
+                # `not settings.immutable_weights` and the default is immutable, so
+                # without this nothing is stored, nothing is pulled, and the second
+                # compile below is a second fresh build. The test would then pass
+                # whether or not aliased_io survives the cache.
+                immutable_weights=False,
                 cache_built_engines=True,
                 reuse_cached_engines=True,
                 engine_cache_dir=engine_cache_dir,
@@ -1095,6 +1100,13 @@ class TestAliasedIOCacheRoundTrip(TestCase):
         fresh_aliased = _aliased_io(fresh)
         # Guard the guard: if the fresh build records nothing there is nothing to lose.
         self.assertEqual(len(fresh_aliased), 1)
+        # And prove the cache was actually populated. Without this, a configuration
+        # that silently disables caching turns the second compile into another fresh
+        # build and the assertions below stop testing anything.
+        self.assertTrue(
+            os.path.isdir(engine_cache_dir) and os.listdir(engine_cache_dir),
+            msg=f"first compile wrote no engine cache entry to {engine_cache_dir}",
+        )
         fresh_out = fresh(*[a.clone() for a in args])
 
         cached = _compile()
