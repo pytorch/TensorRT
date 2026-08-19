@@ -117,6 +117,21 @@ def test_upstream_api_importable():
     )
 
 
+def test_default_tracks_has_complex_decomposition():
+    """use_complex_decomposition's default tracks has_complex_decomposition()
+    rather than a fixed value, so this new path is auto-enabled on
+    torch>=2.14.dev instead of being opt-in (see PR description). Lock this
+    in so an accidental hardcoded default doesn't silently change that."""
+    from torch_tensorrt.dynamo import _defaults
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+
+    assert _defaults.USE_COMPLEX_DECOMPOSITION == cda.has_complex_decomposition()
+    assert (
+        CompilationSettings().use_complex_decomposition
+        == cda.has_complex_decomposition()
+    )
+
+
 # ---------------------------------------------------------------------------
 # I/O-signature metadata survival across the functional decompose call (#7)
 # ---------------------------------------------------------------------------
