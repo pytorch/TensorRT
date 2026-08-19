@@ -90,8 +90,19 @@ the removed `CudaStreamGuard`:
   and therefore take the synchronized staging path. CI separately asserts that the
   runner resolves one shared `libextension_cuda.so`. Device-resident asynchronous
   return is not covered end to end.
-- CUDA green-context streams require context-aware completion-event handling and
-  are not yet part of this integration's validated support matrix.
+- CUDA green-context streams work, and are the case this shared primitive exists
+  for: one `cuGreenCtxStreamCreate` stream drives both the TensorRT delegate and
+  ExecuTorch's CUDA/AOTI delegate, so both are confined to the same SM partition.
+  Verified by hand on an A100 with 108 SMs, using a `.pte` whose graph splits
+  across both delegates and a green context holding 8 of them: the program runs
+  and matches its eager reference. To reproduce, build the reference runner with
+  `-DEXECUTORCH_BUILD_CUDA=ON` and run it with `--green_context_sms=8`.
+
+  Two limits on that result. It is not in CI, because the CI configuration builds
+  the runner without the CUDA delegate. And it took the synchronized path, since
+  the method inputs and outputs are host-backed, so the device-resident
+  asynchronous return described above is still uncovered and the interaction
+  between a green context and the internal completion event remains untested.
 
 ## Standalone Backend Archive
 

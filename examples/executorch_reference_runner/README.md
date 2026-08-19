@@ -144,6 +144,37 @@ the synchronized staging path; that test exercises guarded inference and checks 
 output values, not the device-resident asynchronous fast path. Integrated GPUs may bind
 host-backed storage directly and can follow the asynchronous contract documented in
 [the backend README](../../cpp/src/torch_tensorrt/executorch/README.md).
-Green-context streams are not yet in the validated support matrix. The Python
-`torch_tensorrt` package is needed when exporting the `.pte`; it is not needed
-by this native runner at inference time.
+The Python `torch_tensorrt` package is needed when exporting the `.pte`; it is not
+needed by this native runner at inference time.
+
+## Running both delegates on one green-context stream
+
+The point of the shared caller stream is that TensorRT and the CUDA/AOTI delegate
+can be driven by one caller-owned stream, including a CUDA green-context stream, so
+both stay inside the same SM partition. To exercise that, build with the CUDA
+delegate enabled and pass `--green_context_sms`:
+
+```bash
+cmake -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner" \
+  -B build-executorch-reference-runner \
+  -DEXECUTORCH_BUILD_CUDA=ON \
+  -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
+  -DTensorRT_ROOT="${TensorRT_ROOT}"
+cmake --build build-executorch-reference-runner --target example_executorch_runner -j
+
+build-executorch-reference-runner/example_executorch_runner \
+  --model_path=two_delegate.model.pte --num_runs=1 --green_context_sms=8
+```
+
+`--green_context_sms=N` creates the caller stream inside a green context holding N
+SMs. The runner aborts rather than falling back if one cannot be created, so a
+passing run always means a green context was really used. `N=0`, the default, uses
+an ordinary stream.
+
+Enabling `EXECUTORCH_BUILD_CUDA` does not make this runner depend on libtorch. It
+needs `EXECUTORCH_BUILD_EXTENSION_TENSOR=ON`, which is set automatically, and the
+result links no libtorch and no libc10.
+
+This path is verified by hand, not in CI: the CI configuration builds the runner
+without the CUDA delegate. It also takes the synchronized path, because the method
+inputs and outputs are host-backed.
