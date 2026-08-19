@@ -56,10 +56,16 @@ endif()
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/executorch")
 add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_tensorrt_executorch")
 
+# The green-context flag uses the CUDA driver API (cuGreenCtx*). Imported
+# targets from a find_package inside a subdirectory are not visible here, so
+# find it in this scope.
+find_package(CUDAToolkit REQUIRED)
+
 add_executable(example_executorch_runner main.cpp)
 target_link_libraries(
   example_executorch_runner
   PRIVATE
+    CUDA::cuda_driver
     executorch
     executorch::backends
     executorch::extensions
