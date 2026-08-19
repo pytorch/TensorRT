@@ -123,6 +123,36 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
     assert "set(EXECUTORCH_BUILD_XNNPACK ON" in cmake
 
 
+@pytest.mark.unit
+def test_runtime_extension_does_not_require_an_embeddable_python():
+    """Development.Embed must stay optional, or the release build cannot configure.
+
+    ExecuTorch declares its pybind modules SHARED, so CMake requires the
+    Python::Python target and suggests asking for Development.Embed. Taking that
+    suggestion breaks the build: the release image's CPython ships no libpython, so
+    the component cannot be satisfied and the whole find_package fails. The
+    component is therefore requested optionally, matching pybind11, and the target
+    is stood in for when it is absent.
+    """
+    cmake = (
+        _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "REQUIRED COMPONENTS Interpreter Development.Module" in cmake
+    assert "if(NOT TARGET Python::Python)" in cmake
+
+    # Every mention of the component in actual code, comments excluded, must be an
+    # optional one. A required request is what fails on an image without libpython.
+    code = [line for line in cmake.splitlines() if not line.lstrip().startswith("#")]
+    embed_lines = [line for line in code if "Development.Embed" in line]
+    assert embed_lines, "Development.Embed should be requested, optionally"
+    for line in embed_lines:
+        assert "OPTIONAL_COMPONENTS" in line, (
+            "Development.Embed must stay optional; the release image has no "
+            f"libpython: {line.strip()!r}"
+        )
+
+
 def _setup_tree():
     return ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
 
