@@ -279,10 +279,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   torch::Tensor dynamic_workspace;
   if (compiled_engine->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
-    dynamic_workspace = torch::empty(
-        {compiled_engine->cuda_engine->getDeviceMemorySizeV2()},
-        torch::TensorOptions().dtype(torch::kUInt8).device(torch::kCUDA));
-    ctx->setDeviceMemory(dynamic_workspace.data_ptr());
+    const auto workspace_bytes = compiled_engine->cuda_engine->getDeviceMemorySizeV2();
+    dynamic_workspace =
+        torch::empty({workspace_bytes}, torch::TensorOptions().dtype(torch::kUInt8).device(torch::kCUDA));
+    ctx->setDeviceMemoryV2(dynamic_workspace.data_ptr(), workspace_bytes);
   }
 
   auto run_standard_execution = [&]() {

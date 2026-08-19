@@ -3,8 +3,9 @@ import unittest
 
 import torch
 import torch_tensorrt as torch_trt
-import tensorrt as trt  # isort: skip  # imported after torch_tensorrt for RTX alias
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+import tensorrt as trt  # isort: skip  # imported after torch_tensorrt for RTX alias
 
 
 class TestDynamicWorkspaceAllocation(unittest.TestCase):
@@ -40,9 +41,7 @@ class TestDynamicWorkspaceAllocation(unittest.TestCase):
         self.assertEqual(len(runtime_modules), 1)
 
         runtime = trt.Runtime(trt.Logger(trt.Logger.ERROR))
-        engine = runtime.deserialize_cuda_engine(
-            runtime_modules[0].serialized_engine
-        )
+        engine = runtime.deserialize_cuda_engine(runtime_modules[0].serialized_engine)
         self.assertIsNotNone(engine)
         workspace_bytes = engine.device_memory_size_v2
         self.assertGreater(workspace_bytes, 0)
