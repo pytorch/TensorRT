@@ -375,6 +375,155 @@ def test_declare_aliased_kv_mutations_declares_copyback(monkeypatch):
 
 
 @pytest.mark.unit
+def test_declare_aliased_kv_mutations_skips_already_declared_copyback(monkeypatch):
+    """A buffer torch.export already declared BUFFER_MUTATION is not declared twice,
+    and its trailing value still leaves the user outputs.
+
+    torch.export moves a mutation it recognises to the front of the outputs. The
+    trailing value lift appended for that same buffer is internal plumbing, so it must
+    be detached either way, otherwise it stays a user output and the saved model gains
+    a return it never had."""
+    pytest.importorskip("executorch.exir")
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.placeholder("state_in")
+    state_new = g.call_function(torch.add, (state_in, x))
+    user_out = g.call_function(torch.add, (x, x))
+    # torch.export's own mutation output first, then the user output, then the
+    # trailing copy-back value lift appended for the same buffer.
+    g.output((state_new, user_out, state_new))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    sig = SimpleNamespace(
+        inputs_to_buffers={"state_in": "state_0"},
+        input_specs=[
+            InputSpec(
+                InputKind.BUFFER, TensorArgument(name="state_in"), "state_0", True
+            ),
+            InputSpec(InputKind.USER_INPUT, TensorArgument(name="x"), None),
+        ],
+        output_specs=[
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION,
+                TensorArgument(name=state_new.name),
+                "state_0",
+            ),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="user_out"), None),
+            OutputSpec(
+                OutputKind.USER_OUTPUT, TensorArgument(name=state_new.name), None
+            ),
+        ],
+    )
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=sig,
+        state_dict={},
+        range_constraints={},
+        module_call_graph=[],
+        constants={},
+    )
+
+    captured = {}
+
+    class _CapturingEP:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
+
+    E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
+
+    new_specs = captured["graph_signature"].output_specs
+    # state_0 keeps its single existing mutation spec; no second one is added.
+    mutations = [s for s in new_specs if s.kind == OutputKind.BUFFER_MUTATION]
+    assert [s.target for s in mutations] == ["state_0"]
+    # The trailing copy-back value is gone from the user outputs.
+    user_outputs = [s for s in new_specs if s.kind == OutputKind.USER_OUTPUT]
+    assert [s.arg.name for s in user_outputs] == ["user_out"]
+
+    out_node = next(n for n in gm.graph.nodes if n.op == "output")
+    assert list(out_node.args[0]) == [state_new, user_out]
+
+
+@pytest.mark.unit
+def test_declare_aliased_kv_mutations_pairs_copyback_by_position(monkeypatch):
+    """With a mix of declared and undeclared buffers, each remaining copy-back value
+    is paired with the buffer lift appended it for.
+
+    lift appends the values in copyback_buffers order, so the pairing has to come from
+    that full run. Dropping the declared buffers before slicing shifts the run and
+    declares one buffer's value as another's mutation, which the runtime then copies
+    into a buffer of a different shape."""
+    pytest.importorskip("executorch.exir")
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    a_in = g.placeholder("a_in")
+    b_in = g.placeholder("b_in")
+    c_in = g.placeholder("c_in")
+    a_new = g.call_function(torch.add, (a_in, x))
+    b_new = g.call_function(torch.add, (b_in, x))
+    c_new = g.call_function(torch.add, (c_in, x))
+    user_out = g.call_function(torch.add, (x, x))
+    # Only b is recognised by torch.export, so its mutation leads. The trailing run
+    # is a_new, b_new, c_new, matching copyback_buffers order.
+    g.output((b_new, user_out, a_new, b_new, c_new))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    def buf_spec(name, target):
+        return InputSpec(InputKind.BUFFER, TensorArgument(name=name), target, True)
+
+    sig = SimpleNamespace(
+        inputs_to_buffers={"a_in": "a", "b_in": "b", "c_in": "c"},
+        input_specs=[
+            buf_spec("a_in", "a"),
+            buf_spec("b_in", "b"),
+            buf_spec("c_in", "c"),
+            InputSpec(InputKind.USER_INPUT, TensorArgument(name="x"), None),
+        ],
+        output_specs=[
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION, TensorArgument(name=b_new.name), "b"
+            ),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="user_out"), None),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=a_new.name), None),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=b_new.name), None),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=c_new.name), None),
+        ],
+    )
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=sig,
+        state_dict={},
+        range_constraints={},
+        module_call_graph=[],
+        constants={},
+    )
+
+    captured = {}
+
+    class _CapturingEP:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
+
+    E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["a", "b", "c"])
+
+    new_specs = captured["graph_signature"].output_specs
+    mutations = [s for s in new_specs if s.kind == OutputKind.BUFFER_MUTATION]
+    # Each buffer appears once, paired with the value appended for it.
+    assert [(s.target, s.arg.name) for s in mutations] == [
+        ("a", a_new.name),
+        ("c", c_new.name),
+        ("b", b_new.name),
+    ]
+    user_outputs = [s for s in new_specs if s.kind == OutputKind.USER_OUTPUT]
+    assert [s.arg.name for s in user_outputs] == ["user_out"]
+
+
+@pytest.mark.unit
 def test_create_trt_exp_program_declares_copyback(monkeypatch):
     """retrace=False: create_trt_exp_program reads
     gm.meta['_copyback_mutation_buffers'], tags the trailing outputs with their
