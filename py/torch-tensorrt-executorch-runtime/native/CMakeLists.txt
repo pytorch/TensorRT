@@ -179,7 +179,8 @@ add_subdirectory("${EXECUTORCH_SOURCE_DIR}" executorch)
 
 add_library(torch_tensorrt_executorch_backend STATIC
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
-  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp")
+  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp"
+  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/WeightStreamingBudget.cpp")
 target_compile_features(torch_tensorrt_executorch_backend PUBLIC cxx_std_17)
 target_compile_definitions(torch_tensorrt_executorch_backend
   PRIVATE C10_USING_CUSTOM_GENERATED_MACROS)

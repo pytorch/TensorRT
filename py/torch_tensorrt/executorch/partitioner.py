@@ -36,7 +36,48 @@ try:
 except ImportError:
     _TARGET_DEVICE_COMPILE_SPEC_KEY = "target_device"
 
+# Compile spec key that carries the TensorRT weight streaming budget into the
+# delegate. Must match kWeightStreamingBudgetKey on the C++ side
+# (cpp/include/torch_tensorrt/executorch/WeightStreamingBudget.h). The value is a
+# non-negative decimal integer of bytes (ASCII). The key is absent for the
+# automatic budget, which the delegate applies itself for streamable engines.
+# The delegate also reads this same key as a load-time backend option (runtime
+# spec), which takes precedence over this baked value when provided at load.
+WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY = "weight_streaming_budget"
+
+# The C++ side parses the value into an int64_t, so anything at or above 2**63 has no
+# representation there.
+WEIGHT_STREAMING_BUDGET_MAX_BYTES = 2**63
+
 logger = logging.getLogger(__name__)
+
+
+def normalize_weight_streaming_budget_per_engine(
+    weight_streaming_budget_per_engine: Optional[int],
+) -> Optional[bytes]:
+    """Validate a per-engine weight streaming budget and encode it for a CompileSpec.
+
+    ``None``, the default, means automatic: the delegate picks the budget at load time.
+    A non-negative integer is an explicit GPU budget in bytes. Returns the ASCII bytes
+    to store in the CompileSpec, or ``None`` when no budget was supplied.
+    """
+    if weight_streaming_budget_per_engine is None:
+        return None
+    # bool is an int subclass, so reject it explicitly along with non-ints.
+    if isinstance(weight_streaming_budget_per_engine, bool) or not isinstance(
+        weight_streaming_budget_per_engine, int
+    ):
+        raise TypeError(
+            "weight_streaming_budget_per_engine must be a non-negative int (number of "
+            "bytes) or None for automatic, got "
+            f"{type(weight_streaming_budget_per_engine).__name__}."
+        )
+    if not 0 <= weight_streaming_budget_per_engine < WEIGHT_STREAMING_BUDGET_MAX_BYTES:
+        raise ValueError(
+            "weight_streaming_budget_per_engine must be in [0, 2**63), got "
+            f"{weight_streaming_budget_per_engine}."
+        )
+    return str(weight_streaming_budget_per_engine).encode("ascii")
 
 
 class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
