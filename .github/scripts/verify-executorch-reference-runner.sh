@@ -426,10 +426,29 @@ packaged_runner_log="${verify_root}/packaged_runner.log"
   --model_path="${model_path}" \
   --num_runs=1 2>&1 | tee "${packaged_runner_log}"
 
-# The sample model is x + 1, and both runners fill inputs with 1.0f, so each
-# output sample must report the expected shape and values. ET_LOG output is not
-# part of the packaged runner contract and may be compiled out.
+# The sample model is x + 1 on a (2,3,4,4) input and both runners fill inputs with
+# 1.0f, so the shape is exactly [2,3,4,4] and every printed value is exactly 2.0000.
+# Assert both precisely. Matching only "shape=" accepts any shape, and matching one
+# 2.0000 anywhere on the values line accepts a line of wrong numbers that happens to
+# contain one right one, so neither catches a stream-ordering regression returning
+# stale or partial output. ET_LOG output is not part of the packaged runner contract
+# and may be compiled out, so nothing here depends on it.
 for _log in "${runner_log}" "${packaged_runner_log}"; do
-  grep -q "output\\[0\\] shape=" "${_log}"
-  grep -Eq "first [0-9]+ values:.* 2\\.0000" "${_log}"
+  if ! grep -q 'output\[0\] shape=\[2,3,4,4\]' "${_log}"; then
+    echo "Unexpected output shape in ${_log}:" >&2
+    grep 'output\[0\] shape=' "${_log}" >&2 || echo "  no shape line at all" >&2
+    exit 1
+  fi
+
+  _values="$(sed -n 's/.*first [0-9]* values://p' "${_log}" | head -n1)"
+  if [[ -z "${_values}" ]]; then
+    echo "No output values line in ${_log}" >&2
+    exit 1
+  fi
+  for _value in ${_values}; do
+    if [[ "${_value}" != "2.0000" ]]; then
+      echo "Unexpected output value '${_value}' in ${_log}: ${_values}" >&2
+      exit 1
+    fi
+  done
 done
