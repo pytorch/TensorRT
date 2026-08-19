@@ -26,6 +26,7 @@ UnpackedCacheHit = Tuple[
     CompilationSettings,
     bool,
     bool,
+    Dict[str, Tuple[str, str]],
 ]
 
 
@@ -122,6 +123,7 @@ class BaseEngineCache(ABC):
         compilation_settings: CompilationSettings,
         requires_output_allocator: bool,
         requires_native_multidevice: bool,
+        aliased_io: Dict[str, Tuple[str, str]],
     ) -> bytes:
         """Pack serialized engine, input names, and output names into a single blob
 
@@ -133,6 +135,7 @@ class BaseEngineCache(ABC):
             compilation_settings (CompilationSettings): compilation settings of TRT engine
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
+            aliased_io (Dict[str, Tuple[str, str]]): Map of engine output binding name -> (input binding name, kind_str) for outputs the engine writes through in place
         Returns:
             bytes: packed blob
         """
@@ -147,6 +150,7 @@ class BaseEngineCache(ABC):
                 "compilation_settings": settings,
                 "requires_output_allocator": requires_output_allocator,
                 "requires_native_multidevice": requires_native_multidevice,
+                "aliased_io": aliased_io,
             }
         )
 
@@ -169,6 +173,7 @@ class BaseEngineCache(ABC):
             unpacked["compilation_settings"],
             unpacked["requires_output_allocator"],
             unpacked.get("requires_native_multidevice", False),
+            unpacked.get("aliased_io", {}),
         )
 
     def insert(
