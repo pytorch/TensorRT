@@ -11,7 +11,9 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 )
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
-from .complex_decomposition_adapter import complex_decomposition_adapter
+from .complex_decomposition_adapter import (
+    complex_decomposition_adapter as _complex_decomposition_adapter_pass,
+)
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
@@ -45,7 +47,7 @@ def complex_lowering_pass(
     otherwise the legacy hand-rolled rewriter runs.
     """
     if getattr(settings, "use_complex_decomposition", False):
-        return complex_decomposition_adapter(gm, settings)
+        return _complex_decomposition_adapter_pass(gm, settings)
     return complex_graph_detection(gm, settings)
 
 

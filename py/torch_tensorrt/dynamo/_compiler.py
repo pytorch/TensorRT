@@ -11,6 +11,7 @@ import sympy
 import torch
 from torch.export import ExportedProgram
 from torch.export.graph_signature import InputKind
+from torch.fx.graph import _PyTreeCodeGen, _PyTreeInfo
 from torch.fx.node import Target
 from torch.utils._sympy.numbers import int_oo
 from torch_tensorrt._Device import Device
@@ -919,32 +920,64 @@ def _insert_complex_io_adapters(
         graph_modified = True
 
     # --- Output boundary: view_as_complex for complex outputs from TRT blocks ---
-    if complex_output_indices:
-        output_node = list(partitioned_module.graph.nodes)[-1]
-        outputs = list(output_node.args[0])
-        for idx in complex_output_indices:
-            if idx >= len(outputs):
-                continue
-            src = outputs[idx]
-            if not isinstance(src, torch.fx.Node):
-                continue
-            if src.op == "call_module" and (
-                "_run_on_acc" in str(src.target) or "_run_on_gpu" in str(src.target)
-            ):
-                with partitioned_module.graph.inserting_before(output_node):
-                    complex_node = partitioned_module.graph.call_function(
-                        torch.ops.aten.view_as_complex.default, args=(src,)
-                    )
-                logger.info(
-                    f"Inserted view_as_complex for complex output index {idx} "
-                    f"from TRT block '{src.target}'"
+    # Also runs when there's no complex output (complex_output_indices empty)
+    # but there IS complex input (function didn't early-return above): a
+    # single-output graph's output node arg is a bare Node rather than a
+    # tuple/list of Nodes, and _PyTreeCodeGen's generated forward() requires
+    # the tuple-wrapped form to correctly unflatten the result -- otherwise
+    # it hands the bare result tensor itself to tree_unflatten, which reads
+    # its first dim as a (wrong) leaf count.
+    output_node = list(partitioned_module.graph.nodes)[-1]
+    output_arg = output_node.args[0]
+    outputs = (
+        list(output_arg) if isinstance(output_arg, (list, tuple)) else [output_arg]
+    )
+    for idx in complex_output_indices:
+        if idx >= len(outputs):
+            continue
+        src = outputs[idx]
+        if not isinstance(src, torch.fx.Node):
+            continue
+        if src.op == "call_module" and (
+            "_run_on_acc" in str(src.target) or "_run_on_gpu" in str(src.target)
+        ):
+            with partitioned_module.graph.inserting_before(output_node):
+                complex_node = partitioned_module.graph.call_function(
+                    torch.ops.aten.view_as_complex.default, args=(src,)
                 )
-                outputs[idx] = complex_node
-                graph_modified = True
-        output_node.args = (tuple(outputs),)
+            logger.info(
+                f"Inserted view_as_complex for complex output index {idx} "
+                f"from TRT block '{src.target}'"
+            )
+            outputs[idx] = complex_node
+            graph_modified = True
+    if not isinstance(output_arg, (list, tuple)):
+        graph_modified = True
+    output_node.args = (tuple(outputs),)
 
     if graph_modified:
         partitioned_module.graph.lint()
+        partitioned_module.recompile()
+
+    # Ensure the final module's own forward() unflattens its result back to
+    # the user's original return shape (e.g. a bare tensor instead of a
+    # 1-tuple). complex_decomposition_adapter's make_fx retrace produces a
+    # plain (non-pytree) codegen partway through the pipeline, and that loss
+    # survives partitioning. Applied here -- after partitioning and boundary
+    # adapter insertion, once the module's true final leaf count is settled
+    # -- because setting it earlier (on the pre-partition graph) mismatches
+    # the leaf count at that intermediate stage and crashes on unflatten.
+    in_spec = getattr(gm, "_in_spec", None)
+    out_spec = getattr(gm, "_out_spec", None)
+    if in_spec is not None and out_spec is not None:
+        orig_args = [
+            node.name
+            for node in partitioned_module.graph.nodes
+            if node.op == "placeholder"
+        ]
+        partitioned_module.graph._codegen = _PyTreeCodeGen(
+            _PyTreeInfo(orig_args, in_spec, out_spec)
+        )
         partitioned_module.recompile()
 
 
@@ -1483,7 +1516,10 @@ def compile_module(
     if not settings.dryrun:
         output_node = list(partitioned_module.graph.nodes)[-1]
         for arg in output_node.args:
-            for output in arg:
+            # A single-output graph's output node arg is a bare Node rather
+            # than a tuple/list of Nodes.
+            outputs = arg if isinstance(arg, (list, tuple)) else [arg]
+            for output in outputs:
                 target = output.target
                 if "_run_on_acc" not in str(target):
                     continue

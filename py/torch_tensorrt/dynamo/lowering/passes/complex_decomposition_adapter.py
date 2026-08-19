@@ -13,16 +13,16 @@ interior complex -> real expansion to PyTorch's ``decompose_complex_in_graph``
      so the engine only ever sees real tensors (Option A in the RFC).
 
 Gated by ``settings.use_complex_decomposition``; falls back to the legacy pass on
-older torch (the upstream API only exists in torch>=2.14.0.dev).
-
-NOTE: the exact shape of what ``decompose_complex_in_graph`` emits at the
-boundary must be confirmed by a spike (torch is required to run it).  The steps
-marked ``TODO(spike)`` encode assumptions to validate against real output.
+older torch (the upstream API only exists in torch>=2.14.0.dev), or if
+``decompose_complex_in_graph`` itself raises (e.g. an op it doesn't support yet,
+such as ``aten.log2``/``aten.log10`` as of torch 2.14.dev).
 """
 
 import logging
+from typing import Any
 
 import torch
+from torch._export.utils import _detect_fake_mode_from_gm
 from torch.fx import GraphModule
 from torch_tensorrt._features import has_complex_decomposition
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -63,6 +63,14 @@ def complex_decomposition_adapter(
     complex_output_indices = _get_complex_output_indices(gm)
     complex_input_names = _get_complex_input_names(gm)
     complex_input_dtypes = _get_complex_input_dtypes(gm)
+    # _compiler.py reads _in_spec/_out_spec off this module post-lowering to
+    # unflatten the final result back to the user's original return shape
+    # (e.g. a bare tensor instead of a 1-tuple). decompose_complex_in_graph's
+    # make_fx retrace returns a plain GraphModule that doesn't carry these
+    # torch.export-specific attributes, so without re-attaching them below,
+    # the unflatten step is silently skipped and callers get a raw tuple.
+    original_in_spec = getattr(gm, "_in_spec", None)
+    original_out_spec = getattr(gm, "_out_spec", None)
     if not complex_input_names and not complex_output_indices:
         # No complex I/O and no interior complex work -> nothing to do.  (Interior-
         # only complex still shows up via inputs/outputs of the complex region, so
@@ -77,7 +85,27 @@ def complex_decomposition_adapter(
 
     flat_args = _fake_flat_args(gm)
     logger.debug("complex_decomposition_adapter: retracing under ComplexTensor")
-    gm = decompose_complex_in_graph(gm, flat_args)  # NOTE: returns a new module
+    try:
+        # NOTE: returns a new module -- assign to a fresh name so that on
+        # failure `gm` still refers to the original, untouched module (this
+        # call either fully succeeds or raises; it never partially mutates
+        # anything, since it builds a new GraphModule rather than editing
+        # the existing one in place).
+        decomposed_gm = decompose_complex_in_graph(gm, flat_args)
+    except Exception as e:
+        # decompose_complex_in_graph is upstream, experimental PyTorch code
+        # (torch._functorch._aot_autograd.complex_decomposition) with
+        # incomplete op coverage today -- e.g. ComplexTensor has no
+        # __torch_dispatch__ for aten.log2/log10 as of torch 2.14.dev. Treat
+        # any failure here as "this op set isn't supported yet" and degrade
+        # to the legacy, well-tested rewriter for the whole graph rather
+        # than hard-failing the compile.
+        logger.warning(
+            f"complex decomposition failed ({type(e).__name__}: {e}); "
+            "falling back to the legacy complex_graph_detection pass."
+        )
+        return complex_graph_detection(gm, settings)
+    gm = decomposed_gm
 
     # (3) Normalize SoA seams into the interleaved [..., 2] layout used by TRT.
     gm = _normalize_complex_boundary_for_trt(gm)
@@ -88,6 +116,10 @@ def complex_decomposition_adapter(
     gm.meta["complex_output_indices"] = complex_output_indices
     gm.meta["complex_input_names"] = complex_input_names
     gm.meta["complex_input_dtypes"] = complex_input_dtypes
+    if original_in_spec is not None:
+        gm._in_spec = original_in_spec
+    if original_out_spec is not None:
+        gm._out_spec = original_out_spec
     return gm
 
 
@@ -105,8 +137,9 @@ def _fake_flat_args(gm: GraphModule) -> list[torch.Tensor]:
     """Build the example inputs the upstream retrace (make_fx) needs.
 
     We reuse the placeholders' existing fake tensors so the export ShapeEnv /
-    SymInt ranges are preserved through the retrace.  Whether dynamic shapes
-    actually survive make_fx is RFC open-question #1 -- assert-worthy in the spike.
+    SymInt ranges are preserved through the retrace. Dynamic shapes survive
+    make_fx (see the dynamic-shape cases in test_complex_ops.py and
+    test_rope_embedding.py).
     """
     args = []
     for node in gm.graph.nodes:
@@ -132,12 +165,30 @@ def _normalize_complex_boundary_for_trt(gm: GraphModule) -> GraphModule:
       * remaining ``aten.complex(re, im)``  -> ``stack([re, im], -1)`` tagged as
         complex-layout, so the [..., 2] tensor flows to the boundary adapters.
 
-    TODO(spike): confirm against real decompose_complex_in_graph output --
-    the op set at the boundary (aten.complex vs view_as_complex, real vs
-    select) and whether inputs are unpacked with real/imag or view_as_real.
+    Confirmed against real decompose_complex_in_graph output: the boundary op
+    set is aten.complex/real/imag as assumed above, unpacked via real/imag
+    (not view_as_real).
     """
     g = gm.graph
     aten = torch.ops.aten
+    fake_mode = _detect_fake_mode_from_gm(gm)
+
+    def _to_fake(arg: Any) -> Any:
+        if isinstance(arg, torch.fx.Node):
+            return arg.meta["val"]
+        if isinstance(arg, (list, tuple)):
+            return [_to_fake(a) for a in arg]
+        return arg
+
+    def _propagate_meta(node: torch.fx.Node) -> None:
+        # Newly inserted nodes (unsqueeze/cat below) have no "val" until we
+        # compute one -- downstream stages (dryrun metadata checks, symbolic
+        # shape extraction) require every node to carry one.
+        if fake_mode is None:
+            return
+        arg_vals = [_to_fake(arg) for arg in node.args]
+        with fake_mode:
+            node.meta["val"] = node.target(*arg_vals)
 
     # Pass A: cancel real(complex(re,im)) / imag(complex(re,im)) round-trips.
     for node in list(g.nodes):
@@ -169,8 +220,11 @@ def _normalize_complex_boundary_for_trt(gm: GraphModule) -> GraphModule:
         re, im = node.args[0], node.args[1]
         with g.inserting_before(node):
             re_u = g.call_function(aten.unsqueeze.default, (re, -1))
+            _propagate_meta(re_u)
             im_u = g.call_function(aten.unsqueeze.default, (im, -1))
+            _propagate_meta(im_u)
             packed = g.call_function(aten.cat.default, ([re_u, im_u], -1))
+            _propagate_meta(packed)
         packed.meta["is_complex_layout"] = True
         node.replace_all_uses_with(packed)
         g.erase_node(node)
