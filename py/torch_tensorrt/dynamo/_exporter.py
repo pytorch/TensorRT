@@ -751,13 +751,15 @@ def _declare_aliased_kv_mutations_on_ep(
     ]
 
     # Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer): lift
-    # appended each buffer's new-value as a trailing user output. torch.export usually
-    # leaves them as the last outputs, but when it recognises the mutation itself it
-    # declares them BUFFER_MUTATION and moves them to the front, because the verifier
-    # requires mutations to precede user outputs. Taking the tail unconditionally then
-    # reclassifies a real user output as a buffer mutation, and the runtime later fails
-    # copying that output into a buffer of a different shape. Reclassify only the buffers
-    # the program does not already declare as mutated.
+    # appended each buffer's new-value as a trailing user output, in copyback_buffers
+    # order. Those appended values are internal plumbing, so the whole run leaves the
+    # user outputs whether or not torch.export also recorded the mutation itself. It
+    # does record it when it recognises the write, and then places that BUFFER_MUTATION
+    # ahead of the user outputs because the verifier requires mutations to come first;
+    # re-declaring such a buffer here would describe one mutation twice. So detach the
+    # full run first and pair it positionally with the full buffer list, then keep only
+    # the buffers not already declared. Filtering before slicing would pair a value with
+    # the wrong buffer, and the runtime would copy it into a buffer of a different shape.
     copyback_getitems: List[torch.fx.Node] = []
     copyback_specs: List[OutputSpec] = []
     remaining_specs = orig_specs
@@ -766,18 +768,19 @@ def _declare_aliased_kv_mutations_on_ep(
         for spec in orig_specs
         if spec.kind == OutputKind.BUFFER_MUTATION and isinstance(spec.target, str)
     }
-    pending_copyback = [buf for buf in copyback_buffers if buf not in already_mutated]
-    if pending_copyback:
-        num_pending = len(pending_copyback)
-        copyback_getitems = list(out_args[-num_pending:])
-        remaining_args = out_args[:-num_pending]
-        remaining_specs = orig_specs[:-num_pending]
-        copyback_specs = [
-            OutputSpec(OutputKind.BUFFER_MUTATION, TensorArgument(name=g.name), buf)
-            for g, buf in zip(copyback_getitems, pending_copyback)
-            if isinstance(g, torch.fx.Node)
-        ]
-        out_args = remaining_args
+    if num_copyback:
+        trailing = list(out_args[-num_copyback:])
+        out_args = out_args[:-num_copyback]
+        remaining_specs = orig_specs[:-num_copyback]
+        for value, buf in zip(trailing, copyback_buffers):
+            if not isinstance(value, torch.fx.Node) or buf in already_mutated:
+                continue
+            copyback_getitems.append(value)
+            copyback_specs.append(
+                OutputSpec(
+                    OutputKind.BUFFER_MUTATION, TensorArgument(name=value.name), buf
+                )
+            )
 
     # BUFFER_MUTATIONs (KV + copy-back) must precede USER_OUTPUTs (verifier).
     output_node.args = (tuple(kv_getitems + copyback_getitems + out_args),)
@@ -790,11 +793,12 @@ def _declare_aliased_kv_mutations_on_ep(
     )
 
     # Copy-back outputs were user returns in the retraced program, so torch.export's
-    # out_spec counts them; after reclassifying them as BUFFER_MUTATION only the real
-    # user outputs remain. Rebuild the top-level out_spec (mirroring
-    # create_trt_exp_program) so to_edge's unflatten sees the right leaf count.
+    # out_spec counts them; after detaching them only the real user outputs remain.
+    # Rebuild the top-level out_spec (mirroring create_trt_exp_program) so to_edge's
+    # unflatten sees the right leaf count. Keyed on num_copyback, not on the specs we
+    # added, because an already-declared buffer still had its value detached above.
     module_call_graph = exp_program.module_call_graph
-    if copyback_specs and module_call_graph:
+    if num_copyback and module_call_graph:
         new_out_spec = pytree.tree_flatten(tuple(out_args))[1]
         _e0 = module_call_graph[0]
         _sig0 = _e0.signature
