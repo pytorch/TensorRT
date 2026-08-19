@@ -215,3 +215,32 @@ def test_fake_flat_args_prefers_val_over_tensor_meta():
     assert args[0] is live_fake
     # The val-less placeholder is rebuilt from tensor_meta (static fallback).
     assert tuple(args[1].shape) == (4,)
+
+
+def test_fake_flat_args_raises_on_symbolic_tensor_meta_without_val():
+    """If a placeholder has no "val" and its tensor_meta.shape contains a
+    symbolic dim, we can't synthesize a concrete example tensor safely --
+    fail loudly instead of silently guessing a wrong concrete shape."""
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            return x + 1
+
+    x = torch.randn(4)
+    ep = torch.export.export(
+        M(), (x,), dynamic_shapes={"x": {0: torch.export.Dim("n", min=1, max=16)}}
+    )
+    gm = ep.module()
+    placeholder = next(n for n in gm.graph.nodes if n.op == "placeholder")
+    sym_dim = placeholder.meta["val"].shape[0]  # a real SymInt, from real export
+
+    class _TM:  # tensor_meta stand-in with a symbolic dim
+        shape = (sym_dim,)
+        dtype = torch.float32
+        device = torch.device("cpu")
+
+    placeholder.meta.pop("val", None)
+    placeholder.meta["tensor_meta"] = _TM()
+
+    with pytest.raises(RuntimeError, match="symbolic dimension"):
+        cda._fake_flat_args(gm)

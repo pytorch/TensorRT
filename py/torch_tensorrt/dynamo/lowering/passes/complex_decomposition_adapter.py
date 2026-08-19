@@ -136,10 +136,20 @@ def _graph_has_complex(gm: GraphModule) -> bool:
 def _fake_flat_args(gm: GraphModule) -> list[torch.Tensor]:
     """Build the example inputs the upstream retrace (make_fx) needs.
 
-    We reuse the placeholders' existing fake tensors so the export ShapeEnv /
-    SymInt ranges are preserved through the retrace. Dynamic shapes survive
-    make_fx (see the dynamic-shape cases in test_complex_ops.py and
-    test_rope_embedding.py).
+    node.meta["val"] is always preferred: it's the live FakeTensor torch.export's
+    fake-tensor tracing sets on every node, carrying the real ShapeEnv/SymInt
+    objects, so reusing it (rather than rebuilding a tensor from its shape)
+    is what makes dynamic shapes survive the retrace (see the dynamic-shape
+    cases in test_complex_ops.py and test_rope_embedding.py).
+
+    node.meta["tensor_meta"] is only consulted as a fallback, for a
+    placeholder that somehow lacks "val" (e.g. a graph shape-propagated via
+    torch.fx.passes.shape_prop.ShapeProp instead of torch.export). That path
+    only ever records concrete shapes, so a symbolic dim reaching here means
+    the graph wasn't produced the way this function expects; we refuse to
+    synthesize a placeholder concrete dimension for it, since a silently
+    wrong shape could retrace successfully but produce numerically wrong
+    results, which is worse than failing loudly.
     """
     args = []
     for node in gm.graph.nodes:
@@ -148,6 +158,16 @@ def _fake_flat_args(gm: GraphModule) -> list[torch.Tensor]:
         val = node.meta.get("val", None)
         if val is None:
             tm = node.meta["tensor_meta"]
+            if any(isinstance(dim, torch.SymInt) for dim in tm.shape):
+                raise RuntimeError(
+                    f"complex_decomposition_adapter: placeholder '{node.name}' has "
+                    "no node.meta['val'] and its tensor_meta.shape contains a "
+                    "symbolic dimension, so a concrete example tensor can't be "
+                    "synthesized for decompose_complex_in_graph. This means the "
+                    "graph wasn't produced via torch.export's fake-tensor tracing "
+                    "(which always sets 'val') -- pass a graph traced that way "
+                    "instead of one shape-propagated via ShapeProp."
+                )
             val = torch.empty(tm.shape, dtype=tm.dtype, device=tm.device)
         args.append(val)
     return args
