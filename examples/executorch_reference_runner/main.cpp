@@ -18,12 +18,15 @@
  * shape and sample values.
  */
 
+#include <dlfcn.h>
+
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 #include <cuda.h>
@@ -69,6 +72,66 @@ static const char* get_flag(int argc, char** argv, const char* flag, const char*
 }
 
 
+// The CUDA driver API is resolved at runtime rather than linked. The release build
+// image ships neither libcuda nor a stub, so linking it would break the build for
+// everyone to serve one optional flag, and it would have to be wired into both this
+// runner's CMake and Bazel builds. dlopen keeps the dependency where it belongs: on
+// the machine that actually asks for a green context.
+namespace {
+
+struct CudaDriverApi {
+  CUresult (*Init)(unsigned int) = nullptr;
+  CUresult (*DeviceGet)(CUdevice*, int) = nullptr;
+  CUresult (*DeviceGetDevResource)(CUdevice, CUdevResource*, CUdevResourceType) = nullptr;
+  CUresult (*DevSmResourceSplitByCount)(
+      CUdevResource*, unsigned int*, const CUdevResource*, CUdevResource*, unsigned int, unsigned int) = nullptr;
+  CUresult (*DevResourceGenerateDesc)(CUdevResourceDesc*, CUdevResource*, unsigned int) = nullptr;
+  CUresult (*GreenCtxCreate)(CUgreenCtx*, CUdevResourceDesc, CUdevice, unsigned int) = nullptr;
+  CUresult (*GreenCtxStreamCreate)(CUstream*, CUgreenCtx, unsigned int, int) = nullptr;
+  CUresult (*GreenCtxDestroy)(CUgreenCtx) = nullptr;
+  CUresult (*GetErrorString)(CUresult, const char**) = nullptr;
+};
+
+// Returns nullptr and logs if the driver is unavailable or too old for green contexts.
+const CudaDriverApi* load_cuda_driver_api() {
+  static CudaDriverApi api;
+  static bool loaded = false;
+  static bool attempted = false;
+  if (attempted) {
+    return loaded ? &api : nullptr;
+  }
+  attempted = true;
+
+  void* handle = dlopen("libcuda.so.1", RTLD_LAZY | RTLD_LOCAL);
+  if (handle == nullptr) {
+    ET_LOG(Error, "green context: cannot load libcuda.so.1: %s", dlerror());
+    return nullptr;
+  }
+
+  auto bind = [handle](auto& slot, const char* name) {
+    slot = reinterpret_cast<std::remove_reference_t<decltype(slot)>>(dlsym(handle, name));
+    if (slot == nullptr) {
+      ET_LOG(Error, "green context: libcuda.so.1 has no %s", name);
+    }
+    return slot != nullptr;
+  };
+
+  const bool ok = bind(api.Init, "cuInit") && bind(api.DeviceGet, "cuDeviceGet") &&
+      bind(api.DeviceGetDevResource, "cuDeviceGetDevResource") &&
+      bind(api.DevSmResourceSplitByCount, "cuDevSmResourceSplitByCount") &&
+      bind(api.DevResourceGenerateDesc, "cuDevResourceGenerateDesc") &&
+      bind(api.GreenCtxCreate, "cuGreenCtxCreate") &&
+      bind(api.GreenCtxStreamCreate, "cuGreenCtxStreamCreate") &&
+      bind(api.GreenCtxDestroy, "cuGreenCtxDestroy") &&
+      bind(api.GetErrorString, "cuGetErrorString");
+  loaded = ok;
+  return ok ? &api : nullptr;
+}
+
+const CudaDriverApi* g_cuda_driver = nullptr;
+
+} // namespace
+
 // Creates a stream inside a green context holding at least `min_sms` SMs, so all
 // work on it is confined to that SM partition. Confinement rides the stream, so
 // the green context does not need to be made current. Returns false and leaves
@@ -78,25 +141,31 @@ static bool make_green_context_stream(
     CUgreenCtx* out_green_ctx,
     cudaStream_t* out_stream,
     unsigned int* out_sms) {
-  auto failed = [](const char* what, CUresult res) {
+  const CudaDriverApi* api = load_cuda_driver_api();
+  if (api == nullptr) {
+    return false;
+  }
+  g_cuda_driver = api;
+
+  auto failed = [api](const char* what, CUresult res) {
     const char* msg = nullptr;
-    cuGetErrorString(res, &msg);
+    api->GetErrorString(res, &msg);
     ET_LOG(Error, "green context: %s failed: %s", what, msg ? msg : "unknown");
     return false;
   };
 
-  CUresult res = cuInit(0);
+  CUresult res = api->Init(0);
   if (res != CUDA_SUCCESS) {
     return failed("cuInit", res);
   }
   CUdevice device;
-  res = cuDeviceGet(&device, 0);
+  res = api->DeviceGet(&device, 0);
   if (res != CUDA_SUCCESS) {
     return failed("cuDeviceGet", res);
   }
 
   CUdevResource whole{};
-  res = cuDeviceGetDevResource(device, &whole, CU_DEV_RESOURCE_TYPE_SM);
+  res = api->DeviceGetDevResource(device, &whole, CU_DEV_RESOURCE_TYPE_SM);
   if (res != CUDA_SUCCESS) {
     return failed("cuDeviceGetDevResource", res);
   }
@@ -104,7 +173,7 @@ static bool make_green_context_stream(
   CUdevResource partition{};
   CUdevResource remaining{};
   unsigned int groups = 1;
-  res = cuDevSmResourceSplitByCount(&partition, &groups, &whole, &remaining, 0, min_sms);
+  res = api->DevSmResourceSplitByCount(&partition, &groups, &whole, &remaining, 0, min_sms);
   if (res != CUDA_SUCCESS) {
     return failed("cuDevSmResourceSplitByCount", res);
   }
@@ -114,19 +183,19 @@ static bool make_green_context_stream(
   }
 
   CUdevResourceDesc desc{};
-  res = cuDevResourceGenerateDesc(&desc, &partition, 1);
+  res = api->DevResourceGenerateDesc(&desc, &partition, 1);
   if (res != CUDA_SUCCESS) {
     return failed("cuDevResourceGenerateDesc", res);
   }
-  res = cuGreenCtxCreate(out_green_ctx, desc, device, CU_GREEN_CTX_DEFAULT_STREAM);
+  res = api->GreenCtxCreate(out_green_ctx, desc, device, CU_GREEN_CTX_DEFAULT_STREAM);
   if (res != CUDA_SUCCESS) {
     return failed("cuGreenCtxCreate", res);
   }
 
   CUstream raw_stream{};
-  res = cuGreenCtxStreamCreate(&raw_stream, *out_green_ctx, CU_STREAM_NON_BLOCKING, 0);
+  res = api->GreenCtxStreamCreate(&raw_stream, *out_green_ctx, CU_STREAM_NON_BLOCKING, 0);
   if (res != CUDA_SUCCESS) {
-    cuGreenCtxDestroy(*out_green_ctx);
+    api->GreenCtxDestroy(*out_green_ctx);
     *out_green_ctx = nullptr;
     return failed("cuGreenCtxStreamCreate", res);
   }
@@ -311,11 +380,11 @@ int main(int argc, char** argv) {
   if (cuda_status != cudaSuccess) {
     ET_LOG(Error, "cudaStreamDestroy failed: %s", cudaGetErrorString(cuda_status));
   }
-  if (green_ctx != nullptr) {
-    const CUresult res = cuGreenCtxDestroy(green_ctx);
+  if (green_ctx != nullptr && g_cuda_driver != nullptr) {
+    const CUresult res = g_cuda_driver->GreenCtxDestroy(green_ctx);
     if (res != CUDA_SUCCESS) {
       const char* msg = nullptr;
-      cuGetErrorString(res, &msg);
+      g_cuda_driver->GetErrorString(res, &msg);
       ET_LOG(Error, "cuGreenCtxDestroy failed: %s", msg ? msg : "unknown");
     }
   }
