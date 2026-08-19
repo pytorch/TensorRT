@@ -70,13 +70,16 @@ _DECOMP: dict = {}
 
 
 @pytest.fixture(autouse=True, params=[False, True], ids=["legacy", "decomp"])
-def _complex_path(request):
+def _complex_path(request, monkeypatch):
     """Run every complex test twice: once on the legacy hand-rolled rewriter and
     once on PyTorch's upstream complex decomposition (issue #4390).
 
     The flag is toggled on the shared _COMPILE dict (picked up by the ~28 tests
     that spread **_COMPILE) and mirrored into _DECOMP (spread by the handful of
-    explicit torchtrt.dynamo.compile / truncate tests).
+    explicit torchtrt.dynamo.compile / truncate tests), via monkeypatch.setitem
+    so the change is scoped to the current test and always reverted -- even if
+    the test itself fails -- rather than relying on manual dict mutation that
+    could leak across tests on a teardown failure.
 
     Both params set the flag EXPLICITLY.  Relying on the default for the legacy
     param would be wrong: USE_COMPLEX_DECOMPOSITION defaults to
@@ -88,12 +91,8 @@ def _complex_path(request):
     if use_decomp and not has_complex_decomposition():
         pytest.skip("decompose_complex_in_graph requires torch>=2.14.dev")
 
-    _COMPILE["use_complex_decomposition"] = use_decomp
-    _DECOMP.clear()
-    _DECOMP["use_complex_decomposition"] = use_decomp
-    yield
-    _COMPILE.pop("use_complex_decomposition", None)
-    _DECOMP.clear()
+    monkeypatch.setitem(_COMPILE, "use_complex_decomposition", use_decomp)
+    monkeypatch.setitem(_DECOMP, "use_complex_decomposition", use_decomp)
 
 
 # ===========================================================================

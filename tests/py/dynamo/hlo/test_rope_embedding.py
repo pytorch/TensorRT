@@ -27,10 +27,15 @@ _DECOMP: dict = {}
 
 
 @pytest.fixture(autouse=True, params=[False, True], ids=["legacy", "decomp"])
-def _complex_path(request):
+def _complex_path(request, monkeypatch):
     """Run every RoPE test on both the legacy rewriter and PyTorch's upstream
     complex decomposition. The dynamic cases here are the acceptance bar for
     dynamic-shape survival through the upstream make_fx retrace.
+
+    The flag is toggled on the shared _DECOMP dict via monkeypatch.setitem so
+    the change is scoped to the current test and always reverted -- even if
+    the test itself fails -- rather than relying on manual dict mutation that
+    could leak across tests on a teardown failure.
 
     Both params set the flag EXPLICITLY.  Relying on the default for the legacy
     param would be wrong: USE_COMPLEX_DECOMPOSITION defaults to
@@ -41,10 +46,7 @@ def _complex_path(request):
     use_decomp = bool(request.param)
     if use_decomp and not has_complex_decomposition():
         pytest.skip("decompose_complex_in_graph requires torch>=2.14.dev")
-    _DECOMP.clear()
-    _DECOMP["use_complex_decomposition"] = use_decomp
-    yield
-    _DECOMP.clear()
+    monkeypatch.setitem(_DECOMP, "use_complex_decomposition", use_decomp)
 
 
 # ---------------------------------------------------------------------------
