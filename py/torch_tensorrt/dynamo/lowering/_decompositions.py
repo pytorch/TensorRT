@@ -490,9 +490,15 @@ def scaled_dot_product_attention_decomposition(
 
     if is_causal:
         assert attn_mask is None, "attn_mask must be None when is_causal=True"
-        attn_bias = torch.zeros((L, S), dtype=query.dtype, device=device)
-        temp_mask = torch.ones((L, S), dtype=torch.bool, device=device).tril(diagonal=0)
-        attn_bias = attn_bias.masked_fill(temp_mask.logical_not(), float("-inf"))
+        # Build the causal mask from positions instead of materializing a dense
+        # tensor of ones before applying tril. Dynamic positions reach TensorRT
+        # as Fill layers; static positions may be folded during post-lowering.
+        row_indices = torch.arange(L, device=device).unsqueeze(-1)
+        col_indices = torch.arange(S, device=device).unsqueeze(0)
+        temp_mask = row_indices >= col_indices
+        zero = torch.full((), 0.0, dtype=query.dtype, device=device)
+        negative = torch.full((), float("-inf"), dtype=query.dtype, device=device)
+        attn_bias = torch.where(temp_mask.logical_not(), negative, zero)
 
     if attn_mask is not None:
         if attn_mask.dtype == torch.bool:
