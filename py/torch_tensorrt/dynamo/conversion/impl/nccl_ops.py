@@ -80,7 +80,6 @@ def _get_distributed_rank_and_world_size() -> Tuple[int, int]:
         return rank, world_size
 
 
-
 def _collective_group_ranks(group_name, world_size):
     """Global ranks of the collective's process group.
 
@@ -91,6 +90,7 @@ def _collective_group_ranks(group_name, world_size):
     group when the group cannot be resolved (single-program / group not created in this process).
     """
     import numpy as np
+
     if group_name:
         try:
             import torch.distributed as dist
@@ -103,6 +103,7 @@ def _collective_group_ranks(group_name, world_size):
                 f"Could not resolve process group '{group_name}' ({e}); using world group"
             )
     return np.arange(world_size, dtype=np.int64)
+
 
 def nccl_all_gather(
     ctx: ConversionContext,
