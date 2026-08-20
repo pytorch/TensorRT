@@ -199,8 +199,10 @@ target). Run it:
 ./build-executorch-reference-runner/kv_cache_decode_check --model_path=kv_cache_decode.pte
 ```
 
-It loads the method twice (each starting from a zeroed cache) and runs a decode
-at `input_pos=1` once with no prior step and once after a step at `input_pos=0`.
+It loads the method twice, explicitly zeroing the caller-owned KV arenas on each
+load (ExecuTorch drops a mutated buffer's initial value, so the runner must zero
+them itself), and runs a decode at `input_pos=1` once with no prior step and once
+after a step at `input_pos=0`.
 Because the causal attention at position 1 covers positions 0..1, the two logits
 differ only if the KV written at position 0 persisted across `execute()` calls.
 The runner prints `[kv-check] PASS` and returns 0 on success, or fails if the

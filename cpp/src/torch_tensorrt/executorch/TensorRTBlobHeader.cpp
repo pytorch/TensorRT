@@ -236,7 +236,10 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   // Optional aliased_io array: [{"output":..,"input":..,"kind":..}, ...].
   // Absent in older blobs -> leave empty (backward compatible). Mirrors the
   // io_bindings walk above using the same string helpers.
-  const std::size_t alias_key = json.find("\"aliased_io\"");
+  //
+  // Search from pos (past the io_bindings array) so a model input literally
+  // named "aliased_io" isn't matched as the array key.
+  const std::size_t alias_key = json.find("\"aliased_io\"", pos);
   if (alias_key != std::string::npos) {
     std::size_t apos = json.find('[', alias_key);
     if (apos == std::string::npos) {
@@ -299,8 +302,10 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
         }
       }
       if (!ab.output.empty() && !ab.input.empty()) {
-        // A missing "kind" key means an older blob (the Python serializer omits
-        // it for KV aliases); default to the TRT-enforced kind so init()'s kind
+        // The current Python serializer always writes "kind" (serialization.py),
+        // and older blobs carry no aliased_io array at all, so this default is
+        // defensive: it only fires for a blob that has an aliased_io entry but
+        // omits "kind". Default to the TRT-enforced kind so init()'s kind
         // validation treats an absent key the same as the Python runtime rather
         // than rejecting it as unknown.
         if (ab.kind.empty()) {

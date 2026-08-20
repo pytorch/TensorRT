@@ -96,6 +96,13 @@ static std::vector<float> run_decode(Program& program, const char* method_name, 
     if (dev.ok() && dev.get().type() == executorch::runtime::etensor::DeviceType::CUDA) {
       void* p = nullptr;
       ET_CHECK_MSG(cudaMalloc(&p, sz) == cudaSuccess, "cudaMalloc planned buffer %zu failed", i);
+      // ExecuTorch keeps only a mutated buffer's shape and dtype and drops its
+      // initial value, so register_buffer(torch.zeros(...)) does NOT zero the
+      // arena at runtime. Zero it explicitly: otherwise the two runs compare
+      // uninitialized device memory and can differ for the wrong reason, making
+      // the persistence check pass even when the KV write did not persist. (Host
+      // arenas are already zero-initialized by make_unique above.)
+      ET_CHECK_MSG(cudaMemset(p, 0, sz) == cudaSuccess, "cudaMemset planned buffer %zu failed", i);
       cuda_arenas.push_back(p);
       planned_spans.push_back({reinterpret_cast<uint8_t*>(p), sz});
     } else {
@@ -190,7 +197,14 @@ int main(int argc, char** argv) {
 
   ET_CHECK_MSG(a.size() == b.size() && !a.empty(), "output size mismatch (%zu vs %zu)", a.size(), b.size());
   double max_abs_diff = 0.0;
+  bool saw_nan = false;
   for (size_t i = 0; i < a.size(); ++i) {
+    // std::max(0.0, fabs(NaN)) is 0.0 (NaN compares false), so a NaN logit would
+    // otherwise leave max_abs_diff at 0.0 and be misreported as "identical".
+    // Track NaNs explicitly and fail on them below.
+    if (std::isnan(a[i]) || std::isnan(b[i])) {
+      saw_nan = true;
+    }
     max_abs_diff = std::max(max_abs_diff, std::fabs(static_cast<double>(a[i]) - static_cast<double>(b[i])));
   }
 
@@ -200,6 +214,10 @@ int main(int argc, char** argv) {
       a.size(),
       max_abs_diff,
       tol);
+  if (saw_nan) {
+    fprintf(stderr, "[kv-check] FAIL: logits contain NaN -> the decode produced invalid output.\n");
+    return 1;
+  }
   if (max_abs_diff > tol) {
     fprintf(stderr, "[kv-check] PASS: decode at pos=1 observed the KV written at pos=0 across execute() calls.\n");
     return 0;

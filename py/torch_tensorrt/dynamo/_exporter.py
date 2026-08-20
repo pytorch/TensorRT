@@ -533,8 +533,13 @@ def create_trt_exp_program(
 def _declare_aliased_kv_mutations_on_ep(
     exp_program: ExportedProgram,
 ) -> ExportedProgram:
-    """retrace=True post-export pass: declare each engine's aliased KV output as a
+    """Post-export pass: declare each engine's aliased KV output as a
     BUFFER_MUTATION of its caller-owned buffer input.
+
+    Runs on both save() paths (retrace=True and retrace=False); it is idempotent
+    because it skips buffers that already carry a BUFFER_MUTATION spec (see
+    already_exposed below), so the legacy exporter's transform-time declaration is
+    not duplicated.
 
     torch.export produces execute_engine nodes whose meta['val'] covers only the
     user outputs (the aliased KV outputs are network bindings excluded at the fx
@@ -553,7 +558,15 @@ def _declare_aliased_kv_mutations_on_ep(
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         deserialize_aliased_io,
     )
-    from torch_tensorrt.executorch.backend import _get_engine_info_for_node
+
+    # Guard the import so a non-executorch save() (e.g. output_format=
+    # "exported_program" with no aliased KV outputs) doesn't hard-require the
+    # optional [executorch] extra: with no executorch there's no aliased_io to
+    # read and no declaration to make, so return unchanged.
+    try:
+        from torch_tensorrt.executorch.backend import _get_engine_info_for_node
+    except ImportError:
+        return exp_program
 
     def _estr(engine_info: List[Any], idx: int) -> str:
         if idx < 0 or idx >= len(engine_info) or engine_info[idx] is None:

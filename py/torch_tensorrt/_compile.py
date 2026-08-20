@@ -1071,6 +1071,15 @@ def save(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
             if output_format == "exported_program":
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
+                # A retraced exported_program's signature omits the engines'
+                # aliased KV mutations, so declare them here -- before
+                # normalization, which rewrites the engine constants the pass
+                # reads aliased_io from.
+                module = _declare_aliased_kv_mutations_on_ep(module)
                 _normalize_engine_constants_to_python(module)
                 function_overload_with_kwargs(
                     torch.export.save,

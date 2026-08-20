@@ -161,8 +161,20 @@ TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIoMagic) {
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
   ASSERT_EQ(header.aliased_io.size(), 1u);
-  EXPECT_EQ(header.aliased_io[0].output_name, "out_k");
-  EXPECT_EQ(header.aliased_io[0].input_name, "in_k");
+  EXPECT_EQ(header.aliased_io[0].output, "out_k");
+  EXPECT_EQ(header.aliased_io[0].input, "in_k");
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, InputNamedAliasedIoWithNoAliasesStillParses) {
+  // A model input literally named "aliased_io" must not be mistaken for the
+  // real aliased_io array key.
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"aliased_io","is_input":true},{"name":"out_0","is_input":false}],)"
+                R"("hardware_compatible":false,"device_id":0})");
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.aliased_io.empty());
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
