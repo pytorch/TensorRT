@@ -799,6 +799,63 @@ def aten_ops_matmul(
     )
 
 
+def cross_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    # The cross-product formula only makes sense along an axis of size
+    # exactly 3. torch.cross/torch.linalg.cross already enforce this at the
+    # aten level, but the axis size may be unknown for a dynamic dim, so
+    # reject those rather than emitting a converter that could silently
+    # select out-of-bounds components.
+    dim = node.kwargs.get("dim", args_bounds_check(node.args, 2, -1))
+    for arg in node.args[:2]:
+        if "val" in arg.meta:
+            shape = arg.meta["val"].shape
+        elif "tensor_meta" in arg.meta:
+            shape = arg.meta["tensor_meta"].shape
+        else:
+            _LOGGER.debug(
+                f"linalg_cross node {node.name} has no shape metadata for "
+                f"{arg.name}; falling back to PyTorch."
+            )
+            return False
+        size = shape[dim]
+        if not isinstance(size, int) or size != 3:
+            _LOGGER.debug(
+                f"linalg_cross node {node.name} has a non-static or non-3 "
+                f"sized dim {dim} (size={size}); falling back to PyTorch."
+            )
+            return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.linalg_cross.default,
+    capability_validator=cross_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_linalg_cross(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.linalg.cross(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        kwargs.get("dim", args_bounds_check(args, 2, -1)),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default, supports_dynamic_shapes=True)
 def aten_ops_rsqrt(
     ctx: ConversionContext,
@@ -1380,6 +1437,69 @@ def aten_ops_cumsum(
     }
 )
 def aten_ops_tile(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.tile(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+def repeat_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # aten.repeat may raise the output rank above the input rank: if `repeats`
+    # has more entries than the input has dims, the input is treated as if
+    # size-1 dims were prepended to it first. TensorRT tensors support at
+    # most 8 dims, so reject cases that would exceed that limit and let them
+    # fall back to PyTorch instead of failing at engine build time.
+    repeats = node.args[1]
+    if "val" not in node.args[0].meta:
+        # Without input_rank we can't compute the exact output_rank, but
+        # output_rank = max(len(repeats), input_rank) is always >= len(repeats),
+        # so len(repeats) alone already proves it exceeds 8 here regardless of
+        # input_rank.
+        if len(repeats) > 8:
+            _LOGGER.debug(
+                f"aten.repeat node {node.name} has {len(repeats)} repeat dims, "
+                "which alone exceeds TensorRT's maximum supported tensor rank "
+                "of 8. Falling back to PyTorch for this node."
+            )
+            return False
+        return True
+
+    input_rank = len(node.args[0].meta["val"].shape)
+    output_rank = max(len(repeats), input_rank)
+    if output_rank > 8:
+        _LOGGER.debug(
+            f"aten.repeat node {node.name} would produce a rank-{output_rank} "
+            "output, which exceeds TensorRT's maximum supported tensor rank "
+            "of 8. Falling back to PyTorch for this node."
+        )
+        return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.repeat.default,
+    capability_validator=repeat_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_repeat(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -3124,7 +3244,16 @@ def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -
     if meta_data is None:
         return False
     shape = meta_data.shape
-    dim = node.args[1]
+    if len(shape) == 0:
+        # A 0-D (scalar) input has no dim to normalize -- get_positive_dim
+        # would compute dim % 0 (ZeroDivisionError). Fall back to PyTorch
+        # rather than crash the partitioner; sorting a scalar is a no-op.
+        _LOGGER.debug(
+            f"[sort validator] Skipping node {node.name} with 0-D (scalar) "
+            "input; aten.sort will run in PyTorch."
+        )
+        return False
+    dim = args_bounds_check(node.args, 1, -1)
     dim = get_positive_dim(dim, len(shape))
     k = shape[dim]
     if not isinstance(k, int):
@@ -4018,6 +4147,7 @@ def aten_ops_arange_start_step(
         start=args[0],
         end=args[1],
         step=args_bounds_check(args, 2, 1),
+        dtype=kwargs.get("dtype", None),
     )
 
 

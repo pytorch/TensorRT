@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../_static/documentation_options.js?v=61128d90"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -518,11 +518,11 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">MyModule</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
-<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModule</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
 
 <span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span>
         <span class="n">torchtrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
             <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
             <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
@@ -530,23 +530,23 @@ document.write(`
             <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">],</span>
-    <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="s2">&quot;use_python_runtime&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">"cache_built_engines"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">"reuse_cached_engines"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">"use_python_runtime"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">}</span>
 
 <span class="k">try</span><span class="p">:</span>
     <span class="k">with</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">Debugger</span><span class="p">(</span>
-        <span class="s2">&quot;graphs&quot;</span><span class="p">,</span>
-        <span class="n">logging_dir</span><span class="o">=</span><span class="s2">&quot;debuglogs&quot;</span><span class="p">,</span>
+        <span class="s2">"graphs"</span><span class="p">,</span>
+        <span class="n">logging_dir</span><span class="o">=</span><span class="s2">"debuglogs"</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">compile_spec</span><span class="p">)</span>
 
 <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
     <span class="k">raise</span> <span class="n">e</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;done.....&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"done....."</span><span class="p">)</span>
 </pre></div>
 </div>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TORCHTRT_ENABLE_TENSORRT_API_CAPTURE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>test.py

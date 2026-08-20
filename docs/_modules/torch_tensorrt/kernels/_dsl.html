@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -474,12 +474,12 @@ document.write(`
                 <article class="bd-article">
                   
   <h1>Source code for torch_tensorrt.kernels._dsl</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Declarative kernel descriptor used by :func:`torch_tensorrt.kernels.cuda_kernel_op`.</span>
+<span></span><span class="sd">"""Declarative kernel descriptor used by :func:`torch_tensorrt.kernels.cuda_kernel_op`.</span>
 
 <span class="sd">This module intentionally contains no runtime logic beyond dataclass</span>
 <span class="sd">construction. Derivation of meta / eager / aot / schema happens in</span>
 <span class="sd">``_kernel_plugin.py``.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
@@ -495,13 +495,13 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.SameAs">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SameAs</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Output has the same shape as the referenced tensor input.</span>
+<span class="w">    </span><span class="sd">"""Output has the same shape as the referenced tensor input.</span>
 
 <span class="sd">    ``input_idx`` may be either the integer position into the *tensor*-only</span>
 <span class="sd">    input list (``ScalarInput`` entries are skipped) or the ``name`` of a</span>
 <span class="sd">    tensor input declared via :class:`InputDecl`. The name form is preferred</span>
 <span class="sd">    because it stays correct when the input list is reordered.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">input_idx</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span></div>
 
@@ -511,12 +511,12 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.ReduceDims">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">ReduceDims</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Output = the referenced tensor input with ``dims`` removed.</span>
+<span class="w">    </span><span class="sd">"""Output = the referenced tensor input with ``dims`` removed.</span>
 
 <span class="sd">    If ``keepdim=True`` those axes are kept with size 1 instead of removed.</span>
 <span class="sd">    Negative axes are allowed. ``input_idx`` accepts either the integer</span>
 <span class="sd">    position into the tensor-only input list or the input ``name``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">input_idx</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
     <span class="n">dims</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
@@ -534,7 +534,7 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.Numel">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Numel</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pass ``inputs[input_name].numel()`` as an ``int`` extra.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Pass ``inputs[input_name].numel()`` as an ``int`` extra."""</span>
 
     <span class="n">input_name</span><span class="p">:</span> <span class="nb">str</span></div>
 
@@ -544,10 +544,10 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.DimSize">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">DimSize</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pass ``inputs[input_name].shape[axis]`` as an ``int`` extra.</span>
+<span class="w">    </span><span class="sd">"""Pass ``inputs[input_name].shape[axis]`` as an ``int`` extra.</span>
 
 <span class="sd">    Negative ``axis`` allowed.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">input_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">axis</span><span class="p">:</span> <span class="nb">int</span></div>
@@ -564,18 +564,18 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.Elementwise">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Elementwise</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One thread per output element.</span>
+<span class="w">    </span><span class="sd">"""One thread per output element.</span>
 
-<span class="sd">    ``layout=&quot;flat&quot;``: 1D launch over the flattened output ``numel``.</span>
+<span class="sd">    ``layout="flat"``: 1D launch over the flattened output ``numel``.</span>
 <span class="sd">        ``block = (bx,)`` → ``grid = (cdiv(numel(out), bx),)``.</span>
-<span class="sd">    ``layout=&quot;nd&quot;``: the trailing ``len(block)`` axes of the output are</span>
+<span class="sd">    ``layout="nd"``: the trailing ``len(block)`` axes of the output are</span>
 <span class="sd">        block-parallelized; any leading axes are folded into ``grid_z``.</span>
-<span class="sd">        ``block[0]`` maps to the last (innermost) axis, matching CUDA&#39;s</span>
+<span class="sd">        ``block[0]`` maps to the last (innermost) axis, matching CUDA's</span>
 <span class="sd">        convention that ``grid_x`` / ``block_x`` varies fastest.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">block</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">256</span><span class="p">,)</span>
-    <span class="n">layout</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;flat&quot;</span><span class="p">,</span> <span class="s2">&quot;nd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;flat&quot;</span></div>
+    <span class="n">layout</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"flat"</span><span class="p">,</span> <span class="s2">"nd"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"flat"</span></div>
 
 
 
@@ -583,10 +583,10 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.Reduction">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Reduction</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One block per output element; block threads cooperate across the</span>
+<span class="w">    </span><span class="sd">"""One block per output element; block threads cooperate across the</span>
 <span class="sd">    reduction axes. ``reduce_dims`` are axes of the **input** (not output)</span>
 <span class="sd">    that are collapsed. Grid = ``numel(output)``, block = ``block_size``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">reduce_dims</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
     <span class="n">block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span></div>
@@ -597,9 +597,9 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.Custom">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Custom</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Escape hatch. ``fn(inputs, outputs, tactic)`` returns the same shape</span>
-<span class="sd">    as today&#39;s hand-written aot_fn: ``(KernelLaunchParams, SymExprs)``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Escape hatch. ``fn(inputs, outputs, tactic)`` returns the same shape</span>
+<span class="sd">    as today's hand-written aot_fn: ``(KernelLaunchParams, SymExprs)``.</span>
+<span class="sd">    """</span>
 
     <span class="n">fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span></div>
 
@@ -615,11 +615,11 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.InputDecl">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">InputDecl</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tensor kernel input.</span>
+<span class="w">    </span><span class="sd">"""Tensor kernel input.</span>
 
 <span class="sd">    The corresponding kernel argument is a ``T*`` (data pointer) at the input</span>
 <span class="sd">    pointer position in the calling convention.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">dtype</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
@@ -630,12 +630,12 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.ScalarInput">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">ScalarInput</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scalar (non-tensor) kernel input — e.g. ``float alpha`` or ``int k``.</span>
+<span class="w">    </span><span class="sd">"""Scalar (non-tensor) kernel input — e.g. ``float alpha`` or ``int k``.</span>
 
 <span class="sd">    Scalars are forwarded by value to the kernel at the input position</span>
 <span class="sd">    (after all preceding tensor/scalar inputs, before extras and output</span>
 <span class="sd">    pointers).  ``py_type`` must be ``float``, ``int``, or ``bool``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">py_type</span><span class="p">:</span> <span class="nb">type</span>  <span class="c1"># float, int, bool</span></div>
@@ -662,7 +662,7 @@ document.write(`
 <a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.KernelSpec">[docs]</a>
 <span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">KernelSpec</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Declarative description of a CUDA kernel.</span>
+<span class="w">    </span><span class="sd">"""Declarative description of a CUDA kernel.</span>
 
 <span class="sd">    Kernel signature convention: the ``__global__`` function receives</span>
 <span class="sd">    arguments in this fixed order — input pointers, then extras in</span>
@@ -672,7 +672,7 @@ document.write(`
 <span class="sd">    Whichever fields are populated drive auto-derivation of the matching</span>
 <span class="sd">    meta / eager / aot / schema artifacts; whatever is missing must be</span>
 <span class="sd">    supplied as an override keyword argument to :func:`cuda_kernel_op`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">kernel_source</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">kernel_name</span><span class="p">:</span> <span class="nb">str</span>
@@ -681,7 +681,7 @@ document.write(`
     <span class="n">extras</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">ExtraArg</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
     <span class="n">geometry</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Geometry</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">include_paths</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">compile_std</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;c++17&quot;</span>
+    <span class="n">compile_std</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"c++17"</span>
     <span class="n">arch_override</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 </pre></div>

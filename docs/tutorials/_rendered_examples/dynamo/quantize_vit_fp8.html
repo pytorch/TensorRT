@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -567,16 +567,16 @@ from transformers import ViTForImageClassification
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def _format_report(timings: OrderedDict[str, list[float]], n_iters: int) -&gt; str:
-    &quot;&quot;&quot;Format layer timings into a trtexec-style profiling summary.&quot;&quot;&quot;
+    """Format layer timings into a trtexec-style profiling summary."""
     if not timings:
-        return &quot;(no profiling data collected)&quot;
+        return "(no profiling data collected)"
 
     total_time = sum(sum(ts) for ts in timings.values())
 
     lines: list[str] = []
-    lines.append(f&quot;=== Profile ({n_iters} iterations) ===&quot;)
+    lines.append(f"=== Profile ({n_iters} iterations) ===")
     lines.append(
-        f&quot;{&#39;Time(ms)&#39;:&gt;12s} {&#39;Avg.(ms)&#39;:&gt;12s} {&#39;Median(ms)&#39;:&gt;12s} {&#39;Time(%)&#39;:&gt;9s}   Layer&quot;
+        f"{'Time(ms)':&gt;12s} {'Avg.(ms)':&gt;12s} {'Median(ms)':&gt;12s} {'Time(%)':&gt;9s}   Layer"
     )
 
     for layer_name, ts in timings.items():
@@ -586,14 +586,14 @@ from transformers import ViTForImageClassification
         t_med = float(np.median(arr))
         t_pct = 100.0 * t_sum / total_time if total_time &gt; 0 else 0.0
         lines.append(
-            f&quot;{t_sum:12.2f} {t_avg:12.4f} {t_med:12.4f} {t_pct:8.1f}   {layer_name}&quot;
+            f"{t_sum:12.2f} {t_avg:12.4f} {t_med:12.4f} {t_pct:8.1f}   {layer_name}"
         )
 
-    return &quot;\n&quot;.join(lines)
+    return "\n".join(lines)
 
 
 class TorchTRTLayerProfiler(trt.IProfiler):
-    &quot;&quot;&quot;Collect per-layer timings across many runs via ``trt.IProfiler``.&quot;&quot;&quot;
+    """Collect per-layer timings across many runs via ``trt.IProfiler``."""
 
     def __init__(self):
         super().__init__()
@@ -654,17 +654,17 @@ def benchmark_tensorrt(
             latencies = [s.elapsed_time(e) for s, e in zip(start_events, end_events)]
 
         latencies = np.array(latencies)
-        print(f&quot;\nLatency over {num_runs} runs (ms):&quot;)
-        print(f&quot;  Mean:   {np.mean(latencies):.2f}&quot;)
-        print(f&quot;  Median: {np.median(latencies):.2f}&quot;)
-        print(f&quot;  Min:    {np.min(latencies):.2f}&quot;)
-        print(f&quot;  Max:    {np.max(latencies):.2f}&quot;)
-        print(f&quot;  P90:    {np.percentile(latencies, 90):.2f}&quot;)
-        print(f&quot;  P95:    {np.percentile(latencies, 95):.2f}&quot;)
-        print(f&quot;  P99:    {np.percentile(latencies, 99):.2f}&quot;)
-        print(f&quot;  Avg logits sum: {np.mean(results):.2f}&quot;)
+        print(f"\nLatency over {num_runs} runs (ms):")
+        print(f"  Mean:   {np.mean(latencies):.2f}")
+        print(f"  Median: {np.median(latencies):.2f}")
+        print(f"  Min:    {np.min(latencies):.2f}")
+        print(f"  Max:    {np.max(latencies):.2f}")
+        print(f"  P90:    {np.percentile(latencies, 90):.2f}")
+        print(f"  P95:    {np.percentile(latencies, 95):.2f}")
+        print(f"  P99:    {np.percentile(latencies, 99):.2f}")
+        print(f"  Avg logits sum: {np.mean(results):.2f}")
 
-        if enable_profiling and hasattr(trt_compiled, &quot;engine&quot;):
+        if enable_profiling and hasattr(trt_compiled, "engine"):
             profiler = TorchTRTLayerProfiler()
             trt_compiled.engine.context.profiler = profiler
             torch_results = []
@@ -672,7 +672,7 @@ def benchmark_tensorrt(
                 result = trt_compiled(input_tensor)
                 torch_results.append(result.logits.sum().item())
             torch.cuda.synchronize()
-            print(f&quot;  Avg logits sum (no cudagraphs): {np.mean(torch_results):.2f}&quot;)
+            print(f"  Avg logits sum (no cudagraphs): {np.mean(torch_results):.2f}")
             profiler.report()
 </pre></div>
 </div>
@@ -701,9 +701,9 @@ calibration_dataloader = [
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def quantize_model(model: torch.nn.Module) -&gt; torch.nn.Module:
-    # ModelOpt&#39;s HF plugin expects attention modules to expose ``config``.
+    # ModelOpt's HF plugin expects attention modules to expose ``config``.
     for mod in model.modules():
-        if mod.__class__.__name__ == &quot;ViTAttention&quot;:
+        if mod.__class__.__name__ == "ViTAttention":
             mod.config = model.config
 
     def calibration_loop(model):
@@ -712,19 +712,19 @@ calibration_dataloader = [
 
     # Define quant_cfg to specify which layers to quantize.
     quant_cfg = {
-        &quot;quant_cfg&quot;: {
-            &quot;*&quot;: {&quot;enable&quot;: False},
-            &quot;*weight_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-            &quot;*input_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-            &quot;*output_quantizer&quot;: {&quot;enable&quot;: False},
-            &quot;*[qkv]_bmm_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-            &quot;*softmax_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
-            &quot;*bmm2_output_quantizer&quot;: {&quot;num_bits&quot;: (4, 3), &quot;axis&quot;: None},
+        "quant_cfg": {
+            "*": {"enable": False},
+            "*weight_quantizer": {"num_bits": (4, 3), "axis": None},
+            "*input_quantizer": {"num_bits": (4, 3), "axis": None},
+            "*output_quantizer": {"enable": False},
+            "*[qkv]_bmm_quantizer": {"num_bits": (4, 3), "axis": None},
+            "*softmax_quantizer": {"num_bits": (4, 3), "axis": None},
+            "*bmm2_output_quantizer": {"num_bits": (4, 3), "axis": None},
         },
-        &quot;algorithm&quot;: &quot;max&quot;,
+        "algorithm": "max",
     }
     # You can use the following recipe if you have nvidia-modelopt &gt;= 0.46.0
-    # recipe = load_recipe(&quot;huggingface/vit/ptq/fp8&quot;)
+    # recipe = load_recipe("huggingface/vit/ptq/fp8")
     # quant_cfg = recipe.quantize.model_dump()
 
     mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
@@ -756,13 +756,13 @@ calibration_dataloader = [
 
     with tempfile.TemporaryDirectory() as debug_dir:
         with export_torch_mode(), torch_tensorrt.dynamo.Debugger(
-            log_level=&quot;info&quot;,
+            log_level="info",
             save_layer_info=True,
             logging_dir=debug_dir,
         ):
             trt_compiled = torch_tensorrt.compile(
                 model,
-                ir=&quot;dynamo&quot;,
+                ir="dynamo",
                 inputs=inputs,
                 use_explicit_typing=True,
                 truncate_double=True,
@@ -784,9 +784,9 @@ calibration_dataloader = [
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model = (
     ViTForImageClassification.from_pretrained(
-        &quot;google/vit-large-patch16-224&quot;,
-        hidden_act=&quot;gelu_fast&quot;,
-        attn_implementation=&quot;eager&quot;,
+        "google/vit-large-patch16-224",
+        hidden_act="gelu_fast",
+        attn_implementation="eager",
     )
     .eval()
     .half()

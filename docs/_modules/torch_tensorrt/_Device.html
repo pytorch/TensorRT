@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -494,7 +494,7 @@ document.write(`
 <div class="viewcode-block" id="Device">
 <a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Device">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Device</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Defines a device that can be used to specify target devices for engines</span>
 
 <span class="sd">    Attributes:</span>
@@ -502,7 +502,7 @@ document.write(`
 <span class="sd">        gpu_id (int): Device ID for target GPU</span>
 <span class="sd">        dla_core (int): Core ID for target DLA core</span>
 <span class="sd">        allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">device_type</span><span class="p">:</span> <span class="n">DeviceType</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">DeviceType</span><span class="o">.</span><span class="n">UNKNOWN</span>
@@ -516,12 +516,12 @@ document.write(`
 <div class="viewcode-block" id="Device.__init__">
 <a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Device.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;__init__ Method for torch_tensorrt.Device</span>
+<span class="w">        </span><span class="sd">"""__init__ Method for torch_tensorrt.Device</span>
 
 <span class="sd">        Device accepts one of a few construction patterns</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            spec (str): String with device spec e.g. &quot;dla:0&quot; for dla, core_id 0</span>
+<span class="sd">            spec (str): String with device spec e.g. "dla:0" for dla, core_id 0</span>
 
 <span class="sd">        Keyword Arguments:</span>
 <span class="sd">            gpu_id (int): ID of target GPU (will get overridden if dla_core is specified to the GPU managing DLA). If specified, no positional arguments should be provided</span>
@@ -529,17 +529,17 @@ document.write(`
 <span class="sd">            allow_gpu_fallback (bool): Allow TensorRT to schedule operations on GPU if they are not supported on DLA (ignored if device type is not DLA)</span>
 
 <span class="sd">        Examples:</span>
-<span class="sd">            - Device(&quot;gpu:1&quot;)</span>
-<span class="sd">            - Device(&quot;cuda:1&quot;)</span>
-<span class="sd">            - Device(&quot;dla:0&quot;, allow_gpu_fallback=True)</span>
+<span class="sd">            - Device("gpu:1")</span>
+<span class="sd">            - Device("cuda:1")</span>
+<span class="sd">            - Device("dla:0", allow_gpu_fallback=True)</span>
 <span class="sd">            - Device(gpu_id=0, dla_core=0, allow_gpu_fallback=True)</span>
 <span class="sd">            - Device(dla_core=0, allow_gpu_fallback=True)</span>
 <span class="sd">            - Device(gpu_id=1)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;When specifying Device through positional argument, argument must be str&quot;</span>
+                    <span class="s2">"When specifying Device through positional argument, argument must be str"</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span><span class="p">,</span> <span class="nb">id</span> <span class="o">=</span> <span class="n">Device</span><span class="o">.</span><span class="n">_parse_device_str</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
@@ -547,54 +547,54 @@ document.write(`
                     <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="nb">id</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="mi">0</span>
                     <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                        <span class="s2">&quot;Setting GPU id to 0 for device because device 0 manages DLA on AGX Devices&quot;</span><span class="p">,</span>
+                        <span class="s2">"Setting GPU id to 0 for device because device 0 manages DLA on AGX Devices"</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="nb">id</span>
 
         <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">if</span> <span class="s2">&quot;gpu_id&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">or</span> <span class="s2">&quot;dla_core&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-                <span class="k">if</span> <span class="s2">&quot;dla_core&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;dla_core&quot;</span><span class="p">]</span>
-                <span class="k">if</span> <span class="s2">&quot;gpu_id&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;gpu_id&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s2">"gpu_id"</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">or</span> <span class="s2">"dla_core"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="k">if</span> <span class="s2">"dla_core"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"dla_core"</span><span class="p">]</span>
+                <span class="k">if</span> <span class="s2">"gpu_id"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"gpu_id"</span><span class="p">]</span>
 
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span>
                     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="mi">0</span>
                         <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                            <span class="s2">&quot;Setting GPU id to 0 for device because device 0 manages DLA on AGX Platforms&quot;</span><span class="p">,</span>
+                            <span class="s2">"Setting GPU id to 0 for device because device 0 manages DLA on AGX Platforms"</span><span class="p">,</span>
                         <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Either gpu_id or dla_core or both must be defined if no string with device specs is provided as an arg&quot;</span>
+                    <span class="s2">"Either gpu_id or dla_core or both must be defined if no string with device specs is provided as an arg"</span>
                 <span class="p">)</span>
 
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Unexpected number of positional arguments for class Device </span><span class="se">\n</span><span class="s2">    Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="si">}</span><span class="s2"> arguments, expected either zero or a single positional arguments&quot;</span>
+                <span class="sa">f</span><span class="s2">"Unexpected number of positional arguments for class Device </span><span class="se">\n</span><span class="s2">    Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="si">}</span><span class="s2"> arguments, expected either zero or a single positional arguments"</span>
             <span class="p">)</span>
 
-        <span class="k">if</span> <span class="s2">&quot;allow_gpu_fallback&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;allow_gpu_fallback must be a bool&quot;</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">"allow_gpu_fallback"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"allow_gpu_fallback"</span><span class="p">],</span> <span class="nb">bool</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"allow_gpu_fallback must be a bool"</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"allow_gpu_fallback"</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="s2">&quot;device_type&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;device_type&quot;</span><span class="p">],</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;device_type&quot;</span><span class="p">])</span></div>
+        <span class="k">if</span> <span class="s2">"device_type"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"device_type"</span><span class="p">],</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"device_type"</span><span class="p">])</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">suffix</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="s2">&quot;)&quot;</span>
+            <span class="s2">")"</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">==</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
-            <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;, dla_core=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span><span class="si">}</span><span class="s2">, allow_gpu_fallback=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">allow_gpu_fallback</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="k">else</span> <span class="sa">f</span><span class="s2">", dla_core=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span><span class="si">}</span><span class="s2">, allow_gpu_fallback=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">allow_gpu_fallback</span><span class="si">}</span><span class="s2">)"</span>
         <span class="p">)</span>
-        <span class="n">dev_str</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Device(type=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">device_type</span><span class="si">}</span><span class="s2">, gpu_id=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span><span class="si">}{</span><span class="n">suffix</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">dev_str</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Device(type=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">device_type</span><span class="si">}</span><span class="s2">, gpu_id=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span><span class="si">}{</span><span class="n">suffix</span><span class="si">}</span><span class="s2">"</span>
         <span class="k">return</span> <span class="n">dev_str</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -602,16 +602,16 @@ document.write(`
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Self</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">|</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Device</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Cast a device-type to torch_tensorrt.Device</span>
+<span class="w">        </span><span class="sd">"""Cast a device-type to torch_tensorrt.Device</span>
 
 <span class="sd">        Returns the corresponding torch_tensorrt.Device</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">Device</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">d</span>
 
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">d</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">&quot;cuda&quot;</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Torch Device specs must have type &quot;cuda&quot;&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">d</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">"cuda"</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">'Torch Device specs must have type "cuda"'</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">gpu_id</span><span class="o">=</span><span class="n">d</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
 
         <span class="k">elif</span> <span class="n">d</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -632,22 +632,22 @@ document.write(`
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_parse_device_str</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
         <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-        <span class="n">spec</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;gpu&quot;</span> <span class="ow">or</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span><span class="p">:</span>
+        <span class="n">spec</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">":"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"gpu"</span> <span class="ow">or</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"cuda"</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">(</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
-        <span class="k">elif</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;dla&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"dla"</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">(</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown device type </span><span class="si">{</span><span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown device type </span><span class="si">{</span><span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid GPU ID provided for the CUDA device provided&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid GPU ID provided for the CUDA device provided"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unsupported target type for device conversion&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Unsupported target type for device conversion"</span><span class="p">)</span>
 
     <span class="nd">@needs_torch_tensorrt_runtime</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_to_serialized_rt_device</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -662,7 +662,7 @@ document.write(`
         <span class="p">]</span>
         <span class="n">rt_info</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rt_info</span><span class="p">]</span>
         <span class="n">packed_rt_info</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">delim</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">rt_info</span><span class="p">)</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Serialized Device Info: </span><span class="si">{</span><span class="n">packed_rt_info</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Serialized Device Info: </span><span class="si">{</span><span class="n">packed_rt_info</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">packed_rt_info</span></div>
 
 </pre></div>

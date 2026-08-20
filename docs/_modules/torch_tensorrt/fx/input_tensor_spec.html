@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -490,7 +490,7 @@ document.write(`
     <span class="p">):</span>
         <span class="k">return</span> <span class="n">InputTensorSpec</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 
-    <span class="c1"># If we don&#39;t have additional inputs, we assume the first dimension</span>
+    <span class="c1"># If we don't have additional inputs, we assume the first dimension</span>
     <span class="c1"># is the dynamic batch dimension. Otherwise, we use the additional</span>
     <span class="c1"># inputs to determine the batch dimension.</span>
     <span class="k">if</span> <span class="n">additional_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -520,13 +520,13 @@ document.write(`
                 <span class="k">if</span> <span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">values</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
                     <span class="k">assert</span> <span class="p">(</span>
                         <span class="n">found_batch_dim</span> <span class="ow">is</span> <span class="kc">False</span>
-                    <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;We&#39;ve already found a batch dim, </span><span class="si">{</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">j</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">.&quot;</span>
+                    <span class="p">),</span> <span class="sa">f</span><span class="s2">"We've already found a batch dim, </span><span class="si">{</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">j</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">."</span>
                     <span class="n">batch_dims</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
                     <span class="n">found_batch_dim</span> <span class="o">=</span> <span class="kc">True</span>
 
             <span class="k">if</span> <span class="ow">not</span> <span class="n">found_batch_dim</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Failed to find batch dimension because shapes are the same, </span><span class="si">{</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Failed to find batch dimension because shapes are the same, </span><span class="si">{</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">InputTensorSpec</span><span class="o">.</span><span class="n">from_tensors_with_dynamic_batch_size</span><span class="p">(</span>
@@ -544,7 +544,7 @@ document.write(`
 <div class="viewcode-block" id="InputTensorSpec">
 <a class="viewcode-back" href="../../../py_api/fx.html#torch_tensorrt.fx.InputTensorSpec">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">InputTensorSpec</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    This class contains the information of a input tensor.</span>
 
 <span class="sd">    shape: shape of the tensor.</span>
@@ -559,22 +559,22 @@ document.write(`
 <span class="sd">        tuples ((min_input_shape), (optimized_input_shape), (max_input_shape)). Each shape_range</span>
 <span class="sd">        is used to populate a TensorRT optimization profile.</span>
 <span class="sd">        e.g. If the input shape varies from (1, 224) to (100, 224) and we want to optimize</span>
-<span class="sd">        for (25, 224) because it&#39;s the most common input shape, then we set shape_ranges to</span>
+<span class="sd">        for (25, 224) because it's the most common input shape, then we set shape_ranges to</span>
 <span class="sd">        ((1, 224), (25, 225), (100, 224)).</span>
 
 <span class="sd">    has_batch_dim: Whether the shape includes batch dimension. Batch dimension has to be provided</span>
 <span class="sd">        if the engine want to run with dynamic shape.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">shape</span><span class="p">:</span> <span class="n">Shape</span>
     <span class="n">dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span>
-    <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cpu"</span><span class="p">)</span>
     <span class="n">shape_ranges</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ShapeRange</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">has_batch_dim</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_tensor</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_tensor</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"InputTensorSpec"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Produce an InputTenosrSpec named tuple which contains the</span>
 <span class="sd">        information of the given PyTorch tensor.</span>
 
@@ -583,12 +583,12 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            An InputTensorSpec named tuple.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">tensor</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">tensor</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_tensors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_tensors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">"InputTensorSpec"</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Produce a list of InputTenosrSpec named tuples which contain</span>
 <span class="sd">        the information of all the given PyTorch tensors.</span>
 
@@ -597,7 +597,7 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A list of InputTensorSpec named tuples.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensors</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">from_tensor</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tensors</span><span class="p">]</span>
 
@@ -608,18 +608,18 @@ document.write(`
         <span class="n">batch_size_range</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
         <span class="n">opt_profile_replica</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">batch_dims</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">"InputTensorSpec"</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Produce a list of InputTenosrSpec named tuples which would contain</span>
 <span class="sd">        the information of all the given PyTorch tensors. The produced input</span>
-<span class="sd">        tensor specs will treat all tensors&#39; first dimension as batch dimension</span>
+<span class="sd">        tensor specs will treat all tensors' first dimension as batch dimension</span>
 <span class="sd">        and mark them as dynmaic.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            tensors (Sequence[torch.Tensor]): A list of PyTorch tensors.</span>
 <span class="sd">            batch_size_range (Tuple[int, int, int]): The first integer indicates</span>
 <span class="sd">                the smallest batch size allowed. The second integer indiceates</span>
-<span class="sd">                the batch size that we&#39;ll optimize for. The third integer indicates</span>
+<span class="sd">                the batch size that we'll optimize for. The third integer indicates</span>
 <span class="sd">                the largest batch size allowed.</span>
 <span class="sd">            opt_profile_replica (int): If dynamic shape is enabled, each execution</span>
 <span class="sd">                context requires a different optimization profile. This arg determines</span>
@@ -630,7 +630,7 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A list of InputTensorSpec named tuples with dynamic ranges.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">batch_dims</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">batch_dims</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">find_batch_size_dim</span><span class="p">(</span><span class="n">tensors</span><span class="p">)</span>
 
@@ -645,7 +645,7 @@ document.write(`
                 <span class="n">shape</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
                 <span class="k">assert</span> <span class="n">batch_size</span> <span class="o">==</span> <span class="n">tensor</span><span class="o">.</span><span class="n">size</span><span class="p">(</span>
                     <span class="n">batch_dim</span>
-                <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;The </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">th tensor (shape: </span><span class="si">{</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">) doesn&#39;t have the correct batch size: </span><span class="si">{</span><span class="n">batch_size</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">),</span> <span class="sa">f</span><span class="s2">"The </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">th tensor (shape: </span><span class="si">{</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">) doesn't have the correct batch size: </span><span class="si">{</span><span class="n">batch_size</span><span class="si">}</span><span class="s2">."</span>
                 <span class="n">shape</span><span class="p">[</span><span class="n">batch_dim</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
                 <span class="n">shape_ranges</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ShapeRange</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">batch_dim</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">bs</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape</span><span class="p">[</span><span class="n">batch_dim</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:])</span> <span class="k">for</span> <span class="n">bs</span> <span class="ow">in</span> <span class="n">batch_size_range</span><span class="p">)]</span> <span class="o">*</span> <span class="n">opt_profile_replica</span>  <span class="c1"># type: ignore[list-item]</span>
                 <span class="n">input_specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
@@ -708,7 +708,7 @@ document.write(`
         <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">create_inputs_from_specs</span><span class="p">(</span><span class="n">input_specs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_inputs_from_specs</span><span class="p">(</span><span class="n">input_specs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="s2">"InputTensorSpec"</span><span class="p">]):</span>
         <span class="n">inputs</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">input_specs</span><span class="p">:</span>
             <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">to_random_tensor</span><span class="p">())</span>
@@ -716,7 +716,7 @@ document.write(`
         <span class="k">return</span> <span class="n">inputs</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">create_inputs_from_max_specs</span><span class="p">(</span><span class="n">input_specs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_inputs_from_max_specs</span><span class="p">(</span><span class="n">input_specs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="s2">"InputTensorSpec"</span><span class="p">]):</span>
         <span class="n">inputs</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">input_specs</span><span class="p">:</span>
             <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">to_random_tensor</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -513,7 +513,7 @@ document.write(`
         <span class="k">return</span> <span class="kc">True</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-            <span class="s2">&quot;Input sizes for inputs are required to be a List, tuple or torch.Size or a Dict of three sizes (min, opt, max), found type: &quot;</span>
+            <span class="s2">"Input sizes for inputs are required to be a List, tuple or torch.Size or a Dict of three sizes (min, opt, max), found type: "</span>
             <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">input_size</span><span class="p">))</span>
         <span class="p">)</span>
 
@@ -539,22 +539,22 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">_parse_device</span><span class="p">(</span><span class="n">device_info</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">:</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
         <span class="n">info</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">()</span>
-        <span class="k">if</span> <span class="s2">&quot;device_type&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;Device type is required parameter&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">"device_type"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">"Device type is required parameter"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">info</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">_parse_device_type</span><span class="p">(</span><span class="n">device_info</span><span class="p">[</span><span class="s2">&quot;device_type&quot;</span><span class="p">])</span>
+            <span class="n">info</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">_parse_device_type</span><span class="p">(</span><span class="n">device_info</span><span class="p">[</span><span class="s2">"device_type"</span><span class="p">])</span>
 
-        <span class="k">if</span> <span class="s2">&quot;gpu_id&quot;</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">[</span><span class="s2">&quot;gpu_id&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span>
-            <span class="n">info</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="n">device_info</span><span class="p">[</span><span class="s2">&quot;gpu_id&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">"gpu_id"</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">[</span><span class="s2">"gpu_id"</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span>
+            <span class="n">info</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="n">device_info</span><span class="p">[</span><span class="s2">"gpu_id"</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="s2">&quot;dla_core&quot;</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">[</span><span class="s2">&quot;dla_core&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span>
-            <span class="n">info</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="n">device_info</span><span class="p">[</span><span class="s2">&quot;dla_core&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">"dla_core"</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">[</span><span class="s2">"dla_core"</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span>
+            <span class="n">info</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="n">device_info</span><span class="p">[</span><span class="s2">"dla_core"</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="s2">&quot;allow_gpu_fallback&quot;</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">[</span><span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
-            <span class="n">info</span><span class="o">.</span><span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="n">device_info</span><span class="p">[</span><span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">"allow_gpu_fallback"</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">[</span><span class="s2">"allow_gpu_fallback"</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
+            <span class="n">info</span><span class="o">.</span><span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="n">device_info</span><span class="p">[</span><span class="s2">"allow_gpu_fallback"</span><span class="p">]</span>
 
         <span class="k">return</span> <span class="n">info</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">,</span> <span class="n">Device</span><span class="p">):</span>
@@ -565,28 +565,28 @@ document.write(`
         <span class="k">return</span> <span class="n">TorchScriptDevice</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">device_info</span><span class="p">)</span><span class="o">.</span><span class="n">_to_internal</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;Unsupported data for device specification. Expected either a dict, torch_tensorrt.Device or torch.Device&quot;</span>
+            <span class="s2">"Unsupported data for device specification. Expected either a dict, torch_tensorrt.Device or torch.Device"</span>
         <span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_parse_torch_fallback</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">TorchFallback</span><span class="p">:</span>
     <span class="n">info</span> <span class="o">=</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">TorchFallback</span><span class="p">()</span>
-    <span class="k">if</span> <span class="s2">&quot;enabled&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;Enabled is required parameter&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"enabled"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">"Enabled is required parameter"</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">[</span><span class="s2">&quot;enabled&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="n">fallback_info</span><span class="p">[</span><span class="s2">&quot;enabled&quot;</span><span class="p">]</span>
-    <span class="k">if</span> <span class="s2">&quot;min_block_size&quot;</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">[</span><span class="s2">&quot;min_block_size&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">min_block_size</span> <span class="o">=</span> <span class="n">fallback_info</span><span class="p">[</span><span class="s2">&quot;min_block_size&quot;</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">[</span><span class="s2">"enabled"</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="n">fallback_info</span><span class="p">[</span><span class="s2">"enabled"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"min_block_size"</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">[</span><span class="s2">"min_block_size"</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">min_block_size</span> <span class="o">=</span> <span class="n">fallback_info</span><span class="p">[</span><span class="s2">"min_block_size"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;forced_fallback_ops&quot;</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">[</span><span class="s2">&quot;forced_fallback_ops&quot;</span><span class="p">],</span> <span class="nb">list</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">forced_fallback_operators</span> <span class="o">=</span> <span class="n">fallback_info</span><span class="p">[</span><span class="s2">&quot;forced_fallback_ops&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"forced_fallback_ops"</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">[</span><span class="s2">"forced_fallback_ops"</span><span class="p">],</span> <span class="nb">list</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">forced_fallback_operators</span> <span class="o">=</span> <span class="n">fallback_info</span><span class="p">[</span><span class="s2">"forced_fallback_ops"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;forced_fallback_modules&quot;</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">[</span><span class="s2">&quot;forced_fallback_modules&quot;</span><span class="p">],</span> <span class="nb">list</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">forced_fallback_modules</span> <span class="o">=</span> <span class="n">fallback_info</span><span class="p">[</span><span class="s2">&quot;forced_fallback_modules&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"forced_fallback_modules"</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">[</span><span class="s2">"forced_fallback_modules"</span><span class="p">],</span> <span class="nb">list</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">forced_fallback_modules</span> <span class="o">=</span> <span class="n">fallback_info</span><span class="p">[</span><span class="s2">"forced_fallback_modules"</span><span class="p">]</span>
 
     <span class="k">return</span> <span class="n">info</span>
 
@@ -594,7 +594,7 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">_parse_input_signature</span><span class="p">(</span><span class="n">input_signature</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
     <span class="k">if</span> <span class="n">depth</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
-            <span class="s2">&quot;Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]&quot;</span>
+            <span class="s2">"Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]"</span>
         <span class="p">)</span>
 
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
@@ -618,11 +618,11 @@ document.write(`
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">i</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">try_to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">use_default</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                <span class="s2">&quot;Using non-TRT input types (</span><span class="si">{}</span><span class="s2">) with input_signature is not currently &quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="s2">"Using non-TRT input types (</span><span class="si">{}</span><span class="s2">) with input_signature is not currently "</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                     <span class="n">i</span><span class="o">.</span><span class="n">dtype</span>
                 <span class="p">)</span>
-                <span class="o">+</span> <span class="s2">&quot;supported. Please specify inputs individually to use &quot;</span>
-                <span class="o">+</span> <span class="s2">&quot;non-TRT types.&quot;</span>
+                <span class="o">+</span> <span class="s2">"supported. Please specify inputs individually to use "</span>
+                <span class="o">+</span> <span class="s2">"non-TRT types."</span>
             <span class="p">)</span>
 
         <span class="n">ts_i</span> <span class="o">=</span> <span class="n">i</span>
@@ -631,26 +631,26 @@ document.write(`
         <span class="k">elif</span> <span class="n">i</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
                 <span class="n">ts_i</span> <span class="o">=</span> <span class="n">TorchScriptInput</span><span class="p">(</span>
-                    <span class="n">min_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
-                    <span class="n">opt_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
-                    <span class="n">max_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
+                    <span class="n">min_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">],</span>
+                    <span class="n">opt_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">],</span>
+                    <span class="n">max_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">],</span>
                     <span class="n">dtype</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
                     <span class="nb">format</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">format</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Input set as dynamic, expected dictionary of shapes but found </span><span class="si">{</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Input set as dynamic, expected dictionary of shapes but found </span><span class="si">{</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Invalid shape mode detected for input while parsing the input_signature&quot;</span>
+                <span class="s2">"Invalid shape mode detected for input while parsing the input_signature"</span>
             <span class="p">)</span>
 
         <span class="n">clone</span> <span class="o">=</span> <span class="n">_internal_input_to_torch_class_input</span><span class="p">(</span><span class="n">ts_i</span><span class="o">.</span><span class="n">_to_internal</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">clone</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-            <span class="s2">&quot;Input signature contains an unsupported type </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="s2">"Input signature contains an unsupported type </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                 <span class="nb">type</span><span class="p">(</span><span class="n">input_signature</span><span class="p">)</span>
             <span class="p">)</span>
         <span class="p">)</span>
@@ -661,19 +661,19 @@ document.write(`
     <span class="n">compile_spec</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">compile_spec_</span><span class="p">)</span>
     <span class="n">info</span> <span class="o">=</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">CompileSpec</span><span class="p">()</span>
 
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;inputs&quot;</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"inputs"</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
-            <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Input</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;inputs&quot;</span><span class="p">]</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Input</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"inputs"</span><span class="p">]</span>
         <span class="p">):</span>
             <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-                <span class="s2">&quot;Input specs should be either torch_tensorrt.Input or torch.Tensor, found types: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                    <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;inputs&quot;</span><span class="p">]]</span>
+                <span class="s2">"Input specs should be either torch_tensorrt.Input or torch.Tensor, found types: </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"inputs"</span><span class="p">]]</span>
                 <span class="p">)</span>
             <span class="p">)</span>
 
         <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
             <span class="n">Input</span><span class="o">.</span><span class="n">from_tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">i</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;inputs&quot;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"inputs"</span><span class="p">]</span>
         <span class="p">]</span>
         <span class="n">ts_inputs</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
@@ -688,88 +688,88 @@ document.write(`
             <span class="k">elif</span> <span class="n">i</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
                 <span class="n">ts_inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                     <span class="n">TorchScriptInput</span><span class="p">(</span>
-                        <span class="n">min_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
-                        <span class="n">opt_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
-                        <span class="n">max_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
+                        <span class="n">min_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">],</span>
+                        <span class="n">opt_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">],</span>
+                        <span class="n">max_shape</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">],</span>
                         <span class="n">dtype</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
                         <span class="nb">format</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">),</span>
                     <span class="p">)</span><span class="o">.</span><span class="n">_to_internal</span><span class="p">()</span>
                 <span class="p">)</span>
         <span class="n">info</span><span class="o">.</span><span class="n">inputs</span> <span class="o">=</span> <span class="n">ts_inputs</span>
 
-    <span class="k">elif</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;input_signature&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"input_signature"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">log</span><span class="p">(</span>
             <span class="n">Level</span><span class="o">.</span><span class="n">Warning</span><span class="p">,</span>
-            <span class="s2">&quot;Input signature parsing is an experimental feature, behavior and APIs may change&quot;</span><span class="p">,</span>
+            <span class="s2">"Input signature parsing is an experimental feature, behavior and APIs may change"</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">signature</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;input_signature&quot;</span><span class="p">])</span>
+        <span class="n">signature</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"input_signature"</span><span class="p">])</span>
         <span class="n">info</span><span class="o">.</span><span class="n">input_signature</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">InputSignature</span><span class="p">(</span><span class="n">signature</span><span class="p">)</span>  <span class="c1"># py_object</span>
 
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-            <span class="s1">&#39;Module input definitions are required to compile module. Provide a list of torch_tensorrt.Input keyed to &quot;inputs&quot; in the compile spec&#39;</span>
+            <span class="s1">'Module input definitions are required to compile module. Provide a list of torch_tensorrt.Input keyed to "inputs" in the compile spec'</span>
         <span class="p">)</span>
 
-    <span class="k">if</span> <span class="s2">&quot;enabled_precisions&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+    <span class="k">if</span> <span class="s2">"enabled_precisions"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
         <span class="n">info</span><span class="o">.</span><span class="n">enabled_precisions</span> <span class="o">=</span> <span class="n">_parse_enabled_precisions</span><span class="p">(</span>
-            <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;enabled_precisions&quot;</span><span class="p">]</span>
+            <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"enabled_precisions"</span><span class="p">]</span>
         <span class="p">)</span>
 
-    <span class="k">if</span> <span class="s2">&quot;sparse_weights&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;sparse_weights&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">sparse_weights</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;sparse_weights&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"sparse_weights"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"sparse_weights"</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">sparse_weights</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"sparse_weights"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;disable_tf32&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;disable_tf32&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">disable_tf32</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;disable_tf32&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"disable_tf32"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"disable_tf32"</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">disable_tf32</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"disable_tf32"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;refit&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;refit&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">refit</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;refit&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"refit"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"refit"</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">refit</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"refit"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;debug&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">debug</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"debug"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"debug"</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">debug</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"debug"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;allow_shape_tensors&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;allow_shape_tensors&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">allow_shape_tensors</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;allow_shape_tensors&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"allow_shape_tensors"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"allow_shape_tensors"</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">allow_shape_tensors</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"allow_shape_tensors"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;device&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">_parse_device</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;device&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">"device"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">_parse_device</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"device"</span><span class="p">])</span>
 
-    <span class="k">if</span> <span class="s2">&quot;capability&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="n">capability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;capability&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+    <span class="k">if</span> <span class="s2">"capability"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="n">capability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"capability"</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
             <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span>
         <span class="p">)</span>
         <span class="n">info</span><span class="o">.</span><span class="n">capability</span> <span class="o">=</span> <span class="n">capability</span>
 
-    <span class="k">if</span> <span class="s2">&quot;num_avg_timing_iters&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;num_avg_timing_iters&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">num_avg_timing_iters</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;num_avg_timing_iters&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"num_avg_timing_iters"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"num_avg_timing_iters"</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">num_avg_timing_iters</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"num_avg_timing_iters"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;workspace_size&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;workspace_size&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">workspace_size</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;workspace_size&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"workspace_size"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"workspace_size"</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">workspace_size</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"workspace_size"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;dla_sram_size&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;dla_sram_size&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">dla_sram_size</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;dla_sram_size&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"dla_sram_size"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"dla_sram_size"</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">dla_sram_size</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"dla_sram_size"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;dla_local_dram_size&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">dla_local_dram_size</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"dla_local_dram_size"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"dla_local_dram_size"</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">dla_local_dram_size</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"dla_local_dram_size"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;dla_global_dram_size&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;dla_global_dram_size&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">dla_global_dram_size</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;dla_global_dram_size&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"dla_global_dram_size"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"dla_global_dram_size"</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">int</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">dla_global_dram_size</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"dla_global_dram_size"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;truncate_long_and_double&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">bool</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">truncate_long_and_double</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"truncate_long_and_double"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"truncate_long_and_double"</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">bool</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">truncate_long_and_double</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">"truncate_long_and_double"</span><span class="p">]</span>
 
-    <span class="k">if</span> <span class="s2">&quot;torch_fallback&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">torch_fallback</span> <span class="o">=</span> <span class="n">_parse_torch_fallback</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;torch_fallback&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">"torch_fallback"</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">torch_fallback</span> <span class="o">=</span> <span class="n">_parse_torch_fallback</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">"torch_fallback"</span><span class="p">])</span>
 
     <span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">info</span><span class="p">))</span>
 
@@ -796,7 +796,7 @@ document.write(`
     <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">allow_shape_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">CompileSpec</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Utility to create a formatted spec dictionary for using the PyTorch TensorRT backend</span>
+<span class="w">    </span><span class="sd">"""Utility to create a formatted spec dictionary for using the PyTorch TensorRT backend</span>
 
 <span class="sd">    Keyword Args:</span>
 <span class="sd">        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using</span>
@@ -817,7 +817,7 @@ document.write(`
 
 <span class="sd">        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::</span>
 
-<span class="sd">            device=torch_tensorrt.Device(&quot;dla:1&quot;, allow_gpu_fallback=True)</span>
+<span class="sd">            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)</span>
 
 <span class="sd">        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
 <span class="sd">        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.</span>
@@ -832,27 +832,27 @@ document.write(`
 
 <span class="sd">      Returns:</span>
 <span class="sd">        torch.classes.tensorrt.CompileSpec: List of methods and formatted spec objects to be provided to ``torch._C._jit_to_tensorrt``</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[],</span>
-        <span class="c1"># &quot;input_signature&quot;: input_signature,</span>
-        <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span> <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">device</span><span class="p">,</span>
-        <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="n">disable_tf32</span><span class="p">,</span>  <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
-        <span class="s2">&quot;sparse_weights&quot;</span><span class="p">:</span> <span class="n">sparse_weights</span><span class="p">,</span>  <span class="c1"># Enable sparsity for convolution and fully connected layers.</span>
-        <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"inputs"</span><span class="p">:</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[],</span>
+        <span class="c1"># "input_signature": input_signature,</span>
+        <span class="s2">"device"</span><span class="p">:</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span> <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">device</span><span class="p">,</span>
+        <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="n">disable_tf32</span><span class="p">,</span>  <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
+        <span class="s2">"sparse_weights"</span><span class="p">:</span> <span class="n">sparse_weights</span><span class="p">,</span>  <span class="c1"># Enable sparsity for convolution and fully connected layers.</span>
+        <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">(</span>
             <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">set</span><span class="p">()</span>
         <span class="p">),</span>  <span class="c1"># Enabling FP16 kernels</span>
-        <span class="s2">&quot;refit&quot;</span><span class="p">:</span> <span class="n">refit</span><span class="p">,</span>  <span class="c1"># enable refit</span>
-        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>  <span class="c1"># enable debuggable engine</span>
-        <span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="n">capability</span><span class="p">,</span>  <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
-        <span class="s2">&quot;num_avg_timing_iters&quot;</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>  <span class="c1"># Number of averaging timing iterations used to select kernels</span>
-        <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>  <span class="c1"># Maximum size of workspace given to TensorRT</span>
-        <span class="s2">&quot;dla_sram_size&quot;</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>  <span class="c1"># Fast software managed RAM used by DLA to communicate within a layer.</span>
-        <span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>  <span class="c1"># Host RAM used by DLA to share intermediate tensor data across operations</span>
-        <span class="s2">&quot;dla_global_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>  <span class="c1"># Host RAM used by DLA to store weights and metadata for execution</span>
-        <span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="n">truncate_long_and_double</span><span class="p">,</span>
-        <span class="s2">&quot;allow_shape_tensors&quot;</span><span class="p">:</span> <span class="n">allow_shape_tensors</span><span class="p">,</span>
+        <span class="s2">"refit"</span><span class="p">:</span> <span class="n">refit</span><span class="p">,</span>  <span class="c1"># enable refit</span>
+        <span class="s2">"debug"</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>  <span class="c1"># enable debuggable engine</span>
+        <span class="s2">"capability"</span><span class="p">:</span> <span class="n">capability</span><span class="p">,</span>  <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
+        <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>  <span class="c1"># Number of averaging timing iterations used to select kernels</span>
+        <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>  <span class="c1"># Maximum size of workspace given to TensorRT</span>
+        <span class="s2">"dla_sram_size"</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>  <span class="c1"># Fast software managed RAM used by DLA to communicate within a layer.</span>
+        <span class="s2">"dla_local_dram_size"</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>  <span class="c1"># Host RAM used by DLA to share intermediate tensor data across operations</span>
+        <span class="s2">"dla_global_dram_size"</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>  <span class="c1"># Host RAM used by DLA to store weights and metadata for execution</span>
+        <span class="s2">"truncate_long_and_double"</span><span class="p">:</span> <span class="n">truncate_long_and_double</span><span class="p">,</span>
+        <span class="s2">"allow_shape_tensors"</span><span class="p">:</span> <span class="n">allow_shape_tensors</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">parsed_spec</span> <span class="o">=</span> <span class="n">_parse_compile_spec</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">)</span>
@@ -861,7 +861,7 @@ document.write(`
 
     <span class="k">if</span> <span class="n">input_signature</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;Input signature parsing is not currently supported in the TorchScript backend integration&quot;</span>
+            <span class="s2">"Input signature parsing is not currently supported in the TorchScript backend integration"</span>
         <span class="p">)</span>
 
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">parsed_spec</span><span class="o">.</span><span class="n">inputs</span><span class="p">:</span>
@@ -876,7 +876,7 @@ document.write(`
 
     <span class="k">if</span> <span class="n">parsed_spec</span><span class="o">.</span><span class="n">torch_fallback</span><span class="o">.</span><span class="n">enabled</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">&quot;Partial module compilation is not currently supported via the PyTorch TensorRT backend. If you need partial compilation, use torch_tensorrt.compile&quot;</span>
+            <span class="s2">"Partial module compilation is not currently supported via the PyTorch TensorRT backend. If you need partial compilation, use torch_tensorrt.compile"</span>
         <span class="p">)</span>
 
     <span class="n">torch_fallback</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_TorchFallback</span><span class="p">()</span>

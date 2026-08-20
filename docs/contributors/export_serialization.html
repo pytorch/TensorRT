@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../_static/documentation_options.js?v=61128d90"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -548,10 +548,10 @@ by the standard <code class="docutils literal notranslate"><span class="pre">tor
 package. Input/output structures are captured as PyTrees.</p></li>
 </ul>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Save</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;model.ep&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"model.ep"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Load (no recompilation)</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;model.ep&quot;</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model.ep"</span><span class="p">)</span>
 <span class="n">output</span> <span class="o">=</span> <span class="n">trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -569,7 +569,7 @@ only <code class="docutils literal notranslate"><span class="pre">libtorchtrt_ru
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch</span><span class="o">.</span><span class="n">_export</span><span class="o">.</span><span class="n">aot_compile</span><span class="p">(</span>
     <span class="n">trt_gm</span><span class="p">,</span>
     <span class="n">args</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;aot_inductor.output_path&quot;</span><span class="p">:</span> <span class="s2">&quot;model.so&quot;</span><span class="p">},</span>
+    <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">"aot_inductor.output_path"</span><span class="p">:</span> <span class="s2">"model.so"</span><span class="p">},</span>
 <span class="p">)</span>
 
 <span class="c1"># Runtime (no Python, no PyTorch)</span>
@@ -583,7 +583,7 @@ only <code class="docutils literal notranslate"><span class="pre">libtorchtrt_ru
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_engine_bytes</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">convert_exported_program_to_trt_engine</span><span class="p">(</span>
     <span class="n">exp_program</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span>
 <span class="p">)</span>
-<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;engine.trt&quot;</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"engine.trt"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">trt_engine_bytes</span><span class="p">)</span>
 </pre></div>
 </div>

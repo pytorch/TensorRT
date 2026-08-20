@@ -26,7 +26,21 @@ UnpackedCacheHit = Tuple[
     CompilationSettings,
     bool,
     bool,
+    Dict[str, Tuple[str, str]],
 ]
+
+
+def _canonicalize_setting_value(value: Any) -> str:
+    """Stringify a setting so the result does not depend on iteration order.
+
+    ``str()`` of a set lays elements out in hash order, and Python randomizes
+    string hashing per process unless PYTHONHASHSEED is pinned. Hashing that
+    directly would give the same compilation settings a different cache key on
+    every run, so unordered collections are sorted first.
+    """
+    if isinstance(value, (set, frozenset)):
+        return str(sorted(str(element) for element in value))
+    return str(value)
 
 
 class BaseEngineCache(ABC):
@@ -88,7 +102,7 @@ class BaseEngineCache(ABC):
         input_specs_hash = sha256_hash(input_specs_data)
 
         invariant_engine_specs = [
-            str(getattr(settings, field))
+            _canonicalize_setting_value(getattr(settings, field))
             for field in sorted(_SETTINGS_TO_BE_ENGINE_INVARIANT)
         ]
         with io.BytesIO() as stream:
@@ -109,6 +123,7 @@ class BaseEngineCache(ABC):
         compilation_settings: CompilationSettings,
         requires_output_allocator: bool,
         requires_native_multidevice: bool,
+        aliased_io: Dict[str, Tuple[str, str]],
     ) -> bytes:
         """Pack serialized engine, input names, and output names into a single blob
 
@@ -120,6 +135,7 @@ class BaseEngineCache(ABC):
             compilation_settings (CompilationSettings): compilation settings of TRT engine
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
+            aliased_io (Dict[str, Tuple[str, str]]): Map of engine output binding name -> (input binding name, kind_str) for outputs the engine writes through in place
         Returns:
             bytes: packed blob
         """
@@ -134,6 +150,7 @@ class BaseEngineCache(ABC):
                 "compilation_settings": settings,
                 "requires_output_allocator": requires_output_allocator,
                 "requires_native_multidevice": requires_native_multidevice,
+                "aliased_io": aliased_io,
             }
         )
 
@@ -145,9 +162,18 @@ class BaseEngineCache(ABC):
             packed_obj (bytes): packed blob
 
         Returns:
-            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, bool, bool]: serialized engine, input names, output names, input specs, CompilationSettings, requires_output_allocator, requires_native_multidevice
+            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, bool, bool, Dict[str, Tuple[str, str]]]: serialized engine, input names, output names, input specs, CompilationSettings, requires_output_allocator, requires_native_multidevice, aliased_io
         """
-        unpacked = pickle.loads(packed_obj)
+        return BaseEngineCache._fields_from(pickle.loads(packed_obj))
+
+    @staticmethod
+    def _fields_from(unpacked: Dict[str, Any]) -> UnpackedCacheHit:
+        """Project an already-deserialized blob onto the cache-hit tuple.
+
+        Split out so ``check`` can inspect the blob and build the tuple from a single
+        deserialization. The blob carries the serialized engine, so unpickling it
+        twice would double the peak memory of a cache hit.
+        """
         return (
             unpacked["serialized_engine"],
             unpacked["input_names"],
@@ -156,6 +182,7 @@ class BaseEngineCache(ABC):
             unpacked["compilation_settings"],
             unpacked["requires_output_allocator"],
             unpacked.get("requires_native_multidevice", False),
+            unpacked.get("aliased_io", {}),
         )
 
     def insert(
@@ -189,11 +216,27 @@ class BaseEngineCache(ABC):
             Optional[Tuple[bytes, List[str], List[str], CompilationSettings, Optional[Dict[Any, Any]]]]: The unpacked cache entry if found, None otherwise.
         """
         packed_cache_info = self.load(hash, *args, **kwargs)
-
-        if packed_cache_info:
-            return BaseEngineCache.unpack(packed_cache_info)
-        else:
+        if not packed_cache_info:
             return None
+
+        unpacked = pickle.loads(packed_cache_info)
+
+        # A blob written before aliased_io was cached is indistinguishable from one
+        # for a model that genuinely has no aliased IO, and guessing "none" is not
+        # safe: for a model that does have it, the engine's internal plumbing tensor
+        # is then returned to the caller and output arity changes on a cache hit.
+        # Treat such a blob as a miss so the engine is rebuilt and re-cached once,
+        # rather than serving a silently wrong result. Only entries written before
+        # this change are affected; every new blob carries the key.
+        if "aliased_io" not in unpacked:
+            _LOGGER.info(
+                "Ignoring engine cache entry %s: written before aliased_io was "
+                "cached, so it cannot be reused safely. It will be rebuilt.",
+                hash,
+            )
+            return None
+
+        return BaseEngineCache._fields_from(unpacked)
 
     @abstractmethod
     def save(self, hash: str, blob: bytes, *args: Any, **kwargs: Any) -> None:

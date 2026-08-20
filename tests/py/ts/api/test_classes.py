@@ -9,12 +9,12 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModu
 
 def is_blackwell():
     """
-    Check if running on NVIDIA Blackwell architecture (sm_90+).
+    Check if running on NVIDIA Blackwell architecture (sm_100+).
 
     Blackwell architecture adds input/output reformat layers in TensorRT engines.
 
     Returns:
-        bool: True if running on Blackwell (sm_90+), False otherwise
+        bool: True if running on Blackwell (sm_100+), False otherwise
     """
     if not torch.cuda.is_available():
         return False
@@ -22,8 +22,8 @@ def is_blackwell():
     device_properties = torch.cuda.get_device_properties(0)
     compute_capability = device_properties.major * 10 + device_properties.minor
 
-    # Blackwell is sm_90 and above
-    return compute_capability >= 90
+    # Blackwell is sm_100 and above
+    return compute_capability >= 100
 
 
 @unittest.skipIf(
@@ -358,11 +358,13 @@ class TestTorchTensorRTModule(unittest.TestCase):
         import json
 
         if is_blackwell():
+            # spellchecker:off
             # blackwell has additional layers-
             # Layer 0: __mye88_myl0_0           ← Input reformat layer
             # Layer 1: aten__matmul(...) fc1    ← First matmul (fc1)
             # Layer 2: aten__matmul(...) fc2    ← Second matmul (fc2)
             # Layer 3: __mye90_myl0_3           ← Output reformat layer
+            # spellchecker:on
             num_layers = 4
         else:
             num_layers = 2

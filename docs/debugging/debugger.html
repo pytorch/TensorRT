@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../_static/documentation_options.js?v=61128d90"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -506,11 +506,11 @@ the <code class="docutils literal notranslate"><span class="pre">Debugger</span>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">Debugger</span><span class="p">(</span>
-    <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span>
-    <span class="n">logging_dir</span><span class="o">=</span><span class="s2">&quot;/tmp/trt_debug&quot;</span><span class="p">,</span>
+    <span class="n">log_level</span><span class="o">=</span><span class="s2">"debug"</span><span class="p">,</span>
+    <span class="n">logging_dir</span><span class="o">=</span><span class="s2">"/tmp/trt_debug"</span><span class="p">,</span>
     <span class="n">engine_builder_monitor</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">capture_fx_graph_before</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;remove_detach&quot;</span><span class="p">],</span>
-    <span class="n">capture_fx_graph_after</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;complex_graph_detection&quot;</span><span class="p">],</span>
+    <span class="n">capture_fx_graph_before</span><span class="o">=</span><span class="p">[</span><span class="s2">"remove_detach"</span><span class="p">],</span>
+    <span class="n">capture_fx_graph_after</span><span class="o">=</span><span class="p">[</span><span class="s2">"complex_graph_detection"</span><span class="p">],</span>
 <span class="p">):</span>
     <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
     <span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>

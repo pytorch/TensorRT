@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import gc
+import importlib.util
 import logging
 import os
 import platform
@@ -183,12 +184,13 @@ def get_torch_tensor(
     input: Input,
     device: torch.device,
     mode: str = "",
-) -> Union[int, torch.Tensor]:
+) -> Union[int, List[int], torch.Tensor]:
     if input.is_shape_tensor:
-        # TODO: All the shape tensors we've encountered so far are plain integers.
-        # Validate this assumption on more models.
         assert isinstance(input.shape, dict)
-        return input.shape["opt_shape"][0]
+        opt_shape = input.shape["opt_shape"]
+        # Scalar shape tensors supply SymInt parameters, while multi-element
+        # shape tensors supply SymInt[] parameters such as aten.full's size.
+        return opt_shape[0] if len(opt_shape) == 1 else list(opt_shape)
 
     if len(mode) > 0:
         return input.example_tensor(mode).to(device)
@@ -200,7 +202,10 @@ def get_torch_inputs(
     inputs: Sequence[Input] | Dict[str, Any],
     device: Union[Device, torch.device, str],
     mode: str = "",
-) -> Sequence[Union[int, torch.Tensor]] | Dict[str, Union[int, torch.Tensor]]:
+) -> (
+    Sequence[Union[int, List[int], torch.Tensor]]
+    | Dict[str, Union[int, List[int], torch.Tensor]]
+):
     """
     Return the torch_tensor from the Input object. If mode is set, this implies
     user is using dynamic shaped inputs and return the corresponding input based
@@ -209,7 +214,7 @@ def get_torch_inputs(
     device = to_torch_device(device)
 
     if isinstance(inputs, dict):
-        result_dict: Dict[str, Union[int, torch.Tensor]] = {}
+        result_dict: Dict[str, Union[int, List[int], torch.Tensor]] = {}
         for k, v in inputs.items():
             if isinstance(v, (list, tuple, dict)):
                 result_dict[k] = get_torch_inputs(v, device)
@@ -217,7 +222,7 @@ def get_torch_inputs(
                 result_dict[k] = get_torch_tensor(v, device, mode)
         return result_dict
     else:
-        result_list: List[Union[int, torch.Tensor]] = []
+        result_list: List[Union[int, List[int], torch.Tensor]] = []
         for input in inputs:
             if isinstance(input, Input):
                 result_list.append(get_torch_tensor(input, device, mode))
@@ -1003,3 +1008,23 @@ def release_host_and_device_memory() -> None:
                 logger.warning("Failed to release CPU memory.")
         except Exception:
             logger.warning("Failed to release CPU memory.")
+
+
+def is_quantized_by_modelopt(model: torch.nn.Module) -> bool:
+    """
+    Check if the model has been quantized by NVIDIA ModelOpt library.
+    If ModelOpt is installed, use its function to check if the model is quantized.
+    Otherwise, do name/module-string checks. A caveat is that it can break if ModelOpt renames things.
+    """
+    if importlib.util.find_spec("modelopt") is not None:
+        from modelopt.torch.quantization.utils import is_quantized
+
+        return bool(is_quantized(model))
+
+    for m in model.modules():
+        cls = type(m)
+        if cls.__name__ == "TensorQuantizer" and cls.__module__.startswith(
+            "modelopt.torch.quantization"
+        ):
+            return True
+    return False

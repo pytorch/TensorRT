@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -669,9 +669,9 @@ automatically:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion.plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">_generate_plugin_converter</span>
 
 <span class="n">_generate_plugin_converter</span><span class="p">(</span>
-    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;mylib&quot;</span><span class="p">,</span>
-    <span class="n">op_name</span><span class="o">=</span><span class="s2">&quot;my_custom_op&quot;</span><span class="p">,</span>
-    <span class="n">overload</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>               <span class="c1"># None → &quot;default&quot; overload</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">"mylib"</span><span class="p">,</span>
+    <span class="n">op_name</span><span class="o">=</span><span class="s2">"my_custom_op"</span><span class="p">,</span>
+    <span class="n">overload</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>               <span class="c1"># None → "default" overload</span>
     <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">use_aot_if_available</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># prefer AOT plugin if registered</span>
 <span class="p">)</span>
@@ -727,7 +727,7 @@ Falls back to JIT plugin if the AOT impl is absent.</p>
 <li><p>Verify the plugin is in the QDP registry:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt.plugin</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trtp</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">tensorrt.plugin._lib</span><span class="w"> </span><span class="kn">import</span> <span class="n">QDP_REGISTRY</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;mylib::scaled_add&quot;</span> <span class="ow">in</span> <span class="n">QDP_REGISTRY</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"mylib::scaled_add"</span> <span class="ow">in</span> <span class="n">QDP_REGISTRY</span><span class="p">)</span>
 </pre></div>
 </div>
 </li>

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -588,7 +588,7 @@ old TensorRT, which is called <cite>Autocast</cite>.</p>
 context-based autocast, which means it will affect the precision of the nodes inside the context. For example,
 in PyTorch, we can do the following:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear1</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">device_type</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">):</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">device_type</span><span class="o">=</span><span class="s2">"cuda"</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">):</span>
     <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear3</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 </pre></div>
@@ -625,7 +625,7 @@ For example,</p>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">enable_autocast</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">autocast_low_precision_type</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
-    <span class="n">autocast_excluded_nodes</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;^linear2$&quot;</span><span class="p">},</span>
+    <span class="n">autocast_excluded_nodes</span><span class="o">=</span><span class="p">{</span><span class="s2">"^linear2$"</span><span class="p">},</span>
 <span class="p">)</span>
 </pre></div>
 </div>

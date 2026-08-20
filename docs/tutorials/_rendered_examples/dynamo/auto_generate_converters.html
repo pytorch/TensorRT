@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -641,13 +641,13 @@ def elementwise_mul_kernel(X, Y, Z, BLOCK_SIZE: tl.constexpr):
     tl.store(Z + offsets, z_vals)
 
 
-@torch.library.custom_op(&quot;torchtrt_ex::elementwise_mul&quot;, mutates_args=())  # type: ignore[misc]
+@torch.library.custom_op("torchtrt_ex::elementwise_mul", mutates_args=())  # type: ignore[misc]
 def elementwise_mul(
     X: torch.Tensor, Y: torch.Tensor, b: float = 0.2, a: int = 2
 ) -&gt; torch.Tensor:
     # Ensure the tensors are on the GPU
-    assert X.is_cuda and Y.is_cuda, &quot;Tensors must be on CUDA device.&quot;
-    assert X.shape == Y.shape, &quot;Tensors must have the same shape.&quot;
+    assert X.is_cuda and Y.is_cuda, "Tensors must be on CUDA device."
+    assert X.shape == Y.shape, "Tensors must have the same shape."
 
     # Create output tensor
     Z = torch.empty_like(X)
@@ -656,7 +656,7 @@ def elementwise_mul(
     BLOCK_SIZE = 1024
 
     # Grid of programs
-    grid = lambda meta: (X.numel() // meta[&quot;BLOCK_SIZE&quot;],)
+    grid = lambda meta: (X.numel() // meta["BLOCK_SIZE"],)
 
     # Launch the kernel
     elementwise_mul_kernel[grid](X, Y, Z, BLOCK_SIZE=BLOCK_SIZE)
@@ -670,7 +670,7 @@ def elementwise_mul(
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@torch.library.register_fake(&quot;torchtrt_ex::elementwise_mul&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@torch.library.register_fake("torchtrt_ex::elementwise_mul")
 def _(x: torch.Tensor, y: torch.Tensor, b: float = 0.2, a: int = 2) -&gt; torch.Tensor:
     return x
 </pre></div>
@@ -685,7 +685,7 @@ def _(x: torch.Tensor, y: torch.Tensor, b: float = 0.2, a: int = 2) -&gt; torch.
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@trtp.register(&quot;torchtrt_ex::elementwise_mul&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@trtp.register("torchtrt_ex::elementwise_mul")
 def _(
     x: trtp.TensorDesc, y: trtp.TensorDesc, b: float, a: int
 ) -&gt; Tuple[trtp.TensorDesc]:
@@ -698,7 +698,7 @@ def _(
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@trtp.impl(&quot;torchtrt_ex::elementwise_mul&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@trtp.impl("torchtrt_ex::elementwise_mul")
 def _(
     x: trtp.Tensor,
     y: trtp.Tensor,
@@ -711,11 +711,11 @@ def _(
     BLOCK_SIZE = 1024
 
     # Grid of programs
-    grid = lambda meta: (x.numel() // meta[&quot;BLOCK_SIZE&quot;],)
+    grid = lambda meta: (x.numel() // meta["BLOCK_SIZE"],)
 
-    x_t = torch.as_tensor(x, device=&quot;cuda&quot;)
-    y_t = torch.as_tensor(y, device=&quot;cuda&quot;)
-    z_t = torch.as_tensor(outputs[0], device=&quot;cuda&quot;)
+    x_t = torch.as_tensor(x, device="cuda")
+    y_t = torch.as_tensor(y, device="cuda")
+    z_t = torch.as_tensor(outputs[0], device="cuda")
     # Launch the kernel
     elementwise_mul_kernel[grid](x_t, y_t, z_t, BLOCK_SIZE=BLOCK_SIZE)
 </pre></div>
@@ -730,7 +730,7 @@ def _(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
-    &quot;torchtrt_ex::elementwise_mul&quot;, supports_dynamic_shapes=True
+    "torchtrt_ex::elementwise_mul", supports_dynamic_shapes=True
 )
 </pre></div>
 </div>
@@ -754,9 +754,9 @@ def _(
         return res
 
 
-my_model = MyModel().to(&quot;cuda&quot;).eval()
-m = torch.full((64, 64), 2, device=&quot;cuda&quot;, dtype=torch.float)
-n = torch.full((64, 64), 3, device=&quot;cuda&quot;, dtype=torch.float)
+my_model = MyModel().to("cuda").eval()
+m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
+n = torch.full((64, 64), 3, device="cuda", dtype=torch.float)
 
 with torch_tensorrt.logging.errors():
     model_trt = torch_tensorrt.compile(my_model, inputs=[m, n], min_block_size=1)
@@ -765,7 +765,7 @@ with torch_tensorrt.logging.errors():
             res = model_trt(m, n)
             assert torch.allclose(res, my_model(m, n))
 
-print(&quot;Ran with custom plugin!&quot;)
+print("Ran with custom plugin!")
 </pre></div>
 </div>
 </div>

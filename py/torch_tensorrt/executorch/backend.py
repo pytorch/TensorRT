@@ -282,16 +282,16 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         _validate_engine_info(engine_info)
         serialized_engine = engine_info[ENGINE_IDX]
         if isinstance(serialized_engine, torch.Tensor):
-            # Single copy out of the underlying storage. The prior
-            # `.numpy().tobytes()` path allocated a fresh bytes buffer
-            # on top of the numpy view, which for a >2 GB engine
-            # roughly doubled peak memory at this step. `.cpu()` and
-            # `.contiguous()` are no-ops when already host-side and
-            # contiguous (the common case for the uint8 buffer this
-            # backend produces).
-            engine_info[ENGINE_IDX] = bytes(
-                serialized_engine.cpu().contiguous().untyped_storage()
-            )
+            # `bytes(storage)` looks equivalent but has two problems. It iterates
+            # the storage element by element in Python, costing about two seconds
+            # per megabyte, and it returns the whole backing allocation rather than
+            # the tensor's own extent, so a view of a larger buffer serializes too
+            # many bytes. `memoryview` is not redundant here: on a 0-dim uint8
+            # tensor numpy alone goes through `__index__` and yields that many zero
+            # bytes instead of the value. `.view(torch.uint8)` keeps `.numpy()` from
+            # rejecting a dtype it has no equivalent for.
+            engine_bytes = serialized_engine.cpu().contiguous().view(torch.uint8)
+            engine_info[ENGINE_IDX] = bytes(memoryview(engine_bytes.numpy()))
         elif not isinstance(serialized_engine, (bytes, bytearray)):
             engine_info[ENGINE_IDX] = bytes(serialized_engine)
         input_names = _reorder_input_names_for_executorch(

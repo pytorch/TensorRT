@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../_static/documentation_options.js?v=61128d90"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -556,7 +556,7 @@ observers around each invocation, passing an <code class="docutils literal notra
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># inside a Torch-TensorRT module (illustrative)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.observer</span><span class="w"> </span><span class="kn">import</span> <span class="n">Observer</span>
 
-<span class="n">on_subgraph_converted</span><span class="p">:</span> <span class="n">Observer</span> <span class="o">=</span> <span class="n">Observer</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;on_subgraph_converted&quot;</span><span class="p">)</span>
+<span class="n">on_subgraph_converted</span><span class="p">:</span> <span class="n">Observer</span> <span class="o">=</span> <span class="n">Observer</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"on_subgraph_converted"</span><span class="p">)</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">convert_subgraph</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">):</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">_do_convert</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
@@ -575,7 +575,7 @@ observers around each invocation, passing an <code class="docutils literal notra
 <span class="k">with</span> <span class="n">on_subgraph_converted</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">capture</span><span class="p">):</span>
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Captured </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">)</span><span class="si">}</span><span class="s2"> subgraph conversions&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Captured </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">)</span><span class="si">}</span><span class="s2"> subgraph conversions"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The callback is automatically de-registered when the <code class="docutils literal notranslate"><span class="pre">with</span></code> block exits, so it is
@@ -598,13 +598,13 @@ a <code class="docutils literal notranslate"><span class="pre">.observers</span>
 
 <span class="c1"># Attach a pre-callback</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">log_before</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">ObserveContext</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;About to run </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">callable</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> on graph with &quot;</span>
-          <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">))</span><span class="si">}</span><span class="s2"> nodes&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"About to run </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">callable</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> on graph with "</span>
+          <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">))</span><span class="si">}</span><span class="s2"> nodes"</span><span class="p">)</span>
 
 <span class="c1"># Attach a post-callback</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">log_after</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">ObserveContext</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After pass: graph has &quot;</span>
-          <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">return_value</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">))</span><span class="si">}</span><span class="s2"> nodes&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"After pass: graph has "</span>
+          <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">return_value</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">))</span><span class="si">}</span><span class="s2"> nodes"</span><span class="p">)</span>
 
 <span class="k">with</span> <span class="n">my_lowering_pass</span><span class="o">.</span><span class="n">observers</span><span class="o">.</span><span class="n">pre</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">log_before</span><span class="p">),</span> \
      <span class="n">my_lowering_pass</span><span class="o">.</span><span class="n">observers</span><span class="o">.</span><span class="n">post</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">log_after</span><span class="p">):</span>

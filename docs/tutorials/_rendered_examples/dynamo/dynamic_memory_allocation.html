@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -619,7 +619,7 @@ import torchvision.models as models
 
 np.random.seed(5)
 torch.manual_seed(5)
-inputs = [torch.rand((100, 3, 224, 224)).to(&quot;cuda&quot;)]
+inputs = [torch.rand((100, 3, 224, 224)).to("cuda")]
 </pre></div>
 </div>
 </div>
@@ -638,13 +638,13 @@ inputs = [torch.rand((100, 3, 224, 224)).to(&quot;cuda&quot;)]
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>settings = {
-    &quot;ir&quot;: &quot;dynamo&quot;,
-    &quot;immutable_weights&quot;: False,
-    &quot;lazy_engine_init&quot;: True,
-    &quot;dynamically_allocate_resources&quot;: True,
+    "ir": "dynamo",
+    "immutable_weights": False,
+    "lazy_engine_init": True,
+    "dynamically_allocate_resources": True,
 }
 
-model = models.resnet152(pretrained=True).eval().to(&quot;cuda&quot;)
+model = models.resnet152(pretrained=True).eval().to("cuda")
 compiled_module = torch_trt.compile(model, inputs=inputs, **settings)
 print((torch.cuda.mem_get_info()[1] - torch.cuda.mem_get_info()[0]) / 1024**3)
 compiled_module(*inputs)
@@ -670,7 +670,7 @@ with torch_trt.dynamo.runtime.ResourceAllocationStrategy(
     compiled_module, dynamically_allocate_resources=False
 ):
     print(
-        &quot;Memory used (GB):&quot;,
+        "Memory used (GB):",
         (torch.cuda.mem_get_info()[1] - torch.cuda.mem_get_info()[0]) / 1024**3,
     )
     compiled_module(*inputs)
@@ -678,7 +678,7 @@ with torch_trt.dynamo.runtime.ResourceAllocationStrategy(
     torch.cuda.empty_cache()
     time.sleep(30)
     print(
-        &quot;Memory used (GB):&quot;,
+        "Memory used (GB):",
         (torch.cuda.mem_get_info()[1] - torch.cuda.mem_get_info()[0]) / 1024**3,
     )
     compiled_module(*inputs)

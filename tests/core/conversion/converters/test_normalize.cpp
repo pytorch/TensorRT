@@ -43,6 +43,11 @@
     ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));                 \
   }
 
+// The aten::norm converter is implemented with a TensorRT plugin, which TensorRT-RTX does not
+// provide, so it is compiled out for RTX builds (see
+// core/conversion/converters/impl/normalize.cpp). The aten::frobenius_norm and
+// aten::linalg_norm tests below do not use that converter and are left enabled.
+#ifndef TRT_MAJOR_RTX
 ATEN_INTERPOLATE_TESTS(
     ATenNormOrder1RemoveDims,
     R"IR(
@@ -75,6 +80,7 @@ ATEN_INTERPOLATE_TESTS(
               %5 : Tensor = aten::norm(%x.1, %3, %2, %4)
               return (%5))IR",
     std::vector<int64_t>({3, 4, 3}));
+#endif // TRT_MAJOR_RTX
 
 TEST(Converters, ATenFrobeniusNorm) {
   const auto graph = R"IR(

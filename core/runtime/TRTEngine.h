@@ -22,14 +22,29 @@
 #include "core/runtime/TensorRTBindingNames.h"
 #include "core/util/prelude.h"
 
-// TensorRT 10.16+ has native NCCL collective support via IExecutionContext::setCommunicator()
-#if NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 16)
+// Native NCCL collective support is exposed via IExecutionContext::setCommunicator()
+// together with IDistCollectiveLayer. Two independent release lines ship that API:
+//
+//   * TensorRT-RTX 1.5+ -- NvInferVersion.h defines TRT_MAJOR_RTX/TRT_MINOR_RTX and
+//     then aliases NV_TENSORRT_MAJOR/MINOR to them, so NV_TENSORRT_MAJOR is 1 on RTX
+//     and the mainline ">= 10.16" comparison below can never match. Detect the RTX
+//     package first and version-check against its own numbering.
+//   * TensorRT 10.16+   -- mainline.
+//
+// Do not collapse these into a single NV_TENSORRT_MAJOR/MINOR test: the two lines use
+// incompatible numbering schemes. See is_tensorrt_version_supported() in
+// py/torch_tensorrt/_utils.py for the Python-side equivalent of the same problem.
+#if defined(TRT_MAJOR_RTX)
+#if TRT_MAJOR_RTX > 1 || (TRT_MAJOR_RTX == 1 && TRT_MINOR_RTX >= 5)
+#define TRT_HAS_NATIVE_NCCL 1
+#endif
+#elif NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 16)
 #define TRT_HAS_NATIVE_NCCL 1
 #endif
 
 // Full TRT NCCL collectives support requires both:
 // 1. PyTorch built with NCCL (USE_C10D_NCCL defined via Bazel)
-// 2. TensorRT 10.16+ (TRT_HAS_NATIVE_NCCL defined above)
+// 2. A TensorRT exposing the native collectives API (TRT_HAS_NATIVE_NCCL above)
 #if defined(USE_C10D_NCCL) && defined(TRT_HAS_NATIVE_NCCL)
 #define ENABLE_TRT_NCCL_COLLECTIVES 1
 #endif
@@ -257,6 +272,21 @@ struct TRTEngine : torch::CustomClassHolder {
   // Serde re-export functionality
   FlattenedState __obj_flatten__();
   std::vector<std::string> serialize();
+  // serialize() packs both the metadata and the engine into one vector of strings,
+  // which forces the engine through base64. A caller that wants only metadata pays
+  // that encode for nothing; a caller that wants the engine pays it and then decodes
+  // it back. These expose each half on its own. serialize() still returns the full
+  // base64 record, so serialized engines and .pte artifacts are unaffected.
+  //
+  // The returned record is SERIALIZATION_LEN long with a valid ABI tag and an empty
+  // engine slot, so verify_serialization_fmt accepts it: passing it back to
+  // TRTEngine(std::vector<std::string>) constructs an engine from zero bytes rather
+  // than failing. It is for reading metadata, not for round-tripping.
+  std::vector<std::string> serialize_metadata_only();
+  // Returns uint8 tensor, not std::string: TorchScript maps std::string to a
+  // Python str and engine bytes are not valid UTF-8. A tensor is also the shape
+  // consumers want, so they need not rebuild one from decoded bytes.
+  at::Tensor serialized_engine_tensor();
 
   // CUDAGraph-Related Functionality
   // Keep the captured graph so its executable can be instantiated explicitly.

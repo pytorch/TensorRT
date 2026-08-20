@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -487,9 +487,9 @@ document.write(`
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">_WeightStreamingContextManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Helper class used to setup weight streaming budget</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">module</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">]</span>
@@ -502,7 +502,7 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span> <span class="o">=</span> <span class="n">module</span>
             <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
         <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">rt_mod</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
-            <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">in</span> <span class="n">name</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rt_mod</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s2">"_run_on_acc"</span> <span class="ow">in</span> <span class="n">name</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rt_mod</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
                 <span class="n">rt_mods</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">rt_mod</span><span class="p">))</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">current_device_budget</span> <span class="o">+=</span> <span class="n">rt_mod</span><span class="o">.</span><span class="n">get_device_memory_budget</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">streamable_budget</span> <span class="o">=</span> <span class="p">[</span>
@@ -510,8 +510,8 @@ document.write(`
         <span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">rt_mods</span> <span class="o">=</span> <span class="n">rt_mods</span>
         <span class="n">total_device_budget</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">streamable_budget</span><span class="p">)</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="s2">&quot;device_budget&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_device_budget</span><span class="p">)</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="s2">&quot;total_device_budget&quot;</span><span class="p">,</span> <span class="n">total_device_budget</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="s2">"device_budget"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_device_budget</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="s2">"total_device_budget"</span><span class="p">,</span> <span class="n">total_device_budget</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_automatic_weight_streaming_budget</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="n">ws_budget_bytes</span> <span class="o">=</span> <span class="mi">0</span>
@@ -519,13 +519,13 @@ document.write(`
             <span class="n">ws_budget_bytes</span> <span class="o">+=</span> <span class="n">rt_mod</span><span class="o">.</span><span class="n">get_automatic_device_memory_budget</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">ws_budget_bytes</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;_WeightStreamingContextManager&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"_WeightStreamingContextManager"</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_device_budget</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Revert weight streaming budget to initial size: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">current_device_budget</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">"Revert weight streaming budget to initial size: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">current_device_budget</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">device_budget</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_device_budget</span>
 
@@ -534,15 +534,15 @@ document.write(`
         <span class="n">total_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_device_budget</span>
         <span class="k">if</span> <span class="n">total_bytes</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                <span class="s2">&quot;Streamable bytes are zero. Was module complied with enable_weight_streaming=True option?&quot;</span>
+                <span class="s2">"Streamable bytes are zero. Was module complied with enable_weight_streaming=True option?"</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">total_bytes</span> <span class="o">&lt;</span> <span class="n">requested_budget</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Requested budget is greater than streamable bytes: </span><span class="si">{</span><span class="n">total_bytes</span><span class="si">}</span><span class="s2">. requested budget: </span><span class="si">{</span><span class="n">requested_budget</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">"Requested budget is greater than streamable bytes: </span><span class="si">{</span><span class="n">total_bytes</span><span class="si">}</span><span class="s2">. requested budget: </span><span class="si">{</span><span class="n">requested_budget</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
             <span class="n">requested_budget</span> <span class="o">=</span> <span class="n">total_bytes</span>
         <span class="k">elif</span> <span class="n">requested_budget</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Requested budget cannot be negative&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Requested budget cannot be negative"</span><span class="p">)</span>
         <span class="c1"># Normalized size is applied for multiple runtime module.</span>
         <span class="c1"># e.g. 100B budget is applied to two modules and they have 1000B and 3000B streamable size respectively.</span>
         <span class="c1"># Then 25B and 75B are applied for each module.</span>
@@ -557,7 +557,7 @@ document.write(`
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">rt_mod</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rt_mods</span><span class="p">):</span>
             <span class="n">rt_mod</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
             <span class="n">ws_budget_bytes</span> <span class="o">+=</span> <span class="n">rt_mod</span><span class="o">.</span><span class="n">set_device_memory_budget</span><span class="p">(</span><span class="n">normalized_size</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set weight streaming size </span><span class="si">{</span><span class="n">normalized_size</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Set weight streaming size </span><span class="si">{</span><span class="n">normalized_size</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span><span class="p">:</span>
             <span class="c1"># Changing the weight-streaming budget invalidates TRT execution</span>
@@ -569,7 +569,7 @@ document.write(`
         <span class="k">return</span> <span class="n">ws_budget_bytes</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;device_budget&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"device_budget"</span><span class="p">:</span>
             <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_streamable_weight_bytes</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 

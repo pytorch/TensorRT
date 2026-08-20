@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -485,7 +485,7 @@ document.write(`
 <span class="p">)</span>
 
 <span class="n">logging</span><span class="o">.</span><span class="n">captureWarnings</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;torch_tensorrt [TensorRT Conversion Context]&quot;</span><span class="p">)</span>
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"torch_tensorrt [TensorRT Conversion Context]"</span><span class="p">)</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">_TRTLogger</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
@@ -513,7 +513,7 @@ document.write(`
 <div class="viewcode-block" id="set_level">
 <a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.set_level">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">set_level</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">logger</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set log level for both Python and C++ torch_tensorrt loggers.</span>
+<span class="w">    </span><span class="sd">"""Set log level for both Python and C++ torch_tensorrt loggers.</span>
 
 <span class="sd">    Permanently sets the log level until changed again or process exits.</span>
 <span class="sd">    Automatically handles runtime availability checks.</span>
@@ -533,12 +533,12 @@ document.write(`
 <span class="sd">        torch_tensorrt.logging.set_level(logging.DEBUG)</span>
 
 <span class="sd">        # Or set for a specific logger</span>
-<span class="sd">        my_logger = logging.getLogger(&quot;torch_tensorrt.dynamo&quot;)</span>
+<span class="sd">        my_logger = logging.getLogger("torch_tensorrt.dynamo")</span>
 <span class="sd">        torch_tensorrt.logging.set_level(logging.DEBUG, logger=my_logger)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Set the specified logger or default to root torch_tensorrt logger</span>
     <span class="k">if</span> <span class="n">logger</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"torch_tensorrt"</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
@@ -562,8 +562,8 @@ document.write(`
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Invalid log level: </span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">. Must be one of: &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL, logging.NOTSET&quot;</span>
+                <span class="sa">f</span><span class="s2">"Invalid log level: </span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">. Must be one of: "</span>
+                <span class="sa">f</span><span class="s2">"logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL, logging.NOTSET"</span>
             <span class="p">)</span></div>
 
 
@@ -571,7 +571,7 @@ document.write(`
 <div class="viewcode-block" id="internal_errors">
 <a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.internal_errors">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">internal_errors</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just internal errors</span>
+<span class="w">    </span><span class="sd">"""Context-manager to limit displayed log messages to just internal errors</span>
 
 <span class="sd">    Example:</span>
 
@@ -579,7 +579,7 @@ document.write(`
 
 <span class="sd">            with torch_tensorrt.logging.internal_errors():</span>
 <span class="sd">                outputs = model_torchtrt(inputs)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
@@ -613,7 +613,7 @@ document.write(`
 <div class="viewcode-block" id="errors">
 <a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.errors">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">errors</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just errors and above</span>
+<span class="w">    </span><span class="sd">"""Context-manager to limit displayed log messages to just errors and above</span>
 
 <span class="sd">    Example:</span>
 
@@ -621,7 +621,7 @@ document.write(`
 
 <span class="sd">            with torch_tensorrt.logging.errors():</span>
 <span class="sd">                outputs = model_torchtrt(inputs)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
@@ -653,7 +653,7 @@ document.write(`
 <div class="viewcode-block" id="warnings">
 <a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.warnings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">warnings</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just warnings and above</span>
+<span class="w">    </span><span class="sd">"""Context-manager to limit displayed log messages to just warnings and above</span>
 
 <span class="sd">    Example:</span>
 
@@ -661,7 +661,7 @@ document.write(`
 
 <span class="sd">            with torch_tensorrt.logging.warnings():</span>
 <span class="sd">                model_trt = torch_tensorrt.compile(model, **spec)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
@@ -693,7 +693,7 @@ document.write(`
 <div class="viewcode-block" id="info">
 <a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.info">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">info</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display all info and greater severity messages</span>
+<span class="w">    </span><span class="sd">"""Context-manager to display all info and greater severity messages</span>
 
 <span class="sd">    Example:</span>
 
@@ -701,7 +701,7 @@ document.write(`
 
 <span class="sd">            with torch_tensorrt.logging.info():</span>
 <span class="sd">                model_trt = torch_tensorrt.compile(model, **spec)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
@@ -733,7 +733,7 @@ document.write(`
 <div class="viewcode-block" id="debug">
 <a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.debug">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">debug</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display full debug information through the logger</span>
+<span class="w">    </span><span class="sd">"""Context-manager to display full debug information through the logger</span>
 
 <span class="sd">    Example:</span>
 
@@ -741,7 +741,7 @@ document.write(`
 
 <span class="sd">            with torch_tensorrt.logging.debug():</span>
 <span class="sd">                model_trt = torch_tensorrt.compile(model, **spec)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
@@ -773,7 +773,7 @@ document.write(`
 <div class="viewcode-block" id="graphs">
 <a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.graphs">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">graphs</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display the results of intermediate lowering passes</span>
+<span class="w">    </span><span class="sd">"""Context-manager to display the results of intermediate lowering passes</span>
 <span class="sd">    as well as full debug information through the logger</span>
 
 <span class="sd">    Example:</span>
@@ -782,7 +782,7 @@ document.write(`
 
 <span class="sd">            with torch_tensorrt.logging.graphs():</span>
 <span class="sd">                model_trt = torch_tensorrt.compile(model, **spec)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>

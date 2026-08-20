@@ -8,6 +8,7 @@
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 #include "torch_tensorrt/executorch/TensorRTBindingNames.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
+#include "torch_tensorrt/executorch/WeightStreamingBudget.h"
 
 #include <cstdint>
 #include <cstring>
@@ -20,6 +21,7 @@
 #include <NvInfer.h>
 #include <cuda_runtime.h>
 
+#include <executorch/extension/cuda/caller_stream.h>
 #include <executorch/runtime/backend/interface.h>
 #include <executorch/runtime/core/exec_aten/util/tensor_util.h>
 #include <executorch/runtime/platform/log.h>
@@ -49,19 +51,17 @@ using ::executorch::runtime::Span;
   } while (false)
 
 namespace {
-thread_local cudaStream_t g_user_stream = nullptr;
-thread_local bool g_user_stream_set = false;
+
+extern const Error kRegistrationResult;
+
+Error check_registration() {
+  if (kRegistrationResult != Error::Ok) {
+    ET_LOG(Error, "TensorRTBackend registration failed: %s", ::executorch::runtime::to_string(kRegistrationResult));
+  }
+  return kRegistrationResult;
+}
+
 } // namespace
-
-CudaStreamGuard::CudaStreamGuard(cudaStream_t stream) : prev_stream_(g_user_stream), prev_set_(g_user_stream_set) {
-  g_user_stream = stream;
-  g_user_stream_set = true;
-}
-
-CudaStreamGuard::~CudaStreamGuard() {
-  g_user_stream = prev_stream_;
-  g_user_stream_set = prev_set_;
-}
 
 void TRTLogger::log(Severity severity, const char* msg) noexcept {
   if (severity <= Severity::kERROR) {
@@ -209,6 +209,10 @@ bool is_cuda_accessible_ptr(const void* ptr) {
 // is_available
 // ---------------------------------------------------------------------------
 bool TensorRTBackend::is_available() const {
+  if (check_registration() != Error::Ok) {
+    return false;
+  }
+
   TRTLogger logger;
   TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
   return runtime != nullptr;
@@ -226,6 +230,11 @@ Result<DelegateHandle*> TensorRTBackend::init(
     FreeableBuffer* processed,
     ArrayRef<CompileSpec> compile_specs) const {
   (void)compile_specs;
+
+  const Error registration_result = check_registration();
+  if (registration_result != Error::Ok) {
+    return registration_result;
+  }
 
   TORCHTRT_ET_CHECK_NOT_NULL(processed, Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
   TORCHTRT_ET_CHECK_NOT_NULL(processed->data(), Error::InvalidArgument, "TensorRTBackend::init: null processed buffer");
@@ -283,6 +292,144 @@ Result<DelegateHandle*> TensorRTBackend::init(
   handle->engine.reset(handle->runtime->deserializeCudaEngine(engine_data, header.engine_size));
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle->engine, Error::InvalidProgram, "TensorRTBackend::init: failed to deserialize TensorRT engine");
+
+  // Apply the weight streaming budget before the execution context is created
+  // below: TensorRT forbids changing the budget while a context is active. The
+  // budget is a non-negative decimal byte count and may come from two places, in
+  // order of precedence:
+  //   1. A load-time backend option ("weight_streaming_budget" runtime spec) that
+  //      the caller passes to Module::load(LoadBackendOptionsMap). This lets a
+  //      deployment size the budget for its own GPU without re-exporting.
+  //   2. The same key baked into the .pte as a compile spec at export, used as a
+  //      default when no load-time option is given (and the only channel for
+  //      loaders that cannot pass backend options yet, e.g. Python/Android).
+  // When neither is present and the engine supports streaming, we apply
+  // TensorRT's automatic budget, mirroring what the PyTorch runtimes do on
+  // deserialize. Negative or malformed values are rejected as InvalidProgram.
+  WsBudget ws_request;
+  bool is_explicit = false;
+
+  // (1) A load-time runtime spec takes precedence over the baked compile spec.
+  // The value is a decimal byte string; a non-negative int is also accepted for
+  // small budgets. A present-but-wrong-type or empty option is handled explicitly
+  // so a runtime option is never silently dropped. The const char* returned by
+  // get_runtime_spec points into the caller's LoadBackendOptionsMap storage, which
+  // outlives init(); we parse it immediately and keep only the int64 result.
+  const auto ws_runtime = context.get_runtime_spec<const char*>(kWeightStreamingBudgetKey);
+  if (ws_runtime.ok()) {
+    const char* const value = ws_runtime.get();
+    // The option array need not be NUL terminated (the struct is public), so
+    // bound the scan. An empty value means "unset", so fall through to (2).
+    constexpr std::size_t kRuntimeBudgetMaxScan = 256;
+    std::size_t len = 0;
+    if (value != nullptr) {
+      while (len < kRuntimeBudgetMaxScan && value[len] != '\0') {
+        ++len;
+      }
+    }
+    if (len > 0) {
+      ws_request = parse_weight_streaming_budget(value, len);
+      if (!ws_request.valid) {
+        ET_LOG(Error, "TensorRTBackend::init: malformed weight_streaming_budget runtime option");
+        return Error::InvalidProgram;
+      }
+      is_explicit = true;
+    } else {
+      // The option was supplied but carries no characters, so nothing was set. Say so
+      // rather than falling through silently, since a caller who passed the option
+      // expects it to take effect. The actual fallback is resolved below: either a
+      // budget compile spec if the program carries one, or TensorRT's automatic
+      // budget, so do not name one here.
+      ET_LOG(Error, "TensorRTBackend::init: weight_streaming_budget runtime option is empty and was ignored");
+    }
+  } else if (ws_runtime.error() != Error::NotFound) {
+    // The key is present but stored as a non-string type. Accept a non-negative
+    // int for convenience (its 32-bit range only covers budgets under 2 GB);
+    // otherwise reject it so a wrong-typed option is never silently ignored.
+    const auto ws_runtime_int = context.get_runtime_spec<int>(kWeightStreamingBudgetKey);
+    if (ws_runtime_int.ok() && ws_runtime_int.get() >= 0) {
+      ws_request.valid = true;
+      ws_request.bytes = ws_runtime_int.get();
+      is_explicit = true;
+    } else {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: weight_streaming_budget runtime option must be a "
+          "non-negative int or a decimal byte string");
+      return Error::InvalidProgram;
+    }
+  }
+
+  // (2) Otherwise fall back to the compile spec baked into the .pte at export.
+  if (!is_explicit) {
+    const CompileSpec* ws_spec = nullptr;
+    for (const auto& spec : compile_specs) {
+      if (spec.key != nullptr && std::strcmp(spec.key, kWeightStreamingBudgetKey) == 0) {
+        if (ws_spec != nullptr) {
+          // The budget must appear at most once; a second match means the spec
+          // list is inconsistent, so reject the program instead of guessing.
+          ET_LOG(Error, "TensorRTBackend::init: duplicate weight_streaming_budget compile spec");
+          return Error::InvalidProgram;
+        }
+        ws_spec = &spec;
+      }
+    }
+    if (ws_spec != nullptr) {
+      ws_request = parse_weight_streaming_budget(ws_spec->value.buffer, ws_spec->value.nbytes);
+      if (!ws_request.valid) {
+        ET_LOG(Error, "TensorRTBackend::init: malformed weight_streaming_budget compile spec");
+        return Error::InvalidProgram;
+      }
+      is_explicit = true;
+    }
+  }
+
+  const int64_t streamable = handle->engine->getStreamableWeightsSize();
+  if (streamable > 0) {
+    // getStreamableWeightsSize is > 0 only when the engine was built with
+    // BuilderFlag::kWEIGHT_STREAMING.
+    int64_t budget;
+    if (is_explicit) {
+      // An explicit budget is a non-negative byte count, clamped to the
+      // streamable size (TensorRT also caps it, but clamp for a clear log).
+      budget = ws_request.bytes > streamable ? streamable : ws_request.bytes;
+    } else {
+      budget = handle->engine->getWeightStreamingAutomaticBudget();
+    }
+    if (!handle->engine->setWeightStreamingBudgetV2(budget)) {
+      if (!is_explicit && handle->engine->setWeightStreamingBudgetV2(0)) {
+        // The automatic budget could not be applied; fall back to budget 0, which
+        // streams all weights (minimum resident memory) and always fits.
+        ET_LOG(
+            Info,
+            "TensorRTBackend::init: automatic weight streaming budget failed; falling back to budget 0 (stream all weights)");
+      } else {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::init: setWeightStreamingBudgetV2 failed (requested=%lld%s)",
+            (long long)budget,
+            is_explicit ? "" : ", and fallback to 0 also failed");
+        return Error::InvalidProgram;
+      }
+    }
+    ET_LOG(
+        Info,
+        "TensorRTBackend::init: weight streaming budget=%lld streamable=%lld scratch=%lld",
+        (long long)handle->engine->getWeightStreamingBudgetV2(),
+        (long long)streamable,
+        (long long)handle->engine->getWeightStreamingScratchMemorySize());
+  } else if (is_explicit) {
+    // A budget was requested but the engine has no streamable weights (it was not
+    // built with enable_weight_streaming=True, or nothing is streamable). The
+    // engine is still valid and runs fully resident, so log and continue rather
+    // than fail; failing here would break mixed multi-engine programs where only
+    // some engines were built for streaming. Logged at Error because the caller
+    // asked for a memory setting that will not take effect, and ExecuTorch has no
+    // Warning level.
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: weight_streaming_budget ignored; engine has no streamable weights (it was not built with enable_weight_streaming=True, or none of its weights are streamable). The engine runs with all weights resident.");
+  }
 
   Error err = initialize_engine_io(*handle);
   if (err != Error::Ok) {
@@ -379,7 +526,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return Error::InvalidProgram;
     }
   }
-  cudaStream_t stream = g_user_stream_set ? g_user_stream : cudaStreamPerThread;
+  const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
+  const bool caller_stream_set = caller_stream.has_value();
+  cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
   bool output_staged_to_host = false;
   bool input_staged_from_host = false;
 
@@ -522,10 +671,17 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     for (int d = 0; d < actual_dims.nbDims; ++d) {
       new_sizes[d] = static_cast<SizesType>(actual_dims.d[d]);
     }
-    Error resize_err = executorch::runtime::resize_tensor(et_out, {new_sizes, static_cast<size_t>(actual_dims.nbDims)});
-    if (resize_err != Error::Ok) {
-      ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for output '%s'", name.c_str());
-      return resize_err;
+    // A 0-d output has an immutable rank of zero, and TensorRT reports it as a
+    // 1-element 1-D shape, so resizing would be rejected. Skip it when the
+    // element count already agrees.
+    const bool scalar_output = et_out.dim() == 0 && actual_dims.nbDims == 1 && actual_dims.d[0] == 1;
+    if (!scalar_output) {
+      Error resize_err =
+          executorch::runtime::resize_tensor(et_out, {new_sizes, static_cast<size_t>(actual_dims.nbDims)});
+      if (resize_err != Error::Ok) {
+        ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for output '%s'", name.c_str());
+        return resize_err;
+      }
     }
 
     void* bind_ptr = nullptr;
@@ -571,9 +727,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(
         Error,
-        "TensorRTBackend::execute: enqueueV3 failed. If a CUDA green context is "
-        "current, scope a CudaStreamGuard with a green-context stream: "
-        "cudaStreamPerThread is invalid while a green context is current.");
+        "TensorRTBackend::execute: enqueueV3 failed. Verify that the selected "
+        "CallerStreamGuard stream belongs to the TensorRT engine device. If a CUDA "
+        "green context is current, scope a CallerStreamGuard with a green-context "
+        "stream: cudaStreamPerThread is invalid while a green context is current.");
     return Error::InvalidState;
   }
 
@@ -587,8 +744,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
   // copies live in the must_sync branch: an output staged to host always sets
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
-  const bool must_sync = output_staged_to_host || input_staged_from_host || !g_user_stream_set;
+  const bool must_sync = output_staged_to_host || input_staged_from_host || !caller_stream_set;
   if (must_sync) {
+    Error copy_err = Error::Ok;
     for (auto& output : outputs_needing_copy) {
       exec_aten::Tensor et_out = args[num_inputs + output.first]->toTensor();
       cuda_err =
@@ -599,7 +757,11 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
             "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
             output.first,
             cudaGetErrorString(cuda_err));
-        return Error::InvalidProgram;
+        // The enqueue already succeeded, so the engine is still running on the
+        // stream. Drain below before returning, or the next call mutates a live
+        // execution context, which TensorRT forbids.
+        copy_err = Error::InvalidProgram;
+        break;
       }
     }
     cuda_err = cudaStreamSynchronize(stream);
@@ -607,6 +769,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (cuda_err != cudaSuccess) {
       ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
       return Error::InvalidProgram;
+    }
+    if (copy_err != Error::Ok) {
+      return copy_err;
     }
   } else {
     cuda_err = cudaEventRecord(engine->inflight_event, stream);
@@ -642,14 +807,18 @@ void TensorRTBackend::destroy(DelegateHandle* handle) const {
 // Static registration – links the name "TensorRTBackend" used in the .pte
 // file to this implementation at program startup.
 // ---------------------------------------------------------------------------
+namespace torch_tensorrt {
+namespace executorch_backend {
 namespace {
 
-torch_tensorrt::executorch_backend::TensorRTBackend& get_backend() {
+TensorRTBackend& get_backend() {
   static torch_tensorrt::executorch_backend::TensorRTBackend backend;
   return backend;
 }
 
 const ::executorch::runtime::Backend kBackendId{"TensorRTBackend", &get_backend()};
-const auto kRegistered = ::executorch::runtime::register_backend(kBackendId);
+const Error kRegistrationResult = ::executorch::runtime::register_backend(kBackendId);
 
 } // namespace
+} // namespace executorch_backend
+} // namespace torch_tensorrt

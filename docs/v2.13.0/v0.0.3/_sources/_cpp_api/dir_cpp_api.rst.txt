@@ -1,0 +1,20 @@
+.. _dir_cpp_api:
+
+
+Directory api
+=============
+
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp>` (``cpp``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+*Directory path:* ``cpp/api``
+
+Subdirectories
+--------------
+
+- :ref:`dir_cpp_api_include`
+
+
+

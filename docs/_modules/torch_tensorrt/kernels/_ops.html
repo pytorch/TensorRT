@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -474,7 +474,7 @@ document.write(`
                 <article class="bd-article">
                   
   <h1>Source code for torch_tensorrt.kernels._ops</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Public entry points for ``torch_tensorrt.kernels``.</span>
+<span></span><span class="sd">"""Public entry points for ``torch_tensorrt.kernels``.</span>
 
 <span class="sd">Two functions, two paths into the same registration funnel:</span>
 
@@ -483,7 +483,7 @@ document.write(`
 <span class="sd">  override keyword arguments for cases outside the DSL.</span>
 <span class="sd">* :func:`ptx_op` — escape hatch for pre-compiled PTX bytes (Triton output,</span>
 <span class="sd">  cached NVRTC artifact). User supplies meta / eager / aot directly.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
@@ -517,7 +517,7 @@ document.write(`
     <span class="n">priority</span><span class="p">:</span> <span class="n">ConverterPriority</span> <span class="o">=</span> <span class="n">ConverterPriority</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span>
     <span class="n">capability_validator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register a CUDA kernel as a TensorRT QDP plugin end-to-end.</span>
+<span class="w">    </span><span class="sd">"""Register a CUDA kernel as a TensorRT QDP plugin end-to-end.</span>
 
 <span class="sd">    Two paths share one entry point:</span>
 
@@ -538,11 +538,11 @@ document.write(`
 
 <span class="sd">    The kernel must follow the calling convention</span>
 <span class="sd">    ``(input_ptrs..., scalar_inputs..., extras..., output_ptrs...)``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">qdp_plugin</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">&quot;TensorRT QDP plugins are not available. &quot;</span>
-            <span class="s2">&quot;Requires TensorRT &gt;= 10.7.0 (and not 10.14.x).&quot;</span>
+            <span class="s2">"TensorRT QDP plugins are not available. "</span>
+            <span class="s2">"Requires TensorRT &gt;= 10.7.0 (and not 10.14.x)."</span>
         <span class="p">)</span>
 
     <span class="c1"># Late import to avoid circular imports and keep the decorator cheap.</span>
@@ -590,7 +590,7 @@ document.write(`
 
     <span class="c1"># A user-supplied aot_fn takes ownership of the AOT path; only the</span>
     <span class="c1"># auto-derived path needs the ScalarInput → JIT fallback because QDP</span>
-    <span class="c1"># AOT extras don&#39;t currently support runtime float / bool scalars.</span>
+    <span class="c1"># AOT extras don't currently support runtime float / bool scalars.</span>
     <span class="k">if</span> <span class="n">aot_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">use_aot</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="k">else</span><span class="p">:</span>
@@ -611,7 +611,7 @@ document.write(`
         <span class="n">precompiled_ptx</span><span class="o">=</span><span class="n">ptx</span><span class="p">,</span>
         <span class="n">use_aot_if_available</span><span class="o">=</span><span class="n">use_aot</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;cuda_kernel_op &#39;</span><span class="si">%s</span><span class="s2">&#39; registered (schema: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">op_name</span><span class="p">,</span> <span class="n">final_schema</span><span class="p">)</span></div>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"cuda_kernel_op '</span><span class="si">%s</span><span class="s2">' registered (schema: </span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span> <span class="n">op_name</span><span class="p">,</span> <span class="n">final_schema</span><span class="p">)</span></div>
 
 
 
@@ -631,21 +631,21 @@ document.write(`
     <span class="n">capability_validator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">schema</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register a pre-compiled PTX kernel as a TensorRT QDP plugin.</span>
+<span class="w">    </span><span class="sd">"""Register a pre-compiled PTX kernel as a TensorRT QDP plugin.</span>
 
 <span class="sd">    Use this when the PTX comes from an external compiler (Triton, a cached</span>
 <span class="sd">    NVRTC output, etc.) and NVRTC compilation should be skipped.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">qdp_plugin</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">&quot;TensorRT QDP plugins are not available. &quot;</span>
-            <span class="s2">&quot;Requires TensorRT &gt;= 10.7.0 (and not 10.14.x).&quot;</span>
+            <span class="s2">"TensorRT QDP plugins are not available. "</span>
+            <span class="s2">"Requires TensorRT &gt;= 10.7.0 (and not 10.14.x)."</span>
         <span class="p">)</span>
 
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_cuda_python_plugin</span>
 
     <span class="n">spec</span> <span class="o">=</span> <span class="n">CudaPythonSpec</span><span class="p">(</span>
-        <span class="n">kernel_source</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">kernel_source</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span>
         <span class="n">kernel_name</span><span class="o">=</span><span class="n">kernel_name</span><span class="p">,</span>
         <span class="n">aot_fn</span><span class="o">=</span><span class="n">aot_fn</span><span class="p">,</span>
         <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>

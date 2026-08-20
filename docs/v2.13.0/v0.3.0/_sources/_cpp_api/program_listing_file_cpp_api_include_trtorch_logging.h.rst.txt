@@ -1,0 +1,51 @@
+
+.. _program_listing_file_cpp_api_include_trtorch_logging.h:
+
+Program Listing for File logging.h
+==================================
+
+|exhale_lsh| :ref:`Return to documentation for file <file_cpp_api_include_trtorch_logging.h>` (``cpp/api/include/trtorch/logging.h``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. code-block:: cpp
+
+   /*
+    * Copyright (c) NVIDIA Corporation.
+    * All rights reserved.
+    *
+    * This library is licensed under the BSD-style license found in the
+    * LICENSE file in the root directory of this source tree.
+    */
+   #pragma once
+
+   #include <string>
+   #include "trtorch/macros.h"
+
+   namespace trtorch {
+   namespace logging {
+   enum Level {
+     kINTERNAL_ERROR,
+     kERROR,
+     kWARNING,
+     kINFO,
+     kDEBUG,
+     kGRAPH,
+   };
+
+   // Are these ones necessary for the user?
+   TRTORCH_API std::string get_logging_prefix();
+   TRTORCH_API void set_logging_prefix(std::string prefix);
+
+   TRTORCH_API void set_reportable_log_level(Level lvl);
+
+   TRTORCH_API void set_is_colored_output_on(bool colored_output_on);
+
+   TRTORCH_API Level get_reportable_log_level();
+
+   TRTORCH_API bool get_is_colored_output_on();
+
+   // Dont know if we want this?
+   TRTORCH_API void log(Level lvl, std::string msg);
+   } // namespace logging
+   } // namespace trtorch

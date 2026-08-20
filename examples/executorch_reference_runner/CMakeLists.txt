@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.24)
 project(my_runner LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -28,6 +28,10 @@ set(TORCHTRT_EXECUTORCH_SOURCE_DIR
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_PYBIND OFF CACHE BOOL "" FORCE)
+# Not removable: only this backend registers the allocator the exported program's
+# device copies look up, even when TensorRT is the sole delegate.
+set(EXECUTORCH_BUILD_CUDA ON CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_EXTENSION_TENSOR ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_MODULE ON CACHE BOOL "" FORCE)
@@ -56,6 +60,7 @@ add_executable(example_executorch_runner main.cpp)
 target_link_libraries(
   example_executorch_runner
   PRIVATE
+    ${CMAKE_DL_LIBS}
     executorch
     executorch::backends
     executorch::extensions

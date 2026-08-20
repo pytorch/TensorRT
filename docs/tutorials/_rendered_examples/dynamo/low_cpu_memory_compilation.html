@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -636,22 +636,22 @@ class net(nn.Module):
 
 
 model = net().eval()
-model.to(&quot;cuda&quot;)
-inputs = [torch.randn((1, 1024, 224, 224)).to(&quot;cuda&quot;)]
+model.to("cuda")
+inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
 
 
 compilation_options = {
-    &quot;min_block_size&quot;: 1,
-    &quot;immutable_weights&quot;: True,
-    &quot;reuse_cached_engines&quot;: False,
-    &quot;enable_resource_partitioning&quot;: True,
-    &quot;cpu_memory_budget&quot;: 2 * 1024 * 1024 * 1024,  # 2 GiB in bytes
+    "min_block_size": 1,
+    "immutable_weights": True,
+    "reuse_cached_engines": False,
+    "enable_resource_partitioning": True,
+    "cpu_memory_budget": 2 * 1024 * 1024 * 1024,  # 2 GiB in bytes
 }
 
 settings = CompilationSettings(**compilation_options)
 with torchtrt.dynamo.Debugger(
-    log_level=&quot;debug&quot;,
-    logging_dir=&quot;/home/profile/logging/moe&quot;,
+    log_level="debug",
+    logging_dir="/home/profile/logging/moe",
     engine_builder_monitor=False,
 ):
     exp_program = torch.export.export(model, tuple(inputs))
@@ -665,7 +665,7 @@ with torchtrt.dynamo.Debugger(
     print(trt_gm)
 
 
-&quot;&quot;&quot;
+"""
 You should be able to see two back-to-back TensorRT engines in the graph
 
 Graph Structure:
@@ -707,7 +707,7 @@ def forward(self, x):
     _run_on_acc_0_resource_split_1 = self._run_on_acc_0_resource_split_1(_run_on_acc_0_resource_split_0);  _run_on_acc_0_resource_split_0 = None
     return pytree.tree_unflatten((_run_on_acc_0_resource_split_1,), self._out_spec)
 )
-&quot;&quot;&quot;
+"""
 </pre></div>
 </div>
 </div>

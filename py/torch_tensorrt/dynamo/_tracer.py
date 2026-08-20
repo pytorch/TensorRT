@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 import logging
+from contextlib import nullcontext
 from inspect import signature
 from typing import Any, Optional, Tuple, Union
 
@@ -8,7 +10,11 @@ import torch
 from torch.export import Dim, export
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import default_device
-from torch_tensorrt.dynamo.utils import get_torch_inputs, to_torch_device
+from torch_tensorrt.dynamo.utils import (
+    get_torch_inputs,
+    is_quantized_by_modelopt,
+    to_torch_device,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +72,7 @@ def trace(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
     arg_inputs = inputs if inputs is not None else arg_inputs
+    assert arg_inputs is not None
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -79,13 +86,28 @@ def trace(
     dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
     dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs, dim_registry)
     dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry))
-    exp_program = export(
-        mod,
-        tuple(torch_arg_inputs),
-        kwargs=torch_kwarg_inputs,
-        dynamic_shapes=dynamic_shapes,
-        strict=kwargs.get("strict", False),
-    )
+    logger.debug("Derived dynamic_shapes for export: %s", dynamic_shapes)
+
+    export_context = nullcontext()
+
+    if is_quantized_by_modelopt(mod):
+        if importlib.util.find_spec("modelopt") is None:
+            raise ImportError(
+                "The provided model is quantized by ModelOpt, but ModelOpt is not installed."
+            )
+
+        from modelopt.torch.quantization.utils import export_torch_mode
+
+        export_context = export_torch_mode()
+
+    with export_context:
+        exp_program = export(
+            mod,
+            tuple(torch_arg_inputs),
+            kwargs=torch_kwarg_inputs,
+            dynamic_shapes=dynamic_shapes,
+            strict=kwargs.get("strict", False),
+        )
 
     return exp_program
 
@@ -116,6 +138,10 @@ def build_dim_registry(arg_inputs: Any, kwarg_inputs: Any) -> dict[str, Any]:
     """
     registry: dict[str, Any] = {}
     bounds: dict[str, tuple[int, int]] = {}
+    # {name: ["input_ids[0]", ...]} -- every axis fused under each name. Recorded
+    # during the loop because ``registry`` only keeps name -> Dim, losing the
+    # link back to the inputs that contributed it.
+    usage: dict[str, list[str]] = {}
     for inp in _collect_inputs(arg_inputs) + _collect_inputs(kwarg_inputs):
         shared_dims = getattr(inp, "shared_dims", None)
         if not shared_dims or inp.shape_mode != Input._ShapeMode.DYNAMIC:
@@ -125,16 +151,32 @@ def build_dim_registry(arg_inputs: Any, kwarg_inputs: Any) -> dict[str, Any]:
         max_shape = inp.shape["max_shape"]
         for axis, dim_name in shared_dims.items():
             lo, hi = int(min_shape[axis]), int(max_shape[axis])
+            site = f"{inp.name or '<unnamed>'}[{axis}]"
             if dim_name in bounds:
                 if bounds[dim_name] != (lo, hi):
                     raise ValueError(
                         f"Dimension name '{dim_name}' is used with conflicting ranges "
-                        f"{bounds[dim_name]} and {(lo, hi)}. A shared named dimension "
+                        f"{bounds[dim_name]} on {', '.join(usage[dim_name])} and "
+                        f"{(lo, hi)} on {site}. A shared named dimension "
                         f"must have identical (min, max) on every input that uses it."
                     )
             else:
                 bounds[dim_name] = (lo, hi)
                 registry[dim_name] = Dim(dim_name, min=lo, max=hi)
+            usage.setdefault(dim_name, []).append(site)
+
+    if registry:
+        logger.info(
+            "Resolved %d shared dynamic dim(s) from Input specs: %s. Axes listed "
+            "under one name are exported as a single symbol and are therefore "
+            "constrained equal at runtime.",
+            len(registry),
+            "; ".join(
+                f"'{name}' -> [{bounds[name][0]}, {bounds[name][1]}] on "
+                f"{', '.join(usage[name])}"
+                for name in registry
+            ),
+        )
     return registry
 
 

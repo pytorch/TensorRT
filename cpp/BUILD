@@ -64,8 +64,20 @@ config_setting(
 )
 
 config_setting(
-    name = "rtx_win",
+    name = "rtx_win_x86_64",
     constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "rtx_win_arm64",
+    constraint_values = [
+        "@platforms//cpu:arm64",
         "@platforms//os:windows",
     ],
     flag_values = {
@@ -108,6 +120,17 @@ cc_library(
 )
 
 cc_library(
+    name = "tensorrt_executorch_weight_streaming_budget",
+    srcs = [
+        "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
+    ],
+    hdrs = [
+        "include/torch_tensorrt/executorch/WeightStreamingBudget.h",
+    ],
+    strip_include_prefix = "include",
+)
+
+cc_library(
     name = "tensorrt_executorch_binding_names",
     hdrs = [
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
@@ -126,6 +149,7 @@ cc_library(
     hdrs = [
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
     ],
+    strip_include_prefix = "include",
     # Build the TensorRT backend as a static library. The final application
     # links this target together with the ExecuTorch runtime it was compiled
     # against, avoiding any runtime plugin/dlopen dependency.
@@ -134,18 +158,20 @@ cc_library(
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    strip_include_prefix = "include",
     deps = [
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
+        ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
             "@cuda//:cudart",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
             "@cuda//:cudart",
             "@tensorrt_sbsa//:nvinfer",
         ],
@@ -161,6 +187,7 @@ filegroup(
         "src/torch_tensorrt/executorch/README.md",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
+        "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
     ],
 )
 
@@ -180,5 +207,6 @@ filegroup(
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
+        "include/torch_tensorrt/executorch/WeightStreamingBudget.h",
     ],
 )

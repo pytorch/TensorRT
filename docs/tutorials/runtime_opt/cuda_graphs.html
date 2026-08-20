@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -608,7 +608,7 @@ dispatches, eliminating CPU-side dispatch overhead and improving GPU utilization
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
     <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">)</span> <span class="k">as</span> <span class="n">cg_module</span><span class="p">:</span>
@@ -632,8 +632,8 @@ eliminates inter-subgraph dispatch overhead even when the model is partially
 executed in PyTorch.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Force a graph break so the model has a PyTorch fallback subgraph</span>
 <span class="n">opt_with_break</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="nb">input</span><span class="p">],</span>
-    <span class="n">torch_executed_ops</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;torch.ops.aten.mul.Tensor&quot;</span><span class="p">},</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="nb">input</span><span class="p">],</span>
+    <span class="n">torch_executed_ops</span><span class="o">=</span><span class="p">{</span><span class="s2">"torch.ops.aten.mul.Tensor"</span><span class="p">},</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
 <span class="p">)</span>
 
@@ -704,8 +704,8 @@ graph sets <code class="docutils literal notranslate"><span class="pre">requires
 for that engine.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check if a compiled module uses the output allocator</span>
 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">submodule</span> <span class="ow">in</span> <span class="n">trt_gm</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">submodule</span><span class="p">,</span> <span class="s2">&quot;requires_output_allocator&quot;</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: requires_output_allocator = </span><span class="si">{</span><span class="n">submodule</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">submodule</span><span class="p">,</span> <span class="s2">"requires_output_allocator"</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: requires_output_allocator = </span><span class="si">{</span><span class="n">submodule</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

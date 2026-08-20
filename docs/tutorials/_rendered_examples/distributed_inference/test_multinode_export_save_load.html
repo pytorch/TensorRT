@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -649,20 +649,20 @@ torch.utils._pytree.register_constant(
 
 setup_nccl_for_torch_tensorrt()
 
-rank = int(os.environ[&quot;RANK&quot;])
-world_size = int(os.environ[&quot;WORLD_SIZE&quot;])
+rank = int(os.environ["RANK"])
+world_size = int(os.environ["WORLD_SIZE"])
 
 torch.cuda.set_device(0)  # one GPU per node
 dist.init_process_group(
-    &quot;nccl&quot;,
+    "nccl",
     rank=rank,
     world_size=world_size,
     timeout=datetime.timedelta(hours=2),
 )
 torch.manual_seed(0)
 
-device_mesh = init_device_mesh(&quot;cuda&quot;, (world_size,))
-print(f&quot;[Rank {rank}/{world_size}] distributed init OK&quot;, flush=True)
+device_mesh = init_device_mesh("cuda", (world_size,))
+print(f"[Rank {rank}/{world_size}] distributed init OK", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -692,7 +692,7 @@ class ToyModel(nn.Module):
 
 
 class _RowParallelLinear(nn.Module):
-    &quot;&quot;&quot;Linear + NCCL all-reduce (replaces DTensor RowwiseParallel for export).&quot;&quot;&quot;
+    """Linear + NCCL all-reduce (replaces DTensor RowwiseParallel for export)."""
 
     def __init__(self, linear, group_name):
         super().__init__()
@@ -701,15 +701,15 @@ class _RowParallelLinear(nn.Module):
 
     def forward(self, x):
         out = self.linear(x)
-        out = torch.ops._c10d_functional.all_reduce(out, &quot;sum&quot;, self.group_name)
+        out = torch.ops._c10d_functional.all_reduce(out, "sum", self.group_name)
         out = torch.ops._c10d_functional.wait_tensor(out)
         return out
 
 
 def build_exportable_model(rank, world_size):
-    &quot;&quot;&quot;Build model with manually sliced weights + explicit all-reduce.&quot;&quot;&quot;
+    """Build model with manually sliced weights + explicit all-reduce."""
     group_name = dist.distributed_c10d._get_default_group().group_name
-    model = ToyModel().to(&quot;cuda&quot;)
+    model = ToyModel().to("cuda")
 
     # Column-parallel: slice output dim (dim 0)
     for proj in [model.in_proj, model.in_proj2]:
@@ -721,7 +721,7 @@ def build_exportable_model(rank, world_size):
             proj.bias = nn.Parameter(b[rank * chunk : (rank + 1) * chunk].contiguous())
 
     # Row-parallel: slice input dim (dim 1) + wrap with all-reduce
-    for attr in [&quot;out_proj&quot;, &quot;out_proj2&quot;]:
+    for attr in ["out_proj", "out_proj2"]:
         proj = getattr(model, attr)
         w = proj.weight.data
         chunk = w.shape[1] // world_size
@@ -732,28 +732,28 @@ def build_exportable_model(rank, world_size):
 
 
 def rank_path(save_dir, rank, world_size):
-    return str(Path(save_dir) / f&quot;tp_rank{rank}_of_{world_size}.pt2&quot;)
+    return str(Path(save_dir) / f"tp_rank{rank}_of_{world_size}.pt2")
 
 
 # ---------------------------------------------------------------------------
 # Build DTensor baseline for comparison
 # ---------------------------------------------------------------------------
 
-tp_model = ToyModel().to(&quot;cuda&quot;)
+tp_model = ToyModel().to("cuda")
 tp_model = parallelize_module(
     tp_model,
     device_mesh,
     {
-        &quot;in_proj&quot;: ColwiseParallel(input_layouts=Shard(0)),
-        &quot;out_proj&quot;: RowwiseParallel(output_layouts=Shard(0)),
-        &quot;in_proj2&quot;: ColwiseParallel(input_layouts=Shard(0)),
-        &quot;out_proj2&quot;: RowwiseParallel(output_layouts=Shard(0)),
+        "in_proj": ColwiseParallel(input_layouts=Shard(0)),
+        "out_proj": RowwiseParallel(output_layouts=Shard(0)),
+        "in_proj2": ColwiseParallel(input_layouts=Shard(0)),
+        "out_proj2": RowwiseParallel(output_layouts=Shard(0)),
     },
 )
 
-inp = torch.rand(20, 10, device=&quot;cuda&quot;)
+inp = torch.rand(20, 10, device="cuda")
 python_result = tp_model(inp)
-print(f&quot;[Rank {rank}] PyTorch TP baseline OK, shape={python_result.shape}&quot;, flush=True)
+print(f"[Rank {rank}] PyTorch TP baseline OK, shape={python_result.shape}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -762,15 +762,15 @@ print(f&quot;[Rank {rank}] PyTorch TP baseline OK, shape={python_result.shape}&q
 
 PASSED = []
 FAILED = []
-save_dir = tempfile.mkdtemp(prefix=&quot;trt_export_test_&quot;)
+save_dir = tempfile.mkdtemp(prefix="trt_export_test_")
 
 
 def test_export_compile_save():
-    &quot;&quot;&quot;Test 1: torch.export → TRT AOT compile → save per-rank.&quot;&quot;&quot;
+    """Test 1: torch.export → TRT AOT compile → save per-rank."""
     torch.manual_seed(0)
     model = build_exportable_model(rank, world_size)
 
-    # Get the manually-sharded model&#39;s own PyTorch output as reference
+    # Get the manually-sharded model's own PyTorch output as reference
     with torch.no_grad():
         ref_output = model(inp)
 
@@ -781,7 +781,7 @@ def test_export_compile_save():
         ep,
         inputs=[inp],
         use_fp32_acc=True,
-        device=torch.device(&quot;cuda:0&quot;),
+        device=torch.device("cuda:0"),
         disable_tf32=True,
         use_python_runtime=False,
         min_block_size=1,
@@ -789,26 +789,26 @@ def test_export_compile_save():
         assume_dynamic_shape_support=True,
     )
 
-    # Verify TRT output matches the same model&#39;s PyTorch output
+    # Verify TRT output matches the same model's PyTorch output
     output = trt_model(inp)
     std = float((ref_output - output).std())
-    assert std &lt; 0.01, f&quot;Export compile output mismatch: std={std}&quot;
-    print(f&quot;[Rank {rank}] Export compile OK (std={std:.6f})&quot;, flush=True)
+    assert std &lt; 0.01, f"Export compile output mismatch: std={std}"
+    print(f"[Rank {rank}] Export compile OK (std={std:.6f})", flush=True)
 
     # Save per-rank engine
     path = rank_path(save_dir, rank, world_size)
     torch_tensorrt.save(trt_model, path, inputs=[inp], retrace=False)
     dist.barrier()
 
-    assert os.path.isfile(path), f&quot;Engine file not found: {path}&quot;
+    assert os.path.isfile(path), f"Engine file not found: {path}"
     size_mb = os.path.getsize(path) / 1e6
-    print(f&quot;[Rank {rank}] Saved engine to {path} ({size_mb:.1f} MB)&quot;, flush=True)
+    print(f"[Rank {rank}] Saved engine to {path} ({size_mb:.1f} MB)", flush=True)
     return trt_model
 
 
 def test_load_and_infer():
-    &quot;&quot;&quot;Test 2: Load per-rank engine → inference (no model weights needed).&quot;&quot;&quot;
-    # Eagerly initialize PyTorch&#39;s NCCL communicator so TRT&#39;s
+    """Test 2: Load per-rank engine → inference (no model weights needed)."""
+    # Eagerly initialize PyTorch's NCCL communicator so TRT's
     # bind_nccl_comm() can extract the ncclComm_t on first engine execution.
     from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
 
@@ -827,12 +827,12 @@ def test_load_and_infer():
         ref_output = ref_model(inp)
 
     std = float((ref_output - output).std())
-    assert std &lt; 0.01, f&quot;Loaded engine output mismatch: std={std}&quot;
-    print(f&quot;[Rank {rank}] Load + infer OK (std={std:.6f})&quot;, flush=True)
+    assert std &lt; 0.01, f"Loaded engine output mismatch: std={std}"
+    print(f"[Rank {rank}] Load + infer OK (std={std:.6f})", flush=True)
 
 
 def test_loaded_matches_compiled(compiled_output):
-    &quot;&quot;&quot;Test 3: Loaded engine produces same output as freshly compiled.&quot;&quot;&quot;
+    """Test 3: Loaded engine produces same output as freshly compiled."""
     path = rank_path(save_dir, rank, world_size)
     loaded = torch_tensorrt.load(path)
     trt_model = loaded.module()
@@ -841,25 +841,25 @@ def test_loaded_matches_compiled(compiled_output):
     compiled_output_val = compiled_output(inp)
 
     diff = float((compiled_output_val - loaded_output).abs().max())
-    assert diff &lt; 1e-3, f&quot;Compiled vs loaded mismatch: max_diff={diff}&quot;
-    print(f&quot;[Rank {rank}] Compiled vs loaded match (max_diff={diff:.6f})&quot;, flush=True)
+    assert diff &lt; 1e-3, f"Compiled vs loaded mismatch: max_diff={diff}"
+    print(f"[Rank {rank}] Compiled vs loaded match (max_diff={diff:.6f})", flush=True)
 
 
 compiled_model = None
 
 # Run tests
 for name, fn in [
-    (&quot;export_compile_save&quot;, lambda: test_export_compile_save()),
-    (&quot;load_and_infer&quot;, lambda: test_load_and_infer()),
+    ("export_compile_save", lambda: test_export_compile_save()),
+    ("load_and_infer", lambda: test_load_and_infer()),
 ]:
     dist.barrier()
     try:
         result = fn()
         PASSED.append(name)
-        if name == &quot;export_compile_save&quot;:
+        if name == "export_compile_save":
             compiled_model = result
     except Exception as e:
-        print(f&quot;[Rank {rank}] FAIL  {name}: {e}&quot;, flush=True)
+        print(f"[Rank {rank}] FAIL  {name}: {e}", flush=True)
         import traceback
 
         traceback.print_exc()
@@ -870,10 +870,10 @@ if compiled_model is not None:
     dist.barrier()
     try:
         test_loaded_matches_compiled(compiled_model)
-        PASSED.append(&quot;loaded_matches_compiled&quot;)
+        PASSED.append("loaded_matches_compiled")
     except Exception as e:
-        print(f&quot;[Rank {rank}] FAIL  loaded_matches_compiled: {e}&quot;, flush=True)
-        FAILED.append(&quot;loaded_matches_compiled&quot;)
+        print(f"[Rank {rank}] FAIL  loaded_matches_compiled: {e}", flush=True)
+        FAILED.append("loaded_matches_compiled")
 
 # Delete TRT engines before destroying the process group — the engines hold
 # a reference to the NCCL communicator and will segfault if NCCL is torn
@@ -882,7 +882,7 @@ del compiled_model
 torch.cuda.empty_cache()
 dist.destroy_process_group()
 
-print(f&quot;[Rank {rank}] Results — passed: {PASSED}  failed: {FAILED}&quot;, flush=True)
+print(f"[Rank {rank}] Results — passed: {PASSED}  failed: {FAILED}", flush=True)
 os._exit(0 if not FAILED else 1)
 </pre></div>
 </div>

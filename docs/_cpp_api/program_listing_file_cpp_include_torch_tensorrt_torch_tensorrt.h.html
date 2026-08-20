@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../_static/documentation_options.js?v=61128d90"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -504,9 +504,9 @@ document.write(`
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;set&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/custom_class.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/custom_class.h"</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/macros.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/macros.h"</span>
 
 <span class="c1">// Just include the .h?</span>
 <span class="cp">#ifndef DOXYGEN_SHOULD_SKIP_THIS</span>
@@ -542,7 +542,7 @@ document.write(`
 
 <span class="w">  </span><span class="n">DataType</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">default</span><span class="p">;</span>
 <span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="n">DataType</span><span class="p">(</span><span class="n">Value</span><span class="w"> </span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
-<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">DataType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ScalarType</span><span class="w"> </span><span class="n">t</span><span class="p">);</span>
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">DataType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ScalarType</span><span class="w"> </span><span class="n">t</span><span class="p">);</span>
 <span class="w">  </span><span class="k">operator</span><span class="w"> </span><span class="n">Value</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
 <span class="w">  </span><span class="p">}</span>

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../_static/documentation_options.js?v=61128d90"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -438,6 +438,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">torch_tensorrt.runtime</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kernels.html">torch_tensorrt.kernels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="executorch.html">torch_tensorrt.executorch</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
 <li class="toctree-l2"><a class="reference internal" href="ts.html">torch_tensorrt.ts</a></li>
@@ -457,18 +458,19 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html">Struct TensorRTBlobHeader</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html">Struct WsBudget</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1GraphInputs.html">Struct GraphInputs</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1Input.html">Struct Input</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.html">Class CudaStreamGuard</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">Enum EngineCapability</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">Function torch_tensorrt::dump_build_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html">Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">Function torch_tensorrt::get_build_info</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">Function torch_tensorrt::logging::get_is_colored_output_on</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">Function torch_tensorrt::logging::get_logging_prefix</a></li>
@@ -482,6 +484,7 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html">Function torch_tensorrt::torchscript::compile</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html">Function torch_tensorrt::torchscript::convert_method_to_trt_engine</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9.html">Function torch_tensorrt::torchscript::embed_engine_in_new_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/variable_WeightStreamingBudget_8h_1ad1ed7a6ead3130000477ab49482906ff.html">Variable torch_tensorrt::executorch_backend::kWeightStreamingBudgetKey</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a18d295a837ac71add5578860b55e5502.html">Define STR</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html">Define TORCH_TENSORRT_MAJOR_VERSION</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html">Define TORCH_TENSORRT_MINOR_VERSION</a></li>
@@ -685,9 +688,9 @@ a PyTorch <code class="docutils literal notranslate"><span class="pre">torch.nn.
 
 <span class="n">trt_module</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="p">(</span>
     <span class="n">engine_str</span><span class="p">,</span>
-    <span class="n">input_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span>
-    <span class="n">output_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;output&quot;</span><span class="p">],</span>
-    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;my_module&quot;</span><span class="p">,</span>
+    <span class="n">input_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"x"</span><span class="p">],</span>
+    <span class="n">output_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"output"</span><span class="p">],</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"my_module"</span><span class="p">,</span>
     <span class="n">settings</span><span class="o">=</span><span class="n">CompilationSettings</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">)</span>
 <span class="p">)</span>
 </pre></div>
@@ -736,7 +739,7 @@ that a properly-bound module avoids the per-call attribute check.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.get_engine">
-<span class="sig-name descname"><span class="pre">get_engine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">&lt;torch.ScriptClass</span> <span class="pre">object</span> <span class="pre">at</span> <span class="pre">0x7f5ac6031b30&gt;</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.get_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_engine" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">get_engine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">&lt;torch.ScriptClass</span> <span class="pre">object</span> <span class="pre">at</span> <span class="pre">0x7f9a2d5de7b0&gt;</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.get_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_engine" title="Link to this definition">#</a></dt>
 <dd><p>Return the underlying engine, raising if it has not been set up.</p>
 <p>Used by every engine-accessing method except the hot <code class="docutils literal notranslate"><span class="pre">forward</span></code> path,
 which intentionally skips the check to avoid per-call overhead.</p>

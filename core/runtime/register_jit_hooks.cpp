@@ -70,6 +70,12 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("__str__", &TRTEngine::to_str)
         .def("__repr__", &TRTEngine::to_str)
         .def("__obj_flatten__", &TRTEngine::__obj_flatten__)
+        // Reporting "real" makes torch's tracing_with_real skip fakification and hand
+        // the engine itself to the meta kernel, which reads only
+        // get_serialized_metadata() -- nothing executes or mutates it. Otherwise each
+        // fakification serializes the whole engine through __obj_flatten__ and
+        // deep-copies it through the pickle. The Python TRTEngine reports "real" too.
+        .def("tracing_mode", [](const c10::intrusive_ptr<TRTEngine>& self) -> std::string { return "real"; })
         .def("enable_profiling", &TRTEngine::enable_profiling)
         .def("set_profile_format", &TRTEngine::set_profile_format)
         .def("disable_profiling", &TRTEngine::disable_profiling)
@@ -78,6 +84,8 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("dump_engine_layer_info", &TRTEngine::dump_engine_layer_info)
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
         .def("get_serialized_metadata", &TRTEngine::get_serialized_metadata)
+        .def("serialize_metadata_only", &TRTEngine::serialize_metadata_only)
+        .def("serialized_engine_tensor", &TRTEngine::serialized_engine_tensor)
         .def("infer_outputs", &TRTEngine::infer_outputs)
         .def("reset_captured_graph", &TRTEngine::reset_captured_graph)
         .def("set_output_tensors_as_unowned", &TRTEngine::set_output_tensors_as_unowned)
@@ -231,6 +239,10 @@ TORCH_LIBRARY(tensorrt, m) {
   });
   m.def("_platform_win_x86_64", []() -> std::string {
     auto it = get_platform_name_map().find(Platform::PlatformEnum::kWIN_X86_64);
+    return it->second;
+  });
+  m.def("_platform_win_arm64", []() -> std::string {
+    auto it = get_platform_name_map().find(Platform::PlatformEnum::kWIN_ARM64);
     return it->second;
   });
   m.def("_platform_unknown", []() -> std::string {

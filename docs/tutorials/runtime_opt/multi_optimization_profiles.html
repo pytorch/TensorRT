@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -623,9 +623,9 @@ optimization-profile index you select at runtime.</p>
     <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
     <span class="n">profiles</span><span class="o">=</span><span class="p">[</span>
         <span class="c1"># index 0 -&gt; decode: seq pinned to 1 (a fully static profile)</span>
-        <span class="p">{</span><span class="s2">&quot;min_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)},</span>
+        <span class="p">{</span><span class="s2">"min_shape"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">"opt_shape"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">"max_shape"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)},</span>
         <span class="c1"># index 1 -&gt; prefill: seq in [1, 512], tuned at 256</span>
-        <span class="p">{</span><span class="s2">&quot;min_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">256</span><span class="p">),</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">512</span><span class="p">)},</span>
+        <span class="p">{</span><span class="s2">"min_shape"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">"opt_shape"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">256</span><span class="p">),</span> <span class="s2">"max_shape"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">512</span><span class="p">)},</span>
     <span class="p">],</span>
 <span class="p">)</span>
 </pre></div>
@@ -641,8 +641,8 @@ the same input. <code class="docutils literal notranslate"><span class="pre">pro
 <code class="docutils literal notranslate"><span class="pre">opt_shape</span></code> is taken from the first profile). Each declared profile is a subset of this
 envelope. You export over the envelope and the individual profiles become the
 per-profile TensorRT tunings:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">profiled_input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">])</span>  <span class="c1"># (1, 1)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">profiled_input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">])</span>  <span class="c1"># (1, 512)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">profiled_input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">])</span>  <span class="c1"># (1, 1)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">profiled_input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">])</span>  <span class="c1"># (1, 512)</span>
 </pre></div>
 </div>
 </section>
@@ -653,7 +653,7 @@ per-profile TensorRT tunings:</p>
 declares <code class="docutils literal notranslate"><span class="pre">profiles</span></code> must declare the <strong>same number</strong> of profiles; static
 inputs (or dynamic inputs without <code class="docutils literal notranslate"><span class="pre">profiles</span></code>) reuse their single shape in every
 profile.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">seq</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;seq&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">seq</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"seq"</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
 <span class="n">exported</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_ids</span><span class="p">,),</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="p">({</span><span class="mi">1</span><span class="p">:</span> <span class="n">seq</span><span class="p">},))</span>
 
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
@@ -684,7 +684,7 @@ on enter and restored on exit, so blocks nest cleanly.</p>
 is <strong>lazy / first-working</strong>: it scans profiles in index order and uses the first
 whose <code class="docutils literal notranslate"><span class="pre">[min,</span> <span class="pre">max]</span></code> contains the input. Order matters when profiles overlap –
 declaring <code class="docutils literal notranslate"><span class="pre">decode</span></code> first lets it win the <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> overlap:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">optimization_profile</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="s2">&quot;auto&quot;</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">optimization_profile</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">):</span>
     <span class="n">trt_model</span><span class="p">(</span><span class="n">decode_ids</span><span class="p">)</span>    <span class="c1"># seq == 1   -&gt; index 0 (decode) accepts -&gt; decode</span>
     <span class="n">trt_model</span><span class="p">(</span><span class="n">prefill_ids</span><span class="p">)</span>   <span class="c1"># seq == 256 -&gt; index 0 rejects -&gt; index 1 (prefill)</span>
 </pre></div>

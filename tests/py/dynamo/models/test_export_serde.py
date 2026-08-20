@@ -626,7 +626,7 @@ def test_arange_export(ir, tmpdir):
 
 
 @pytest.mark.unit
-def test_save_load_ts(ir, tmpdir):
+def test_save_load_ts(ir, tmp_path):
     """
     This tests save/load API on Torchscript format (model still compiled using dynamo workflow)
     """
@@ -643,7 +643,6 @@ def test_save_load_ts(ir, tmpdir):
             mul = relu * 0.5
             return mul
 
-    ts_path = os.path.join(tmpdir, "trt.ts")
     model = MyModule().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -661,9 +660,10 @@ def test_save_load_ts(ir, tmpdir):
     )
     outputs_trt = trt_gm(input)
     # Save it as torchscript representation
-    torchtrt.save(trt_gm, ts_path, output_format="torchscript", inputs=[input])
+    trt_file = tmp_path / "trt.ts"
+    torchtrt.save(trt_gm, trt_file, output_format="torchscript", inputs=[input])
 
-    trt_ts_module = torchtrt.load(ts_path)
+    trt_ts_module = torchtrt.load(trt_file)
     outputs_trt_deser = trt_ts_module(input)
 
     cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)

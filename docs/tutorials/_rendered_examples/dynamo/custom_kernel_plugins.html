@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -606,7 +606,7 @@ document.write(`
 in terms of PyTorch ops that are supported in Torch-TensorRT or a converter (see: <a class="reference external" href="https://pytorch.org/TensorRT/contributors/dynamo_converters.html">Writing converters for the Dynamo frontend</a>) - which defines the operator in terms of TensorRT operators.</p>
 <p>In some cases there isn’t a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or TensorRT cannot support it natively.</p>
 <p>For these cases, it is possible to use a TensorRT plugin to replace the operator <strong>inside</strong> the TensorRT engine, thereby avoiding the performance and resource overhead from a graph break. For the sake of demonstration, consider the operation circular padding. Circular padding is useful for ops like circular convolution in deep learning. The following image denotes how the original image (red) is circular padded once (green) and twice (blue):</p>
-<p><img alt="4dabd2c389c848fb9dd941ba1e20f08e" class="no-scaled-link" src="file://tutorials/images/circ_pad_example.png" style="width: 512px; height: 512px;" /></p>
+<p><img alt="a5820c7eba164c8e93d33d963428309a" class="no-scaled-link" src="file://tutorials/images/circ_pad_example.png" style="width: 512px; height: 512px;" /></p>
 <section id="Writing-Custom-Operators-in-PyTorch">
 <h2>Writing Custom Operators in PyTorch<a class="headerlink" href="#Writing-Custom-Operators-in-PyTorch" title="Link to this heading">#</a></h2>
 <p>Assume for whatever reason we would like to use a custom implementation of circular padding. In this case as implemented using a kernel written in <a class="reference external" href="https://openai.com/index/triton">OpenAI Triton</a></p>
@@ -673,7 +673,7 @@ def circ_pad_kernel(
 
 
 # The launch code wrapped to expose it as a custom operator in our namespace
-@custom_op(&quot;torchtrt_ex::triton_circular_pad&quot;, mutates_args=())  # type: ignore[misc]
+@custom_op("torchtrt_ex::triton_circular_pad", mutates_args=())  # type: ignore[misc]
 def triton_circular_pad(x: torch.Tensor, padding: Sequence[int]) -&gt; torch.Tensor:
     out_dims = np.ones(len(x.shape), dtype=np.int32)
     for i in range(np.size(padding) // 2):
@@ -728,9 +728,9 @@ def triton_circular_pad(x: torch.Tensor, padding: Sequence[int]) -&gt; torch.Ten
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ex_input = torch.arange(9, dtype=torch.float).reshape(1, 1, 3, 3).to(&quot;cuda&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ex_input = torch.arange(9, dtype=torch.float).reshape(1, 1, 3, 3).to("cuda")
 padding = (1, 1, 2, 0)
-torch.nn.functional.pad(ex_input, padding, &quot;circular&quot;)
+torch.nn.functional.pad(ex_input, padding, "circular")
 </pre></div>
 </div>
 </div>
@@ -738,7 +738,7 @@ torch.nn.functional.pad(ex_input, padding, &quot;circular&quot;)
           [8., 6., 7., 8., 6.],
           [2., 0., 1., 2., 0.],
           [5., 3., 4., 5., 3.],
-          [8., 6., 7., 8., 6.]]]], device=&#39;cuda:0&#39;)
+          [8., 6., 7., 8., 6.]]]], device='cuda:0')
 </pre></div>
 </div>
 <p>Our custom implementation</p>
@@ -754,7 +754,7 @@ torch.nn.functional.pad(ex_input, padding, &quot;circular&quot;)
           [8., 6., 7., 8., 6.],
           [2., 0., 1., 2., 0.],
           [5., 3., 4., 5., 3.],
-          [8., 6., 7., 8., 6.]]]], device=&#39;cuda:0&#39;)
+          [8., 6., 7., 8., 6.]]]], device='cuda:0')
 </pre></div>
 </div>
 <p>We have defined the minimum to start using our custom op in PyTorch, but to take the extra step of making this operator tracable by Dynamo (a prerequisite for being supported in Torch-TensorRT), we need to define a “Fake Tensor” implementation of the op. This function defines the effect that our kernel would have on input tensors in terms of native PyTorch ops. It allows Dynamo to calculate tensor properties like sizes, stride, device etc. without needing to use real data (More information
@@ -763,9 +763,9 @@ torch.nn.functional.pad(ex_input, padding, &quot;circular&quot;)
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@torch.library.register_fake(&quot;torchtrt_ex::triton_circular_pad&quot;)  # type: ignore[misc]
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@torch.library.register_fake("torchtrt_ex::triton_circular_pad")  # type: ignore[misc]
 def _(x: torch.Tensor, padding: Sequence[int]) -&gt; torch.Tensor:
-    return torch.nn.functional.pad(x, padding, &quot;circular&quot;)
+    return torch.nn.functional.pad(x, padding, "circular")
 
 
 # Additionally one may want to define an autograd implementation for the backwards pass to round out the custom op implementation but that is beyond the scope of this tutorial (see https://pytorch.org/docs/main/library.html#torch.library.register_autograd for more)
@@ -799,7 +799,7 @@ class MyModel(nn.Module):  # type: ignore[misc]
         return y
 
 
-my_model = MyModel((1, 1, 2, 0)).to(&quot;cuda&quot;).eval()
+my_model = MyModel((1, 1, 2, 0)).to("cuda").eval()
 with torch.no_grad():
     my_model(ex_input)
 </pre></div>
@@ -823,7 +823,7 @@ with torch.no_grad():
 
          [[-0.4311, -0.1649, -1.2091],
           [-4.3668, -4.1006, -5.1447],
-          [-5.0352, -4.7689, -5.8131]]]], device=&#39;cuda:0&#39;)
+          [-5.0352, -4.7689, -5.8131]]]], device='cuda:0')
 </pre></div>
 </div>
 <p>If we try to compile this model with Torch-TensorRT, we can see that (as of Torch-TensorRT 2.4.0) a number of subgraphs are created to run the custom op in PyTorch and the convolution in TensorRT</p>
@@ -911,12 +911,12 @@ class CircularPaddingPlugin(trt.IPluginV2DynamicExt):  # type: ignore[misc]
         self.X_shape: List[int] = []
 
         self.num_outputs = 1
-        self.plugin_namespace = &quot;&quot;
-        self.plugin_type = &quot;CircularPaddingPlugin&quot;
-        self.plugin_version = &quot;1&quot;
+        self.plugin_namespace = ""
+        self.plugin_type = "CircularPaddingPlugin"
+        self.plugin_version = "1"
 
         if field_collection is not None:
-            assert field_collection[0].name == &quot;pads&quot;
+            assert field_collection[0].name == "pads"
             self.pads = field_collection[0].data
 
     def get_output_datatype(
@@ -952,7 +952,7 @@ class CircularPaddingPlugin(trt.IPluginV2DynamicExt):  # type: ignore[misc]
             self.X_shape[i] = X_dims[i]
 
     def serialize(self) -&gt; bytes:
-        return pkl.dumps({&quot;pads&quot;: self.pads})
+        return pkl.dumps({"pads": self.pads})
 
     def supports_format_combination(
         self, pos: int, in_out: List[trt.PluginTensorDesc], num_inputs: int
@@ -1003,8 +1003,8 @@ class CircularPaddingPlugin(trt.IPluginV2DynamicExt):  # type: ignore[misc]
         a_d = cp.ndarray((np.prod(input_desc[0].dims)), dtype=in_dtype, memptr=a_ptr)
         c_d = cp.ndarray((np.prod(output_desc[0].dims)), dtype=in_dtype, memptr=c_ptr)
 
-        a_t = torch.as_tensor(a_d, device=&quot;cuda&quot;)
-        c_t = torch.as_tensor(c_d, device=&quot;cuda&quot;)
+        a_t = torch.as_tensor(a_d, device="cuda")
+        c_t = torch.as_tensor(c_d, device="cuda")
 
         N = len(self.X_shape)
         all_pads = np.zeros((N * 2,), dtype=np.int32)
@@ -1053,11 +1053,11 @@ class CircularPaddingPluginCreator(trt.IPluginCreator):  # type: ignore[misc]
     def __init__(self):
         super().__init__()
 
-        self.name = &quot;CircularPaddingPlugin&quot;
-        self.plugin_namespace = &quot;&quot;
-        self.plugin_version = &quot;1&quot;
+        self.name = "CircularPaddingPlugin"
+        self.plugin_namespace = ""
+        self.plugin_version = "1"
         self.field_names = trt.PluginFieldCollection(
-            [trt.PluginField(&quot;pads&quot;, np.array([]), trt.PluginFieldType.INT32)]
+            [trt.PluginField("pads", np.array([]), trt.PluginFieldType.INT32)]
         )
 
     def create_plugin(
@@ -1076,7 +1076,7 @@ class CircularPaddingPluginCreator(trt.IPluginCreator):  # type: ignore[misc]
 
 # Register the plugin creator in the TensorRT Plugin Registry
 TRT_PLUGIN_REGISTRY = trt.get_plugin_registry()
-TRT_PLUGIN_REGISTRY.register_creator(CircularPaddingPluginCreator(), &quot;&quot;)  # type: ignore[no-untyped-call]
+TRT_PLUGIN_REGISTRY.register_creator(CircularPaddingPluginCreator(), "")  # type: ignore[no-untyped-call]
 </pre></div>
 </div>
 </div>
@@ -1112,15 +1112,15 @@ def circular_padding_converter(
     # How to retrieve a plugin if it is defined elsewhere (e.g. linked library)
     plugin_registry = trt.get_plugin_registry()
     plugin_creator = plugin_registry.get_plugin_creator(
-        type=&quot;CircularPaddingPlugin&quot;, version=&quot;1&quot;, plugin_namespace=&quot;&quot;
+        type="CircularPaddingPlugin", version="1", plugin_namespace=""
     )
-    assert plugin_creator, f&quot;Unable to find CircularPaddingPlugin creator&quot;
+    assert plugin_creator, f"Unable to find CircularPaddingPlugin creator"
 
     # Pass configurations to the plugin implementation
     field_configs = trt.PluginFieldCollection(
         [
             trt.PluginField(
-                &quot;pads&quot;,
+                "pads",
                 np.array(
                     args[1], dtype=np.int32
                 ),  # Arg 1 of `torch.ops.torchtrt_ex.triton_circular_pad` is the int list containing the padding settings. Note: the dtype matters as you are eventually passing this as a c-like buffer
@@ -1130,19 +1130,19 @@ def circular_padding_converter(
     )
 
     plugin = plugin_creator.create_plugin(name=name, field_collection=field_configs)
-    assert plugin, &quot;Unable to create CircularPaddingPlugin&quot;
+    assert plugin, "Unable to create CircularPaddingPlugin"
 
     input_tensor = args[
         0
     ]  # Arg 0 `torch.ops.torchtrt_ex.triton_circular_pad` is the input tensor
     if not isinstance(input_tensor, trt.ITensor):
         # Freeze input tensor if not TensorRT Tensor already
-        input_tensor = get_trt_tensor(ctx, input_tensor, f&quot;{name}_input&quot;)
+        input_tensor = get_trt_tensor(ctx, input_tensor, f"{name}_input")
 
     layer = ctx.net.add_plugin_v2(
         [input_tensor], plugin
     )  # Add the plugin to the network being constructed
-    layer.name = f&quot;circular_padding_plugin-{name}&quot;
+    layer.name = f"circular_padding_plugin-{name}"
     return layer.get_output(0)
 </pre></div>
 </div>
@@ -1220,7 +1220,7 @@ Compiled with: CompilationSettings(workspace_size=0, min_block_size=1, torch_exe
 
      [[-0.4311, -0.1649, -1.2091],
       [-4.3668, -4.1006, -5.1447],
-      [-5.0352, -4.7689, -5.8131]]]], device=&#39;cuda:0&#39;)
+      [-5.0352, -4.7689, -5.8131]]]], device='cuda:0')
 </pre></div>
 </div>
 <p>We can verify our implementation is run correctly by both TensorRT and PyTorch</p>
@@ -1251,7 +1251,7 @@ Compiled with: CompilationSettings(workspace_size=0, min_block_size=1, torch_exe
 
        [[0., 0., 0.],
         [0., 0., 0.],
-        [0., 0., 0.]]]], device=&#39;cuda:0&#39;, grad_fn=&lt;SubBackward0&gt;)
+        [0., 0., 0.]]]], device='cuda:0', grad_fn=&lt;SubBackward0&gt;)
 </pre></div>
 </div>
 </section>

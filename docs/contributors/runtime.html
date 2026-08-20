@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../_static/documentation_options.js?v=61128d90"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -556,9 +556,9 @@ stores engine objects as attributes, making the whole module portable.</p>
 <a class="reference external" href="https://docs.pytorch.org/docs/stable/user_guide/torch_compiler/export.html">torch.export.ExportedProgram</a>
 container. TensorRT engines are stored as tensor attributes in the package; PyTrees
 capture input/output structure.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;model.ep&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"model.ep"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 <span class="c1"># later:</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;model.ep&quot;</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model.ep"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -610,7 +610,7 @@ arguments off the stack, execute, and push results back. Stack elements are
 JIT operator library. Compiled TorchScript graphs store the engine as an attribute so
 it is portable and serializable. A typical compiled graph looks like:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>graph(%self_1 : ..., %input_0 : Tensor):
-    %1 : Engine = prim::GetAttr[name=&quot;...engine&quot;](%self_1)
+    %1 : Engine = prim::GetAttr[name="...engine"](%self_1)
     %3 : Tensor[] = prim::ListConstruct(%input_0)
     %4 : Tensor[] = trt::execute_engine(%3, %1)
     %5 : Tensor = prim::ListUnpack(%4)

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=321cbabf"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -579,8 +579,8 @@ model = SimpleModel().eval().cuda()
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>example_input = torch.randn(4, 10).cuda()
 
 # Define dynamic dimension explicitly
-dyn_batch = torch.export.Dim(&quot;batch&quot;, min=1, max=32)
-dynamic_shapes = {&quot;x&quot;: {0: dyn_batch}}
+dyn_batch = torch.export.Dim("batch", min=1, max=32)
+dynamic_shapes = {"x": {0: dyn_batch}}
 
 # Export with dynamic shapes
 exp_program = torch.export.export(
@@ -602,13 +602,13 @@ trt_module_method1 = torch_tensorrt.dynamo.compile(
 )
 
 with tempfile.TemporaryDirectory() as tmpdir:
-    save_path = f&quot;{tmpdir}/model_method1.ep&quot;
+    save_path = f"{tmpdir}/model_method1.ep"
 
     # Save with explicit dynamic_shapes parameter
     torch_tensorrt.save(
         trt_module_method1,
         save_path,
-        output_format=&quot;exported_program&quot;,
+        output_format="exported_program",
         arg_inputs=[example_input],
         dynamic_shapes=dynamic_shapes,  # Explicit!
         retrace=True,
@@ -637,23 +637,23 @@ inputs = [
         opt_shape=(8, 10),
         max_shape=(32, 10),
         dtype=torch.float32,
-        name=&quot;x&quot;,
+        name="x",
     )
 ]
 
 # Compile directly with torch_tensorrt.compile
-trt_module_method2 = torch_tensorrt.compile(model2, ir=&quot;dynamo&quot;, inputs=inputs)
+trt_module_method2 = torch_tensorrt.compile(model2, ir="dynamo", inputs=inputs)
 
 
 with tempfile.TemporaryDirectory() as tmpdir:
-    save_path = f&quot;{tmpdir}/model_method2.ep&quot;
+    save_path = f"{tmpdir}/model_method2.ep"
 
     # Save with Input objects - dynamic_shapes inferred automatically!
     # No need to specify dynamic_shapes explicitly
     torch_tensorrt.save(
         trt_module_method2,
         save_path,
-        output_format=&quot;exported_program&quot;,
+        output_format="exported_program",
         arg_inputs=inputs,  # Pass the same Input objects used for compile
         retrace=True,
     )
@@ -690,14 +690,14 @@ inputs_multi = [
         opt_shape=(8, 3, 256, 256),
         max_shape=(16, 3, 512, 512),
         dtype=torch.float32,
-        name=&quot;image&quot;,
+        name="image",
     )
 ]
 
-trt_module_multi = torch_tensorrt.compile(model3, ir=&quot;dynamo&quot;, inputs=inputs_multi)
+trt_module_multi = torch_tensorrt.compile(model3, ir="dynamo", inputs=inputs_multi)
 
 with tempfile.TemporaryDirectory() as tmpdir:
-    save_path = f&quot;{tmpdir}/model_multi_dim.ep&quot;
+    save_path = f"{tmpdir}/model_multi_dim.ep"
 
     torch_tensorrt.save(
         trt_module_multi,

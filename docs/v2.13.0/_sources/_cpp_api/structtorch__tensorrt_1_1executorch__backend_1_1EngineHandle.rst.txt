@@ -1,0 +1,17 @@
+.. _exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle:
+
+Struct EngineHandle
+===================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h`
+
+
+Struct Documentation
+--------------------
+
+
+.. doxygenstruct:: torch_tensorrt::executorch_backend::EngineHandle
+   :project: Torch-TensorRT
+   :members:
+   :protected-members:
+   :undoc-members:
