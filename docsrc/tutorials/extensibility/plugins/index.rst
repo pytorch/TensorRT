@@ -15,3 +15,4 @@ in serialized engines.
    Example: Custom Kernels with NVRTC in TensorRT AOT Plugins <../../_rendered_examples/dynamo/nvrtc_aot_plugin>
    Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op <../../_rendered_examples/dynamo/cuda_kernel_op>
    Example: Pre-compiled PTX Kernels via ptx_op <../../_rendered_examples/dynamo/ptx_op>
+   Example: Triton Kernel AOT Plugins via triton_op <../../_rendered_examples/dynamo/triton_op>
