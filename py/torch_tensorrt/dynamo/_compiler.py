@@ -5,7 +5,6 @@ import logging
 import os
 import platform
 import warnings
-
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
@@ -47,6 +46,9 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
+)
+from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+    reset_folded_constructors,
 )
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
@@ -1352,6 +1354,12 @@ def compile_module(
             raise ValueError(
                 f"node_name: {name} does not exist in the submodule node dictionary"
             )
+
+        # Partitioning can expose an internal folded constructor as a new TRT
+        # subgraph output. Give that compiler-owned value fresh storage on each
+        # invocation before downstream eager code can mutate it.
+        submodule = reset_folded_constructors(submodule, settings)
+        setattr(partitioned_module, name, submodule)
 
         # set the submodule metadata back to the parent trt_module_node
         metadata_list = get_output_metadata(submodule)
