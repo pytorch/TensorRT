@@ -807,9 +807,16 @@ def cross_validator(node: Node, settings: Optional[CompilationSettings] = None) 
     # select out-of-bounds components.
     dim = node.kwargs.get("dim", args_bounds_check(node.args, 2, -1))
     for arg in node.args[:2]:
-        if "val" not in arg.meta:
-            continue
-        shape = arg.meta["val"].shape
+        if "val" in arg.meta:
+            shape = arg.meta["val"].shape
+        elif "tensor_meta" in arg.meta:
+            shape = arg.meta["tensor_meta"].shape
+        else:
+            _LOGGER.debug(
+                f"linalg_cross node {node.name} has no shape metadata for "
+                f"{arg.name}; falling back to PyTorch."
+            )
+            return False
         size = shape[dim]
         if not isinstance(size, int) or size != 3:
             _LOGGER.debug(
