@@ -1996,9 +1996,7 @@ def _multirank_compute_collective_single_engine(
     torch.manual_seed(42)
     model = ComputeCollective().to(device=device, dtype=torch.bfloat16).eval()
     torch.manual_seed(1234 + rank)
-    inp = torch.randn(
-        batch, sequence, hidden, device=device, dtype=torch.bfloat16
-    )
+    inp = torch.randn(batch, sequence, hidden, device=device, dtype=torch.bfloat16)
     residual = torch.randn_like(inp)
 
     with torch.no_grad():
@@ -2015,13 +2013,11 @@ def _multirank_compute_collective_single_engine(
 
             # Compilation must not hide the collective in a PyTorch fallback.
             trt_engines = [
-                name
-                for name, _ in trt_model.named_modules()
-                if "_run_on_acc" in name
+                name for name, _ in trt_model.named_modules() if "_run_on_acc" in name
             ]
-            assert len(trt_engines) == 1, (
-                f"expected one TRT engine, found {trt_engines}"
-            )
+            assert (
+                len(trt_engines) == 1
+            ), f"expected one TRT engine, found {trt_engines}"
             graph = str(trt_model.graph) if hasattr(trt_model, "graph") else ""
             for token in ("all_reduce", "_c10d_functional", "wait_tensor"):
                 assert token not in graph, f"collective escaped TRT engine: {graph}"
@@ -2382,9 +2378,7 @@ class TestMultirankNccl(MultiProcessTestCase):
     def test_compute_collective_single_engine(self) -> None:
         """Compute and a native collective compile and run in one TRT engine."""
         device = self._init_dist()
-        _multirank_compute_collective_single_engine(
-            self.rank, self.world_size, device
-        )
+        _multirank_compute_collective_single_engine(self.rank, self.world_size, device)
 
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()

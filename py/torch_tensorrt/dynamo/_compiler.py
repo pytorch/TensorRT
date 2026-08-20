@@ -495,6 +495,10 @@ def compile(
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
+    native_collective_boundary_dtype: Optional[
+        Union[torch.dtype, dtype]
+    ] = _defaults.NATIVE_COLLECTIVE_BOUNDARY_DTYPE,
+    all_gather_via_all_reduce: bool = _defaults.ALL_GATHER_VIA_ALL_REDUCE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -594,6 +598,8 @@ def compile(
             foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
+        native_collective_boundary_dtype (Optional[Union[torch.dtype, dtype]]): Precision of the reformat inserted on the input and output of every native TensorRT distributed collective layer. The reformat is a Myelin fusion barrier that keeps the collective from being absorbed into a ForeignNode (pytorch/TensorRT#4381); it must differ from the collective input's own dtype to have any effect, because identity casts are folded away. Default is ``dtype.f32``. A same-width dtype (e.g. ``torch.float16`` for a bf16 network) avoids widening the transferred payload, at the cost of fp16's narrower exponent range. Set to ``None`` to insert no reformat.
+        all_gather_via_all_reduce (bool): Lower ``all_gather`` as "place this rank's slice into a zero-padded buffer of the gathered size, then ALL_REDUCE(SUM)" instead of emitting a native ALL_GATHER, for TensorRT versions whose Myelin backend needs a build-time graph world size to infer the ALL_GATHER output shape. Numerically identical to ``all_gather``, but multiplies the communication volume by the group size and requires a static shape on the collective's input. Default is False.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -784,6 +790,8 @@ def compile(
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
+        "native_collective_boundary_dtype": native_collective_boundary_dtype,
+        "all_gather_via_all_reduce": all_gather_via_all_reduce,
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
@@ -1736,6 +1744,10 @@ def convert_exported_program_to_serialized_trt_engine(
         str
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    native_collective_boundary_dtype: Optional[
+        Union[torch.dtype, dtype]
+    ] = _defaults.NATIVE_COLLECTIVE_BOUNDARY_DTYPE,
+    all_gather_via_all_reduce: bool = _defaults.ALL_GATHER_VIA_ALL_REDUCE,
     lift_mutable_buffers: bool = False,
     arg_input_binding_names: Any = None,
     kwarg_input_binding_names: Any = None,
@@ -1839,6 +1851,8 @@ def convert_exported_program_to_serialized_trt_engine(
             need to register them. Disabling a rule makes its matching nodes
             foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        native_collective_boundary_dtype (Optional[Union[torch.dtype, dtype]]): Precision of the reformat inserted on the input and output of every native TensorRT distributed collective layer. The reformat is a Myelin fusion barrier that keeps the collective from being absorbed into a ForeignNode (pytorch/TensorRT#4381); it must differ from the collective input's own dtype to have any effect, because identity casts are folded away. Default is ``dtype.f32``. A same-width dtype (e.g. ``torch.float16`` for a bf16 network) avoids widening the transferred payload, at the cost of fp16's narrower exponent range. Set to ``None`` to insert no reformat.
+        all_gather_via_all_reduce (bool): Lower ``all_gather`` as "place this rank's slice into a zero-padded buffer of the gathered size, then ALL_REDUCE(SUM)" instead of emitting a native ALL_GATHER, for TensorRT versions whose Myelin backend needs a build-time graph world size to infer the ALL_GATHER output shape. Numerically identical to ``all_gather``, but multiplies the communication volume by the group size and requires a static shape on the collective's input. Default is False.
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -2005,6 +2019,8 @@ def convert_exported_program_to_serialized_trt_engine(
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "native_collective_boundary_dtype": native_collective_boundary_dtype,
+        "all_gather_via_all_reduce": all_gather_via_all_reduce,
     }
 
     settings = CompilationSettings(**compilation_options)
