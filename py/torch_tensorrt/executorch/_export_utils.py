@@ -32,11 +32,60 @@ def _seed_graph_bound_leaves(value: Any, memo: dict[int, Any]) -> None:
             memo[id(leaf)] = leaf
 
 
-def get_engine_info_from_state(engine_obj: Any) -> list[Any]:
-    """Normalize TensorRT engine state into the serialized engine-info list."""
+_WARNED_MISSING: set[str] = set()
+
+
+def _warn_missing_accessor(name: str) -> None:
+    """Warn once per accessor that the loaded runtime predates it.
+
+    Without this the only symptom is that export gets slower: the fallback is
+    correct, it just re-serializes the whole ICudaEngine and base64-encodes it.
+    It means the Torch-TensorRT C++ library is older than this Python package,
+    i.e. a source or editable build where only the Python half was rebuilt; a
+    wheel ships both halves together, so an unmodified wheel should not see it.
+    """
+    if name in _WARNED_MISSING:
+        return
+    _WARNED_MISSING.add(name)
+    logger.warning(
+        "TensorRT runtime has no %s(); falling back to full engine serialization "
+        "on every read of this engine's info. This is correct but slower, and "
+        "means the Torch-TensorRT C++ library loaded from torch_tensorrt/lib "
+        "predates this Python package -- rebuild the C++ side to avoid it.",
+        name,
+    )
+
+
+def get_engine_info_from_state(
+    engine_obj: Any, *, metadata_only: bool = False
+) -> list[Any]:
+    """Normalize TensorRT engine state into the serialized engine-info list.
+
+    `__getstate__` on a TRT engine is the pickling hook, not a metadata accessor:
+    it re-serializes the whole ICudaEngine and base64-encodes it. ``metadata_only``
+    takes the record from ``serialize_metadata_only`` instead, which touches
+    nothing but members. Pass it from any caller that reads only metadata --
+    device, name, binding names, flags, aliased_io -- that is, anything but the
+    engine itself.
+
+    WARNING: with ``metadata_only`` the ENGINE_IDX slot is not reliable. On a
+    runtime providing ``serialize_metadata_only`` it is an empty string; on an
+    older runtime the fallback returns the full record, engine included. The
+    record keeps its full length either way, so nothing about its shape says
+    which one you got -- reading ENGINE_IDX yields an empty string on some
+    builds and a base64-encoded engine on others, with no error. Use
+    :func:`_resolve_engine_tensor` when the engine itself is needed.
+    """
+    reader = (
+        getattr(engine_obj, "serialize_metadata_only", None) if metadata_only else None
+    )
+    if reader is not None:
+        return list(reader())
+
+    if metadata_only:
+        _warn_missing_accessor("serialize_metadata_only")
     state = engine_obj.__getstate__()
-    engine_info = state[0] if isinstance(state, tuple) else state
-    return list(engine_info)
+    return list(state[0] if isinstance(state, tuple) else state)
 
 
 def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> None:
@@ -62,10 +111,14 @@ def _schema_name(node: Any) -> str:
     return target._schema.name if hasattr(target, "_schema") else ""
 
 
-def _resolve_engine_info(exported_program: Any, node: Any) -> list[Any]:
-    if node.target is not torch.ops.tensorrt.execute_engine.default:
-        return list(node.args[1:])
+def _resolve_engine_object(exported_program: Any, node: Any) -> Any:
+    """Resolve an execute_engine node's engine to the live TRTEngine object.
 
+    The engine arg is a ``get_attr`` before ExecuTorch lifts constants and a
+    ``placeholder`` after, so both node forms must be resolved here. Raises rather
+    than returning ``None``, so a caller never has to tell "no engine here" apart
+    from "engine argument in a form this does not know".
+    """
     graph_module = exported_program.graph_module
     engine_node = node.args[1]
     if engine_node.op == "get_attr":
@@ -91,7 +144,58 @@ def _resolve_engine_info(exported_program: Any, node: Any) -> list[Any]:
             f"execute_engine node '{node.name}': unexpected engine arg op "
             f"'{engine_node.op}'"
         )
-    return get_engine_info_from_state(engine_obj)
+    return engine_obj
+
+
+def _resolve_engine_info(
+    exported_program: Any, node: Any, *, metadata_only: bool = False
+) -> list[Any]:
+    """Serialized engine-info record for a TensorRT node.
+
+    For a node that is not ``execute_engine`` the record is the node's own args,
+    so ENGINE_IDX holds an FX node rather than a blob and ``metadata_only`` is
+    ignored -- nothing is serialized on that path.
+    """
+    if node.target is not torch.ops.tensorrt.execute_engine.default:
+        return list(node.args[1:])
+    engine_obj = _resolve_engine_object(exported_program, node)
+    return get_engine_info_from_state(engine_obj, metadata_only=metadata_only)
+
+
+def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
+    """Return the serialized engine as a uint8 tensor.
+
+    Prefers the engine's tensor accessor so the blob avoids base64 whenever the
+    runtime provides that accessor: serialize() encodes in C++ only for callers
+    that need everything as strings, and the matching decode here is waste when the
+    destination is a byte tensor. Falls back to decoding ENGINE_IDX on a runtime
+    without that accessor. Only ``execute_engine`` nodes are supported: a
+    ``no_op_placeholder_for_execute_engine`` carries its engine as a buffer
+    argument rather than a serialized blob, and is resolved by
+    ``_get_engine_info_for_node`` in backend.py instead.
+
+    The fallback re-resolves the engine's own record with ``_resolve_engine_info``
+    (no ``metadata_only``), so it never reads the empty ENGINE_IDX of a
+    metadata-only record that ``validate_engine_program`` may have stashed in the
+    caller's ``resolved`` dict. That keeps the two record shapes from crossing.
+    """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX
+
+    if node.target is torch.ops.tensorrt.execute_engine.default:
+        engine_obj = _resolve_engine_object(exported_program, node)
+        raw = getattr(engine_obj, "serialized_engine_tensor", None)
+        if raw is not None:
+            return raw()
+        _warn_missing_accessor("serialized_engine_tensor")
+
+    engine_bytes = _resolve_engine_info(exported_program, node)[ENGINE_IDX]
+    if isinstance(engine_bytes, str):
+        import base64
+
+        engine_bytes = base64.b64decode(engine_bytes)
+    elif not isinstance(engine_bytes, (bytes, bytearray)):
+        engine_bytes = bytes(engine_bytes)
+    return torch.frombuffer(bytearray(engine_bytes), dtype=torch.uint8)
 
 
 def validate_engine_program(
@@ -101,6 +205,12 @@ def validate_engine_program(
 
     Resolving an engine serializes it, so pass a dict as ``resolved`` to keep what was
     resolved here and let the rewrite reuse it instead of serializing a second time.
+
+    Validation reads only metadata, so the records kept in ``resolved`` are
+    metadata-only: their ENGINE_IDX slot is empty. The rewrite reuses them for the
+    plain-string slots and takes the engine itself from :func:`_resolve_engine_tensor`,
+    which never reads a cached record's ENGINE_IDX -- so a metadata-only record is
+    never cross-served as the engine bytes.
     """
     count = 0
     # One engine can feed several execute_engine nodes, and resolving it again would
@@ -123,7 +233,9 @@ def validate_engine_program(
             by_engine_node.get(engine_node) if engine_node is not None else None
         )
         if engine_info is None:
-            engine_info = _resolve_engine_info(exported_program, node)
+            engine_info = _resolve_engine_info(
+                exported_program, node, metadata_only=True
+            )
             if engine_node is not None:
                 by_engine_node[engine_node] = engine_info
         validate_engine_info(engine_info, node_name=node.name)
@@ -349,20 +461,16 @@ def replace_execute_engine(
         engine_node = node.args[1]
         materialized = materialized_engines.get(engine_node)
         if materialized is None:
+            # Metadata reuses what validate_engine_program already resolved (a
+            # metadata-only record, empty ENGINE_IDX); the engine bytes come from
+            # _resolve_engine_tensor, which re-resolves the engine itself rather than
+            # reading this record's ENGINE_IDX, so the empty slot is never consumed.
             engine_info = (resolved or {}).get(node.name)
             if engine_info is None:
-                engine_info = _resolve_engine_info(exported_program, node)
-            engine_bytes = engine_info[ENGINE_IDX]
-            if isinstance(engine_bytes, str):
-                import base64
-
-                engine_bytes = base64.b64decode(engine_bytes)
-            elif not isinstance(engine_bytes, (bytes, bytearray)):
-                engine_bytes = bytes(engine_bytes)
-            # frombuffer needs a writable buffer, and rebinding here releases the
-            # read-only copy instead of holding both for the rest of the loop.
-            engine_bytes = bytearray(engine_bytes)
-            engine_tensor = torch.frombuffer(engine_bytes, dtype=torch.uint8)
+                engine_info = _resolve_engine_info(
+                    exported_program, node, metadata_only=True
+                )
+            engine_tensor = _resolve_engine_tensor(exported_program, node)
 
             buffer_name = _unique_engine_buffer_name(exported_program, graph_module)
             graph_module.register_buffer(buffer_name, engine_tensor, persistent=True)

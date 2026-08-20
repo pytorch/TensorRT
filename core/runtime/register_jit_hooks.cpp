@@ -84,6 +84,8 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("dump_engine_layer_info", &TRTEngine::dump_engine_layer_info)
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
         .def("get_serialized_metadata", &TRTEngine::get_serialized_metadata)
+        .def("serialize_metadata_only", &TRTEngine::serialize_metadata_only)
+        .def("serialized_engine_tensor", &TRTEngine::serialized_engine_tensor)
         .def("infer_outputs", &TRTEngine::infer_outputs)
         .def("reset_captured_graph", &TRTEngine::reset_captured_graph)
         .def("set_output_tensors_as_unowned", &TRTEngine::set_output_tensors_as_unowned)
