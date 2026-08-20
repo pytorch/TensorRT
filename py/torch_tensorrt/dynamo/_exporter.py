@@ -756,6 +756,11 @@ def _declare_aliased_kv_mutations_on_ep(
         if spec.kind == OutputKind.BUFFER_MUTATION and isinstance(spec.target, str)
     }
     if num_copyback:
+        if len(out_args) < num_copyback:
+            raise RuntimeError(
+                f"Expected at least {num_copyback} trailing outputs to pair with "
+                f"copy-back buffers {copyback_buffers}, found only {len(out_args)}."
+            )
         trailing = list(out_args[-num_copyback:])
         out_args = out_args[:-num_copyback]
         remaining_specs = orig_specs[:-num_copyback]
