@@ -18,6 +18,7 @@ from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .lower_associative_scan import lower_associative_scan
 from .normalize_negative_slice_stop import normalize_negative_slice_stop
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
@@ -38,6 +39,7 @@ pre_lowering_pass_list = [
 post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
+    lower_associative_scan,
     constant_fold,
     repair_input_as_output,
     fuse_prims_broadcast,
