@@ -780,7 +780,9 @@ def save(
                 - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes
                   parameter takes precedence.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
-                ``compile_specs=``, and ``backend_config=`` are only used with
+                ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
+                ``transform_passes=``, ``compile_config=`` and
+                ``generate_etrecord=`` are only used with
                 ``output_format="executorch"``; otherwise they are ignored with a
                 warning. Pass ``compile_specs=[CompileSpec("target_device",
                 b"cuda:<i>")]`` to override the default target device (``cuda:0``).
@@ -794,6 +796,17 @@ def save(
                 <executorch_save>` for the ``CudaPartitioner`` recipe, its
                 export-time requirements (CUDA backend + nvcc), and the external
                 ``.ptd`` weight caveats.
+                ``constant_methods=``, ``transform_passes=`` and
+                ``compile_config=`` are forwarded to
+                ``to_edge_transform_and_lower(...)``. When ``compile_config`` is
+                omitted it defaults to ``_check_ir_validity=False`` (the TRT engine
+                graph fails edge IR validation); a caller-supplied
+                ``compile_config`` is forwarded verbatim, so set
+                ``_check_ir_validity=False`` on it explicitly when the graph carries
+                TRT engines.
+                ``generate_etrecord=True`` writes an ETRecord to
+                ``<model>_etrecord.bin`` next to the ``.pte`` for use with the
+                ExecuTorch Inspector.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -821,6 +834,10 @@ def save(
     executorch_partitioners = kwargs.pop("partitioners", None)
     executorch_compile_specs = kwargs.pop("compile_specs", None)
     executorch_backend_config = kwargs.pop("backend_config", None)
+    executorch_constant_methods = kwargs.pop("constant_methods", None)
+    executorch_transform_passes = kwargs.pop("transform_passes", None)
+    executorch_compile_config = kwargs.pop("compile_config", None)
+    executorch_generate_etrecord = kwargs.pop("generate_etrecord", False)
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -952,6 +969,26 @@ def save(
             "backend_config= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
+    if executorch_constant_methods and output_format != "executorch":
+        logger.warning(
+            "constant_methods= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if executorch_transform_passes and output_format != "executorch":
+        logger.warning(
+            "transform_passes= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if executorch_compile_config and output_format != "executorch":
+        logger.warning(
+            "compile_config= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if executorch_generate_etrecord and output_format != "executorch":
+        logger.warning(
+            "generate_etrecord= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
@@ -1021,6 +1058,10 @@ def save(
                     partitioners=executorch_partitioners,
                     compile_specs=executorch_compile_specs,
                     backend_config=executorch_backend_config,
+                    constant_methods=executorch_constant_methods,
+                    transform_passes=executorch_transform_passes,
+                    compile_config=executorch_compile_config,
+                    generate_etrecord=executorch_generate_etrecord,
                 )
             else:
                 raise RuntimeError(
@@ -1087,6 +1128,10 @@ def save(
                         partitioners=executorch_partitioners,
                         compile_specs=executorch_compile_specs,
                         backend_config=executorch_backend_config,
+                        constant_methods=executorch_constant_methods,
+                        transform_passes=executorch_transform_passes,
+                        compile_config=executorch_compile_config,
+                        generate_etrecord=executorch_generate_etrecord,
                     )
                 else:
                     raise RuntimeError(
@@ -1174,6 +1219,10 @@ def save(
                         partitioners=executorch_partitioners,
                         compile_specs=executorch_compile_specs,
                         backend_config=executorch_backend_config,
+                        constant_methods=executorch_constant_methods,
+                        transform_passes=executorch_transform_passes,
+                        compile_config=executorch_compile_config,
+                        generate_etrecord=executorch_generate_etrecord,
                     )
                 else:
                     raise RuntimeError(
@@ -1230,15 +1279,29 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
                 "output_format='executorch'"
             )
 
+    generate_etrecord = kwargs.get("generate_etrecord", False)
+    # export() runs the TRT partitioner and to_edge_transform_and_lower itself; it
+    # defaults compile_config to get_edge_compile_config() (_check_ir_validity=False,
+    # since the TRT execute_engine placeholder graph fails edge IR validation) when a
+    # caller passes none, and forwards a caller-supplied compile_config verbatim.
     edge_program = export(
         exp_program,
         partitioners=kwargs.get("partitioners"),
         compile_specs=kwargs.get("compile_specs"),
+        transform_passes=kwargs.get("transform_passes"),
+        compile_config=kwargs.get("compile_config"),
+        constant_methods=kwargs.get("constant_methods"),
+        generate_etrecord=generate_etrecord,
     )
     executorch_program = edge_program.to_executorch(config=kwargs.get("backend_config"))
     with open(file_path, "wb") as f:
         executorch_program.write_to_file(f)
     _write_external_tensor_data(executorch_program, file_path)
+    if generate_etrecord:
+        # Follows ExecuTorch's example convention (e.g. examples/cuda/scripts/export.py):
+        # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
+        etrecord_path = os.path.splitext(file_path)[0] + "_etrecord.bin"
+        executorch_program.get_etrecord().save(etrecord_path)
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:
