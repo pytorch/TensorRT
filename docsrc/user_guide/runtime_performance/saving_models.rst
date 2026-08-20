@@ -230,10 +230,25 @@ The ``executorch`` output format lowers the compiled module to an ExecuTorch
 backend. It requires the ``executorch`` package (``pip install
 "torch_tensorrt[executorch]"``) and is Linux-only.
 
+There are two ways to produce a ``.pte``, and they suit different needs:
+
+* **Use** ``torch_tensorrt.save()``. This is the default, and the right choice
+  whenever a ``.pte`` file is all that is needed. It runs the whole pipeline in one
+  call and writes the file.
+* **Use** ``torch_tensorrt.executorch.export()`` only when the program has to be
+  changed before it is written to disk. It stops at the Edge program, hands it back
+  for inspection or customization, and leaves serialization to the caller.
+
+Start with ``save()``. Reach for ``export()`` when something below is required.
+
+Default: ``save()``
+"""""""""""""""""""
+
 .. code-block:: python
 
     import torch
     import torch_tensorrt
+    import torch_tensorrt.executorch
 
     model = MyModel().eval().cuda()
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
@@ -242,6 +257,104 @@ backend. It requires the ``executorch`` package (``pip install
         trt_gm, "trt.pte", output_format="executorch",
         retrace=False, arg_inputs=inputs,
     )
+
+``save`` writes both the ``.pte`` and any external ``.ptd`` tensor-data files.
+
+Advanced: ``export()``
+""""""""""""""""""""""
+
+Stop at the standard Edge program boundary when the program needs work before it is
+serialized: inspecting the delegated graph, adding metadata, controlling final memory
+planning, or carrying more than one method. The caller then serializes it:
+
+.. code-block:: python
+
+    edge = torch_tensorrt.executorch.export(
+        trt_gm,
+        arg_inputs=inputs,
+        retrace=False,
+        partitioners=extra_partitioners,
+        transform_passes=passes,
+        compile_config=edge_config,
+        constant_methods={"get_vocab_size": 256},
+    )
+
+    # Inspect edge.exported_program() or apply additional Edge transforms here.
+    program = edge.to_executorch(config=backend_config)
+    with open("trt.pte", "wb") as output:
+        program.write_to_file(output)
+    program.write_tensor_data_to_file(".")
+
+``executorch.export`` accepts a TensorRT-compiled ``GraphModule``, an
+engine-bearing ``ExportedProgram``, or a mapping of independently exported
+methods. It always applies the TensorRT partitioner first, followed by caller
+``partitioners`` in order, and returns ExecuTorch's native
+``EdgeProgramManager``. Use ``save`` for the one-shot path where Torch-TensorRT
+manages Edge lowering, finalization, and persistence.
+
+**Several methods in one .pte**
+
+Pass a mapping of method name to ``ExportedProgram`` to keep independent entry
+points, such as a separate prefill and decode, in one program. Give each method
+its own partitioner instances when a partitioner carries method-specific state: a
+partitioner holds its compile specs from construction, so one instance whose specs
+name a method would tag every method sharing it with that same name. Reusing such
+an instance across methods is rejected.
+
+Sharing an instance whose specs name no method is not rejected, because some
+backends are built to share one. A backend that instead reads its own method name
+from its specs, such as the CUDA backend below, raises
+``Could not find method name in compile specs`` during lowering, so give it one
+instance per method carrying that method's name spec.
+
+.. code-block:: python
+
+    from executorch.backends.cuda.cuda_backend import CudaBackend
+    from executorch.backends.cuda.cuda_partitioner import CudaPartitioner
+
+    edge = torch_tensorrt.executorch.export(
+        {"prefill": prefill_program, "decode": decode_program},
+        partitioners={
+            "prefill": [
+                CudaPartitioner(
+                    [CudaBackend.generate_method_name_compile_spec("prefill")]
+                )
+            ],
+            "decode": [
+                CudaPartitioner(
+                    [CudaBackend.generate_method_name_compile_spec("decode")]
+                )
+            ],
+        },
+    )
+
+Each method is validated before any program is rewritten, so an error in one
+method leaves the others untouched. A method mapping preserves independent entry
+points but does not by itself give them shared mutable state.
+
+.. warning::
+
+    **The returned Edge program shares tensor storage with the programs you
+    passed in.** Only structure is copied: the graph, the graph signature, the
+    ``state_dict`` keys, and node metadata. Weights and every other tensor
+    payload are shared by reference.
+
+    TensorRT engines are not shared. Export never deep copies an engine object,
+    since that would serialize and deserialize it, but every engine is decoded
+    once into a byte buffer the returned program owns. Plan for the bytes of a
+    multi-gigabyte engine to be resident twice while both programs are alive.
+
+    Two consequences to plan for:
+
+    * A transform pass must not modify a shared payload in place. An in-place
+      edit such as ``weight.data.mul_(scale)`` changes the program you passed in,
+      and every other Edge program exported from it. Build a new tensor and
+      rebind it instead of mutating the existing one.
+    * Modifying a source program after calling ``export`` is also visible in the
+      Edge program. Finish preparing a program before exporting it.
+
+    Neither case raises an error or a warning, so treat every shared payload as
+    read-only.
 
 **Coalesced TensorRT + CUDA .pte**
 

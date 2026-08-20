@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=6ddce912"></script>
+    <script src="../../_static/documentation_options.js?v=1f89f020"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -726,8 +726,21 @@ see <a class="reference internal" href="aot_inductor.html#aot-inductor"><span cl
 <code class="docutils literal notranslate"><span class="pre">.pte</span></code> program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
 backend. It requires the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> package (<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span>
 <span class="pre">&quot;torch_tensorrt[executorch]&quot;</span></code>) and is Linux-only.</p>
+<p>There are two ways to produce a <code class="docutils literal notranslate"><span class="pre">.pte</span></code>, and they suit different needs:</p>
+<ul class="simple">
+<li><p><strong>Use</strong> <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code>. This is the default, and the right choice
+whenever a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> file is all that is needed. It runs the whole pipeline in one
+call and writes the file.</p></li>
+<li><p><strong>Use</strong> <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.export()</span></code> only when the program has to be
+changed before it is written to disk. It stops at the Edge program, hands it back
+for inspection or customization, and leaves serialization to the caller.</p></li>
+</ul>
+<p>Start with <code class="docutils literal notranslate"><span class="pre">save()</span></code>. Reach for <code class="docutils literal notranslate"><span class="pre">export()</span></code> when something below is required.</p>
+<section id="default-save">
+<h4>Default: <code class="docutils literal notranslate"><span class="pre">save()</span></code><a class="headerlink" href="#default-save" title="Link to this heading">#</a></h4>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
@@ -737,6 +750,93 @@ backend. It requires the <code class="docutils literal notranslate"><span class=
     <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">save</span></code> writes both the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> and any external <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> tensor-data files.</p>
+</section>
+<section id="advanced-export">
+<h4>Advanced: <code class="docutils literal notranslate"><span class="pre">export()</span></code><a class="headerlink" href="#advanced-export" title="Link to this heading">#</a></h4>
+<p>Stop at the standard Edge program boundary when the program needs work before it is
+serialized: inspecting the delegated graph, adding metadata, controlling final memory
+planning, or carrying more than one method. The caller then serializes it:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">edge</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">executorch</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
+    <span class="n">trt_gm</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">partitioners</span><span class="o">=</span><span class="n">extra_partitioners</span><span class="p">,</span>
+    <span class="n">transform_passes</span><span class="o">=</span><span class="n">passes</span><span class="p">,</span>
+    <span class="n">compile_config</span><span class="o">=</span><span class="n">edge_config</span><span class="p">,</span>
+    <span class="n">constant_methods</span><span class="o">=</span><span class="p">{</span><span class="s2">"get_vocab_size"</span><span class="p">:</span> <span class="mi">256</span><span class="p">},</span>
+<span class="p">)</span>
+
+<span class="c1"># Inspect edge.exported_program() or apply additional Edge transforms here.</span>
+<span class="n">program</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">backend_config</span><span class="p">)</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"trt.pte"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">output</span><span class="p">:</span>
+    <span class="n">program</span><span class="o">.</span><span class="n">write_to_file</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+<span class="n">program</span><span class="o">.</span><span class="n">write_tensor_data_to_file</span><span class="p">(</span><span class="s2">"."</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">executorch.export</span></code> accepts a TensorRT-compiled <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code>, an
+engine-bearing <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code>, or a mapping of independently exported
+methods. It always applies the TensorRT partitioner first, followed by caller
+<code class="docutils literal notranslate"><span class="pre">partitioners</span></code> in order, and returns ExecuTorch’s native
+<code class="docutils literal notranslate"><span class="pre">EdgeProgramManager</span></code>. Use <code class="docutils literal notranslate"><span class="pre">save</span></code> for the one-shot path where Torch-TensorRT
+manages Edge lowering, finalization, and persistence.</p>
+<p><strong>Several methods in one .pte</strong></p>
+<p>Pass a mapping of method name to <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> to keep independent entry
+points, such as a separate prefill and decode, in one program. Give each method
+its own partitioner instances when a partitioner carries method-specific state: a
+partitioner holds its compile specs from construction, so one instance whose specs
+name a method would tag every method sharing it with that same name. Reusing such
+an instance across methods is rejected.</p>
+<p>Sharing an instance whose specs name no method is not rejected, because some
+backends are built to share one. A backend that instead reads its own method name
+from its specs, such as the CUDA backend below, raises
+<code class="docutils literal notranslate"><span class="pre">Could</span> <span class="pre">not</span> <span class="pre">find</span> <span class="pre">method</span> <span class="pre">name</span> <span class="pre">in</span> <span class="pre">compile</span> <span class="pre">specs</span></code> during lowering, so give it one
+instance per method carrying that method’s name spec.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaBackend</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaPartitioner</span>
+
+<span class="n">edge</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">executorch</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
+    <span class="p">{</span><span class="s2">"prefill"</span><span class="p">:</span> <span class="n">prefill_program</span><span class="p">,</span> <span class="s2">"decode"</span><span class="p">:</span> <span class="n">decode_program</span><span class="p">},</span>
+    <span class="n">partitioners</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">"prefill"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="n">CudaPartitioner</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"prefill"</span><span class="p">)]</span>
+            <span class="p">)</span>
+        <span class="p">],</span>
+        <span class="s2">"decode"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="n">CudaPartitioner</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"decode"</span><span class="p">)]</span>
+            <span class="p">)</span>
+        <span class="p">],</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Each method is validated before any program is rewritten, so an error in one
+method leaves the others untouched. A method mapping preserves independent entry
+points but does not by itself give them shared mutable state.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The returned Edge program shares tensor storage with the programs you
+passed in.</strong> Only structure is copied: the graph, the graph signature, the
+<code class="docutils literal notranslate"><span class="pre">state_dict</span></code> keys, and node metadata. Weights and every other tensor
+payload are shared by reference.</p>
+<p>TensorRT engines are not shared. Export never deep copies an engine object,
+since that would serialize and deserialize it, but every engine is decoded
+once into a byte buffer the returned program owns. Plan for the bytes of a
+multi-gigabyte engine to be resident twice while both programs are alive.</p>
+<p>Two consequences to plan for:</p>
+<ul class="simple">
+<li><p>A transform pass must not modify a shared payload in place. An in-place
+edit such as <code class="docutils literal notranslate"><span class="pre">weight.data.mul_(scale)</span></code> changes the program you passed in,
+and every other Edge program exported from it. Build a new tensor and
+rebind it instead of mutating the existing one.</p></li>
+<li><p>Modifying a source program after calling <code class="docutils literal notranslate"><span class="pre">export</span></code> is also visible in the
+Edge program. Finish preparing a program before exporting it.</p></li>
+</ul>
+<p>Neither case raises an error or a warning, so treat every shared payload as
+read-only.</p>
 </div>
 <p><strong>Coalesced TensorRT + CUDA .pte</strong></p>
 <p>To run the ops TensorRT does not take on ExecuTorch’s CUDA (AOTInductor) backend
@@ -787,6 +887,7 @@ asynchronous.</p>
 autoregressive decode loop), synchronize the shared stream before reading: the
 work may still be in flight when <code class="docutils literal notranslate"><span class="pre">execute()</span></code> returns, and a host-side copy on
 the default stream will not wait for a non-blocking stream.</p>
+</section>
 </section>
 </section>
 <section id="saving-torch-compile-models">
@@ -915,7 +1016,11 @@ serializable <code class="docutils literal notranslate"><span class="pre">torch.
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torchscript-ir">Torchscript IR</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-the-models">Loading the models</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#b-pt2-format-aotinductor">b) PT2 Format (AOTInductor)</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#c-executorch-pte">c) ExecuTorch (.pte)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#c-executorch-pte">c) ExecuTorch (.pte)</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#default-save">Default: <code class="docutils literal notranslate"><span class="pre">save()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#advanced-export">Advanced: <code class="docutils literal notranslate"><span class="pre">export()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#saving-torch-compile-models">Saving torch.compile models</a></li>

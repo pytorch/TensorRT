@@ -14,7 +14,12 @@ from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
 
 @pytest.mark.unit
 def test_lazy_import_error_when_executorch_missing(monkeypatch):
+    import torch_tensorrt
+
     original_module = sys.modules.pop("torch_tensorrt.executorch", None)
+    original_attribute = getattr(torch_tensorrt, "executorch", None)
+    if hasattr(torch_tensorrt, "executorch"):
+        delattr(torch_tensorrt, "executorch")
     original_find_spec = importlib.util.find_spec
 
     def fake_find_spec(name, package=None):
@@ -31,6 +36,10 @@ def test_lazy_import_error_when_executorch_missing(monkeypatch):
     sys.modules.pop("torch_tensorrt.executorch", None)
     if original_module is not None:
         sys.modules["torch_tensorrt.executorch"] = original_module
+    if original_attribute is not None:
+        torch_tensorrt.executorch = original_attribute
+    elif hasattr(torch_tensorrt, "executorch"):
+        delattr(torch_tensorrt, "executorch")
 
 
 @pytest.mark.unit
@@ -89,8 +98,10 @@ def test_public_api_symbols_present():
     assert "get_edge_compile_config" in module.__all__
     assert "TensorRTPartitioner" in module.__all__
     assert "TensorRTBackend" in module.__all__
+    assert "export" in module.__all__
     assert "Program" not in module.__all__
     assert "load" not in module.__all__
+    assert "to_executorch" not in module.__all__
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -121,6 +132,36 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
     assert "-Wl,-Bsymbolic" not in cmake
     assert "set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON" in cmake
     assert "set(EXECUTORCH_BUILD_XNNPACK ON" in cmake
+
+
+@pytest.mark.unit
+def test_runtime_extension_does_not_require_an_embeddable_python():
+    """Development.Embed must stay optional, or the release build cannot configure.
+
+    ExecuTorch declares its pybind modules SHARED, so CMake requires the
+    Python::Python target and suggests asking for Development.Embed. Taking that
+    suggestion breaks the build: the release image's CPython ships no libpython, so
+    the component cannot be satisfied and the whole find_package fails. The
+    component is therefore requested optionally, matching pybind11, and the target
+    is stood in for when it is absent.
+    """
+    cmake = (
+        _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "REQUIRED COMPONENTS Interpreter Development.Module" in cmake
+    assert "if(NOT TARGET Python::Python)" in cmake
+
+    # Every mention of the component in actual code, comments excluded, must be an
+    # optional one. A required request is what fails on an image without libpython.
+    code = [line for line in cmake.splitlines() if not line.lstrip().startswith("#")]
+    embed_lines = [line for line in code if "Development.Embed" in line]
+    assert embed_lines, "Development.Embed should be requested, optionally"
+    for line in embed_lines:
+        assert "OPTIONAL_COMPONENTS" in line, (
+            "Development.Embed must stay optional; the release image has no "
+            f"libpython: {line.strip()!r}"
+        )
 
 
 def _setup_tree():

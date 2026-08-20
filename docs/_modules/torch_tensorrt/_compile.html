@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=6ddce912"></script>
+    <script src="../../_static/documentation_options.js?v=1f89f020"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1181,7 +1181,7 @@ document.write(`
     <span class="o">*</span><span class="p">,</span>
     <span class="n">extra_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">output_format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span>
-        <span class="s2">"exported_program"</span><span class="p">,</span> <span class="s2">"torchscript"</span><span class="p">,</span> <span class="s2">"aot_inductor"</span>
+        <span class="s2">"exported_program"</span><span class="p">,</span> <span class="s2">"torchscript"</span><span class="p">,</span> <span class="s2">"aot_inductor"</span><span class="p">,</span> <span class="s2">"executorch"</span>
     <span class="p">]</span> <span class="o">=</span> <span class="s2">"exported_program"</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1672,197 +1672,6 @@ document.write(`
 
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_get_engine_info_from_state</span><span class="p">(</span><span class="n">engine_obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""Normalize TensorRT engine state into the serialized engine-info list."""</span>
-    <span class="n">state</span> <span class="o">=</span> <span class="n">engine_obj</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()</span>
-    <span class="n">engine_info</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="n">state</span>
-    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">_validate_executorch_engine_info</span><span class="p">(</span>
-    <span class="n">engine_info</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">node_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Reject engine configurations unsupported by the ExecuTorch export path."""</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-        <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">,</span>
-    <span class="p">)</span>
-
-    <span class="k">if</span> <span class="p">(</span>
-        <span class="nb">len</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span>
-        <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">])</span> <span class="o">==</span> <span class="s2">"1"</span>
-    <span class="p">):</span>
-        <span class="n">node_suffix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">" for node '</span><span class="si">{</span><span class="n">node_name</span><span class="si">}</span><span class="s2">'"</span> <span class="k">if</span> <span class="n">node_name</span> <span class="k">else</span> <span class="s2">""</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">"ExecuTorch export does not support TensorRT engines that require "</span>
-            <span class="s2">"an output allocator (data-dependent output shapes)"</span>
-            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">node_suffix</span><span class="si">}</span><span class="s2">."</span>
-        <span class="p">)</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">_count_executorch_engine_nodes</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Count TRT execute-engine nodes in an ExportedProgram."""</span>
-    <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">exp_program</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">"call_function"</span><span class="p">:</span>
-            <span class="k">continue</span>
-        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">:</span>
-            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
-            <span class="k">continue</span>
-        <span class="n">target</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span>
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="nb">hasattr</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="s2">"_schema"</span><span class="p">)</span>
-            <span class="ow">and</span> <span class="n">target</span><span class="o">.</span><span class="n">_schema</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"tensorrt::no_op_placeholder_for_execute_engine"</span>
-        <span class="p">):</span>
-            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
-    <span class="k">return</span> <span class="n">count</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">_replace_execute_engine_for_executorch</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Replace execute_engine nodes with no_op_placeholder_for_execute_engine.</span>
-
-<span class="sd">    ExecuTorch's to_edge_transform_and_lower runs ExportPass subclasses that</span>
-<span class="sd">    dispatch through the C++ schema validator. The validator rejects the</span>
-<span class="sd">    ScriptObject engine arg (it arrives as a CustomObjArgument placeholder</span>
-<span class="sd">    rather than a real FakeScriptObject). Converting each execute_engine node</span>
-<span class="sd">    to no_op_placeholder_for_execute_engine (which carries all engine info as</span>
-<span class="sd">    plain strings) avoids the ScriptObject entirely so the passes succeed.</span>
-
-<span class="sd">    The TRT engine bytes are stored as a ``torch.uint8`` buffer on the graph</span>
-<span class="sd">    module and referenced from the no_op call via a ``get_attr`` FX node. This</span>
-<span class="sd">    keeps the engine out of the FX-emitted Python source: CPython's tokenizer</span>
-<span class="sd">    cannot parse string literals larger than ~2 GB, so an inline base64 string</span>
-<span class="sd">    breaks ``gm.recompile()`` for any engine whose payload exceeds that limit.</span>
-<span class="sd">    """</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-        <span class="n">ENGINE_IDX</span><span class="p">,</span>
-        <span class="n">SERIALIZATION_LEN</span><span class="p">,</span>
-    <span class="p">)</span>
-
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">exp_program</span><span class="o">.</span><span class="n">graph_module</span>
-    <span class="n">execute_engine_op</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span>
-    <span class="n">no_op</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">no_op_placeholder_for_execute_engine</span><span class="o">.</span><span class="n">default</span>
-
-    <span class="n">nodes_to_replace</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">n</span>
-        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
-        <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_function"</span> <span class="ow">and</span> <span class="n">n</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="n">execute_engine_op</span>
-    <span class="p">]</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">nodes_to_replace</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">exp_program</span>
-
-    <span class="k">for</span> <span class="n">engine_idx_in_graph</span><span class="p">,</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">nodes_to_replace</span><span class="p">):</span>
-        <span class="n">inputs_arg</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">engine_node</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-
-        <span class="c1"># Retrieve the engine ScriptObject from the graph module or constants.</span>
-        <span class="k">if</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span><span class="p">:</span>
-            <span class="n">engine_obj</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">engine_obj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"execute_engine node '</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">': get_attr target "</span>
-                    <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">engine_node</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">' not found on graph module"</span>
-                <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span><span class="p">:</span>
-            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">_resolve_lifted_custom_obj</span>
-
-            <span class="n">engine_obj</span> <span class="o">=</span> <span class="n">_resolve_lifted_custom_obj</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">engine_obj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"execute_engine node '</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">': placeholder engine "</span>
-                    <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">' did not resolve to a lifted "</span>
-                    <span class="sa">f</span><span class="s2">"custom-object constant (available: "</span>
-                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span><span class="w"> </span><span class="s1">'constants'</span><span class="p">,</span><span class="w"> </span><span class="p">{})</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="p">{})</span><span class="si">}</span><span class="s2">)"</span>
-                <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"execute_engine node '</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">': unexpected engine arg op "</span>
-                <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">engine_node</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2">'"</span>
-            <span class="p">)</span>
-
-        <span class="n">engine_info</span> <span class="o">=</span> <span class="n">_get_engine_info_from_state</span><span class="p">(</span><span class="n">engine_obj</span><span class="p">)</span>
-        <span class="n">_validate_executorch_engine_info</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">node_name</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-        <span class="c1"># Ensure the engine bytes slot is a base64 string (no_op takes str args).</span>
-        <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="c1"># `_get_engine_info_from_state` returns the engine as a</span>
-            <span class="c1"># base64-encoded `str` when the engine arrived through the</span>
-            <span class="c1"># serialized TRT runtime round-trip path. Decode back to raw</span>
-            <span class="c1"># bytes so it can land in a uint8 buffer below.</span>
-            <span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
-
-            <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
-            <span class="n">engine_bytes</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span>
-        <span class="c1"># Store engine payload as a uint8 buffer + get_attr ref. FX emits a</span>
-        <span class="c1"># name reference instead of an inline literal, sidestepping the</span>
-        <span class="c1"># tokenizer's &gt;2 GB string-literal limit.</span>
-        <span class="n">engine_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">frombuffer</span><span class="p">(</span><span class="nb">bytearray</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
-        <span class="c1"># Use FX's unique-attr-name helper so re-export passes (which may</span>
-        <span class="c1"># invoke this rewriter multiple times on the same `gm`) don't</span>
-        <span class="c1"># silently overwrite earlier engine buffers.</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.experimental.const_fold</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-            <span class="n">get_unique_attr_name_in_module</span><span class="p">,</span>
-        <span class="p">)</span>
-
-        <span class="n">buffer_name</span> <span class="o">=</span> <span class="n">get_unique_attr_name_in_module</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">"_trt_engine_0"</span><span class="p">)</span>
-        <span class="n">gm</span><span class="o">.</span><span class="n">register_buffer</span><span class="p">(</span><span class="n">buffer_name</span><span class="p">,</span> <span class="n">engine_tensor</span><span class="p">,</span> <span class="n">persistent</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="n">exp_program</span><span class="o">.</span><span class="n">state_dict</span><span class="p">[</span><span class="n">buffer_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">engine_tensor</span>
-
-        <span class="n">str_args</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">""</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">engine_info</span><span class="p">[:</span><span class="n">SERIALIZATION_LEN</span><span class="p">]</span>
-        <span class="p">]</span>
-        <span class="c1"># Build a FakeTensor mirror so downstream FX passes (FakeTensorProp,</span>
-        <span class="c1"># ExecuTorch lowering, export-serde) that read `node.meta["val"]`</span>
-        <span class="c1"># on the `get_attr` reference don't `KeyError`. Must reuse the</span>
-        <span class="c1"># graph's existing FakeTensorMode — creating a fresh one would</span>
-        <span class="c1"># fail downstream with "fake mode from input 0 doesn't match</span>
-        <span class="c1"># mode from input 1" the moment any pass mixes the two.</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">torch._guards</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_fake_mode</span>
-
-        <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">detect_fake_mode</span><span class="p">(</span>
-            <span class="p">[</span><span class="n">n</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="s2">"val"</span> <span class="ow">in</span> <span class="n">n</span><span class="o">.</span><span class="n">meta</span><span class="p">]</span>
-        <span class="p">)</span>
-        <span class="n">fake_engine</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">fake_mode</span><span class="o">.</span><span class="n">from_tensor</span><span class="p">(</span><span class="n">engine_tensor</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">fake_mode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-            <span class="k">else</span> <span class="n">engine_tensor</span>
-        <span class="p">)</span>
-        <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
-            <span class="n">engine_attr_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">buffer_name</span><span class="p">)</span>
-            <span class="n">engine_attr_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">fake_engine</span>
-            <span class="n">no_op_args</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">inputs_arg</span><span class="p">,</span>
-                <span class="o">*</span><span class="n">str_args</span><span class="p">[:</span><span class="n">ENGINE_IDX</span><span class="p">],</span>
-                <span class="n">engine_attr_node</span><span class="p">,</span>
-                <span class="o">*</span><span class="n">str_args</span><span class="p">[</span><span class="n">ENGINE_IDX</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:],</span>
-            <span class="p">)</span>
-            <span class="n">no_op_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span><span class="n">no_op</span><span class="p">,</span> <span class="n">no_op_args</span><span class="p">)</span>
-            <span class="n">no_op_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"val"</span><span class="p">)</span>
-
-        <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">no_op_node</span><span class="p">)</span>
-        <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
-
-        <span class="c1"># Erase the engine get_attr node if it is now unused.</span>
-        <span class="k">if</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">users</span><span class="p">:</span>
-            <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">engine_node</span><span class="p">)</span>
-            <span class="c1"># Also drop the now-orphan attribute from the module so the</span>
-            <span class="c1"># original engine bytes aren't double-serialized into state_dict</span>
-            <span class="c1"># alongside the new uint8 buffer. Use FX's dotted-path helper</span>
-            <span class="c1"># so nested-target attrs (e.g. `submod.engine`) are deleted</span>
-            <span class="c1"># correctly — plain `delattr(gm, "a.b")` only works on</span>
-            <span class="c1"># top-level names.</span>
-            <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.graph_module</span><span class="w"> </span><span class="kn">import</span> <span class="n">_del_attr</span><span class="p">,</span> <span class="n">_has_attr</span>
-
-            <span class="k">if</span> <span class="n">_has_attr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">target</span><span class="p">):</span>
-                <span class="n">_del_attr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
-
-    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">eliminate_dead_code</span><span class="p">()</span>
-    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
-    <span class="n">gm</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
-
-    <span class="k">return</span> <span class="n">exp_program</span>
-
-
 <span class="k">def</span><span class="w"> </span><span class="nf">_write_external_tensor_data</span><span class="p">(</span><span class="n">executorch_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.</span>
 
@@ -1887,69 +1696,35 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_save_as_executorch</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Save an ExportedProgram (with TensorRT execute_engine nodes) as an ExecuTorch .pte file.</span>
-
-<span class="sd">    Partitions the graph by torch.ops.tensorrt.no_op_placeholder_for_execute_engine</span>
-<span class="sd">    (execute_engine is pre-converted to avoid schema type errors in edge passes),</span>
-<span class="sd">    serializes each engine to the same blob format as the TRT runtime (vector of</span>
-<span class="sd">    strings), and embeds it in the .pte. Requires the ``executorch`` package and</span>
-<span class="sd">    torch_tensorrt_runtime. See https://pytorch.org/executorch/stable/getting-started-setup.html</span>
-<span class="sd">    """</span>
+<span class="w">    </span><span class="sd">"""Save an engine-bearing ExportedProgram as an ExecuTorch program."""</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
             <span class="s2">"output_format='executorch' requires the Torch-TensorRT runtime "</span>
             <span class="s2">"(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."</span>
         <span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_edge_transform_and_lower</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
             <span class="s2">"ExecuTorch is not installed. Install with: pip install "</span>
             <span class="s2">"</span><span class="se">\"</span><span class="s2">torch_tensorrt[executorch]</span><span class="se">\"</span><span class="s2"> to use output_format='executorch'."</span>
         <span class="p">)</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops</span>  <span class="c1"># noqa: F401</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-        <span class="n">TensorRTPartitioner</span><span class="p">,</span>
-        <span class="n">get_edge_compile_config</span><span class="p">,</span>
-    <span class="p">)</span>
 
-    <span class="n">extra_partitioners</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"partitioners"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">extra_partitioners</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-            <span class="s2">"partitioners must be a list or tuple when using "</span>
-            <span class="s2">"output_format='executorch'"</span>
-        <span class="p">)</span>
-    <span class="c1"># Forward any caller-provided compile_specs to TensorRTPartitioner so users</span>
-    <span class="c1"># can override the default target_device ("cuda:0") by passing e.g.</span>
-    <span class="c1"># `compile_specs=[CompileSpec("target_device", b"cuda:1")]` to save().</span>
-    <span class="c1"># When omitted, TensorRTPartitioner auto-appends the cuda:0 default.</span>
-    <span class="n">executorch_compile_specs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"compile_specs"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">executorch_compile_specs</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-            <span class="s2">"compile_specs must be a list or tuple when using "</span>
-            <span class="s2">"output_format='executorch'"</span>
-        <span class="p">)</span>
-    <span class="n">partitioners</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">TensorRTPartitioner</span><span class="p">(</span><span class="n">compile_specs</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">executorch_compile_specs</span><span class="p">))</span>
-    <span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">extra_partitioners</span><span class="p">)</span>
+    <span class="c1"># save() only ever lowers a single method, so keep rejecting the per-method</span>
+    <span class="c1"># mappings that torch_tensorrt.executorch.export() accepts.</span>
+    <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"partitioners"</span><span class="p">,</span> <span class="s2">"compile_specs"</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">option</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">option</span><span class="si">}</span><span class="s2"> must be a list or tuple when using "</span>
+                <span class="s2">"output_format='executorch'"</span>
+            <span class="p">)</span>
 
-    <span class="n">engine_count</span> <span class="o">=</span> <span class="n">_count_executorch_engine_nodes</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">engine_count</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-            <span class="s2">"</span><span class="si">%d</span><span class="s2"> TRT engines detected. Multi-engine .pte exports can incur extra "</span>
-            <span class="s2">"delegate boundary overhead."</span><span class="p">,</span>
-            <span class="n">engine_count</span><span class="p">,</span>
-        <span class="p">)</span>
-
-    <span class="c1"># Replace execute_engine nodes (ScriptObject arg) with no_op_placeholder_for_execute_engine</span>
-    <span class="c1"># (string args only) before to_edge_transform_and_lower runs ExportPass subclasses that</span>
-    <span class="c1"># would fail trying to cast the CustomObjArgument placeholder to a real C++ Engine object.</span>
-    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_replace_execute_engine_for_executorch</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
-
-    <span class="n">edge_program</span> <span class="o">=</span> <span class="n">to_edge_transform_and_lower</span><span class="p">(</span>
+    <span class="n">edge_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
         <span class="n">exp_program</span><span class="p">,</span>
-        <span class="n">partitioner</span><span class="o">=</span><span class="n">partitioners</span><span class="p">,</span>
-        <span class="n">compile_config</span><span class="o">=</span><span class="n">get_edge_compile_config</span><span class="p">(),</span>
+        <span class="n">partitioners</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"partitioners"</span><span class="p">),</span>
+        <span class="n">compile_specs</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"compile_specs"</span><span class="p">),</span>
     <span class="p">)</span>
     <span class="n">executorch_program</span> <span class="o">=</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"backend_config"</span><span class="p">))</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -1968,14 +1743,10 @@ document.write(`
     <span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
 
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._serialized_engine_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENGINE_IDX</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-        <span class="n">EngineSerializer</span><span class="p">,</span>
-        <span class="n">TRTEngine</span><span class="p">,</span>
-    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineSerializer</span><span class="p">,</span> <span class="n">TRTEngine</span>
 
     <span class="k">for</span> <span class="n">fqn</span><span class="p">,</span> <span class="n">constant</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">exp_program</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">constant</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">ScriptObject</span><span class="p">,</span> <span class="n">TRTEngine</span><span class="p">)):</span>
-
             <span class="n">state</span> <span class="o">=</span> <span class="n">constant</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()</span>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">state</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="p">(</span>
                 <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"TRTEngine"</span>

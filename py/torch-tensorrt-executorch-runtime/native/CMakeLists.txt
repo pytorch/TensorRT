@@ -35,6 +35,54 @@ find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 
+# ExecuTorch declares every pybind module with pybind11_add_module(<target> SHARED
+# ...). pybind11 maps a non-MODULE type onto pybind11::embed, and CMake's
+# python_add_library then requires the Python::Python target, so the first module
+# ExecuTorch declares (codegen/tools/selective_build) aborts the configure with:
+#
+#   Python_ADD_LIBRARY: dependent target 'Python::Python' is not defined.
+#      Did you miss to request COMPONENT 'Development.Embed'?
+#
+# Do NOT take that hint literally. Development.Embed needs a libpython, and the
+# manylinux CPython in the release image is built without one, so requesting it
+# just fails the whole find_package instead:
+#
+#   Could NOT find Python (missing: Python_INCLUDE_DIRS Python_LIBRARIES ...)
+#
+# pybind11 hit this and deliberately made the component optional for manylinux
+# (pybind11NewTools.cmake: "Development.Module support (required for manylinux)"),
+# so match that: Module required, Embed optional. Finding Python before pybind11
+# is the override pybind11 documents.
+#
+# PYTHON_EXECUTABLE is bridged first because the build passes the interpreter
+# under that name while FindPython reads Python_EXECUTABLE. ExecuTorch does the
+# same bridge, but only after this point, so without it this call could resolve a
+# different interpreter than the rest of the build.
+if(PYTHON_EXECUTABLE AND NOT Python_EXECUTABLE)
+  set(Python_EXECUTABLE "${PYTHON_EXECUTABLE}")
+endif()
+find_package(Python REQUIRED COMPONENTS Interpreter Development.Module
+             OPTIONAL_COMPONENTS Development.Embed)
+
+# With Embed optional, Python::Python does not exist on manylinux, and the SHARED
+# declaration above still demands it. Supply an empty stand-in for that case only.
+# It links nothing, which is what an extension module needs: Python symbols
+# resolve from the interpreter that loads the module, never from a linked
+# libpython. Where the image does provide a usable libpython, the real imported
+# target is used instead.
+#
+# This is a workaround for a defect upstream, not the root fix. Those three
+# modules should be declared MODULE rather than SHARED: CMake skips this check
+# entirely for MODULE, and MODULE is what a Python extension is. Filed upstream.
+if(NOT TARGET Python::Python)
+  add_library(Python::Python INTERFACE IMPORTED)
+  # The real Python::Python carries INTERFACE_INCLUDE_DIRECTORIES. Forward those
+  # through Python::Module so the stand-in is not silently header-less if a
+  # consumer ever relies on them. Python::Module links no libpython.
+  set_target_properties(Python::Python PROPERTIES
+    INTERFACE_LINK_LIBRARIES Python::Module)
+endif()
+
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_PYBIND ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_MODULE ON CACHE BOOL "" FORCE)
@@ -94,11 +142,16 @@ target_link_libraries(portable_lib PRIVATE
   CUDA::cudart TensorRT::nvinfer Threads::Threads)
 
 # The build and validation containers do not necessarily provide the same
-# libstdc++. Link the C++ runtime archives explicitly into both Python
-# extensions. In particular, data_loader is an ExecuTorch target and merely
-# passing -static-libstdc++ as a driver option was not sufficient to prevent
-# its shared object from retaining an unresolved
-# exception_ptr::_M_addref reference on the older CI runtime.
+# libstdc++, so both Python extensions link the C++ runtime statically. Setting
+# LINKER_LANGUAGE CXX below is what makes -static-libstdc++ take effect: without
+# it, data_loader is linked by the C driver and its shared object retained an
+# unresolved exception_ptr::_M_addref reference on the older CI runtime. That
+# symbol is supplied by libstdc++_nonshared.a, which the toolchain links for us,
+# so the driver flags plus the correct linker language are sufficient.
+# Probed as a precondition, not as a link input. -static-libstdc++ below makes the
+# driver resolve -lstdc++ to exactly this file, so if it is absent the link fails
+# with a less obvious error. Nothing names it on the link line: doing that is what
+# caused duplicate definitions against libstdc++_nonshared.a.
 execute_process(
   COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.a
   OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBSTDCXX
@@ -113,9 +166,9 @@ if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
 endif()
 
 # rules_foreign_cc injects an explicit dynamic -lstdc++ into module and shared
-# linker flags. Remove only that scoped fragment: the archives below provide
-# the C++ runtime, and retaining this injected library makes the wheel depend
-# on the build host's CXXABI version.
+# linker flags. Remove only that scoped fragment: the driver flags below select the
+# static runtime, and retaining this injected library makes the wheel depend on the
+# build host's CXXABI version.
 foreach(_torch_tensorrt_linker_flags CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS)
   string(REPLACE "-Wl,--push-state,-as-needed -lstdc++ -Wl,--pop-state" ""
     ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
@@ -127,12 +180,27 @@ foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
   # leaving CXXABI-versioned exception_ptr symbols for the host runtime.
   set_property(TARGET ${_torch_tensorrt_executorch_runtime_target}
     PROPERTY LINKER_LANGUAGE CXX)
+  # Do not add libstdc++.a here, and in particular do not whole-archive it. The
+  # driver flags below already select the static runtime, and on a Red Hat
+  # gcc-toolset the toolchain adds a second archive of its own: libstdc++.so is a
+  # text linker script, not an ELF object, and it reads
+  #
+  #   INPUT ( /usr/lib64/libstdc++.so.6 -lstdc++_nonshared )
+  #
+  # so libstdc++_nonshared.a arrives as an independent input carrying the
+  # newer-ABI symbols the base libstdc++.so.6 lacks. That archive is a strict
+  # subset of libstdc++.a: measured in the release image with
+  # `nm --defined-only -g`, counting T/W/B/D/R, 1003 definitions and none unique to
+  # it. Counting all global types gives 1141 instead; "none unique" holds either
+  # way, which is the part that matters. Whole-archiving libstdc++.a
+  # forces every member in whether referenced or not, so all 1003 collide and the
+  # link fails on whichever the linker reaches first.
   target_link_libraries(${_torch_tensorrt_executorch_runtime_target} PRIVATE
-    "$<LINK_LIBRARY:WHOLE_ARCHIVE,${TORCH_TENSORRT_STATIC_LIBSTDCXX}>"
     "${TORCH_TENSORRT_STATIC_LIBGCC}")
   target_link_options(${_torch_tensorrt_executorch_runtime_target} PRIVATE
     -static-libstdc++
     -static-libgcc)
+
 endforeach()
 
 # The runtime wheel intentionally does not bundle PyTorch, TensorRT, or CUDA.
@@ -155,4 +223,35 @@ set_target_properties(data_loader PROPERTIES SUFFIX ".so")
 
 install(TARGETS portable_lib data_loader LIBRARY DESTINATION lib)
 
-add_custom_target(torch_tensorrt_executorch_portable_lib DEPENDS portable_lib data_loader)
+add_custom_target(torch_tensorrt_executorch_portable_lib ALL DEPENDS portable_lib data_loader)
+
+# Guard the two properties the removed whole-archive used to guarantee, on the real
+# artifacts: no dynamic dependency on the build host's libstdc++, and no undefined
+# exception_ptr::_M_addref. This wheel has no auditwheel step behind it.
+#
+# ALL on the aggregate target above matters: a custom target without it is excluded
+# from the default build, and the default target is what the wheel build runs. The
+# check hangs off that aggregate rather than off portable_lib and data_loader
+# directly, because add_custom_command(TARGET) only accepts targets created in this
+# directory and those two come from ExecuTorch's subdirectory.
+#
+# The predicate captures readelf's output and checks its status before inspecting it,
+# so an unreadable artifact fails the build instead of passing quietly.
+find_program(TORCH_TENSORRT_READELF NAMES readelf llvm-readelf)
+if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR
+    "readelf is required to verify the Python extensions link the C++ runtime "
+    "statically. Install binutils, or set TORCH_TENSORRT_READELF to a readelf.")
+endif()
+if(TORCH_TENSORRT_READELF)
+  foreach(_torch_tensorrt_checked_target portable_lib data_loader)
+    add_custom_command(TARGET torch_tensorrt_executorch_portable_lib POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E echo
+        "checking $<TARGET_FILE_NAME:${_torch_tensorrt_checked_target}> links the C++ runtime statically"
+      COMMAND sh -c
+        "dyn=$(\"$0\" -d \"$1\") || { echo \"FATAL: could not inspect $1 with $0\" >&2; exit 1; }; printf %s \"$dyn\" | grep -qE 'NEEDED.*libstdc\\+\\+' && { echo \"FATAL: $1 has a dynamic libstdc++ dependency\" >&2; exit 1; }; syms=$(\"$0\" -Ws \"$1\") || { echo \"FATAL: could not read symbols of $1\" >&2; exit 1; }; printf %s \"$syms\" | grep -qE 'UND .*_M_addref' && { echo \"FATAL: $1 has an undefined exception_ptr::_M_addref\" >&2; exit 1; }; exit 0"
+        "${TORCH_TENSORRT_READELF}"
+        "$<TARGET_FILE:${_torch_tensorrt_checked_target}>"
+      VERBATIM)
+  endforeach()
+endif()
