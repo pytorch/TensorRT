@@ -128,6 +128,16 @@ class BazelBuild(build_ext):
         output.unlink(missing_ok=True)
         shutil.copy2(built, output)
 
+        # Ship the two shared libraries the extensions load. ExecuTorch's published
+        # wheel provides neither, so without them importing the runtime fails on a
+        # missing shared object. Copied rather than declared as extensions because they
+        # are plain dependencies, not Python modules.
+        for dependency in ("libextension_cuda.so", "libaoti_cuda_shims.so"):
+            source = built.parent / dependency
+            if not source.is_file():
+                raise RuntimeError(f"Bazel did not produce {source}")
+            shutil.copy2(source, output.parent / dependency)
+
 
 require_cuda_13()
 executorch_version = installed_version("executorch")

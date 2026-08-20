@@ -73,6 +73,9 @@ set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_TENSOR ON CACHE BOOL "" FORCE)
+# Needed for the same reason as in the reference runner: only this backend
+# registers the allocator the exported program's device copies look up.
+set(EXECUTORCH_BUILD_CUDA ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_XNNPACK ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -188,6 +191,14 @@ target_include_directories(torch_tensorrt_executorch_backend PRIVATE
 target_link_libraries(torch_tensorrt_executorch_backend PRIVATE
   CUDA::cudart TensorRT::nvinfer Threads::Threads executorch)
 
+foreach(_torch_tensorrt_required_cuda_target extension_cuda aoti_cuda_shims)
+  if(NOT TARGET ${_torch_tensorrt_required_cuda_target})
+    message(FATAL_ERROR
+      "ExecuTorch did not define ${_torch_tensorrt_required_cuda_target}; the wheel "
+      "ships it and the extensions load it. Check EXECUTORCH_BUILD_CUDA.")
+  endif()
+endforeach()
+
 if(NOT TARGET portable_lib)
   message(FATAL_ERROR "ExecuTorch did not define portable_lib")
 endif()
@@ -238,7 +249,25 @@ target_link_libraries(portable_lib PRIVATE
 # so that archive used to arrive as an independent input and every forced member
 # collided. Nothing reaches it now, because that linker script is no longer on the link
 # line at all.
-foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
+# The CUDA backend brings two shared libraries of its own. They get the same treatment,
+# because one left on the host libstdc++ hands that dependency straight back to
+# _portable_lib.so through its own DT_NEEDED.
+set(_torch_tensorrt_executorch_runtime_targets portable_lib data_loader)
+foreach(_torch_tensorrt_cuda_shared_target extension_cuda aoti_cuda_shims)
+  get_target_property(_torch_tensorrt_cuda_shared_type
+    ${_torch_tensorrt_cuda_shared_target} TYPE)
+  # An IMPORTED prebuilt is already linked and cannot be given link options.
+  get_target_property(_torch_tensorrt_cuda_shared_imported
+    ${_torch_tensorrt_cuda_shared_target} IMPORTED)
+  if(_torch_tensorrt_cuda_shared_type STREQUAL "SHARED_LIBRARY" AND
+     NOT _torch_tensorrt_cuda_shared_imported)
+    list(APPEND _torch_tensorrt_executorch_runtime_targets
+      ${_torch_tensorrt_cuda_shared_target})
+  endif()
+endforeach()
+
+foreach(_torch_tensorrt_executorch_runtime_target
+        IN LISTS _torch_tensorrt_executorch_runtime_targets)
   # Keep the C++ runtime self-contained. The compiler driver otherwise
   # appends a dynamic -lstdc++ even when libstdc++.a is a direct link input,
   # leaving CXXABI-versioned exception_ptr symbols for the host runtime.
@@ -283,11 +312,23 @@ set_target_properties(portable_lib PROPERTIES
   INSTALL_RPATH "${_torch_tensorrt_executorch_runtime_rpath}"
   OUTPUT_NAME "_portable_lib"
   SUFFIX ".so")
-set_target_properties(data_loader PROPERTIES SUFFIX ".so")
+# data_loader gets $ORIGIN too, so finding those libraries does not depend on which
+# module Python imports first.
+set_target_properties(data_loader PROPERTIES
+  BUILD_WITH_INSTALL_RPATH ON
+  INSTALL_RPATH "${_torch_tensorrt_executorch_runtime_rpath}"
+  SUFFIX ".so")
 
 install(TARGETS portable_lib data_loader LIBRARY DESTINATION lib)
 
-add_custom_target(torch_tensorrt_executorch_portable_lib ALL DEPENDS portable_lib data_loader)
+# ExecuTorch's published wheel ships neither of these and the extensions carry a
+# DT_NEEDED on them, so importing the runtime fails without them. ExecuTorch installs
+# them to CMAKE_INSTALL_LIBDIR, which is lib64 on some distributions, so put them in
+# lib/ as well, beside the extensions.
+install(TARGETS extension_cuda aoti_cuda_shims LIBRARY DESTINATION lib)
+
+add_custom_target(torch_tensorrt_executorch_portable_lib ALL
+  DEPENDS ${_torch_tensorrt_executorch_runtime_targets})
 
 # Guard the two properties the removed whole-archive used to guarantee, on the real
 # artifacts: no dynamic dependency on the build host's libstdc++, and no undefined
@@ -309,7 +350,8 @@ if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     "statically. Install binutils, or set TORCH_TENSORRT_READELF to a readelf.")
 endif()
 if(TORCH_TENSORRT_READELF)
-  foreach(_torch_tensorrt_checked_target portable_lib data_loader)
+  foreach(_torch_tensorrt_checked_target
+          IN LISTS _torch_tensorrt_executorch_runtime_targets)
     add_custom_command(TARGET torch_tensorrt_executorch_portable_lib POST_BUILD
       COMMAND "${CMAKE_COMMAND}" -E echo
         "checking $<TARGET_FILE_NAME:${_torch_tensorrt_checked_target}> links the C++ runtime statically"
