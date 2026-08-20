@@ -11,6 +11,9 @@ from torch.fx import Graph, GraphModule
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
+from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+    reset_folded_constructors,
+)
 
 
 @torch._dynamo.disable
@@ -50,7 +53,7 @@ class TestFoldedConstantGraphBreak(TestCase):
         torch.testing.assert_close(first, torch.ones_like(first))
         torch.testing.assert_close(second, torch.full_like(second, 3.0))
 
-    def test_constant_fold_clones_frozen_outputs(self):
+    def test_folded_constructor_outputs_are_reset(self):
         """Folded constants returned as graph outputs must be cloned."""
         g = Graph()
         with g.inserting_after():
@@ -68,6 +71,7 @@ class TestFoldedConstantGraphBreak(TestCase):
 
         gm = GraphModule(torch.nn.Module(), g)
         gm = constant_fold(gm, CompilationSettings())
+        gm = reset_folded_constructors(gm, CompilationSettings())
 
         # Outputs should be clones of _frozen_param*, not the attrs themselves.
         output_node = next(n for n in gm.graph.nodes if n.op == "output")
@@ -105,6 +109,7 @@ class TestFoldedConstantGraphBreak(TestCase):
 
         gm = GraphModule(torch.nn.Module(), g)
         gm = constant_fold(gm, CompilationSettings())
+        gm = reset_folded_constructors(gm, CompilationSettings())
 
         output_node = next(n for n in gm.graph.nodes if n.op == "output")
         out0, out1 = output_node.args[0]
@@ -127,6 +132,44 @@ class TestFoldedConstantGraphBreak(TestCase):
         self.assertGreaterEqual(len(frozen), 1)
         for t in frozen:
             self.assertTrue(torch.equal(t.detach().cpu(), torch.zeros(8)))
+
+    def test_post_partition_frozen_output_is_reset(self):
+        """A frozen value exposed as a subgraph output is cloned by the late pass."""
+        root = torch.nn.Module()
+        root.register_parameter(
+            "_frozen_param0",
+            torch.nn.Parameter(torch.zeros(8), requires_grad=False),
+        )
+        g = Graph()
+        frozen = g.get_attr("_frozen_param0")
+        g.output({"first": frozen, "nested": (frozen,)})
+
+        gm = GraphModule(root, g)
+        gm = reset_folded_constructors(gm, CompilationSettings())
+
+        first = gm()
+        self.assertEqual(first["first"].data_ptr(), first["nested"][0].data_ptr())
+        first["first"].add_(1)
+        self.assertTrue(torch.equal(first["first"], first["nested"][0]))
+        self.assertTrue(torch.equal(gm._frozen_param0, torch.zeros(8)))
+
+        second = gm()
+        self.assertTrue(torch.equal(second["first"], torch.zeros(8)))
+
+    def test_user_owned_output_is_not_reset(self):
+        """Graph inputs remain caller-owned and retain copy-by-reference semantics."""
+        g = Graph()
+        value = g.placeholder("value")
+        g.output(value)
+
+        gm = GraphModule(torch.nn.Module(), g)
+        gm = reset_folded_constructors(gm, CompilationSettings())
+
+        supplied = torch.zeros(8)
+        returned = gm(supplied)
+        self.assertEqual(returned.data_ptr(), supplied.data_ptr())
+        returned.add_(1)
+        self.assertTrue(torch.equal(supplied, torch.ones(8)))
 
 
 if __name__ == "__main__":
