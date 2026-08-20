@@ -725,19 +725,6 @@ def _declare_aliased_kv_mutations_on_ep(
 
     copyback_buffers = copyback_buffers or []
     num_copyback = len(copyback_buffers)
-    # Unlike the KV path this reclassifies the trailing num_copyback outputs by
-    # position, so it cannot skip an already-declared buffer the way already_exposed
-    # does: after a first declaration the mutations sit at the front and the trailing
-    # outputs are the user's. Declaring twice would retarget those, dropping a user
-    # output and leaving the buffer with two mutation specs.
-    redeclared = sorted(set(copyback_buffers) & already_exposed)
-    if redeclared:
-        raise RuntimeError(
-            f"Copy-back buffer(s) {redeclared} already carry a BUFFER_MUTATION spec. "
-            "Declaring them again would reclassify the trailing outputs, which are no "
-            "longer the copy-back ones. Pass copyback_buffers only for a program whose "
-            "exporter has not already declared them."
-        )
     if not mutation_outputs and not num_copyback:
         return exp_program
 

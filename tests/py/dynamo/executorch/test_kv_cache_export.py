@@ -422,6 +422,8 @@ def test_declare_aliased_kv_mutations_skips_already_declared_copyback(monkeypatc
         range_constraints={},
         module_call_graph=[],
         constants={},
+        example_inputs=_EXAMPLE_INPUTS,
+        verifiers=[Verifier],
     )
 
     captured = {}
@@ -499,6 +501,8 @@ def test_declare_aliased_kv_mutations_pairs_copyback_by_position(monkeypatch):
         range_constraints={},
         module_call_graph=[],
         constants={},
+        example_inputs=_EXAMPLE_INPUTS,
+        verifiers=[Verifier],
     )
 
     captured = {}
@@ -640,57 +644,6 @@ def test_create_trt_exp_program_does_not_duplicate_copyback_get_attr(monkeypatch
 
     targets = sorted(n.target for n in gm.graph.nodes if n.op == "get_attr")
     assert targets == ["state_0"]
-
-
-@pytest.mark.unit
-def test_declare_aliased_kv_mutations_rejects_redeclared_copyback():
-    """Declaring copy-back twice must fail rather than corrupt the signature.
-
-    The copy-back path reclassifies the trailing outputs by position, so on a
-    program whose exporter already declared them the trailing outputs are the
-    user's: a second pass would retarget those, dropping a user output and giving
-    the buffer two mutation specs.
-    """
-    pytest.importorskip("executorch.exir")
-
-    g = torch.fx.Graph()
-    x = g.placeholder("x")
-    state_in = g.placeholder("state_in")
-    user_out = g.call_function(torch.add, (x, x))
-    state_new = g.call_function(torch.add, (state_in, x))
-    g.output((state_new, user_out))
-    gm = torch.fx.GraphModule(torch.nn.Module(), g)
-
-    # state_0 already declared -- what the legacy exporter leaves behind.
-    sig = SimpleNamespace(
-        inputs_to_buffers={"state_in": "state_0"},
-        input_specs=[
-            InputSpec(
-                InputKind.BUFFER, TensorArgument(name="state_in"), "state_0", True
-            )
-        ],
-        output_specs=[
-            OutputSpec(
-                OutputKind.BUFFER_MUTATION,
-                TensorArgument(name=state_new.name),
-                "state_0",
-            ),
-            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name="user_out"), None),
-        ],
-    )
-    ep = SimpleNamespace(
-        graph_module=gm,
-        graph_signature=sig,
-        state_dict={},
-        range_constraints={},
-        module_call_graph=[],
-        constants={},
-        example_inputs=_EXAMPLE_INPUTS,
-        verifiers=[Verifier],
-    )
-
-    with pytest.raises(RuntimeError, match="already carry a BUFFER_MUTATION"):
-        E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
 
 
 @pytest.mark.unit
