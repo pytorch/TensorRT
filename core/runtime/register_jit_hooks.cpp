@@ -70,6 +70,12 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("__str__", &TRTEngine::to_str)
         .def("__repr__", &TRTEngine::to_str)
         .def("__obj_flatten__", &TRTEngine::__obj_flatten__)
+        // Reporting "real" makes torch's tracing_with_real skip fakification and hand
+        // the engine itself to the meta kernel, which reads only
+        // get_serialized_metadata() -- nothing executes or mutates it. Otherwise each
+        // fakification serializes the whole engine through __obj_flatten__ and
+        // deep-copies it through the pickle. The Python TRTEngine reports "real" too.
+        .def("tracing_mode", [](const c10::intrusive_ptr<TRTEngine>& self) -> std::string { return "real"; })
         .def("enable_profiling", &TRTEngine::enable_profiling)
         .def("set_profile_format", &TRTEngine::set_profile_format)
         .def("disable_profiling", &TRTEngine::disable_profiling)
