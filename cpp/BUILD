@@ -164,13 +164,15 @@ cc_library(
         ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
         ":linux_x86_64": [
-            "@cuda//:cudart",
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
+            "@cuda//:cudart",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
-            "@cuda//:cudart",
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
+            "@cuda//:cudart",
             "@tensorrt_sbsa//:nvinfer",
         ],
         "//conditions:default": [],

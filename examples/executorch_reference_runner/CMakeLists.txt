@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.24)
 project(my_runner LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -60,6 +60,7 @@ add_executable(example_executorch_runner main.cpp)
 target_link_libraries(
   example_executorch_runner
   PRIVATE
+    ${CMAKE_DL_LIBS}
     executorch
     executorch::backends
     executorch::extensions

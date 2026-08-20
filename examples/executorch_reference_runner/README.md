@@ -42,16 +42,16 @@ torch_tensorrt/bin/example_executorch_runner
 ```
 
 ```bash
-# Get the ExecuTorch source code. Set EXECUTORCH_REF to a branch or tag;
-# leave it unset for the latest main.
-EXECUTORCH_REF="${EXECUTORCH_REF:-main}"
-case "${EXECUTORCH_REF}" in
-  latest|latest-main|latest_main|"latest main")
-    EXECUTORCH_REF="main"
-    ;;
-esac
-git clone --depth 1 --branch "${EXECUTORCH_REF}" --recurse-submodules --shallow-submodules \
+# Get the ExecuTorch source snapshot this package is built against. Keep this in sync
+# with the executorch commit pinned in MODULE.bazel.
+EXECUTORCH_REF="${EXECUTORCH_REF:-e4d02f41f7909e8ed5bf4a14ffc520d733453d9f}"
+git clone --filter=blob:none --no-checkout \
   https://github.com/pytorch/executorch.git executorch
+pushd executorch
+git fetch --depth 1 origin "${EXECUTORCH_REF}"
+git checkout FETCH_HEAD
+git submodule update --init --recursive --depth 1
+popd
 
 # download the libtorchtrt.tar.gz
 tar xvf libtorchtrt.tar.gz
@@ -72,16 +72,22 @@ cmake -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner" \
 cmake --build build-executorch-reference-runner --target example_executorch_runner -j
 ```
 
+This packaged reference-runner flow currently targets Linux x86_64 and SBSA,
+matching the native backend's Bazel compatibility constraints. Windows and
+JetPack packaging are outside this flow.
+
 Expected artifact:
 
 ```text
 build-executorch-reference-runner/example_executorch_runner
 ```
 
-The build also creates the executorch core and tensorrt backend archive as a dependency:
+The build also creates the ExecuTorch core, the shared caller-stream extension,
+and the TensorRT backend archive as dependencies:
 
 ```text
 build-executorch-reference-runner/executorch/libexecutorch_core.a
+build-executorch-reference-runner/torch_tensorrt_executorch/executorch_extension_cuda/libextension_cuda.so
 build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 ```
 
@@ -130,6 +136,45 @@ method.get_outputs(...)
 ```
 
 Loading the method initializes the TensorRT ExecuTorch backend for any
-Torch-TensorRT delegate subgraphs embedded in the `.pte`. The Python
-`torch_tensorrt` package is needed when exporting the `.pte`; it is not needed
-by this native runner at inference time.
+Torch-TensorRT delegate subgraphs embedded in the `.pte`. Applications can
+scope `executorch::extension::cuda::CallerStreamGuard` around execution to run
+TensorRT and CUDA/AOTI delegates on one ordinary caller-owned CUDA stream. On the
+discrete-GPU CI configuration, this runner's host-backed inputs and outputs take
+the synchronized staging path; that test exercises guarded inference and checks the
+output values, not the device-resident asynchronous fast path. Integrated GPUs may bind
+host-backed storage directly and can follow the asynchronous contract documented in
+[the backend README](../../cpp/src/torch_tensorrt/executorch/README.md).
+The Python `torch_tensorrt` package is needed when exporting the `.pte`; it is not
+needed by this native runner at inference time.
+
+## Running both delegates on one green-context stream
+
+The point of the shared caller stream is that TensorRT and the CUDA/AOTI delegate
+can be driven by one caller-owned stream, including a CUDA green-context stream, so
+both stay inside the same SM partition. To exercise that, build with the CUDA
+delegate enabled and pass `--green_context_sms`:
+
+```bash
+cmake -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner" \
+  -B build-executorch-reference-runner \
+  -DEXECUTORCH_BUILD_CUDA=ON \
+  -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
+  -DTensorRT_ROOT="${TensorRT_ROOT}"
+cmake --build build-executorch-reference-runner --target example_executorch_runner -j
+
+build-executorch-reference-runner/example_executorch_runner \
+  --model_path=two_delegate.model.pte --num_runs=1 --green_context_sms=8
+```
+
+`--green_context_sms=N` creates the caller stream inside a green context holding N
+SMs. The runner aborts rather than falling back if one cannot be created, so a
+passing run always means a green context was really used. `N=0`, the default, uses
+an ordinary stream.
+
+Enabling `EXECUTORCH_BUILD_CUDA` does not make this runner depend on libtorch. It
+needs `EXECUTORCH_BUILD_EXTENSION_TENSOR=ON`, which is set automatically, and the
+result links no libtorch and no libc10.
+
+This path is verified by hand, not in CI: the CI configuration builds the runner
+without the CUDA delegate. It also takes the synchronized path, because the method
+inputs and outputs are host-backed.

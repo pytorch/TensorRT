@@ -73,8 +73,8 @@ set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_TENSOR ON CACHE BOOL "" FORCE)
-# Needed for the same reason as in the reference runner: only this backend
-# registers the allocator the exported program's device copies look up.
+# Needed twice over: this backend registers the allocator the exported program's device
+# copies look up, and extension/cuda, which owns the shared caller stream, comes with it.
 set(EXECUTORCH_BUILD_CUDA ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_XNNPACK ON CACHE BOOL "" FORCE)
@@ -189,8 +189,14 @@ target_include_directories(torch_tensorrt_executorch_backend PRIVATE
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/include"
   "${EXECUTORCH_SOURCE_DIR}/.."
   "${EXECUTORCH_SOURCE_DIR}/runtime/core/portable_type/c10")
+if(NOT TARGET extension_cuda)
+  message(FATAL_ERROR
+    "ExecuTorch did not define extension_cuda; the delegate needs it for the shared "
+    "caller-stream selection. Configure ExecuTorch with EXECUTORCH_BUILD_CUDA=ON.")
+endif()
+
 target_link_libraries(torch_tensorrt_executorch_backend PRIVATE
-  CUDA::cudart TensorRT::nvinfer Threads::Threads executorch)
+  CUDA::cudart TensorRT::nvinfer Threads::Threads executorch extension_cuda)
 
 foreach(_torch_tensorrt_required_cuda_target extension_cuda aoti_cuda_shims)
   if(NOT TARGET ${_torch_tensorrt_required_cuda_target})
