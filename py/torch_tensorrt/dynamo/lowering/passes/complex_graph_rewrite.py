@@ -1809,15 +1809,13 @@ class ComplexGraphRewriter:
         """
         from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 
-        fake_inputs: List[Optional[torch.Tensor]] = []
+        fake_inputs: List[Any] = []
         for node in self.gm.graph.nodes:
             if node.op == "placeholder":
                 if "val" in node.meta:
                     fake_val = node.meta["val"]
-                    if fake_val is None:
-                        # present-but-None placeholder = a real None input
-                        # (e.g. an optional/None transformer input, common in diffusers)
-                        fake_inputs.append(None)
+                    if not isinstance(fake_val, torch.Tensor):
+                        fake_inputs.append(fake_val)
                     elif fake_val.device.type == "cuda":
                         fake_inputs.append(fake_val.to("cuda"))
                     else:
