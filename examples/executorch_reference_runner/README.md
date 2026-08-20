@@ -27,6 +27,14 @@ both ExecuTorch and the Torch-TensorRT ExecuTorch source package, and linking
 `torchtrt::executorch_backend` makes the backend archive a dependency of
 `example_executorch_runner`.
 
+The build also turns on ExecuTorch's CUDA backend, so the CUDA toolkit has to be
+installed. That is needed even for a program that uses only the TensorRT delegate.
+A Torch-TensorRT export marks its delegate inputs and outputs as CUDA memory, so
+ExecuTorch places device copies around the delegate, and the allocator those copies
+use is registered by the CUDA backend. Build without it and the runner loads the
+program, initializes the TensorRT engine, then stops on the first instruction with
+`_h2d_copy: no device allocator registered for device_type=1`.
+
 The `libtorchtrt.tar.gz` package also includes a prebuilt reference runner:
 
 ```text
