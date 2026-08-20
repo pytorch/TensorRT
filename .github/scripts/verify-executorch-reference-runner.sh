@@ -311,6 +311,17 @@ for _tool in ldd readelf nm; do
   fi
 done
 
+# Capture nm output instead of piping it into `grep -q`. grep exits at its first
+# match and closes the pipe, so nm dies of SIGPIPE and pipefail reports 141, which
+# reads as a false verdict in either direction.
+nm_matches() {
+  local _pattern="$1"
+  shift
+  local _symbols
+  _symbols="$(nm "$@" 2>/dev/null)"
+  grep -qE "${_pattern}" <<<"${_symbols}"
+}
+
 # The runner must not pull in libtorch: this native path is libtorch-free.
 if ldd "${runner_path}" |
     grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
@@ -340,7 +351,7 @@ fi
 # the assertion pass vacuously. A private definition would satisfy the reference
 # at link time and leave no import here.
 for _symbol in getCallerStream CallerStreamGuard; do
-  if ! nm -D --undefined-only "${runner_path}" 2>/dev/null | grep -q "${_symbol}"; then
+  if ! nm_matches "${_symbol}" -D --undefined-only "${runner_path}"; then
     echo "example_executorch_runner does not import ${_symbol} from libextension_cuda.so" >&2
     exit 1
   fi
@@ -352,15 +363,14 @@ done
 # must be the sole definer the runner sees.
 loaded_extension_cuda="$(
   ldd "${runner_path}" 2>/dev/null |
-    sed -n 's/.*libextension_cuda\.so[^ ]* => \([^ ]*\).*/\1/p' |
-    head -n1
+    sed -n 's/.*libextension_cuda\.so[^ ]* => \([^ ]*\).*/\1/p'
 )"
+loaded_extension_cuda="${loaded_extension_cuda%%$'\n'*}"
 if [[ -z "${loaded_extension_cuda}" || ! -f "${loaded_extension_cuda}" ]]; then
   echo "Could not resolve the libextension_cuda.so the runner loads" >&2
   exit 1
 fi
-if ! nm --defined-only --dynamic "${loaded_extension_cuda}" 2>/dev/null |
-    grep -q "getCallerStream"; then
+if ! nm_matches "getCallerStream" --defined-only --dynamic "${loaded_extension_cuda}"; then
   echo "Loaded ${loaded_extension_cuda} does not export getCallerStream" >&2
   exit 1
 fi
@@ -379,8 +389,7 @@ if [[ ! -f "${packaged_extension_cuda}" ]]; then
   echo "Packaged libextension_cuda.so missing at ${packaged_extension_cuda}" >&2
   exit 1
 fi
-if ! nm --defined-only --dynamic "${packaged_extension_cuda}" 2>/dev/null |
-    grep -q "getCallerStream"; then
+if ! nm_matches "getCallerStream" --defined-only --dynamic "${packaged_extension_cuda}"; then
   echo "Packaged libextension_cuda.so does not export getCallerStream" >&2
   exit 1
 fi
@@ -394,7 +403,7 @@ if ldd "${packaged_runner}" | grep -E "libextension_cuda\.so.*=>.*not found" >&2
   exit 1
 fi
 for _symbol in getCallerStream CallerStreamGuard; do
-  if ! nm -D --undefined-only "${packaged_runner}" 2>/dev/null | grep -q "${_symbol}"; then
+  if ! nm_matches "${_symbol}" -D --undefined-only "${packaged_runner}"; then
     echo "Packaged runner does not import ${_symbol} from libextension_cuda.so" >&2
     exit 1
   fi
@@ -406,8 +415,7 @@ extra_defs="$(
   find "${TORCH_TENSORRT_ROOT}/lib" -maxdepth 1 -type f -name '*.so*' \
     ! -name 'libextension_cuda.so' -print0 2>/dev/null |
     while IFS= read -r -d '' _so; do
-      if nm --defined-only --dynamic "${_so}" 2>/dev/null |
-          grep -qE "getCallerStream|CallerStreamGuard"; then
+      if nm_matches "getCallerStream|CallerStreamGuard" --defined-only --dynamic "${_so}"; then
         echo "${_so}"
       fi
     done
@@ -440,7 +448,8 @@ for _log in "${runner_log}" "${packaged_runner_log}"; do
     exit 1
   fi
 
-  _values="$(sed -n 's/.*first [0-9]* values://p' "${_log}" | head -n1)"
+  _values="$(sed -n 's/.*first [0-9]* values://p' "${_log}")"
+  _values="${_values%%$'\n'*}"
   if [[ -z "${_values}" ]]; then
     echo "No output values line in ${_log}" >&2
     exit 1
