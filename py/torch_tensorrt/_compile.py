@@ -781,8 +781,8 @@ def save(
                   parameter takes precedence.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
                 ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
-                ``transform_passes=``, ``compile_config=`` and
-                ``generate_etrecord=`` are only used with
+                ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``
+                and ``weight_streaming_budget_per_engine=`` are only used with
                 ``output_format="executorch"``; otherwise they are ignored with a
                 warning. Pass ``compile_specs=[CompileSpec("target_device",
                 b"cuda:<i>")]`` to override the default target device (``cuda:0``).
@@ -807,6 +807,14 @@ def save(
                 ``generate_etrecord=True`` writes an ETRecord to
                 ``<model>_etrecord.bin`` next to the ``.pte`` for use with the
                 ExecuTorch Inspector.
+                ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``
+                number of bytes of engine weights that may stay resident in GPU
+                memory, with the rest streamed from host memory. It applies to
+                **each** TensorRT engine separately, not as a total for the program,
+                so a program with N engines can hold up to N times this value
+                resident. Requires the engine to have been compiled with
+                ``enable_weight_streaming=True``. See
+                :func:`torch_tensorrt.executorch.export` for the full description.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -838,6 +846,9 @@ def save(
     executorch_transform_passes = kwargs.pop("transform_passes", None)
     executorch_compile_config = kwargs.pop("compile_config", None)
     executorch_generate_etrecord = kwargs.pop("generate_etrecord", False)
+    executorch_weight_streaming_budget_per_engine = kwargs.pop(
+        "weight_streaming_budget_per_engine", None
+    )
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -848,6 +859,25 @@ def save(
             "Saving in ExecuTorch format requires the executorch package "
             "with executorch.exir. Install with: pip install "
             "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
+        )
+    if output_format == "executorch":
+        # Every executorch option is popped above, so a leftover kwarg is a typo. Fail
+        # here rather than silently ignoring it, since nothing downstream reads kwargs.
+        if kwargs:
+            raise TypeError(
+                "save() received unexpected keyword argument(s) for "
+                f"output_format='executorch': {sorted(kwargs)}. Supported executorch "
+                "options are 'partitioners', 'compile_specs', 'backend_config', and "
+                "'weight_streaming_budget_per_engine'."
+            )
+        # Validate the budget before the input and model-shape checks below, so a wrong
+        # type is not reported as an unrelated failure.
+        from torch_tensorrt.executorch.partitioner import (
+            normalize_weight_streaming_budget_per_engine,
+        )
+
+        normalize_weight_streaming_budget_per_engine(
+            executorch_weight_streaming_budget_per_engine
         )
 
     def _all_are_input_objects(obj: Any) -> bool:
@@ -989,6 +1019,15 @@ def save(
             "generate_etrecord= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
+    if (
+        executorch_weight_streaming_budget_per_engine is not None
+        and output_format != "executorch"
+    ):
+        logger.warning(
+            "weight_streaming_budget_per_engine= is only used with "
+            "output_format='executorch' and will be ignored for "
+            f"output_format='{output_format}'."
+        )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
@@ -1062,6 +1101,7 @@ def save(
                     transform_passes=executorch_transform_passes,
                     compile_config=executorch_compile_config,
                     generate_etrecord=executorch_generate_etrecord,
+                    weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                 )
             else:
                 raise RuntimeError(
@@ -1132,6 +1172,7 @@ def save(
                         transform_passes=executorch_transform_passes,
                         compile_config=executorch_compile_config,
                         generate_etrecord=executorch_generate_etrecord,
+                        weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                     )
                 else:
                     raise RuntimeError(
@@ -1223,6 +1264,7 @@ def save(
                         transform_passes=executorch_transform_passes,
                         compile_config=executorch_compile_config,
                         generate_etrecord=executorch_generate_etrecord,
+                        weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                     )
                 else:
                     raise RuntimeError(
@@ -1292,6 +1334,9 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         compile_config=kwargs.get("compile_config"),
         constant_methods=kwargs.get("constant_methods"),
         generate_etrecord=generate_etrecord,
+        weight_streaming_budget_per_engine=kwargs.get(
+            "weight_streaming_budget_per_engine"
+        ),
     )
     executorch_program = edge_program.to_executorch(config=kwargs.get("backend_config"))
     with open(file_path, "wb") as f:
