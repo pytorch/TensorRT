@@ -1,9 +1,8 @@
 # Regression tests for https://github.com/pytorch/TensorRT/issues/4466
 #
 # Constant folding may replace input-independent factories (e.g. torch.zeros)
-# with persistent _frozen_param* attributes. If those are returned across a
-# graph break and mutated in eager code, later calls must not observe that
-# mutation.
+# with persistent module attributes. If those are returned across a graph break
+# and mutated in eager code, later calls must not observe that mutation.
 
 import torch
 import torch_tensorrt  # noqa: F401  # Registers the "tensorrt" backend
@@ -26,7 +25,7 @@ def mutate_accumulators(values, weight, sample):
 
 def accumulate_with_fresh_state(sample):
     # Input-independent factories; constant folding replaces these with
-    # persistent _frozen_param* attributes.
+    # persistent module attributes.
     values = torch.zeros((8,), dtype=torch.float32, device="cuda")
     weight = torch.zeros((8,), dtype=torch.float32, device="cuda")
     return mutate_accumulators(values, weight, sample)
@@ -73,7 +72,7 @@ class TestFoldedConstantGraphBreak(TestCase):
         gm = constant_fold(gm, CompilationSettings())
         gm = reset_folded_constructors(gm, CompilationSettings())
 
-        # Outputs should be clones of _frozen_param*, not the attrs themselves.
+        # Outputs should be clones of the folded constants, not the attrs themselves.
         output_node = next(n for n in gm.graph.nodes if n.op == "output")
         outs = output_node.args[0]
         self.assertEqual(len(outs), 2)
