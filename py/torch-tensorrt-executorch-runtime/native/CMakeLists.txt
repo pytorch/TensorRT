@@ -103,14 +103,24 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # exact string, so a spacing change cannot make the removal silently stop working.
 # The resolved values are printed because the check at the end of this file reports a
 # property of the artifact, and the first question is always what was on the link line.
+# Only these three can carry it. rules_foreign_cc puts the toolchain's link libraries
+# into CMAKE_{SHARED,MODULE,EXE}_LINKER_FLAGS_INIT, and filters the STANDARD_LIBRARIES
+# variables down to static-runtime flags, so touching those would strip nothing and
+# would additionally shadow the cache entry enable_language(C) creates later.
+#
+# The whole push/pop group goes at once. Removing only -lstdc++ from inside it would
+# leave an unbalanced --push-state, which both linkers reject outright:
+#   ld.gold: error: unbalanced --push-state/--pop-state
+# The bare form is matched separately, with a boundary, so -lstdc++fs and
+# -lstdc++_nonshared are left alone.
 foreach(_torch_tensorrt_linker_flags
         CMAKE_MODULE_LINKER_FLAGS
         CMAKE_SHARED_LINKER_FLAGS
-        CMAKE_EXE_LINKER_FLAGS
-        CMAKE_CXX_STANDARD_LIBRARIES
-        CMAKE_C_STANDARD_LIBRARIES)
-  string(REGEX REPLACE "(-Wl,--push-state,-as-needed +)?-lstdc\\+\\+( +-Wl,--pop-state)?"
+        CMAKE_EXE_LINKER_FLAGS)
+  string(REGEX REPLACE "-Wl,--push-state,-as-needed +-lstdc\\+\\+ +-Wl,--pop-state"
     "" ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
+  string(REGEX REPLACE "(^| )-lstdc\\+\\+( |$)" "\\2"
+    ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
   message(STATUS "torch_tensorrt: ${_torch_tensorrt_linker_flags} = "
     "[${${_torch_tensorrt_linker_flags}}]")
 endforeach()
@@ -132,14 +142,33 @@ endforeach()
 #                                        UND _M_addref   libstdc++ NEEDED
 #   dynamic -lstdc++ before objects            2                1
 #   nothing at all                             2                0
-#   -l:libstdc++.a before objects              2                0
-#   -l:libstdc++.a after objects               0                0
+#   the static archive before objects          2                0
+#   the static archive after objects           0                0
 #
 # Only the last satisfies both halves of the check at the end of this file. Named with
 # -l: rather than whole-archived: forcing every member in is what previously collided
 # with libstdc++_nonshared.a, and nothing pulls that archive in now because the
 # libstdc++.so linker script that used to reference it is no longer on the link line.
-string(APPEND CMAKE_CXX_STANDARD_LIBRARIES " -l:libstdc++.a")
+execute_process(
+  COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.a
+  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBSTDCXX
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(
+  COMMAND "${CMAKE_CXX_COMPILER}" -print-libgcc-file-name
+  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBGCC
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
+   NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBGCC}")
+  message(FATAL_ERROR "A static C++ runtime is required to build the ExecuTorch runtime wheel")
+endif()
+# Named by the path the driver reports rather than as -l:libstdc++.a, so the archive
+# that gets linked is the one just checked for existence and not whichever copy a -L on
+# the link line happens to shadow it with.
+string(APPEND CMAKE_CXX_STANDARD_LIBRARIES " \"${TORCH_TENSORRT_STATIC_LIBSTDCXX}\"")
+# try_compile forwards CMAKE_EXE_LINKER_FLAGS but not CMAKE_CXX_STANDARD_LIBRARIES, so
+# without this a C++ probe loses the runtime the strip above removed and reports the
+# feature absent instead of failing.
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_CXX_STANDARD_LIBRARIES)
 message(STATUS "torch_tensorrt: CMAKE_CXX_STANDARD_LIBRARIES now = "
   "[${CMAKE_CXX_STANDARD_LIBRARIES}]")
 
@@ -189,31 +218,26 @@ target_link_libraries(portable_lib PRIVATE
   extension_threadpool
   CUDA::cudart TensorRT::nvinfer Threads::Threads)
 
-# The build and validation containers do not necessarily provide the same
-# libstdc++, so both Python extensions link the C++ runtime statically. Setting
-# LINKER_LANGUAGE CXX below is what makes -static-libstdc++ take effect: without
-# it, data_loader is linked by the C driver and its shared object retained an
-# unresolved exception_ptr::_M_addref reference on the older CI runtime. That
-# symbol is supplied by libstdc++_nonshared.a, which the toolchain links for us,
-# so the driver flags plus the correct linker language are sufficient.
-# Probed as a precondition, not as a link input. -static-libstdc++ below makes the
-# driver resolve -lstdc++ to exactly this file, so if it is absent the link fails
-# with a less obvious error. Nothing names it on the link line: doing that is what
-# caused duplicate definitions against libstdc++_nonshared.a.
-execute_process(
-  COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.a
-  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBSTDCXX
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(
-  COMMAND "${CMAKE_CXX_COMPILER}" -print-libgcc-file-name
-  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBGCC
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
-   NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBGCC}")
-  message(FATAL_ERROR "A static C++ runtime is required to build the ExecuTorch runtime wheel")
-endif()
-
-
+# The build and validation containers do not necessarily provide the same libstdc++,
+# so both Python extensions carry their own copy. What supplies it is the static archive
+# appended to CMAKE_CXX_STANDARD_LIBRARIES near the top of this file, not the driver
+# flags below: CMAKE_CXX_COMPILER here is gcc, the C driver, which links no C++ runtime
+# and treats -static-libstdc++ as a no-op.
+#
+# The driver flags are still set, because they are what a C++ driver would need and the
+# toolchain is not ours to depend on. LINKER_LANGUAGE CXX is still set, because it is
+# what selects CMAKE_CXX_COMPILER and the CXX standard libraries for these targets.
+# Neither is sufficient on its own here.
+#
+# libstdc++.a is named, but not whole-archived. Forcing every member in is what
+# collided with libstdc++_nonshared.a before: on a Red Hat gcc-toolset, libstdc++.so is
+# a text linker script reading
+#
+#   INPUT ( /usr/lib64/libstdc++.so.6 -lstdc++_nonshared )
+#
+# so that archive used to arrive as an independent input and every forced member
+# collided. Nothing reaches it now, because that linker script is no longer on the link
+# line at all.
 foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
   # Keep the C++ runtime self-contained. The compiler driver otherwise
   # appends a dynamic -lstdc++ even when libstdc++.a is a direct link input,
