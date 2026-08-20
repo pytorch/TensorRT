@@ -22,7 +22,14 @@ def _mark_constant_fold_exclusion(nodes: Iterable[torch.fx.Node], rule_id: str) 
 def register_constant_fold_exclusion_rule(
     rule_id: str,
 ) -> Callable[[ConstantFoldExclusionRule], ConstantFoldExclusionRule]:
-    """Register a named rule that selects FX nodes to exclude from folding."""
+    """Register a named rule that selects FX nodes to exclude from folding.
+
+    This extension point is intended for Torch-TensorRT lowering
+    implementations. Compilation users do not need to register rules: all
+    predefined rules are enabled by default and can be disabled by rule ID in
+    ``CompilationSettings``. Rules must be registered during module
+    initialization, before compilation begins.
+    """
     if not isinstance(rule_id, str) or not rule_id:
         raise ValueError("A constant-fold exclusion rule ID must be a non-empty string")
 
@@ -36,6 +43,14 @@ def register_constant_fold_exclusion_rule(
         return rule
 
     return register
+
+
+def unregister_constant_fold_exclusion_rule(rule_id: str) -> None:
+    """Unregister a rule during teardown when no lowering pass is running."""
+    if rule_id not in _CONSTANT_FOLD_EXCLUSION_RULES:
+        raise ValueError(f"Constant-fold exclusion rule {rule_id!r} is not registered")
+
+    del _CONSTANT_FOLD_EXCLUSION_RULES[rule_id]
 
 
 def validate_disabled_constant_fold_exclusions(

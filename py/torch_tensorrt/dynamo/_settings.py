@@ -18,8 +18,8 @@ from torch_tensorrt.dynamo._defaults import (
     CACHE_BUILT_ENGINES,
     CPU_MEMORY_BUDGET,
     DECOMPOSE_ATTENTION,
-    DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     DISABLE_TF32,
+    DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
@@ -134,10 +134,11 @@ class CompilationSettings:
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
             the final output back to FP16.
-        disabled_constant_fold_exclusions (Collection[str]): IDs of Torch-TensorRT
-            rules that exclude matching FX nodes from constant folding. Naming a
-            rule here turns it off, so the nodes it would have kept become
-            foldable again. Default is empty.
+        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
+            Torch-TensorRT rules to disable. Rules are registered by lowering
+            implementations and enabled by default; compilation users do not
+            need to register them. Disabling a rule makes its matching nodes
+            foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
     """

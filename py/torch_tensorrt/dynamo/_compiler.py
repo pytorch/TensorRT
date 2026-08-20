@@ -5,7 +5,6 @@ import logging
 import os
 import platform
 import warnings
-
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
@@ -117,7 +116,9 @@ def cross_compile_for_windows(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
-    disabled_constant_fold_exclusions: Collection[str] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
+    disabled_constant_fold_exclusions: Collection[
+        str
+    ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
@@ -202,10 +203,11 @@ def cross_compile_for_windows(
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
             the final output back to FP16.
-        disabled_constant_fold_exclusions (Collection[str]): IDs of
-            Torch-TensorRT rules that exclude matching FX nodes from constant
-            folding. Naming a rule here turns it off, so the nodes it would have
-            kept become foldable again. Default is empty.
+        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
+            Torch-TensorRT rules to disable. Rules are registered by lowering
+            implementations and enabled by default; compilation users do not
+            need to register them. Disabling a rule makes its matching nodes
+            foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -488,7 +490,9 @@ def compile(
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
-    disabled_constant_fold_exclusions: Collection[str] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
+    disabled_constant_fold_exclusions: Collection[
+        str
+    ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
@@ -583,10 +587,11 @@ def compile(
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
             the final output back to FP16.
-        disabled_constant_fold_exclusions (Collection[str]): IDs of
-            Torch-TensorRT rules that exclude matching FX nodes from constant
-            folding. Naming a rule here turns it off, so the nodes it would have
-            kept become foldable again. Default is empty.
+        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
+            Torch-TensorRT rules to disable. Rules are registered by lowering
+            implementations and enabled by default; compilation users do not
+            need to register them. Disabling a rule makes its matching nodes
+            foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -1727,7 +1732,9 @@ def convert_exported_program_to_serialized_trt_engine(
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
-    disabled_constant_fold_exclusions: Collection[str] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
+    disabled_constant_fold_exclusions: Collection[
+        str
+    ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     lift_mutable_buffers: bool = False,
     arg_input_binding_names: Any = None,
@@ -1826,10 +1833,11 @@ def convert_exported_program_to_serialized_trt_engine(
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
             the final output back to FP16.
-        disabled_constant_fold_exclusions (Collection[str]): IDs of
-            Torch-TensorRT rules that exclude matching FX nodes from constant
-            folding. Naming a rule here turns it off, so the nodes it would have
-            kept become foldable again. Default is empty.
+        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
+            Torch-TensorRT rules to disable. Rules are registered by lowering
+            implementations and enabled by default; compilation users do not
+            need to register them. Disabling a rule makes its matching nodes
+            foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:

@@ -2,8 +2,8 @@ from typing import Any, Optional
 
 import torch
 from torch_tensorrt.dynamo.lowering.constant_fold_exclusions._core import (
-    CONSTANT_FOLD_EXCLUSION_META_KEY,
     _CONSTANT_FOLD_EXCLUSION_RULES,
+    CONSTANT_FOLD_EXCLUSION_META_KEY,
     _mark_constant_fold_exclusion,
     validate_disabled_constant_fold_exclusions,
 )
