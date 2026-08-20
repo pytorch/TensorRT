@@ -1,22 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
 
-# rules_foreign_cc initializes these flags with an explicit dynamic -lstdc++.
-# CMake consumes the *_INIT variables when project() enables CXX, so removing
-# it later from CMAKE_{MODULE,SHARED}_LINKER_FLAGS is too late on some CMake
-# versions: the dynamic runtime is already retained in the generated link
-# rule. Preserve the remaining Bazel toolchain flags, but remove only that
-# dependency before CMake initializes the language.
-foreach(_torch_tensorrt_linker_flags_init
-    CMAKE_MODULE_LINKER_FLAGS_INIT
-    CMAKE_SHARED_LINKER_FLAGS_INIT)
-  string(REPLACE "-Wl,--push-state,-as-needed -lstdc++ -Wl,--pop-state" ""
-    _torch_tensorrt_sanitized_linker_flags
-    "${${_torch_tensorrt_linker_flags_init}}")
-  set(${_torch_tensorrt_linker_flags_init}
-    "${_torch_tensorrt_sanitized_linker_flags}" CACHE STRING
-    "Torch-TensorRT sanitized linker flags" FORCE)
-endforeach()
-
 project(torch_tensorrt_executorch_runtime LANGUAGES CXX)
 
 if(NOT EXECUTORCH_SOURCE_DIR AND EXECUTORCH_CMAKE_FILE)
@@ -90,10 +73,107 @@ set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_TENSOR ON CACHE BOOL "" FORCE)
+# Needed for the same reason as in the reference runner: only this backend
+# registers the allocator the exported program's device copies look up.
+set(EXECUTORCH_BUILD_CUDA ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_XNNPACK ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# rules_foreign_cc puts an explicit dynamic -lstdc++ in the Bazel toolchain's linker
+# flags. Retaining it makes the wheel depend on the build host's CXXABI version, so
+# remove it before anything that links is defined.
+#
+# Two things have to be right, and each was got wrong before.
+#
+# WHERE. Removing it later, after add_subdirectory below, is too late: the extensions
+# are created in ExecuTorch's directory and take their copy of these variables at that
+# point, so a later edit changes a value nothing reads. Measured by stripping before
+# and after add_subdirectory and reading the subdirectory target's own link.txt.
+#
+# WHY IT IS NOT HARMLESS WHERE IT SITS. It arrives wrapped in --as-needed, before the
+# object files, which with the default linker means it gets dropped. This build passes
+# -fuse-ld=gold, and gold keeps it anyway. Measured in the release image on a shared
+# object using std::string and exceptions, all with -static-libstdc++ -static-libgcc:
+#
+#   bfd,       -lstdc++ present   -> no libstdc++ NEEDED
+#   gold,      -lstdc++ present   -> libstdc++.so.6 NEEDED
+#   gold+lto,  -lstdc++ present   -> libstdc++.so.6 NEEDED
+#   gold+lto,  -lstdc++ removed   -> no libstdc++ NEEDED
+#
+# So the fragment has to go, wherever it sits. Matched by regex rather than as one
+# exact string, so a spacing change cannot make the removal silently stop working.
+# The resolved values are printed because the check at the end of this file reports a
+# property of the artifact, and the first question is always what was on the link line.
+# Only these three can carry it. rules_foreign_cc puts the toolchain's link libraries
+# into CMAKE_{SHARED,MODULE,EXE}_LINKER_FLAGS_INIT, and filters the STANDARD_LIBRARIES
+# variables down to static-runtime flags, so touching those would strip nothing and
+# would additionally shadow the cache entry enable_language(C) creates later.
+#
+# The whole push/pop group goes at once. Removing only -lstdc++ from inside it would
+# leave an unbalanced --push-state, which both linkers reject outright:
+#   ld.gold: error: unbalanced --push-state/--pop-state
+# The bare form is matched separately, with a boundary, so -lstdc++fs and
+# -lstdc++_nonshared are left alone.
+foreach(_torch_tensorrt_linker_flags
+        CMAKE_MODULE_LINKER_FLAGS
+        CMAKE_SHARED_LINKER_FLAGS
+        CMAKE_EXE_LINKER_FLAGS)
+  string(REGEX REPLACE "-Wl,--push-state,-as-needed +-lstdc\\+\\+ +-Wl,--pop-state"
+    "" ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
+  string(REGEX REPLACE "(^| )-lstdc\\+\\+( |$)" "\\2"
+    ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
+  message(STATUS "torch_tensorrt: ${_torch_tensorrt_linker_flags} = "
+    "[${${_torch_tensorrt_linker_flags}}]")
+endforeach()
+
+# Removing the dynamic -lstdc++ is only half of it: something still has to supply the
+# C++ runtime. The Bazel toolchain hands CMake the C driver, gcc, as CMAKE_CXX_COMPILER,
+# and gcc links no C++ runtime at all. -static-libstdc++ is silently a no-op for it,
+# which is exactly why the toolchain injected an explicit -lstdc++ in the first place.
+#
+# So put the static archive in its place, and put it where an archive can actually do
+# something. An archive only pulls the members that resolve symbols already undefined
+# when it is scanned, so ahead of the object files it contributes nothing. CMake appends
+# CMAKE_CXX_STANDARD_LIBRARIES after the objects, which is the position that works, and
+# is the same placement rules_foreign_cc documents for exactly this problem.
+#
+# Measured in the release image with the build's own flags (gcc driver, -fuse-ld=gold,
+# -flto=auto, --gc-sections) on a shared object that stores a std::exception_ptr:
+#
+#                                        UND _M_addref   libstdc++ NEEDED
+#   dynamic -lstdc++ before objects            2                1
+#   nothing at all                             2                0
+#   the static archive before objects          2                0
+#   the static archive after objects           0                0
+#
+# Only the last satisfies both halves of the check at the end of this file. Named with
+# -l: rather than whole-archived: forcing every member in is what previously collided
+# with libstdc++_nonshared.a, and nothing pulls that archive in now because the
+# libstdc++.so linker script that used to reference it is no longer on the link line.
+execute_process(
+  COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.a
+  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBSTDCXX
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(
+  COMMAND "${CMAKE_CXX_COMPILER}" -print-libgcc-file-name
+  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBGCC
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
+   NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBGCC}")
+  message(FATAL_ERROR "A static C++ runtime is required to build the ExecuTorch runtime wheel")
+endif()
+# Named by the path the driver reports rather than as -l:libstdc++.a, so the archive
+# that gets linked is the one just checked for existence and not whichever copy a -L on
+# the link line happens to shadow it with.
+string(APPEND CMAKE_CXX_STANDARD_LIBRARIES " \"${TORCH_TENSORRT_STATIC_LIBSTDCXX}\"")
+# try_compile forwards CMAKE_EXE_LINKER_FLAGS but not CMAKE_CXX_STANDARD_LIBRARIES, so
+# without this a C++ probe loses the runtime the strip above removed and reports the
+# feature absent instead of failing.
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_CXX_STANDARD_LIBRARIES)
+message(STATUS "torch_tensorrt: CMAKE_CXX_STANDARD_LIBRARIES now = "
+  "[${CMAKE_CXX_STANDARD_LIBRARIES}]")
 
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" executorch)
 
@@ -110,6 +190,14 @@ target_include_directories(torch_tensorrt_executorch_backend PRIVATE
   "${EXECUTORCH_SOURCE_DIR}/runtime/core/portable_type/c10")
 target_link_libraries(torch_tensorrt_executorch_backend PRIVATE
   CUDA::cudart TensorRT::nvinfer Threads::Threads executorch)
+
+foreach(_torch_tensorrt_required_cuda_target extension_cuda aoti_cuda_shims)
+  if(NOT TARGET ${_torch_tensorrt_required_cuda_target})
+    message(FATAL_ERROR
+      "ExecuTorch did not define ${_torch_tensorrt_required_cuda_target}; the wheel "
+      "ships it and the extensions load it. Check EXECUTORCH_BUILD_CUDA.")
+  endif()
+endforeach()
 
 if(NOT TARGET portable_lib)
   message(FATAL_ERROR "ExecuTorch did not define portable_lib")
@@ -141,40 +229,45 @@ target_link_libraries(portable_lib PRIVATE
   extension_threadpool
   CUDA::cudart TensorRT::nvinfer Threads::Threads)
 
-# The build and validation containers do not necessarily provide the same
-# libstdc++, so both Python extensions link the C++ runtime statically. Setting
-# LINKER_LANGUAGE CXX below is what makes -static-libstdc++ take effect: without
-# it, data_loader is linked by the C driver and its shared object retained an
-# unresolved exception_ptr::_M_addref reference on the older CI runtime. That
-# symbol is supplied by libstdc++_nonshared.a, which the toolchain links for us,
-# so the driver flags plus the correct linker language are sufficient.
-# Probed as a precondition, not as a link input. -static-libstdc++ below makes the
-# driver resolve -lstdc++ to exactly this file, so if it is absent the link fails
-# with a less obvious error. Nothing names it on the link line: doing that is what
-# caused duplicate definitions against libstdc++_nonshared.a.
-execute_process(
-  COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.a
-  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBSTDCXX
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(
-  COMMAND "${CMAKE_CXX_COMPILER}" -print-libgcc-file-name
-  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBGCC
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
-   NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBGCC}")
-  message(FATAL_ERROR "A static C++ runtime is required to build the ExecuTorch runtime wheel")
-endif()
-
-# rules_foreign_cc injects an explicit dynamic -lstdc++ into module and shared
-# linker flags. Remove only that scoped fragment: the driver flags below select the
-# static runtime, and retaining this injected library makes the wheel depend on the
-# build host's CXXABI version.
-foreach(_torch_tensorrt_linker_flags CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS)
-  string(REPLACE "-Wl,--push-state,-as-needed -lstdc++ -Wl,--pop-state" ""
-    ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
+# The build and validation containers do not necessarily provide the same libstdc++,
+# so both Python extensions carry their own copy. What supplies it is the static archive
+# appended to CMAKE_CXX_STANDARD_LIBRARIES near the top of this file, not the driver
+# flags below: CMAKE_CXX_COMPILER here is gcc, the C driver, which links no C++ runtime
+# and treats -static-libstdc++ as a no-op.
+#
+# The driver flags are still set, because they are what a C++ driver would need and the
+# toolchain is not ours to depend on. LINKER_LANGUAGE CXX is still set, because it is
+# what selects CMAKE_CXX_COMPILER and the CXX standard libraries for these targets.
+# Neither is sufficient on its own here.
+#
+# libstdc++.a is named, but not whole-archived. Forcing every member in is what
+# collided with libstdc++_nonshared.a before: on a Red Hat gcc-toolset, libstdc++.so is
+# a text linker script reading
+#
+#   INPUT ( /usr/lib64/libstdc++.so.6 -lstdc++_nonshared )
+#
+# so that archive used to arrive as an independent input and every forced member
+# collided. Nothing reaches it now, because that linker script is no longer on the link
+# line at all.
+# The CUDA backend brings two shared libraries of its own. They get the same treatment,
+# because one left on the host libstdc++ hands that dependency straight back to
+# _portable_lib.so through its own DT_NEEDED.
+set(_torch_tensorrt_executorch_runtime_targets portable_lib data_loader)
+foreach(_torch_tensorrt_cuda_shared_target extension_cuda aoti_cuda_shims)
+  get_target_property(_torch_tensorrt_cuda_shared_type
+    ${_torch_tensorrt_cuda_shared_target} TYPE)
+  # An IMPORTED prebuilt is already linked and cannot be given link options.
+  get_target_property(_torch_tensorrt_cuda_shared_imported
+    ${_torch_tensorrt_cuda_shared_target} IMPORTED)
+  if(_torch_tensorrt_cuda_shared_type STREQUAL "SHARED_LIBRARY" AND
+     NOT _torch_tensorrt_cuda_shared_imported)
+    list(APPEND _torch_tensorrt_executorch_runtime_targets
+      ${_torch_tensorrt_cuda_shared_target})
+  endif()
 endforeach()
 
-foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
+foreach(_torch_tensorrt_executorch_runtime_target
+        IN LISTS _torch_tensorrt_executorch_runtime_targets)
   # Keep the C++ runtime self-contained. The compiler driver otherwise
   # appends a dynamic -lstdc++ even when libstdc++.a is a direct link input,
   # leaving CXXABI-versioned exception_ptr symbols for the host runtime.
@@ -219,11 +312,23 @@ set_target_properties(portable_lib PROPERTIES
   INSTALL_RPATH "${_torch_tensorrt_executorch_runtime_rpath}"
   OUTPUT_NAME "_portable_lib"
   SUFFIX ".so")
-set_target_properties(data_loader PROPERTIES SUFFIX ".so")
+# data_loader gets $ORIGIN too, so finding those libraries does not depend on which
+# module Python imports first.
+set_target_properties(data_loader PROPERTIES
+  BUILD_WITH_INSTALL_RPATH ON
+  INSTALL_RPATH "${_torch_tensorrt_executorch_runtime_rpath}"
+  SUFFIX ".so")
 
 install(TARGETS portable_lib data_loader LIBRARY DESTINATION lib)
 
-add_custom_target(torch_tensorrt_executorch_portable_lib ALL DEPENDS portable_lib data_loader)
+# ExecuTorch's published wheel ships neither of these and the extensions carry a
+# DT_NEEDED on them, so importing the runtime fails without them. ExecuTorch installs
+# them to CMAKE_INSTALL_LIBDIR, which is lib64 on some distributions, so put them in
+# lib/ as well, beside the extensions.
+install(TARGETS extension_cuda aoti_cuda_shims LIBRARY DESTINATION lib)
+
+add_custom_target(torch_tensorrt_executorch_portable_lib ALL
+  DEPENDS ${_torch_tensorrt_executorch_runtime_targets})
 
 # Guard the two properties the removed whole-archive used to guarantee, on the real
 # artifacts: no dynamic dependency on the build host's libstdc++, and no undefined
@@ -235,8 +340,9 @@ add_custom_target(torch_tensorrt_executorch_portable_lib ALL DEPENDS portable_li
 # directly, because add_custom_command(TARGET) only accepts targets created in this
 # directory and those two come from ExecuTorch's subdirectory.
 #
-# The predicate captures readelf's output and checks its status before inspecting it,
-# so an unreadable artifact fails the build instead of passing quietly.
+# The check lives in a script rather than an inline shell string so it can report what
+# it saw. A bare "has a dynamic libstdc++ dependency" does not say which input added
+# it, and the build logs do not print link lines, so the script prints both.
 find_program(TORCH_TENSORRT_READELF NAMES readelf llvm-readelf)
 if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR
@@ -244,14 +350,16 @@ if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     "statically. Install binutils, or set TORCH_TENSORRT_READELF to a readelf.")
 endif()
 if(TORCH_TENSORRT_READELF)
-  foreach(_torch_tensorrt_checked_target portable_lib data_loader)
+  foreach(_torch_tensorrt_checked_target
+          IN LISTS _torch_tensorrt_executorch_runtime_targets)
     add_custom_command(TARGET torch_tensorrt_executorch_portable_lib POST_BUILD
       COMMAND "${CMAKE_COMMAND}" -E echo
         "checking $<TARGET_FILE_NAME:${_torch_tensorrt_checked_target}> links the C++ runtime statically"
-      COMMAND sh -c
-        "dyn=$(\"$0\" -d \"$1\") || { echo \"FATAL: could not inspect $1 with $0\" >&2; exit 1; }; printf %s \"$dyn\" | grep -qE 'NEEDED.*libstdc\\+\\+' && { echo \"FATAL: $1 has a dynamic libstdc++ dependency\" >&2; exit 1; }; syms=$(\"$0\" -Ws \"$1\") || { echo \"FATAL: could not read symbols of $1\" >&2; exit 1; }; printf %s \"$syms\" | grep -qE 'UND .*_M_addref' && { echo \"FATAL: $1 has an undefined exception_ptr::_M_addref\" >&2; exit 1; }; exit 0"
+      COMMAND sh
+        "${CMAKE_CURRENT_LIST_DIR}/check_static_cxx_runtime.sh"
         "${TORCH_TENSORRT_READELF}"
         "$<TARGET_FILE:${_torch_tensorrt_checked_target}>"
+        "$<TARGET_PROPERTY:${_torch_tensorrt_checked_target},BINARY_DIR>/CMakeFiles/${_torch_tensorrt_checked_target}.dir/link.txt"
       VERBATIM)
   endforeach()
 endif()
