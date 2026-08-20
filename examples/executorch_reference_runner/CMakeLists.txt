@@ -28,9 +28,8 @@ set(TORCHTRT_EXECUTORCH_SOURCE_DIR
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_PYBIND OFF CACHE BOOL "" FORCE)
-# Needed even for a TensorRT-only program: its delegate I/O is tagged CUDA, so
-# ExecuTorch inserts device copies, and only the CUDA backend registers the allocator
-# those copies look up. EXTENSION_TENSOR is its companion in ExecuTorch's presets.
+# Not removable: only this backend registers the allocator the exported program's
+# device copies look up, even when TensorRT is the sole delegate.
 set(EXECUTORCH_BUILD_CUDA ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_TENSOR ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)

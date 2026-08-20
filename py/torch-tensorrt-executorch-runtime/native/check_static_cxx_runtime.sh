@@ -34,23 +34,17 @@ if printf %s "${dyn}" | grep -qE 'NEEDED.*libstdc\+\+'; then
     fail "${target} has a dynamic libstdc++ dependency"
 fi
 
-# A missing C++ runtime leaves mangled C++ symbols undefined. This used to look for
-# exception_ptr::_M_addref alone, which only appears when something COPIES an
-# exception_ptr: an object that never does passed the check and still failed to load
-# with "undefined symbol: _ZTISt9exception". Measured on this toolchain, comparing a
-# shared object linked with the static archive against the same one linked without it:
-#
-#   pattern                                 healthy   unloadable
-#   UND .*_M_addref                            0          0      <- missed it
-#   UND .*(_ZSt|_ZNSt|__cxa_|__gxx_personality) 6         46      <- false positive
-#   UND .*(_ZS|_ZN|_ZT|__gxx_personality)      0         40      <- used here
-#
-# __cxa_atexit and __cxa_finalize come from glibc and are undefined in a healthy
-# artifact, which is why the middle pattern cannot be used.
+# Narrow on purpose. exception_ptr::_M_addref is emitted only when something copies an
+# exception_ptr, so this misses an artifact that never does. Widening it to any
+# undefined mangled C++ symbol was tried and reverted: this extension links
+# libtorch_cpu, libc10 and libtorch_python, so it legitimately carries undefined
+# _ZN... symbols that resolve from those at load time, and the wider pattern rejected
+# a good artifact. Telling the two apart needs to know which NEEDED library supplies
+# each symbol, which is more than a grep.
 syms=$("${readelf_bin}" -Ws "${target}") ||
     fail "could not read symbols of ${target}"
-if printf %s "${syms}" | grep -qE 'UND .*(_ZS|_ZN|_ZT|__gxx_personality)'; then
-    fail "${target} has undefined C++ runtime symbols"
+if printf %s "${syms}" | grep -qE 'UND .*_M_addref'; then
+    fail "${target} has an undefined exception_ptr::_M_addref"
 fi
 
 exit 0
