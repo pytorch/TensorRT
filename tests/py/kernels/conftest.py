@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+
 import torch_tensorrt
 
 skip_no_cuda = pytest.mark.skipif(
@@ -15,20 +16,25 @@ skip_no_qdp = pytest.mark.skipif(
 )
 
 
-def _has_cuda_core() -> bool:
-    """True if the cuda-core ``cuda.core`` API (NVRTC/QDP backend) is importable."""
+def _has_module(*names: str) -> bool:
+    """True if any of ``names`` is importable."""
     import importlib.util
 
-    for mod in ("cuda.core", "cuda.core.experimental"):
+    for name in names:
         try:
-            if importlib.util.find_spec(mod) is not None:
+            if importlib.util.find_spec(name) is not None:
                 return True
         except (ImportError, ModuleNotFoundError, ValueError):
             continue
     return False
 
 
-_HAS_CUDA_CORE = _has_cuda_core()
+skip_no_cutile = pytest.mark.skipif(
+    not _has_module("cuda.tile"), reason="cuda-tile not installed"
+)
+
+# The cuda-core ``cuda.core`` API is the NVRTC/QDP backend.
+_HAS_CUDA_CORE = _has_module("cuda.core", "cuda.core.experimental")
 
 skip_no_cuda_core = pytest.mark.skipif(
     not _HAS_CUDA_CORE,
@@ -131,6 +137,47 @@ def register_once(register_fn):
         register_fn()
     except Exception:
         pass
+
+
+def assert_ran_in_engine(trt_module, op_name: str) -> None:
+    """Fail unless the op was actually lowered into a TensorRT engine.
+
+    Numeric agreement alone proves nothing: an op TensorRT declines falls back
+    to its eager impl and produces exactly the same answer. What distinguishes
+    the two is whether a call to the op survives in the top-level graph
+    alongside the ``_run_on_acc_*`` engine submodules.
+    """
+    _, name = op_name.split("::")
+    leftover = [
+        node
+        for node in trt_module.graph.nodes
+        if node.op == "call_function" and name in str(node.target)
+    ]
+    assert not leftover, (
+        f"'{op_name}' was not converted — it is still called in the top-level "
+        f"graph ({leftover}), so the result came from PyTorch, not the plugin."
+    )
+    assert any(
+        node.op == "call_module" and "_run_on_acc" in str(node.target)
+        for node in trt_module.graph.nodes
+    ), "no TensorRT engine submodule in the compiled graph"
+
+
+def compile_op(op_name: str, inputs, **compile_kwargs):
+    """Compile a module that does nothing but call ``op_name`` on ``inputs``."""
+    ns, name = op_name.split("::")
+    target = getattr(getattr(torch.ops, ns), name)
+
+    # torch.export matches dynamic_shapes against the forward signature, so it
+    # needs real positional parameters — with ``*args`` it reads the module as
+    # taking one tuple and rejects the inputs.
+    args = ", ".join(f"x{index}" for index in range(len(inputs)))
+    scope: dict = {"_target": target}
+    exec(f"def forward(self, {args}):\n    return _target({args})\n", scope)
+    model = type("_OpModule", (torch.nn.Module,), {"forward": scope["forward"]})()
+
+    compile_kwargs.setdefault("min_block_size", 1)
+    return torch_tensorrt.compile(model.cuda().eval(), inputs=inputs, **compile_kwargs)
 
 
 def make_sigmoid_aot(block_size: int = 256):
