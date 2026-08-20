@@ -1,22 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
 
-# rules_foreign_cc initializes these flags with an explicit dynamic -lstdc++.
-# CMake consumes the *_INIT variables when project() enables CXX, so removing
-# it later from CMAKE_{MODULE,SHARED}_LINKER_FLAGS is too late on some CMake
-# versions: the dynamic runtime is already retained in the generated link
-# rule. Preserve the remaining Bazel toolchain flags, but remove only that
-# dependency before CMake initializes the language.
-foreach(_torch_tensorrt_linker_flags_init
-    CMAKE_MODULE_LINKER_FLAGS_INIT
-    CMAKE_SHARED_LINKER_FLAGS_INIT)
-  string(REPLACE "-Wl,--push-state,-as-needed -lstdc++ -Wl,--pop-state" ""
-    _torch_tensorrt_sanitized_linker_flags
-    "${${_torch_tensorrt_linker_flags_init}}")
-  set(${_torch_tensorrt_linker_flags_init}
-    "${_torch_tensorrt_sanitized_linker_flags}" CACHE STRING
-    "Torch-TensorRT sanitized linker flags" FORCE)
-endforeach()
-
 project(torch_tensorrt_executorch_runtime LANGUAGES CXX)
 
 if(NOT EXECUTORCH_SOURCE_DIR AND EXECUTORCH_CMAKE_FILE)
@@ -95,6 +78,43 @@ set(EXECUTORCH_BUILD_XNNPACK ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# rules_foreign_cc puts an explicit dynamic -lstdc++ in the Bazel toolchain's linker
+# flags. Retaining it makes the wheel depend on the build host's CXXABI version, so
+# remove it before anything that links is defined.
+#
+# Two things have to be right, and each was got wrong before.
+#
+# WHERE. Removing it later, after add_subdirectory below, is too late: the extensions
+# are created in ExecuTorch's directory and take their copy of these variables at that
+# point, so a later edit changes a value nothing reads. Measured by stripping before
+# and after add_subdirectory and reading the subdirectory target's own link.txt.
+#
+# WHY IT IS NOT HARMLESS WHERE IT SITS. It arrives wrapped in --as-needed, before the
+# object files, which with the default linker means it gets dropped. This build passes
+# -fuse-ld=gold, and gold keeps it anyway. Measured in the release image on a shared
+# object using std::string and exceptions, all with -static-libstdc++ -static-libgcc:
+#
+#   bfd,       -lstdc++ present   -> no libstdc++ NEEDED
+#   gold,      -lstdc++ present   -> libstdc++.so.6 NEEDED
+#   gold+lto,  -lstdc++ present   -> libstdc++.so.6 NEEDED
+#   gold+lto,  -lstdc++ removed   -> no libstdc++ NEEDED
+#
+# So the fragment has to go, wherever it sits. Matched by regex rather than as one
+# exact string, so a spacing change cannot make the removal silently stop working.
+# The resolved values are printed because the check at the end of this file reports a
+# property of the artifact, and the first question is always what was on the link line.
+foreach(_torch_tensorrt_linker_flags
+        CMAKE_MODULE_LINKER_FLAGS
+        CMAKE_SHARED_LINKER_FLAGS
+        CMAKE_EXE_LINKER_FLAGS
+        CMAKE_CXX_STANDARD_LIBRARIES
+        CMAKE_C_STANDARD_LIBRARIES)
+  string(REGEX REPLACE "(-Wl,--push-state,-as-needed +)?-lstdc\\+\\+( +-Wl,--pop-state)?"
+    "" ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
+  message(STATUS "torch_tensorrt: ${_torch_tensorrt_linker_flags} = "
+    "[${${_torch_tensorrt_linker_flags}}]")
+endforeach()
+
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" executorch)
 
 add_library(torch_tensorrt_executorch_backend STATIC
@@ -165,38 +185,6 @@ if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
   message(FATAL_ERROR "A static C++ runtime is required to build the ExecuTorch runtime wheel")
 endif()
 
-# rules_foreign_cc injects an explicit dynamic -lstdc++ from the Bazel toolchain.
-# Retaining it makes the wheel depend on the build host's CXXABI version, so drop it
-# wherever it lands.
-#
-# Position on the link line is what decides whether it matters, measured in the
-# release image with a shared object that uses std::string and exceptions:
-#
-#   -static-libstdc++ -static-libgcc                       -> no libstdc++ NEEDED
-#   ... plus -lstdc++ BEFORE the objects                    -> no libstdc++ NEEDED
-#   ... plus -lstdc++ AFTER the objects                     -> libstdc++.so.6 NEEDED
-#
-# Before the objects nothing is undefined yet, so --as-needed drops it. After them the
-# libstdc++ symbols are still unresolved, because -static-libstdc++ makes the driver
-# append libstdc++.a at the very end, so --as-needed keeps it and the NEEDED sticks.
-# CMake puts CMAKE_*_LINKER_FLAGS before the objects and CMAKE_*_STANDARD_LIBRARIES
-# after them, so the standard-libraries variables are the ones that can actually hurt.
-#
-# Matched by regex rather than as one exact string: the previous exact-string match
-# covered only the flags variables and would also miss a spacing change silently.
-foreach(_torch_tensorrt_linker_flags
-        CMAKE_MODULE_LINKER_FLAGS
-        CMAKE_SHARED_LINKER_FLAGS
-        CMAKE_EXE_LINKER_FLAGS
-        CMAKE_CXX_STANDARD_LIBRARIES
-        CMAKE_C_STANDARD_LIBRARIES)
-  string(REGEX REPLACE "(-Wl,--push-state,-as-needed +)?-lstdc\\+\\+( +-Wl,--pop-state)?"
-    "" ${_torch_tensorrt_linker_flags} "${${_torch_tensorrt_linker_flags}}")
-  # Reported unconditionally: when the check at the end of this file trips, the first
-  # question is always what ended up on the link line.
-  message(STATUS "torch_tensorrt: ${_torch_tensorrt_linker_flags} = "
-    "[${${_torch_tensorrt_linker_flags}}]")
-endforeach()
 
 foreach(_torch_tensorrt_executorch_runtime_target portable_lib data_loader)
   # Keep the C++ runtime self-contained. The compiler driver otherwise
