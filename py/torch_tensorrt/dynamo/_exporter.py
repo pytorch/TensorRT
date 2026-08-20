@@ -399,6 +399,17 @@ def create_trt_exp_program(
             # the placeholders and fails only later, so size it from them instead.
             in_spec = pytree.tree_flatten((tuple(range(len(input_nodes))), {}))[1]
         else:
+            # pytree flattens kwargs in dict insertion order, but the graph
+            # consumes placeholders positionally, so kwargs passed out of
+            # signature order would silently bind to the wrong input. Each kwarg
+            # placeholder's target is its key, so when the trailing placeholder
+            # targets match the kwarg keys, reorder the kwargs into that order.
+            if example_kwargs:
+                kwarg_targets = [
+                    node.target for node in input_nodes[len(example_args) :]
+                ]
+                if set(kwarg_targets) == set(example_kwargs):
+                    example_kwargs = {key: example_kwargs[key] for key in kwarg_targets}
             in_spec = pytree.tree_flatten((example_args, example_kwargs))[1]
         out_spec = pytree.tree_flatten(tuple(output_nodes))[1]
         assert in_spec.num_leaves == len(input_nodes), (

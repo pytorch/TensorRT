@@ -6,9 +6,18 @@ import operator
 
 import pytest
 import torch
+from torch.export.graph_signature import (
+    ExportGraphSignature,
+    InputKind,
+    InputSpec,
+    OutputKind,
+    OutputSpec,
+    TensorArgument,
+)
 from torch_tensorrt.dynamo._exporter import (
     create_trt_exp_program,
     inline_torch_modules,
+    lift,
 )
 
 
@@ -65,10 +74,18 @@ def test_inline_torch_modules_preserves_all_submodule_outputs():
     consumer after inlining. Regression: a mis-wired input orphaned one submodule
     output, which dead-code elimination then pruned, leaving a downstream consumer
     (or, in the hybrid case, a TensorRT engine) short an output at runtime.
+
+    The submodule's first placeholder is deliberately named "y" so it collides
+    with the parent's second input "y", even though the first *argument* passed is
+    the parent's "x". Wiring by position binds that first input to "x" and passes;
+    wiring by name would instead pre-seed "y" to the parent's "y", drop the "x"
+    binding, and fail with a missing positional argument. That collision is what
+    makes the test discriminate between the two.
     """
-    # Submodule returns (a + b, a - b); both outputs are consumed downstream.
+    # Submodule returns (y + b, y - b); both outputs are consumed downstream.
+    # First placeholder named "y" to collide with the parent's second input.
     sub_graph = torch.fx.Graph()
-    a = sub_graph.placeholder("a")
+    a = sub_graph.placeholder("y")
     b = sub_graph.placeholder("b")
     add = sub_graph.call_function(torch.add, (a, b))
     sub = sub_graph.call_function(torch.sub, (a, b))
@@ -173,3 +190,87 @@ def test_create_trt_exp_program_rebuilds_in_spec_without_inputs():
     out = ep.module()(x)
     out = out[0] if isinstance(out, (tuple, list)) else out
     assert torch.allclose(out, x.relu())
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_reorders_kwargs_to_placeholder_order():
+    """On the plain-CodeGen fallback, create_trt_exp_program must build in_spec in
+    placeholder order even when kwargs are supplied in a different order.
+
+    Regression: pytree flattens kwargs in dict insertion order while the graph
+    consumes placeholders positionally, so kwargs passed out of signature order
+    silently bound each value to the wrong input. a - b with reversed kwargs must
+    still compute a - b.
+    """
+
+    class Sub(torch.nn.Module):
+        def forward(self, a, b):
+            return a - b
+
+    gm = torch.export.export(
+        Sub().eval(), (), {"a": torch.tensor(10.0), "b": torch.tensor(3.0)}
+    ).module()
+    # Force the plain-CodeGen fallback branch (see the no-input test above).
+    for node in list(gm.graph.nodes):
+        if node.op == "call_module" and node.target == "_guards_fn":
+            gm.graph.erase_node(node)
+            break
+    gm.graph.set_codegen(torch.fx.graph.CodeGen())
+    gm.graph.lint()
+    gm.recompile()
+
+    # Kwargs supplied in reverse of the (a, b) placeholder order.
+    ep = create_trt_exp_program(
+        gm, kwarg_inputs={"b": torch.tensor(3.0), "a": torch.tensor(10.0)}
+    )
+    # in_spec must record the kwargs in placeholder order (a, b), not caller order.
+    assert ep.call_spec.in_spec.children()[1].context == ["a", "b"]
+
+    out = ep.module()(a=torch.tensor(10.0), b=torch.tensor(3.0))
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    assert torch.allclose(out, torch.tensor(7.0))
+
+
+@pytest.mark.unit
+def test_lift_sets_persistent_true_on_buffer_spec():
+    """lift() must mark a lifted BUFFER InputSpec as persistent.
+
+    torch>=2.3 asserts an explicit persistent flag on BUFFER specs
+    ("Failed to specify persistent flag on BUFFER"); a registered buffer that
+    reaches lift() through the in-state_dict branch is persistent by construction
+    (non-persistent buffers are excluded from state_dict and lifted as constants).
+    This pins _exporter.py so a dropped persistent= would fail loudly here.
+    """
+    from torch._subclasses.fake_tensor import FakeTensorMode
+
+    fake_mode = FakeTensorMode()
+    graph = torch.fx.Graph()
+    x = graph.placeholder("x")
+    with fake_mode:
+        x.meta["val"] = torch.empty(3, 4)
+    buf_attr = graph.get_attr("my_buffer")
+    add = graph.call_function(torch.add, (x, buf_attr))
+    graph.output((add,))
+
+    root = torch.nn.Module()
+    root.register_buffer("my_buffer", torch.zeros(3, 4))
+    gm = torch.fx.GraphModule(root, graph)
+
+    graph_signature = ExportGraphSignature(
+        input_specs=[
+            InputSpec(InputKind.USER_INPUT, TensorArgument(name="x"), target=None)
+        ],
+        output_specs=[
+            OutputSpec(
+                OutputKind.USER_OUTPUT, TensorArgument(name=add.name), target=None
+            )
+        ],
+    )
+
+    _, lifted_signature, _, _ = lift(gm, graph_signature)
+
+    buffer_specs = [
+        spec for spec in lifted_signature.input_specs if spec.kind == InputKind.BUFFER
+    ]
+    assert len(buffer_specs) == 1
+    assert buffer_specs[0].persistent is True
