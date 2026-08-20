@@ -339,3 +339,76 @@ Benchmarking Checklist
      - For latency workloads: enable CUDA graphs
    * - ☐
      - For large models: try weight streaming or INT8 quantization
+
+----
+
+Global Performance Tuner
+------------------------
+
+TensorRT's `Global Performance Tuner <https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/tuning.html>`_
+searches internal builder knobs (a *build route*) for faster engines. Torch-TensorRT
+exposes the same capability in-process for Dynamo TRT subgraphs.
+
+**Requirements:** TensorRT with Global Performance Tuner enabled (enterprise Linux
+builds >= 11.1; currently unavailable on TensorRT-RTX / Windows). Probe with
+``torch_tensorrt.dynamo.is_global_perf_tuner_available()``.
+
+**Discover knobs** (``trtexec --helpBuildRoute`` equivalent)::
+
+    from torch_tensorrt.dynamo import get_all_build_routes
+
+    knobs = get_all_build_routes()
+    print(knobs["tuner_version"], len(knobs["tuner_options"]))
+
+**Apply a known route** (``trtexec --setBuildRoute`` equivalent)::
+
+    trt_model = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        arg_inputs=inputs,
+        build_route="-slice_fusion=off -kgen:codegen:cuda_tile=3",
+    )
+
+**Sweep routes** (``trtexec --tuneBuildRoutes`` equivalent)::
+
+    trt_model = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        arg_inputs=inputs,
+        tune_build_routes="-match_ragged_mha=[on|off] -copy_ppg=[on|off]",
+        tuning_search="fast",  # or "full" / "mixed"
+        accuracy_threshold=0.01,
+        accuracy_algorithm="cos",
+        tuning_cache_file="/tmp/torch_trt_tune.jsonl",
+    )
+
+See also the runnable attention walkthrough:
+:ref:`global_perf_tuner_attention_example`
+(``examples/dynamo/global_perf_tuner_attention_example.py``).
+
+Notes:
+
+- Tuning runs **per TRT partition**. Prefer ``require_full_compilation=True`` when you
+  want a single-engine sweep similar to ``trtexec``.
+- ``tuning_cache_file`` is treated as a **base path**. Each TRT partition writes
+  ``<base>.<partition_key>.jsonl`` so multi-subgraph models do not overwrite one
+  another. Use the same base path with ``tuning_continue=True`` to resume; Torch-TensorRT
+  resolves the partition file from the subgraph fingerprint.
+- ``tuning_search="fast"`` is linear in the number of variable knobs; ``full`` is a
+  Cartesian product; ``mixed`` runs ``fast`` search and then ``full`` search only on knobs that improved performance.
+  Prefer ``fast`` / ``mixed`` over large ``full`` expressions.
+- Some knob values are model-dependent and may fail to build (for example certain
+  ``-kgen:codegen:cuda_tile`` settings). Those trials are recorded with ``crash=true``
+  (``error_message`` may include recent TensorRT ERROR log lines) and are skipped when
+  selecting the winner.
+- ``tuning_dry_run=True`` enumerates routes without building TRT engines (incompatible with ``mixed``).
+- Accuracy metrics match trtexec: ``l0`` / ``l1`` / ``l2`` / ``lInf`` / ``cos`` (lower is better).
+  References are eager Torch outputs on the compile example inputs.
+  ``accuracy_atol`` / ``accuracy_rtol`` apply only to ``l0``.
+- Resume an interrupted sweep with ``tuning_continue=True`` and the same
+  ``tuning_cache_file`` base path (Torch-TensorRT JSONL header; not interchangeable with
+  ``trtexec`` cache files).
+- Gains are model-, GPU-, and TensorRT-version-dependent; re-tune after hardware or
+  TensorRT upgrades. Non-default routes have no cross-release performance guarantee.
+  Engines are not bit-deterministic across builds. Sweeps multiply compile time,
+  especially with multi-partition graphs and ``full`` search. Use ``tuning_timeout_s`` to limit the sweep duration.

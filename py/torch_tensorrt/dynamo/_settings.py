@@ -7,6 +7,10 @@ from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
+    ACCURACY_ALGORITHM,
+    ACCURACY_ATOL,
+    ACCURACY_RTOL,
+    ACCURACY_THRESHOLD,
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     ATTN_BIAS_IS_CAUSAL,
     AUTOCAST_CALIBRATION_DATALOADER,
@@ -15,6 +19,7 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_LOW_PRECISION_TYPE,
     AUTOCAST_MAX_DEPTH_OF_REDUCTION,
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
+    BUILD_ROUTE,
     CACHE_BUILT_ENGINES,
     CPU_MEMORY_BUDGET,
     DECOMPOSE_ATTENTION,
@@ -49,6 +54,13 @@ from torch_tensorrt.dynamo._defaults import (
     TILING_OPTIMIZATION_LEVEL,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
+    TUNE_BUILD_ROUTE_FILE,
+    TUNE_BUILD_ROUTES,
+    TUNING_CACHE_FILE,
+    TUNING_CONTINUE,
+    TUNING_DRY_RUN,
+    TUNING_SEARCH,
+    TUNING_TIMEOUT_S,
     USE_DISTRIBUTED_MODE_TRACE,
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
@@ -121,6 +133,18 @@ class CompilationSettings:
             the final output back to FP16.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
+        build_route (str): TensorRT Global Performance Tuner build route string (space-separated "-knob=value" tokens). Empty uses the default route. This feature requires TensorRT with Global Performance Tuner enabled; currently unavailable on TensorRT-RTX / Windows.
+        tune_build_routes (str): Build-route expression for an in-process autotuning sweep (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). Empty disables tuning.
+        tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".
+        tuning_search (str): Search algorithm: "fast", "full", or "mixed". Default is "fast". "fast" runs a baseline with all knobs at default, then varies one knob at a time. "full" runs a full grid search. "mixed" runs "fast" first, and then "full" only on knobs that improved performance.
+        tuning_timeout_s (int): Time budget for the entire tuning process. The current iteration finishes before the loop stops. Use -1 (default) to disable the timeout. Helpful for capping large "full" sweeps.
+        tuning_cache_file (Optional[str]): JSONL path for tuning results / resume.
+        tuning_continue (bool): Resume an interrupted sweep from "tuning_cache_file". When it is True, "tuning_cache_file" must be provided; "tune_build_routes", "tune_build_route_file", and "tuning_dry_run" must not be provided.
+        tuning_dry_run (bool): Enumerate candidate routes without building engines.
+        accuracy_threshold (Optional[float]): Max allowed accuracy loss between the engine outputs and eager Torch reference outputs; routes with accuracy loss above this threshold are excluded from best-engine selection. "None" skips accuracy checks.
+        accuracy_algorithm (str): Loss metric: "l0", "l1", "l2", "lInf", or "cos" (lower is better).
+        accuracy_atol (float): Absolute tolerance for "accuracy_algorithm="l0"".
+        accuracy_rtol (float): Relative tolerance for "accuracy_algorithm="l0"".
     """
 
     workspace_size: int = WORKSPACE_SIZE
@@ -180,6 +204,18 @@ class CompilationSettings:
     decompose_attention: bool = DECOMPOSE_ATTENTION
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
     fallback_data_dependent_ops: bool = FALLBACK_DATA_DEPENDENT_OPS
+    build_route: str = BUILD_ROUTE
+    tune_build_routes: str = TUNE_BUILD_ROUTES
+    tune_build_route_file: Optional[str] = TUNE_BUILD_ROUTE_FILE
+    tuning_search: str = TUNING_SEARCH
+    tuning_timeout_s: int = TUNING_TIMEOUT_S
+    tuning_cache_file: Optional[str] = TUNING_CACHE_FILE
+    tuning_continue: bool = TUNING_CONTINUE
+    tuning_dry_run: bool = TUNING_DRY_RUN
+    accuracy_threshold: Optional[float] = ACCURACY_THRESHOLD
+    accuracy_algorithm: str = ACCURACY_ALGORITHM
+    accuracy_atol: float = ACCURACY_ATOL
+    accuracy_rtol: float = ACCURACY_RTOL
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -196,6 +232,18 @@ class CompilationSettings:
     def __setstate__(self, state: dict[str, Any]) -> None:
         state.pop("use_python_runtime", None)
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
+        state.setdefault("build_route", BUILD_ROUTE)
+        state.setdefault("tune_build_routes", TUNE_BUILD_ROUTES)
+        state.setdefault("tune_build_route_file", TUNE_BUILD_ROUTE_FILE)
+        state.setdefault("tuning_search", TUNING_SEARCH)
+        state.setdefault("tuning_timeout_s", TUNING_TIMEOUT_S)
+        state.setdefault("tuning_cache_file", TUNING_CACHE_FILE)
+        state.setdefault("tuning_continue", TUNING_CONTINUE)
+        state.setdefault("tuning_dry_run", TUNING_DRY_RUN)
+        state.setdefault("accuracy_threshold", ACCURACY_THRESHOLD)
+        state.setdefault("accuracy_algorithm", ACCURACY_ALGORITHM)
+        state.setdefault("accuracy_atol", ACCURACY_ATOL)
+        state.setdefault("accuracy_rtol", ACCURACY_RTOL)
         self.__dict__.update(state)
 
 
@@ -222,6 +270,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "autocast_calibration_dataloader",
     "decompose_attention",
     "attn_bias_is_causal",
+    "build_route",
 }
 
 

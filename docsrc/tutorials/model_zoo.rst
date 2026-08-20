@@ -10,6 +10,7 @@ and benchmark against eager PyTorch.
    :caption: Vision
 
    Example: Compiling ResNet with dynamic shapes <_rendered_examples/dynamo/torch_compile_resnet_example>
+   Example: Global Performance Tuner <_rendered_examples/dynamo/global_perf_tuner_attention_example>
    Example: Compiling BERT with torch.compile <_rendered_examples/dynamo/torch_compile_transformers_example>
    Example: Engine Caching (BERT) <_rendered_examples/dynamo/engine_caching_bert_example>
 

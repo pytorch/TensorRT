@@ -68,6 +68,20 @@ DECOMPOSE_ATTENTION = False
 ATTN_BIAS_IS_CAUSAL = True
 FALLBACK_DATA_DEPENDENT_OPS = False
 
+# Global Performance Tuner (TensorRT build-route knobs)
+BUILD_ROUTE = ""
+TUNE_BUILD_ROUTES = ""
+TUNE_BUILD_ROUTE_FILE = None
+TUNING_SEARCH = "fast"
+TUNING_TIMEOUT_S = -1
+TUNING_CACHE_FILE = None
+TUNING_CONTINUE = False
+TUNING_DRY_RUN = False
+ACCURACY_THRESHOLD = None
+ACCURACY_ALGORITHM = "l0"
+ACCURACY_ATOL = 1e-5
+ACCURACY_RTOL = 1e-5
+
 if platform.system() == "Linux":
     import pwd
 
