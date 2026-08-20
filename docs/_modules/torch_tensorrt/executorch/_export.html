@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=765c8b8f"></script>
+    <script src="../../../_static/documentation_options.js?v=a14d38ce"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -717,6 +717,41 @@ document.write(`
     <span class="k">return</span> <span class="kc">None</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_apply_weight_streaming_budget</span><span class="p">(</span>
+    <span class="n">method_compile_specs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span>
+    <span class="n">weight_streaming_budget_per_engine</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Bake the per-engine weight streaming budget into every method's compile specs.</span>
+
+<span class="sd">    The raw compile spec is rejected even when no budget is given, because writing it</span>
+<span class="sd">    by hand skips the validation here and silently disagrees with a budget passed the</span>
+<span class="sd">    supported way.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.compile_spec_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompileSpec</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">normalize_weight_streaming_budget_per_engine</span><span class="p">,</span>
+        <span class="n">WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="n">WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY</span>
+            <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">specs</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"compile_specs for </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> carries a "</span>
+                <span class="sa">f</span><span class="s2">"CompileSpec(</span><span class="si">{</span><span class="n">WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY</span><span class="si">!r}</span><span class="s2">, ...). Pass "</span>
+                <span class="s2">"weight_streaming_budget_per_engine instead."</span>
+            <span class="p">)</span>
+    <span class="n">spec_value</span> <span class="o">=</span> <span class="n">normalize_weight_streaming_budget_per_engine</span><span class="p">(</span>
+        <span class="n">weight_streaming_budget_per_engine</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">spec_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">for</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY</span><span class="p">,</span> <span class="n">spec_value</span><span class="p">))</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_per_method_values</span><span class="p">(</span>
     <span class="n">value</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">method_names</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
@@ -769,6 +804,7 @@ document.write(`
     <span class="n">compile_config</span><span class="p">:</span> <span class="s2">"EdgeCompileConfig | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">constant_methods</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">generate_etrecord</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">weight_streaming_budget_per_engine</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"EdgeProgramManager"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Prepare TensorRT-compiled programs for composable ExecuTorch lowering.</span>
 
@@ -843,6 +879,18 @@ document.write(`
 <span class="sd">            ``source``.</span>
 <span class="sd">        generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.</span>
 <span class="sd">            This copies the whole program, engines included.</span>
+<span class="sd">        weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that</span>
+<span class="sd">            may stay resident in GPU memory, with the rest streamed from host memory.</span>
+<span class="sd">            It applies to **each** TensorRT engine separately, not as a total for the</span>
+<span class="sd">            program, so a program with N engines can hold up to N times this value</span>
+<span class="sd">            resident: every delegate is initialized when its method loads and they stay</span>
+<span class="sd">            resident together. Requires the engine to have been compiled with</span>
+<span class="sd">            ``enable_weight_streaming=True``; it is ignored, with a log message, on an</span>
+<span class="sd">            engine that cannot stream. Leave it unset, the default, so each engine gets</span>
+<span class="sd">            TensorRT's own automatic budget, sized against free memory on the device it</span>
+<span class="sd">            actually loads on. This is a different unit from</span>
+<span class="sd">            ``torch_tensorrt.runtime.weight_streaming(...).device_budget``, which is a</span>
+<span class="sd">            program total split proportionally across engines.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        executorch.exir.EdgeProgramManager: The Edge program, ready for inspection,</span>
@@ -885,6 +933,9 @@ document.write(`
     <span class="n">_reject_misnamed_partitioners</span><span class="p">(</span><span class="n">extra_partitioners</span><span class="p">)</span>
     <span class="n">method_compile_specs</span> <span class="o">=</span> <span class="n">_per_method_values</span><span class="p">(</span>
         <span class="n">compile_specs</span><span class="p">,</span> <span class="n">method_names</span><span class="p">,</span> <span class="s2">"compile_specs"</span>
+    <span class="p">)</span>
+    <span class="n">_apply_weight_streaming_budget</span><span class="p">(</span>
+        <span class="n">method_compile_specs</span><span class="p">,</span> <span class="n">weight_streaming_budget_per_engine</span>
     <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">constant_methods</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -943,6 +994,15 @@ document.write(`
                 <span class="n">name</span><span class="p">,</span>
                 <span class="n">engine_call_counts</span><span class="p">[</span><span class="n">name</span><span class="p">],</span>
             <span class="p">)</span>
+            <span class="k">if</span> <span class="n">weight_streaming_budget_per_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">"weight_streaming_budget_per_engine applies to each of those </span><span class="si">%d</span><span class="s2"> "</span>
+                    <span class="s2">"engines separately, not as a total, so resident weights for </span><span class="si">%s</span><span class="s2"> "</span>
+                    <span class="s2">"can reach </span><span class="si">%d</span><span class="s2"> times the value given."</span><span class="p">,</span>
+                    <span class="n">engine_call_counts</span><span class="p">[</span><span class="n">name</span><span class="p">],</span>
+                    <span class="n">name</span><span class="p">,</span>
+                    <span class="n">engine_call_counts</span><span class="p">[</span><span class="n">name</span><span class="p">],</span>
+                <span class="p">)</span>
         <span class="c1"># Drop this method's engine payloads as soon as they are in the graph.</span>
         <span class="n">rewritten</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">replace_execute_engine</span><span class="p">(</span><span class="n">program</span><span class="p">,</span> <span class="n">resolved_engines</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
         <span class="n">method_partitioners</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
