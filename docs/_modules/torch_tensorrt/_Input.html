@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=1f89f020"></script>
+    <script src="../../_static/documentation_options.js?v=765c8b8f"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -554,18 +554,41 @@ document.write(`
 
 <span class="sd">        Keyword Arguments:</span>
 <span class="sd">            shape (Tuple or List, optional): Static shape of input tensor</span>
-<span class="sd">            min_shape (Tuple or List, optional): Min size of input tensor's shape range</span>
-<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC</span>
-<span class="sd">            opt_shape (Tuple or List, optional): Opt size of input tensor's shape range</span>
-<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC</span>
-<span class="sd">            max_shape (Tuple or List, optional): Max size of input tensor's shape range</span>
-<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC</span>
+<span class="sd">            min_shape (Tuple, List, torch.Size, or NamedTuple, optional): Min size of input tensor's shape range.</span>
+<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.</span>
+<span class="sd">                If a namedtuple is provided, its field names are used as axis names — see the namedtuple shape spec note below.</span>
+<span class="sd">            opt_shape (Tuple, List, torch.Size, or NamedTuple, optional): Opt size of input tensor's shape range.</span>
+<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.</span>
+<span class="sd">                Must be a namedtuple with identical fields to min_shape if min_shape is a namedtuple.</span>
+<span class="sd">            max_shape (Tuple, List, torch.Size, or NamedTuple, optional): Max size of input tensor's shape range.</span>
+<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.</span>
+<span class="sd">                Must be a namedtuple with identical fields to min_shape if min_shape is a namedtuple.</span>
 <span class="sd">            dtype (torch.dtype or torch_tensorrt.dtype): Expected data type for input tensor (default: torch_tensorrt.dtype.float32)</span>
 <span class="sd">            format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</span>
 <span class="sd">            tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).</span>
 <span class="sd">                Note: Entering "None" (or not specifying) will set the bound to [0, 2)</span>
 <span class="sd">            torch_tensor (torch.Tensor): Holds a corresponding torch tensor with this Input.</span>
 <span class="sd">            name (str, optional): Name of this input in the input nn.Module's forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.</span>
+<span class="sd">            shared_dims (Dict[int, str], optional): Maps axis indices to names. Axes with the same name across multiple inputs are exported as a single shared ``torch.export.Dim``. Cannot be combined with a namedtuple min_shape.</span>
+
+<span class="sd">        Note — namedtuple shape spec (shorthand for ``shared_dims``):</span>
+<span class="sd">            Passing a namedtuple as ``min_shape``/``opt_shape``/``max_shape`` is a shorthand</span>
+<span class="sd">            for declaring shared dynamic axes without writing ``shared_dims`` explicitly.</span>
+<span class="sd">            Each field name becomes the axis name; dynamic axes (min != max) with the same</span>
+<span class="sd">            name across inputs are automatically exported as one shared ``torch.export.Dim``.</span>
+<span class="sd">            Static axes (min == max) are ignored. Cannot be combined with ``shared_dims``::</span>
+
+<span class="sd">                from collections import namedtuple</span>
+<span class="sd">                S = namedtuple("shape", ["batch", "seq"])</span>
+<span class="sd">                inputs = [</span>
+<span class="sd">                    torch_tensorrt.Input(min_shape=S(1, 16), opt_shape=S(4, 16), max_shape=S(4, 16),</span>
+<span class="sd">                                         dtype=torch.int64, name="input_ids"),</span>
+<span class="sd">                    torch_tensorrt.Input(min_shape=S(1, 16), opt_shape=S(4, 16), max_shape=S(4, 16),</span>
+<span class="sd">                                         dtype=torch.int64, name="attention_mask"),</span>
+<span class="sd">                ]</span>
+<span class="sd">                # "batch" is dynamic (1→4) on both inputs → one shared Dim("batch")</span>
+<span class="sd">                # "seq" is static (16==16) → no shared dim needed</span>
+
 <span class="sd">        Examples:</span>
 <span class="sd">            - Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)</span>
 <span class="sd">            - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)</span>
@@ -663,7 +686,42 @@ document.write(`
                         <span class="s2">"if you try to run inference with empty tensor inputs."</span>
                     <span class="p">)</span>
 
+                <span class="c1"># Namedtuple shape API: field names encode per-axis dimension names.</span>
+                <span class="c1"># Convert to shared_dims so _tracer.py needs no changes — axes with the</span>
+                <span class="c1"># same name across inputs become one shared torch.export.Dim.</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">],</span> <span class="s2">"_fields"</span><span class="p">):</span>
+                    <span class="n">fields</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
+                        <span class="nb">hasattr</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">],</span> <span class="s2">"_fields"</span><span class="p">)</span>
+                        <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">],</span> <span class="s2">"_fields"</span><span class="p">)</span>
+                    <span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                            <span class="s2">"If min_shape is a namedtuple, opt_shape and max_shape must also be namedtuples"</span>
+                        <span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
+                        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span> <span class="o">==</span> <span class="n">fields</span>
+                        <span class="ow">and</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span> <span class="o">==</span> <span class="n">fields</span>
+                    <span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">"min_shape, opt_shape, max_shape namedtuples must have identical field names"</span>
+                        <span class="p">)</span>
+                    <span class="c1"># Only tag dynamic axes (min != max); static axes need no shared Dim.</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">shared_dims</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="n">i</span><span class="p">:</span> <span class="n">name</span>
+                        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">][</span><span class="n">i</span><span class="p">]</span>
+                    <span class="p">}</span>
+
                 <span class="k">if</span> <span class="s2">"shared_dims"</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shared_dims"</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">],</span> <span class="s2">"_fields"</span><span class="p">):</span>
+                        <span class="c1"># Not allowed:</span>
+                        <span class="c1">#   S = namedtuple('S', ['b', 'c'])</span>
+                        <span class="c1">#   Input(min_shape=S(1,2), opt_shape=S(4,2), max_shape=S(8,2),</span>
+                        <span class="c1">#         shared_dims={0: "b"})   # ← redundant and ambiguous</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">"Cannot specify both a namedtuple min_shape and shared_dims; "</span>
+                            <span class="s2">"use one or the other to name dynamic axes."</span>
+                        <span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">shared_dims</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_shared_dims</span><span class="p">(</span>
                         <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shared_dims"</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
                     <span class="p">)</span>

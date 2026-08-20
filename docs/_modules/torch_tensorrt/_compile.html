@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=1f89f020"></script>
+    <script src="../../_static/documentation_options.js?v=765c8b8f"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1270,7 +1270,9 @@ document.write(`
 <span class="sd">                - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes</span>
 <span class="sd">                  parameter takes precedence.</span>
 <span class="sd">        kwargs: Additional format-specific kwargs. ``partitioners=``,</span>
-<span class="sd">                ``compile_specs=``, and ``backend_config=`` are only used with</span>
+<span class="sd">                ``compile_specs=``, ``backend_config=``, ``constant_methods=``,</span>
+<span class="sd">                ``transform_passes=``, ``compile_config=`` and</span>
+<span class="sd">                ``generate_etrecord=`` are only used with</span>
 <span class="sd">                ``output_format="executorch"``; otherwise they are ignored with a</span>
 <span class="sd">                warning. Pass ``compile_specs=[CompileSpec("target_device",</span>
 <span class="sd">                b"cuda:&lt;i&gt;")]`` to override the default target device (``cuda:0``).</span>
@@ -1284,6 +1286,17 @@ document.write(`
 <span class="sd">                &lt;executorch_save&gt;` for the ``CudaPartitioner`` recipe, its</span>
 <span class="sd">                export-time requirements (CUDA backend + nvcc), and the external</span>
 <span class="sd">                ``.ptd`` weight caveats.</span>
+<span class="sd">                ``constant_methods=``, ``transform_passes=`` and</span>
+<span class="sd">                ``compile_config=`` are forwarded to</span>
+<span class="sd">                ``to_edge_transform_and_lower(...)``. When ``compile_config`` is</span>
+<span class="sd">                omitted it defaults to ``_check_ir_validity=False`` (the TRT engine</span>
+<span class="sd">                graph fails edge IR validation); a caller-supplied</span>
+<span class="sd">                ``compile_config`` is forwarded verbatim, so set</span>
+<span class="sd">                ``_check_ir_validity=False`` on it explicitly when the graph carries</span>
+<span class="sd">                TRT engines.</span>
+<span class="sd">                ``generate_etrecord=True`` writes an ETRecord to</span>
+<span class="sd">                ``&lt;model&gt;_etrecord.bin`` next to the ``.pte`` for use with the</span>
+<span class="sd">                ExecuTorch Inspector.</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
@@ -1311,6 +1324,10 @@ document.write(`
     <span class="n">executorch_partitioners</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"partitioners"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">executorch_compile_specs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"compile_specs"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">executorch_backend_config</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"backend_config"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">executorch_constant_methods</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"constant_methods"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">executorch_transform_passes</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"transform_passes"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">executorch_compile_config</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"compile_config"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">executorch_generate_etrecord</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"generate_etrecord"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">accepted_formats</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1442,6 +1459,26 @@ document.write(`
             <span class="s2">"backend_config= is only used with output_format='executorch' and will "</span>
             <span class="sa">f</span><span class="s2">"be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
         <span class="p">)</span>
+    <span class="k">if</span> <span class="n">executorch_constant_methods</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"constant_methods= is only used with output_format='executorch' and will "</span>
+            <span class="sa">f</span><span class="s2">"be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">executorch_transform_passes</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"transform_passes= is only used with output_format='executorch' and will "</span>
+            <span class="sa">f</span><span class="s2">"be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">executorch_compile_config</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"compile_config= is only used with output_format='executorch' and will "</span>
+            <span class="sa">f</span><span class="s2">"be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">executorch_generate_etrecord</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"generate_etrecord= is only used with output_format='executorch' and will "</span>
+            <span class="sa">f</span><span class="s2">"be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
+        <span class="p">)</span>
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"aot_inductor"</span> <span class="ow">and</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">"Linux"</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">"The AOT Inductor format is only supported on Linux, </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="si">}</span><span class="s2"> is not a supported platform for this format"</span>
@@ -1511,6 +1548,10 @@ document.write(`
                     <span class="n">partitioners</span><span class="o">=</span><span class="n">executorch_partitioners</span><span class="p">,</span>
                     <span class="n">compile_specs</span><span class="o">=</span><span class="n">executorch_compile_specs</span><span class="p">,</span>
                     <span class="n">backend_config</span><span class="o">=</span><span class="n">executorch_backend_config</span><span class="p">,</span>
+                    <span class="n">constant_methods</span><span class="o">=</span><span class="n">executorch_constant_methods</span><span class="p">,</span>
+                    <span class="n">transform_passes</span><span class="o">=</span><span class="n">executorch_transform_passes</span><span class="p">,</span>
+                    <span class="n">compile_config</span><span class="o">=</span><span class="n">executorch_compile_config</span><span class="p">,</span>
+                    <span class="n">generate_etrecord</span><span class="o">=</span><span class="n">executorch_generate_etrecord</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1577,6 +1618,10 @@ document.write(`
                         <span class="n">partitioners</span><span class="o">=</span><span class="n">executorch_partitioners</span><span class="p">,</span>
                         <span class="n">compile_specs</span><span class="o">=</span><span class="n">executorch_compile_specs</span><span class="p">,</span>
                         <span class="n">backend_config</span><span class="o">=</span><span class="n">executorch_backend_config</span><span class="p">,</span>
+                        <span class="n">constant_methods</span><span class="o">=</span><span class="n">executorch_constant_methods</span><span class="p">,</span>
+                        <span class="n">transform_passes</span><span class="o">=</span><span class="n">executorch_transform_passes</span><span class="p">,</span>
+                        <span class="n">compile_config</span><span class="o">=</span><span class="n">executorch_compile_config</span><span class="p">,</span>
+                        <span class="n">generate_etrecord</span><span class="o">=</span><span class="n">executorch_generate_etrecord</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1664,6 +1709,10 @@ document.write(`
                         <span class="n">partitioners</span><span class="o">=</span><span class="n">executorch_partitioners</span><span class="p">,</span>
                         <span class="n">compile_specs</span><span class="o">=</span><span class="n">executorch_compile_specs</span><span class="p">,</span>
                         <span class="n">backend_config</span><span class="o">=</span><span class="n">executorch_backend_config</span><span class="p">,</span>
+                        <span class="n">constant_methods</span><span class="o">=</span><span class="n">executorch_constant_methods</span><span class="p">,</span>
+                        <span class="n">transform_passes</span><span class="o">=</span><span class="n">executorch_transform_passes</span><span class="p">,</span>
+                        <span class="n">compile_config</span><span class="o">=</span><span class="n">executorch_compile_config</span><span class="p">,</span>
+                        <span class="n">generate_etrecord</span><span class="o">=</span><span class="n">executorch_generate_etrecord</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1721,15 +1770,29 @@ document.write(`
                 <span class="s2">"output_format='executorch'"</span>
             <span class="p">)</span>
 
+    <span class="n">generate_etrecord</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"generate_etrecord"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="c1"># export() runs the TRT partitioner and to_edge_transform_and_lower itself; it</span>
+    <span class="c1"># defaults compile_config to get_edge_compile_config() (_check_ir_validity=False,</span>
+    <span class="c1"># since the TRT execute_engine placeholder graph fails edge IR validation) when a</span>
+    <span class="c1"># caller passes none, and forwards a caller-supplied compile_config verbatim.</span>
     <span class="n">edge_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
         <span class="n">exp_program</span><span class="p">,</span>
         <span class="n">partitioners</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"partitioners"</span><span class="p">),</span>
         <span class="n">compile_specs</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"compile_specs"</span><span class="p">),</span>
+        <span class="n">transform_passes</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transform_passes"</span><span class="p">),</span>
+        <span class="n">compile_config</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"compile_config"</span><span class="p">),</span>
+        <span class="n">constant_methods</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"constant_methods"</span><span class="p">),</span>
+        <span class="n">generate_etrecord</span><span class="o">=</span><span class="n">generate_etrecord</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">executorch_program</span> <span class="o">=</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"backend_config"</span><span class="p">))</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
         <span class="n">executorch_program</span><span class="o">.</span><span class="n">write_to_file</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
     <span class="n">_write_external_tensor_data</span><span class="p">(</span><span class="n">executorch_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">generate_etrecord</span><span class="p">:</span>
+        <span class="c1"># Follows ExecuTorch's example convention (e.g. examples/cuda/scripts/export.py):</span>
+        <span class="c1"># persist the ETRecord as "&lt;pte_base&gt;_etrecord.bin" next to the .pte.</span>
+        <span class="n">etrecord_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">file_path</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s2">"_etrecord.bin"</span>
+        <span class="n">executorch_program</span><span class="o">.</span><span class="n">get_etrecord</span><span class="p">()</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">etrecord_path</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_engine_constants_to_python</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="s2">"ExportedProgram"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>

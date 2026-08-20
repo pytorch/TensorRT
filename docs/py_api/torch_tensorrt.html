@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=1f89f020"></script>
+    <script src="../_static/documentation_options.js?v=765c8b8f"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -748,7 +748,9 @@ parameter takes precedence.</p></li>
 </ul>
 </p></li>
 <li><p><strong>kwargs</strong> – Additional format-specific kwargs. <code class="docutils literal notranslate"><span class="pre">partitioners=</span></code>,
-<code class="docutils literal notranslate"><span class="pre">compile_specs=</span></code>, and <code class="docutils literal notranslate"><span class="pre">backend_config=</span></code> are only used with
+<code class="docutils literal notranslate"><span class="pre">compile_specs=</span></code>, <code class="docutils literal notranslate"><span class="pre">backend_config=</span></code>, <code class="docutils literal notranslate"><span class="pre">constant_methods=</span></code>,
+<code class="docutils literal notranslate"><span class="pre">transform_passes=</span></code>, <code class="docutils literal notranslate"><span class="pre">compile_config=</span></code> and
+<code class="docutils literal notranslate"><span class="pre">generate_etrecord=</span></code> are only used with
 <code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code>; otherwise they are ignored with a
 warning. Pass <code class="docutils literal notranslate"><span class="pre">compile_specs=[CompileSpec(&quot;target_device&quot;,</span>
 <span class="pre">b&quot;cuda:&lt;i&gt;&quot;)]</span></code> to override the default target device (<code class="docutils literal notranslate"><span class="pre">cuda:0</span></code>).
@@ -760,7 +762,18 @@ partitioner, so ops TensorRT does not take can be routed to another
 delegate – e.g. a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> for a coalesced TensorRT +
 CUDA <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. See <a class="reference internal" href="../user_guide/runtime_performance/saving_models.html#executorch-save"><span class="std std-ref">the ExecuTorch save guide</span></a> for the <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> recipe, its
 export-time requirements (CUDA backend + nvcc), and the external
-<code class="docutils literal notranslate"><span class="pre">.ptd</span></code> weight caveats.</p></li>
+<code class="docutils literal notranslate"><span class="pre">.ptd</span></code> weight caveats.
+<code class="docutils literal notranslate"><span class="pre">constant_methods=</span></code>, <code class="docutils literal notranslate"><span class="pre">transform_passes=</span></code> and
+<code class="docutils literal notranslate"><span class="pre">compile_config=</span></code> are forwarded to
+<code class="docutils literal notranslate"><span class="pre">to_edge_transform_and_lower(...)</span></code>. When <code class="docutils literal notranslate"><span class="pre">compile_config</span></code> is
+omitted it defaults to <code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code> (the TRT engine
+graph fails edge IR validation); a caller-supplied
+<code class="docutils literal notranslate"><span class="pre">compile_config</span></code> is forwarded verbatim, so set
+<code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code> on it explicitly when the graph carries
+TRT engines.
+<code class="docutils literal notranslate"><span class="pre">generate_etrecord=True</span></code> writes an ETRecord to
+<code class="docutils literal notranslate"><span class="pre">&lt;model&gt;_etrecord.bin</span></code> next to the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> for use with the
+ExecuTorch Inspector.</p></li>
 </ul>
 </dd>
 </dl>
@@ -943,19 +956,43 @@ Static shaped inputs will have a single tuple. Dynamic inputs will have a dict o
 <dt class="field-even">Keyword Arguments<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><strong>shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Static shape of input tensor</p></li>
-<li><p><strong>min_shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Min size of input tensor’s shape range
-Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC</p></li>
-<li><p><strong>opt_shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Opt size of input tensor’s shape range
-Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC</p></li>
-<li><p><strong>max_shape</strong> (<em>Tuple</em><em> or </em><em>List</em><em>, </em><em>optional</em>) – Max size of input tensor’s shape range
-Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC</p></li>
+<li><p><strong>min_shape</strong> (<em>Tuple</em><em>, </em><em>List</em><em>, </em><em>torch.Size</em><em>, or </em><em>NamedTuple</em><em>, </em><em>optional</em>) – Min size of input tensor’s shape range.
+Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC.
+If a namedtuple is provided, its field names are used as axis names — see the namedtuple shape spec note below.</p></li>
+<li><p><strong>opt_shape</strong> (<em>Tuple</em><em>, </em><em>List</em><em>, </em><em>torch.Size</em><em>, or </em><em>NamedTuple</em><em>, </em><em>optional</em>) – Opt size of input tensor’s shape range.
+Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC.
+Must be a namedtuple with identical fields to min_shape if min_shape is a namedtuple.</p></li>
+<li><p><strong>max_shape</strong> (<em>Tuple</em><em>, </em><em>List</em><em>, </em><em>torch.Size</em><em>, or </em><em>NamedTuple</em><em>, </em><em>optional</em>) – Max size of input tensor’s shape range.
+Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input’s shape_mode to DYNAMIC.
+Must be a namedtuple with identical fields to min_shape if min_shape is a namedtuple.</p></li>
 <li><p><strong>dtype</strong> (<em>torch.dpython:type</em><em> or </em><em>torch_tensorrt.dpython:type</em>) – Expected data type for input tensor (default: torch_tensorrt.dtype.float32)</p></li>
 <li><p><strong>format</strong> (<em>torch.memory_format</em><em> or </em><em>torch_tensorrt.TensorFormat</em>) – The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</p></li>
 <li><p><strong>tensor_domain</strong> (<em>Tuple</em><em>(</em><em>python:float</em><em>, </em><em>python:float</em><em>)</em><em>, </em><em>optional</em>) – The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
 Note: Entering “None” (or not specifying) will set the bound to [0, 2)</p></li>
 <li><p><strong>torch_tensor</strong> (<em>torch.Tensor</em>) – Holds a corresponding torch tensor with this Input.</p></li>
 <li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of this input in the input nn.Module’s forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.</p></li>
+<li><p><strong>shared_dims</strong> (<em>Dict</em><em>[</em><em>python:int</em><em>, </em><em>str</em><em>]</em><em>, </em><em>optional</em>) – Maps axis indices to names. Axes with the same name across multiple inputs are exported as a single shared <code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code>. Cannot be combined with a namedtuple min_shape.</p></li>
 </ul>
+</dd>
+</dl>
+<dl>
+<dt>Note — namedtuple shape spec (shorthand for <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code>):</dt><dd><p>Passing a namedtuple as <code class="docutils literal notranslate"><span class="pre">min_shape</span></code>/<code class="docutils literal notranslate"><span class="pre">opt_shape</span></code>/<code class="docutils literal notranslate"><span class="pre">max_shape</span></code> is a shorthand
+for declaring shared dynamic axes without writing <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> explicitly.
+Each field name becomes the axis name; dynamic axes (min != max) with the same
+name across inputs are automatically exported as one shared <code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code>.
+Static axes (min == max) are ignored. Cannot be combined with <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">from</span><span class="w"> </span><span class="n">collections</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">namedtuple</span>
+<span class="n">S</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">namedtuple</span><span class="p">(</span><span class="s">"shape"</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="s">"batch"</span><span class="p">,</span><span class="w"> </span><span class="s">"seq"</span><span class="p">])</span>
+<span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">),</span><span class="w"> </span><span class="n">opt_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">),</span><span class="w"> </span><span class="n">max_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">),</span>
+<span class="w">                         </span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="p">.</span><span class="n">int64</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="o">=</span><span class="s">"input_ids"</span><span class="p">),</span>
+<span class="w">    </span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">),</span><span class="w"> </span><span class="n">opt_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">),</span><span class="w"> </span><span class="n">max_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">),</span>
+<span class="w">                         </span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="p">.</span><span class="n">int64</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="o">=</span><span class="s">"attention_mask"</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="cp"># "batch" is dynamic (1→4) on both inputs → one shared Dim("batch")</span>
+<span class="cp"># "seq" is static (16==16) → no shared dim needed</span>
+</pre></div>
+</div>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
