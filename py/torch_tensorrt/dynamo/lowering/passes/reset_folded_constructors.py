@@ -15,10 +15,10 @@ def reset_folded_constructors(
 ) -> torch.fx.GraphModule:
     """Clone folded constructors that escape through a graph boundary.
 
-    A ``_frozen_param*`` is compiler-owned state, unlike a placeholder supplied
-    by the caller. If a folded constructor becomes an output, eager code or a
-    downstream partition may mutate it. Cloning at that boundary gives each
-    invocation fresh storage while preserving aliases between repeated outputs.
+    A folded constructor is compiler-owned state, unlike a placeholder supplied
+    by the caller. If it becomes an output, eager code or a downstream partition
+    may mutate it. Cloning at that boundary gives each invocation fresh storage
+    while preserving aliases between repeated outputs.
 
     This pass is intentionally separate from constant folding so it can run
     again after partitioning, when new TensorRT subgraph outputs are known.
