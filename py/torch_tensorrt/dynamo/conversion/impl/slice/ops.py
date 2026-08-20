@@ -64,7 +64,12 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     # isinstance/sign check (it's known at trace time). When `start` is
     # itself a TRTTensor (e.g. computed at runtime by another converter),
     # its sign isn't known at trace time, so the same wraparound has to be
-    # computed dynamically here: start = start < 0 ? start + dim_size : start.
+    # computed dynamically here. Python's slice semantics clamp an
+    # out-of-range start to the nearest valid bound rather than wrapping
+    # past it, so a start below -dim_size must clamp to 0 (not
+    # start + dim_size, which would still be negative) and a start above
+    # dim_size must clamp to dim_size:
+    #   start = start < 0 ? max(start + dim_size, 0) : min(start, dim_size)
     if isinstance(start, TRTTensor):
         dim_size = get_shape(
             ctx, target, source_ir, name + "_start_dim_size", input, dim
@@ -75,13 +80,19 @@ def slice_op(  # TODO: This should be slice not whatever is in base
         wrapped_start = impl.elementwise.add(
             ctx, target, source_ir, name + "_start_wrapped", start, dim_size
         )
+        wrapped_start = impl.elementwise.max(
+            ctx, target, source_ir, name + "_start_wrapped_clamped", wrapped_start, 0
+        )
+        clamped_start = impl.elementwise.min(
+            ctx, target, source_ir, name + "_start_clamped", start, dim_size
+        )
         start = impl.condition.where(
             ctx,
             target,
             source_ir,
             name + "_start_where",
             wrapped_start,
-            start,
+            clamped_start,
             is_negative,
         )
 
