@@ -5,7 +5,6 @@ import logging
 import os
 import platform
 import warnings
-
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
@@ -1263,6 +1262,9 @@ def compile_module(
                 torch_executed_ops=settings.torch_executed_ops,
                 require_full_compilation=settings.require_full_compilation,
                 skip_fusion=(num_supported_ops == total_ops),
+                assume_full_support=(
+                    settings.require_full_compilation and num_supported_ops == total_ops
+                ),
             )
 
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
