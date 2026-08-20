@@ -115,6 +115,34 @@ foreach(_torch_tensorrt_linker_flags
     "[${${_torch_tensorrt_linker_flags}}]")
 endforeach()
 
+# Removing the dynamic -lstdc++ is only half of it: something still has to supply the
+# C++ runtime. The Bazel toolchain hands CMake the C driver, gcc, as CMAKE_CXX_COMPILER,
+# and gcc links no C++ runtime at all. -static-libstdc++ is silently a no-op for it,
+# which is exactly why the toolchain injected an explicit -lstdc++ in the first place.
+#
+# So put the static archive in its place, and put it where an archive can actually do
+# something. An archive only pulls the members that resolve symbols already undefined
+# when it is scanned, so ahead of the object files it contributes nothing. CMake appends
+# CMAKE_CXX_STANDARD_LIBRARIES after the objects, which is the position that works, and
+# is the same placement rules_foreign_cc documents for exactly this problem.
+#
+# Measured in the release image with the build's own flags (gcc driver, -fuse-ld=gold,
+# -flto=auto, --gc-sections) on a shared object that stores a std::exception_ptr:
+#
+#                                        UND _M_addref   libstdc++ NEEDED
+#   dynamic -lstdc++ before objects            2                1
+#   nothing at all                             2                0
+#   -l:libstdc++.a before objects              2                0
+#   -l:libstdc++.a after objects               0                0
+#
+# Only the last satisfies both halves of the check at the end of this file. Named with
+# -l: rather than whole-archived: forcing every member in is what previously collided
+# with libstdc++_nonshared.a, and nothing pulls that archive in now because the
+# libstdc++.so linker script that used to reference it is no longer on the link line.
+string(APPEND CMAKE_CXX_STANDARD_LIBRARIES " -l:libstdc++.a")
+message(STATUS "torch_tensorrt: CMAKE_CXX_STANDARD_LIBRARIES now = "
+  "[${CMAKE_CXX_STANDARD_LIBRARIES}]")
+
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" executorch)
 
 add_library(torch_tensorrt_executorch_backend STATIC
