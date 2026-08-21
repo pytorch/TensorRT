@@ -159,6 +159,33 @@ class TestDeprecatedInputsAlias(unittest.TestCase):
         )
         torch.testing.assert_close(trt_gm(x=x), model(x=x), rtol=1e-2, atol=1e-2)
 
+    @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+    def test_empty_arg_inputs_tuple_convert_method_to_trt_engine(self):
+        class KwargsOnly(torch.nn.Module):
+            def forward(self, *, x):
+                return x + 1
+
+        model = KwargsOnly().eval().cuda()
+        x = torch.randn(2, 3, device="cuda")
+        engine = torch_tensorrt.convert_method_to_trt_engine(
+            model,
+            "forward",
+            arg_inputs=(),
+            kwarg_inputs={"x": x},
+            ir="dynamo",
+            min_block_size=1,
+        )
+        self.assertIsInstance(engine, bytes)
+        self.assertGreater(len(engine), 0)
+
+    def test_save_rejects_empty_arg_inputs_with_inputs(self):
+        class M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        with self.assertRaises(AssertionError):
+            torch_tensorrt.save(M(), arg_inputs=(), inputs=(torch.randn(2, 3),))
+
 
 if __name__ == "__main__":
     unittest.main()

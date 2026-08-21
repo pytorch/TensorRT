@@ -424,7 +424,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -524,7 +524,7 @@ def convert_method_to_trt_engine(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
-    arg_inputs = arg_inputs or inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
@@ -564,7 +564,7 @@ def convert_method_to_trt_engine(
         torchtrt_arg_inputs = prepare_inputs(normalized_arg_inputs)
         torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
 
-        exp_program = torch_tensorrt.dynamo.trace(
+        exp_program = dynamo_trace(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
@@ -826,12 +826,12 @@ def save(
         raise ValueError(
             "Not all inputs provided are torch.Tensor or torch_tensorrt.Input objects. Please provide inputs of a valid type"
         )
-    if arg_inputs and inputs:
+    if arg_inputs is not None and inputs is not None:
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
