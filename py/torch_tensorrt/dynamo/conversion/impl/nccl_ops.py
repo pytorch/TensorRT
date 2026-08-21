@@ -80,6 +80,40 @@ def _get_distributed_rank_and_world_size() -> Tuple[int, int]:
         return rank, world_size
 
 
+def _collective_group_ranks(group_name, world_size):
+    """Global ranks of the collective's process group.
+
+    The native ``add_dist_collective`` layer needs the set of ranks that participate in
+    *this* collective. Resolving it from the op's ``group_name`` lets a collective target a
+    process **subgroup** (e.g. context/sequence-parallel over one subgroup while tensor-parallel
+    uses another -- a 2-D device mesh) instead of always the whole world. Falls back to the world
+    group when the group cannot be resolved (single-program / group not created in this process).
+    """
+    import numpy as np
+
+    if group_name:
+        try:
+            import torch.distributed as dist
+            from torch.distributed.distributed_c10d import _resolve_process_group
+
+            # Preserve the group's own ordering: get_process_group_ranks() returns global
+            # ranks indexed by *group* rank, and that mapping is what layout-sensitive
+            # collectives are defined against. all_gather concatenates by group rank,
+            # reduce_scatter sends chunk i to group rank i, all_to_all permutes by it, and a
+            # scatter/gather root names a position in it. Sorting would silently renumber the
+            # group whenever it was not created in ascending order -- e.g. a device mesh
+            # yielding [5, 2] would be read as [2, 5], swapping which rank receives which
+            # slice. Sorting is not needed for agreement either: every member resolves the
+            # same group_name to the same group and therefore already sees the same order.
+            ranks = dist.get_process_group_ranks(_resolve_process_group(group_name))
+            return np.array(ranks, dtype=np.int64)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                f"Could not resolve process group '{group_name}' ({e}); using world group"
+            )
+    return np.arange(world_size, dtype=np.int64)
+
+
 def nccl_all_gather(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -228,6 +262,7 @@ def nccl_all_gather_native(
     source_ir: Optional[SourceIR],
     name: str,
     plug_inputs: Tuple[Argument, ...],
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement all_gather using native TensorRT DistCollective API.
@@ -263,7 +298,7 @@ def nccl_all_gather_native(
         import numpy as np
 
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         logger.debug(
             f"Creating ALL_GATHER layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -285,7 +320,7 @@ def nccl_all_gather_native(
         set_layer_name(layer, target, name, source_ir)
 
         output = layer.get_output(0)
-        layer.num_ranks = world_size
+        layer.num_ranks = len(groups)
 
         return output
 
@@ -302,6 +337,7 @@ def nccl_reduce_scatter_native(
     name: str,
     plug_inputs: Tuple[Argument, ...],
     reduce_op: str = "sum",
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement reduce_scatter using native TensorRT DistCollective API.
@@ -350,7 +386,7 @@ def nccl_reduce_scatter_native(
     trt_reduce_op = reduce_op_map[reduce_op.lower()]
 
     try:
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         layer = ctx.net.add_dist_collective(
             input_tensor,
@@ -363,7 +399,7 @@ def nccl_reduce_scatter_native(
         set_layer_name(layer, target, name, source_ir)
 
         output = layer.get_output(0)
-        layer.num_ranks = world_size
+        layer.num_ranks = len(groups)
         logger.debug(
             f"Successfully created native REDUCE_SCATTER layer: {name}, reduce_op={reduce_op}, groups={groups.tolist()}"
         )
@@ -383,6 +419,7 @@ def nccl_all_reduce_native(
     name: str,
     plug_inputs: Tuple[Argument, ...],
     reduce_op: str = "sum",
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement all_reduce using native TensorRT DistCollective API.
@@ -435,7 +472,7 @@ def nccl_all_reduce_native(
         # Create array of all participating rank IDs [0, 1, ..., world_size-1]
         # Passing None for groups can be treated as a no-op by TRT; use an explicit
         # rank array (same as ALL_GATHER) to ensure the reduction is performed.
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         layer = ctx.net.add_dist_collective(
             input_tensor,
@@ -448,7 +485,7 @@ def nccl_all_reduce_native(
         set_layer_name(layer, target, name, source_ir)
 
         output = layer.get_output(0)
-        layer.num_ranks = world_size
+        layer.num_ranks = len(groups)
         logger.debug(
             f"Successfully created native ALL_REDUCE layer: {name}, reduce_op={reduce_op}, groups={groups.tolist()}"
         )
@@ -467,6 +504,7 @@ def nccl_all_to_all_native(
     source_ir: Optional[SourceIR],
     name: str,
     plug_inputs: Tuple[Argument, ...],
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement all_to_all using native TensorRT DistCollective API.
@@ -503,7 +541,7 @@ def nccl_all_to_all_native(
         import numpy as np
 
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         logger.debug(
             f"Creating ALL_TO_ALL layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -525,7 +563,7 @@ def nccl_all_to_all_native(
         set_layer_name(layer, target, name, source_ir)
 
         output = layer.get_output(0)
-        layer.num_ranks = world_size
+        layer.num_ranks = len(groups)
 
         return output
 
@@ -542,6 +580,7 @@ def nccl_scatter_native(
     name: str,
     plug_inputs: Tuple[Argument, ...],
     root: int = 0,
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement scatter using native TensorRT DistCollective API.
@@ -577,7 +616,7 @@ def nccl_scatter_native(
         import numpy as np
 
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         logger.debug(
             f"Creating scatter layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -599,7 +638,7 @@ def nccl_scatter_native(
         set_layer_name(layer, target, name, source_ir)
 
         output = layer.get_output(0)
-        layer.num_ranks = world_size
+        layer.num_ranks = len(groups)
 
         return output
 
@@ -616,6 +655,7 @@ def nccl_gather_native(
     name: str,
     plug_inputs: Tuple[Argument, ...],
     root: int = 0,
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement gather using native TensorRT DistCollective API.
@@ -651,7 +691,7 @@ def nccl_gather_native(
         import numpy as np
 
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         logger.debug(
             f"Creating gather layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -673,7 +713,7 @@ def nccl_gather_native(
         set_layer_name(layer, target, name, source_ir)
 
         output = layer.get_output(0)
-        layer.num_ranks = world_size
+        layer.num_ranks = len(groups)
 
         return output
 
