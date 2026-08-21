@@ -96,8 +96,17 @@ def _collective_group_ranks(group_name, world_size):
             import torch.distributed as dist
             from torch.distributed.distributed_c10d import _resolve_process_group
 
+            # Preserve the group's own ordering: get_process_group_ranks() returns global
+            # ranks indexed by *group* rank, and that mapping is what layout-sensitive
+            # collectives are defined against. all_gather concatenates by group rank,
+            # reduce_scatter sends chunk i to group rank i, all_to_all permutes by it, and a
+            # scatter/gather root names a position in it. Sorting would silently renumber the
+            # group whenever it was not created in ascending order -- e.g. a device mesh
+            # yielding [5, 2] would be read as [2, 5], swapping which rank receives which
+            # slice. Sorting is not needed for agreement either: every member resolves the
+            # same group_name to the same group and therefore already sees the same order.
             ranks = dist.get_process_group_ranks(_resolve_process_group(group_name))
-            return np.array(sorted(ranks), dtype=np.int64)
+            return np.array(ranks, dtype=np.int64)
         except Exception as e:  # noqa: BLE001
             logger.warning(
                 f"Could not resolve process group '{group_name}' ({e}); using world group"

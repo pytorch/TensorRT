@@ -694,6 +694,52 @@ class TestSetDistributedGroup(unittest.TestCase):
 # ============================================================================
 
 
+class TestCollectiveGroupRanks(unittest.TestCase):
+    """_collective_group_ranks must preserve group-rank order — no GPU / no dist required."""
+
+    def _resolve_with(self, ranks, group_name="pg_under_test"):
+        """Run _collective_group_ranks with the process-group lookup stubbed to *ranks*."""
+        from torch_tensorrt.dynamo.conversion.impl import nccl_ops
+
+        import torch.distributed as dist
+        from torch.distributed import distributed_c10d
+
+        real_resolve = getattr(distributed_c10d, "_resolve_process_group", None)
+        real_get = dist.get_process_group_ranks
+        distributed_c10d._resolve_process_group = lambda name: _FakeGroup(name)
+        dist.get_process_group_ranks = lambda group: list(ranks)
+        try:
+            return nccl_ops._collective_group_ranks(group_name, world_size=8)
+        finally:
+            dist.get_process_group_ranks = real_get
+            if real_resolve is not None:
+                distributed_c10d._resolve_process_group = real_resolve
+
+    def test_group_rank_order_is_preserved(self) -> None:
+        """A non-ascending group must not be renumbered.
+
+        get_process_group_ranks() returns global ranks *ordered by group rank*, and that
+        mapping is what layout-sensitive collectives are defined against: all_gather
+        concatenates by group rank, reduce_scatter sends chunk i to group rank i,
+        all_to_all permutes by it, and a scatter/gather root names a position in it.
+        Sorting a group created as [5, 2] into [2, 5] swaps which rank receives which
+        slice, silently producing wrong results rather than an error.
+        """
+        self.assertEqual(list(self._resolve_with([5, 2])), [5, 2])
+        self.assertEqual(list(self._resolve_with([3, 1, 2, 0])), [3, 1, 2, 0])
+
+    def test_ascending_group_is_unchanged(self) -> None:
+        """The common ascending case is unaffected by preserving order."""
+        self.assertEqual(list(self._resolve_with([0, 1, 2, 3])), [0, 1, 2, 3])
+
+    def test_unresolvable_group_falls_back_to_world(self) -> None:
+        """An unresolvable group name falls back to the world group rather than raising."""
+        from torch_tensorrt.dynamo.conversion.impl import nccl_ops
+
+        result = nccl_ops._collective_group_ranks("no_such_group", world_size=4)
+        self.assertEqual(list(result), [0, 1, 2, 3])
+
+
 class TestNcclUtils(unittest.TestCase):
     """Tests for _nccl_utils.py functions — no GPU / no dist required."""
 
