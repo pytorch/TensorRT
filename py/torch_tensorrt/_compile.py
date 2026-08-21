@@ -574,7 +574,7 @@ def convert_method_to_trt_engine(
             kwarg_inputs, disable_memory_format_check=True
         )
 
-        exp_program = torch_tensorrt.dynamo.trace(
+        exp_program = dynamo_trace(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
