@@ -7,6 +7,9 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+    FOLDED_CONSTRUCTOR_META,
+)
 
 from packaging import version
 
@@ -93,6 +96,9 @@ def replace_node_with_constant(
         new_input_node = g.create_node("get_attr", qualname, (), {})
         node.replace_all_uses_with(new_input_node)
         new_input_node.meta.update(node.meta)
+        # Distinguishes this from module state that existed before folding: the
+        # value came from an op in the graph body, so eager rebuilds it per call.
+        new_input_node.meta[FOLDED_CONSTRUCTOR_META] = True
         g.erase_node(node)
 
     # Needed to suppress `does not reference an nn.Module, nn.Parameter, or buffer` warning
