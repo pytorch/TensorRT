@@ -20,10 +20,10 @@ jobs:
     if: ${{ ! contains(github.actor, 'pytorchbot') }}
     environment: pytorchbot-env
     container:
-      image: pytorch/manylinux2_28-builder:cuda13.0
+      image: pytorch/manylinux2_28-builder:cuda13.2
       options: --gpus all
       env:
-        CUDA_VERSION: 13.0
+        CUDA_VERSION: 13.2
         CUDA_HOME: /usr/local/cuda
 
     steps:
