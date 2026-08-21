@@ -45,7 +45,18 @@ ENGINE_BASE64 = base64.b64encode(ENGINE_BYTES).decode("utf-8")
 
 
 class FakeExportedProgram:
-    pass
+    """A program stand-in carrying the graph module and signature ``export()`` reads.
+
+    ``export()`` runs the mutation-declaration pass over every program it is handed, and
+    that pass reads both members. Nothing here is mutated, so the pass finds nothing to
+    declare and hands back the same object.
+    """
+
+    def __init__(self):
+        graph = torch.fx.Graph()
+        graph.output((graph.placeholder("x"),))
+        self.graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
+        self.graph_signature = SimpleNamespace(inputs_to_buffers={}, output_specs=[])
 
 
 class FakeTensorRTPartitioner:

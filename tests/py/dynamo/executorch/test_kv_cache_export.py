@@ -847,13 +847,31 @@ def test_create_trt_exp_program_does_not_duplicate_copyback_get_attr(monkeypatch
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("use_legacy, expect_warning", [(True, False), (False, True)])
+@pytest.mark.parametrize(
+    "use_legacy, output_format, expect_warning",
+    [
+        (True, "exported_program", False),
+        (False, "exported_program", True),
+        (True, "executorch", False),
+        (False, "executorch", False),
+    ],
+)
 def test_save_warns_when_copyback_cannot_be_declared(
-    monkeypatch, tmp_path, caplog, use_legacy, expect_warning
+    monkeypatch, tmp_path, caplog, use_legacy, output_format, expect_warning
 ):
-    """retrace=False only declares copy-back through the legacy exporter, so the
-    non-legacy combination drops it. Say so rather than saving a signature that
-    omits the update."""
+    """One combination of ``retrace=False`` leaves copy-back undeclared, and only it
+    warns.
+
+    Under ``exported_program`` the legacy exporter is what declares copy-back, so the
+    non-legacy pairing drops it and the saved signature would omit the update
+    silently. Under ``executorch`` the program goes on to
+    ``torch_tensorrt.executorch.export``, which declares copy-back for every source
+    shape it accepts, so neither pairing drops it -- warning there would contradict
+    what the branch does.
+
+    The two formats reach the warning through the same block, so pinning them
+    together is what keeps them from drifting apart.
+    """
     pytest.importorskip("executorch.exir")
     import torch_tensorrt
     from torch_tensorrt import _compile as C
@@ -862,6 +880,7 @@ def test_save_warns_when_copyback_cannot_be_declared(
     monkeypatch.setattr(E, "export", lambda *a, **k: object())
     monkeypatch.setattr(E, "_declare_aliased_kv_mutations_on_ep", lambda ep, **k: ep)
     monkeypatch.setattr(C, "_normalize_engine_constants_to_python", lambda ep: None)
+    monkeypatch.setattr(C, "_save_as_executorch", lambda *a, **k: None)
     monkeypatch.setattr(torch.export, "save", lambda *a, **k: None)
 
     g = torch.fx.Graph()
@@ -869,11 +888,12 @@ def test_save_warns_when_copyback_cannot_be_declared(
     gm = torch.fx.GraphModule(torch.nn.Module(), g)
     gm.meta["_copyback_mutation_buffers"] = ["state_0"]
 
+    suffix = "pte" if output_format == "executorch" else "pt2"
     with caplog.at_level("WARNING"):
         torch_tensorrt.save(
             gm,
-            str(tmp_path / "out.pt2"),
-            output_format="exported_program",
+            str(tmp_path / f"out.{suffix}"),
+            output_format=output_format,
             retrace=False,
             use_legacy_exporter=use_legacy,
         )
@@ -971,3 +991,154 @@ def test_serialized_engine_rejects_copyback_buffers():
         )
     # The offending buffer has to be named, or the user cannot act on the error.
     assert "state" in str(excinfo.value)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "source_shape",
+    ["graph_module", "graph_module_no_retrace", "exported_program", "mapping"],
+)
+def test_executorch_export_declares_copyback_for_every_source_shape(
+    monkeypatch, source_shape
+):
+    """Every source shape ``torch_tensorrt.executorch.export`` accepts reaches the Edge
+    program with its copy-back buffer declared as a BUFFER_MUTATION, on every method,
+    and with the module's own output still there.
+
+    Undeclared, the buffer's new value stays a trailing user output that nothing copies
+    back and the buffer loads frozen. Only the legacy exporter declares the mutation
+    while building the program, so some of these sources arrive already declared and
+    have to come through a second declaration attempt unharmed.
+    """
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+        inline_lifted_buffers_into_gm,
+        lift_mutated_buffers,
+    )
+    from torch_tensorrt.executorch import export as executorch_export
+
+    class _CopyBackModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("state", torch.zeros(4))
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            self.state.copy_(self.state + x)
+            return x * 3.0
+
+    def _graph_module() -> torch.fx.GraphModule:
+        """The shape ``compile()`` hands on: the mutated buffer lifted to an input, its
+        new value appended as a trailing output, and its name left in the meta."""
+        program = torch.export.export(_CopyBackModel(), (torch.ones(4),))
+        gm, lifted = lift_mutated_buffers(program.module())
+        gm = inline_lifted_buffers_into_gm(gm, lifted)
+        assert gm.meta["_copyback_mutation_buffers"] == ["state"]
+        return gm
+
+    def _exported(use_legacy_exporter: bool) -> torch.export.ExportedProgram:
+        return E.export(
+            _graph_module(),
+            arg_inputs=(torch.ones(4),),
+            use_legacy_exporter=use_legacy_exporter,
+        )
+
+    # A GraphModule source is retraced against example inputs placed on the default
+    # device, and this model's buffer is on the host.
+    monkeypatch.setattr(
+        "torch_tensorrt.dynamo._defaults.default_device", lambda: torch.device("cpu")
+    )
+
+    if source_shape == "graph_module":
+        source = _graph_module()
+        options = {"arg_inputs": (torch.ones(4),), "retrace": True}
+        methods = ("forward",)
+    elif source_shape == "graph_module_no_retrace":
+        # Retracing is off by default, which routes through the legacy exporter and
+        # its transform-time declaration.
+        source = _graph_module()
+        options = {"arg_inputs": (torch.ones(4),)}
+        methods = ("forward",)
+    elif source_shape == "exported_program":
+        source, options, methods = _exported(False), {}, ("forward",)
+    else:
+        # decode comes from the legacy exporter, which declared its mutation already:
+        # it is the method that must not end up describing that mutation twice.
+        source = {"prefill": _exported(False), "decode": _exported(True)}
+        options, methods = {}, ("prefill", "decode")
+
+    edge_program = executorch_export(source, **options)
+
+    for method in methods:
+        specs = edge_program.exported_program(method).graph_signature.output_specs
+        assert [(spec.kind, spec.target) for spec in specs] == [
+            (OutputKind.BUFFER_MUTATION, "state"),
+            (OutputKind.USER_OUTPUT, None),
+        ]
+
+
+@pytest.mark.unit
+def test_executorch_export_leaves_the_source_program_intact(tmp_path):
+    """A caller who hands ``torch_tensorrt.executorch.export`` their own
+    ExportedProgram keeps it usable afterwards.
+
+    The declaration pass rewrites the graph's output node in place and returns the
+    matching signature on a new program, so running it on the caller's object leaves
+    that object's graph and signature describing different outputs. Nothing on the
+    program raises for that -- ``module()`` and calling it still work -- until the
+    ExportedProgram verifier runs, so the check below saves the program as well as
+    comparing it.
+    """
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+        inline_lifted_buffers_into_gm,
+        lift_mutated_buffers,
+    )
+    from torch_tensorrt.executorch import export as executorch_export
+
+    class _CopyBackModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("state", torch.zeros(4))
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            self.state.copy_(self.state + x)
+            return x * 3.0
+
+    program = torch.export.export(_CopyBackModel(), (torch.ones(4),))
+    gm, lifted = lift_mutated_buffers(program.module())
+    source = E.export(
+        inline_lifted_buffers_into_gm(gm, lifted),
+        arg_inputs=(torch.ones(4),),
+        use_legacy_exporter=False,
+    )
+
+    def _outputs(exported_program):
+        output_node = next(
+            node
+            for node in exported_program.graph_module.graph.nodes
+            if node.op == "output"
+        )
+        return (
+            [getattr(arg, "name", arg) for arg in output_node.args[0]],
+            [
+                (spec.kind, spec.target)
+                for spec in exported_program.graph_signature.output_specs
+            ],
+        )
+
+    before = _outputs(source)
+
+    def _edge_output_specs(edge_program):
+        specs = edge_program.exported_program("forward").graph_signature.output_specs
+        return [(spec.kind, spec.target) for spec in specs]
+
+    declared = [
+        (OutputKind.BUFFER_MUTATION, "state"),
+        (OutputKind.USER_OUTPUT, None),
+    ]
+    assert _edge_output_specs(executorch_export(source)) == declared
+    assert _outputs(source) == before
+    torch.export.save(source, str(tmp_path / "source.pt2"))
+    # Exporting the same program twice has to give the same Edge program, which it
+    # cannot if the first export consumed something from it.
+    assert _edge_output_specs(executorch_export(source)) == declared

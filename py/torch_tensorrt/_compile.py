@@ -1176,9 +1176,15 @@ def save(
                     _declare_aliased_kv_mutations_on_ep,
                 )
 
-                # The legacy exporter is the only thing that declares copy-back on this
-                # path, so this combination leaves it undeclared.
-                if not _use_legacy and module.meta.get("_copyback_mutation_buffers"):
+                # On this path the legacy exporter is what declares copy-back, except
+                # under output_format="executorch", where torch_tensorrt.executorch
+                # .export() declares it for whatever source shape it is handed. The
+                # remaining combination leaves it undeclared.
+                if (
+                    not _use_legacy
+                    and output_format != "executorch"
+                    and module.meta.get("_copyback_mutation_buffers")
+                ):
                     logger.warning(
                         "Module has non-KV mutable buffer(s) needing copy-back, but "
                         "retrace=False with use_legacy_exporter=False does not declare "
