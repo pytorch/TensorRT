@@ -276,6 +276,7 @@ _L2: list[Suite] = [
             "automatic_plugin/test_automatic_plugin.py",
             "automatic_plugin/test_automatic_plugin_with_attrs.py",
             "automatic_plugin/test_flashinfer_rmsnorm.py",
+            "automatic_plugin/test_plugin_attr_annotations.py",
         ),
         overrides={"rtx": {"paths": ("automatic_plugin/",)}},
     ),
