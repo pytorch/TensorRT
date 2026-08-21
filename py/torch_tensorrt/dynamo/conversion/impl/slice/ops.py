@@ -396,7 +396,8 @@ def _cumsum_with_loop(
     dtype: Optional[torch.dtype] = None,
 ) -> TRTTensor:
     # Kept for TensorRT without the cumulative layer.
-    # aten widens integer cumsum to int64 unless dtype is set; floats keep their type.
+    # aten.cumsum accumulates bool and integer inputs in int64 and floats in
+    # their own dtype; an explicit dtype wins over both
     input_dtype = _enums.dtype._from(input.dtype).to(torch.dtype)
     if dtype is not None:
         acc_dtype = dtype
@@ -404,7 +405,6 @@ def _cumsum_with_loop(
         acc_dtype = torch.int64
     else:
         acc_dtype = input_dtype
-    acc_np_dtype = _enums.dtype._from(acc_dtype).to(np.dtype)
 
     if input_dtype != acc_dtype:
         input = cast_trt_tensor(ctx, input, acc_dtype, f"{name}_input_cast")
@@ -441,13 +441,13 @@ def _cumsum_with_loop(
                     )
                 else:
                     data_shape.append(input_shape[i])
-        zero_trttensor = impl.full.full(
-            ctx, target, source_ir, name + "_full", data_shape, 0, dtype=acc_dtype
-        )
     else:
-        new_dims = tuple(data.shape)
-        zeros = np.zeros(new_dims, dtype=acc_np_dtype)
-        zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
+        data_shape = list(data.shape)
+
+    # full rather than np.zeros: numpy has no bf16
+    zero_trttensor = impl.full.full(
+        ctx, target, source_ir, f"{name}_initial_value", data_shape, 0, dtype=acc_dtype
+    )
 
     running_sum = loop.add_recurrence(zero_trttensor)
     set_layer_name(running_sum, target, f"{name}_running_sum", source_ir)
@@ -466,10 +466,7 @@ def _cumsum_with_loop(
     loop_output = loop.add_loop_output(current_sum, trt.LoopOutput.CONCATENATE, dim)
     set_layer_name(loop_output, target, f"{name}_loop_output", source_ir)
     loop_output.set_input(1, trip_limit)
-    out = loop_output.get_output(0)
-    if _enums.dtype._from(out.dtype).to(torch.dtype) != acc_dtype:
-        out = cast_trt_tensor(ctx, out, acc_dtype, f"{name}_output_cast")
-    return out
+    return loop_output.get_output(0)
 
 
 def cumsum(
