@@ -757,5 +757,116 @@ class TestImplicitWarmLoadPyRt(TestCase):
             self.assertTrue(found, "No TorchTensorRTModule with implicit handle found")
 
 
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache is only available with TensorRT-RTX",
+)
+@unittest.skipIf(
+    ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Module-less TRTEngine construction requires the Python TRTEngine path",
+)
+class TestEngineOwnsNoCache(TestCase):
+    """An engine never owns a runtime cache; the module does.
+
+    A module-less engine -- built from packed engine info, or loaded as a
+    graph constant from a saved ``ExportedProgram`` -- comes up with
+    ``runtime_cache=None`` and must run without one, rather than attaching a
+    handle nothing outlives.
+    """
+
+    def _bare_engine(self, compiled):
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        mod = _find_python_trt_module(compiled)
+        self.assertIsNotNone(mod, "expected a TorchTensorRTModule after compile")
+        return TRTEngine(mod._pack_engine_info())
+
+    @staticmethod
+    def _first(out):
+        """``execute`` returns a bare Tensor for single-output engines."""
+        return out if isinstance(out, torch.Tensor) else out[0]
+
+    def test_bare_engine_defaults_to_no_cache(self):
+        model, inputs = _fresh_conv_model_and_inputs()
+        engine = self._bare_engine(_compile(model, inputs))
+        self.assertIsNone(engine.runtime_settings.runtime_cache)
+
+    def test_bare_engine_executes_without_a_cache(self):
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        ref = compiled(*inputs)
+        engine = self._bare_engine(compiled)
+        out = self._first(engine.execute(list(inputs)))
+        self.assertGreater(cosine_similarity(ref, out), COSINE_THRESHOLD)
+
+    def test_bare_engine_takes_an_explicit_cache(self):
+        """The opt-in an AOT deployment is expected to make."""
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        ref = compiled(*inputs)
+        engine = self._bare_engine(compiled)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = torchtrt.runtime.RuntimeCache(path=path)
+            engine.update_runtime_settings(RuntimeSettings(runtime_cache=handle))
+            out = self._first(engine.execute(list(inputs)))
+            self.assertGreater(cosine_similarity(ref, out), COSINE_THRESHOLD)
+            handle.save()
+            self.assertTrue(os.path.exists(path))
+            self.assertGreater(os.path.getsize(path), 0)
+
+    def test_path_string_on_an_engine_raises(self):
+        """Strings are the module's business; an engine rejects them."""
+        model, inputs = _fresh_conv_model_and_inputs()
+        engine = self._bare_engine(_compile(model, inputs))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.update_runtime_settings(
+                RuntimeSettings(runtime_cache=os.path.join(tmp, "rc.bin"))
+            )
+            with self.assertRaisesRegex(TypeError, "must be None or a RuntimeCache"):
+                engine.execute(list(inputs))
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache is only available with TensorRT-RTX",
+)
+class TestModuleStillOwnsImplicitCache(TestCase):
+    """Guard against over-correction: the compile path must keep caching."""
+
+    def test_compiled_module_persists_its_implicit_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            model, inputs = _fresh_conv_model_and_inputs()
+            compiled = _compile(model, inputs)
+            _apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=path))
+            compiled(*inputs)
+            del compiled
+            gc.collect()
+            self.assertTrue(os.path.exists(path), "implicit cache was not saved")
+            self.assertGreater(os.path.getsize(path), 0)
+
+    def test_empty_path_string_is_normalized_to_none(self):
+        """An empty string means "no cache" and must not reach the engine."""
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        _apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=""))
+
+        # Engine-flavor agnostic: the module's resolved settings are what gets
+        # dispatched, on both the Python and cpp runtimes.
+        mods = [
+            m for _, m in compiled.named_modules() if isinstance(m, TorchTensorRTModule)
+        ]
+        self.assertTrue(mods, "expected a TorchTensorRTModule after compile")
+        for m in mods:
+            self.assertIsNone(m.runtime_settings.runtime_cache)
+        compiled(*inputs)
+
+
 if __name__ == "__main__":
     run_tests()
