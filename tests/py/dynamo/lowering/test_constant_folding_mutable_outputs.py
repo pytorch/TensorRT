@@ -11,6 +11,7 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
 from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+    FOLDED_CONSTRUCTOR_META,
     reset_folded_constructors,
 )
 
@@ -133,7 +134,7 @@ class TestFoldedConstantGraphBreak(TestCase):
             self.assertTrue(torch.equal(t.detach().cpu(), torch.zeros(8)))
 
     def test_post_partition_frozen_output_is_reset(self):
-        """A frozen value exposed as a subgraph output is cloned by the late pass."""
+        """A folded value exposed as a subgraph output is reset by the late pass."""
         root = torch.nn.Module()
         root.register_parameter(
             "_frozen_param0",
@@ -141,6 +142,7 @@ class TestFoldedConstantGraphBreak(TestCase):
         )
         g = Graph()
         frozen = g.get_attr("_frozen_param0")
+        frozen.meta[FOLDED_CONSTRUCTOR_META] = True
         g.output({"first": frozen, "nested": (frozen,)})
 
         gm = GraphModule(root, g)
@@ -169,6 +171,80 @@ class TestFoldedConstantGraphBreak(TestCase):
         self.assertEqual(returned.data_ptr(), supplied.data_ptr())
         returned.add_(1)
         self.assertTrue(torch.equal(supplied, torch.ones(8)))
+
+    def _mutate_and_return_attr(self, root, attr, folded):
+        """Graph for `self.<attr> += 1; return self.<attr>`."""
+        g = Graph()
+        state = g.get_attr(attr)
+        if folded:
+            state.meta[FOLDED_CONSTRUCTOR_META] = True
+        g.output(g.call_function(torch.ops.aten.add_.Tensor, args=(state, 1)))
+        gm = GraphModule(root, g)
+        return reset_folded_constructors(gm, CompilationSettings())
+
+    def test_module_state_keeps_mutation_between_calls(self):
+        """State assigned in __init__ is caller-visible, so mutation must persist."""
+        root = torch.nn.Module()
+        root.register_buffer("weight", torch.zeros(8))
+
+        gm = self._mutate_and_return_attr(root, "weight", folded=False)
+
+        self.assertTrue(torch.equal(gm(), torch.ones(8)))
+        self.assertTrue(torch.equal(gm(), torch.full((8,), 2.0)))
+        self.assertTrue(torch.equal(gm.weight, torch.full((8,), 2.0)))
+
+    def test_function_state_is_rebuilt_between_calls(self):
+        """A constructor folded out of forward must not accumulate across calls."""
+        root = torch.nn.Module()
+        root.register_parameter(
+            "_frozen_param0",
+            torch.nn.Parameter(torch.zeros(8), requires_grad=False),
+        )
+
+        gm = self._mutate_and_return_attr(root, "_frozen_param0", folded=True)
+
+        # The copy precedes the in-place op, so the stored value never changes.
+        self.assertTrue(torch.equal(gm(), torch.ones(8)))
+        self.assertTrue(torch.equal(gm(), torch.ones(8)))
+        self.assertTrue(torch.equal(gm._frozen_param0.detach(), torch.zeros(8)))
+
+    def test_read_only_folded_constant_is_left_alone(self):
+        """A folded constant that only feeds an op stays a constant for TensorRT."""
+        root = torch.nn.Module()
+        root.register_parameter(
+            "_frozen_param0",
+            torch.nn.Parameter(torch.ones(8), requires_grad=False),
+        )
+        g = Graph()
+        weight = g.get_attr("_frozen_param0")
+        weight.meta[FOLDED_CONSTRUCTOR_META] = True
+        value = g.placeholder("value")
+        g.output(g.call_function(torch.ops.aten.add.Tensor, args=(value, weight)))
+
+        gm = GraphModule(root, g)
+        gm = reset_folded_constructors(gm, CompilationSettings())
+
+        clones = [n for n in gm.graph.nodes if n.target is torch.ops.aten.clone.default]
+        self.assertEqual(clones, [])
+
+    def test_repeated_runs_do_not_stack_copies(self):
+        """Re-running per TensorRT submodule must not add a copy each time."""
+        root = torch.nn.Module()
+        root.register_parameter(
+            "_frozen_param0",
+            torch.nn.Parameter(torch.zeros(8), requires_grad=False),
+        )
+        g = Graph()
+        frozen = g.get_attr("_frozen_param0")
+        frozen.meta[FOLDED_CONSTRUCTOR_META] = True
+        g.output(frozen)
+
+        gm = GraphModule(root, g)
+        for _ in range(3):
+            gm = reset_folded_constructors(gm, CompilationSettings())
+
+        clones = [n for n in gm.graph.nodes if n.target is torch.ops.aten.clone.default]
+        self.assertEqual(len(clones), 1)
 
 
 if __name__ == "__main__":
