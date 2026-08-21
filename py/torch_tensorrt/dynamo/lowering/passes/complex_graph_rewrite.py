@@ -1284,19 +1284,21 @@ class ComplexGraphRewriter:
 
     @_complex_unpacker(torch.ops.aten._to_copy.default)
     def _rewrite_to_copy(self, node: Node) -> bool:
-        # In the [..., 2] real layout the copy is unchanged; only a complex
-        # dtype request needs remapping to its real counterpart.
+        # complex target: remap dtype, [..., 2] layout unchanged
+        # real target: the cast discards the imaginary part, so select re
         kwargs = dict(node.kwargs)
         dtype = kwargs.get("dtype")
-        if dtype is not None and dtype not in COMPLEX_DTYPES:
-            # complex -> real changes meaning, not layout; use the fallback.
-            return False
-        if dtype is not None:
+        inp = node.args[0]
+        to_real = dtype is not None and dtype not in COMPLEX_DTYPES
+        if dtype is not None and not to_real:
             kwargs["dtype"] = COMPLEX_TO_REAL_DTYPE[dtype]
         with SubgraphBuilder(self.gm.graph, node) as b:
-            out = b(torch.ops.aten._to_copy.default, node.args[0])
+            if to_real:
+                inp = b(torch.ops.aten.select.int, inp, -1, 0)
+            out = b(torch.ops.aten._to_copy.default, inp)
             out.kwargs = kwargs
-            out.meta["is_complex_layout"] = True
+            if not to_real:
+                out.meta["is_complex_layout"] = True
             node.replace_all_uses_with(out)
             self.gm.graph.erase_node(node)
             return True

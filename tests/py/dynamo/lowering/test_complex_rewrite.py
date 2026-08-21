@@ -601,9 +601,7 @@ def test_reshape_copy():
             return torch.ops.aten._reshape_copy.default(z, [12])
 
     gm = _export_and_lower(M(), (_z(),))
-    targets = {
-        n.target for n in gm.graph.nodes if n.op == "call_function"
-    }
+    targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
     assert torch.ops.aten.view_as_complex.default not in targets
     assert torch.ops.aten.view_as_real.default not in targets
     _check_op(M(), (_z(),), "reshape_copy")
@@ -613,15 +611,31 @@ def test_reshape_copy():
 def test_to_copy_complex_dtype():
     class M(nn.Module):
         def forward(self, z):
-            return torch.ops.aten._to_copy.default(z, dtype=torch.complex128)
+            return torch.ops.aten._to_copy.default(z, dtype=torch.complex64)
 
-    gm = _export_and_lower(M(), (_z(),))
-    targets = {
-        n.target for n in gm.graph.nodes if n.op == "call_function"
-    }
+    # complex64's real counterpart (float32) is TRT-convertible; float64 is not
+    z = torch.randn(3, 4, dtype=torch.complex128)
+    gm = _export_and_lower(M(), (z,))
+    targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
     assert torch.ops.aten.view_as_complex.default not in targets
     assert torch.ops.aten.view_as_real.default not in targets
-    _check_op(M(), (_z(),), "to_copy_complex_dtype")
+    assert any(
+        node.target == torch.ops.aten._to_copy.default
+        and node.kwargs.get("dtype") == torch.float32
+        for node in gm.graph.nodes
+    ), "a complex target must be remapped to its real counterpart"
+    _check_op(M(), (z,), "to_copy_complex_dtype")
+
+
+@pytest.mark.unit
+def test_to_copy_complex_to_real():
+    """z.to(float) discards the imaginary part and the trailing real/imag dim."""
+
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._to_copy.default(z, dtype=torch.float32)
+
+    _check_op(M(), (_z(3, 5),), "to_copy_complex_to_real")  # shape (3,5) so last dim≠2
 
 
 @pytest.mark.unit
