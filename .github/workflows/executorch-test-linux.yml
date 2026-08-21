@@ -64,7 +64,7 @@ jobs:
         chmod +x "${RUNNER_TEMP}/bin/bazel"
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
-        python -m pip install pyyaml executorch
+        python -m pip install pyyaml "executorch==1.4.1"
         # Keep this diagnostic until the native runtime initialization crash is understood.
         ulimit -c unlimited || true
         if command -v gdb >/dev/null 2>&1; then
