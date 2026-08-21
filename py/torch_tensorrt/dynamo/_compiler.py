@@ -864,12 +864,15 @@ def compile(
         trt_gm.meta["_copyback_mutation_buffers"] = _copyback_mutation_buffers
     # Ground-truth check: every write lift classified as KV (engine-aliased, so its
     # copy_ was dropped) must actually appear in a compiled engine's aliased_io,
-    # else its write-back would be silently lost -- fail loudly instead.
+    # else its write-back would be silently lost -- fail loudly instead. A dryrun
+    # returns before conversion, so there is no ground truth to check against.
     assert_predicted_kv_aliased(
         aliased_input_bindings(
             getattr(sub, "aliased_io", None) for _name, sub in trt_gm.named_children()
         ),
         _predicted_kv_bindings,
+        settings,
+        engines_built=not settings.dryrun,
     )
     if lifted_buffers:
         # Inline buffers into the compiled gm as get_attr nodes + registered
@@ -2220,6 +2223,7 @@ def convert_exported_program_to_serialized_trt_engine(
     assert_predicted_kv_aliased(
         aliased_input_bindings([interpreter_result.aliased_io]),
         predicted_kv_bindings,
+        settings,
     )
 
     serialized_engine: bytes = interpreter_result.serialized_engine

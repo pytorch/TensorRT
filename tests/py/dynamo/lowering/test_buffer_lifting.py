@@ -623,6 +623,42 @@ class TestPredictedKvAssertion(TestCase):
     def test_noop_when_no_prediction(self):
         assert_predicted_kv_aliased(self._aliased_in(_FakeGM({})), [])
 
+    def test_no_engines_built_does_not_raise(self):
+        """With no engine built, aliased_io is empty for every prediction whatever
+        the predictions were worth, so there is nothing to check and raising would
+        fail a run on the strength of its own absence of evidence."""
+        assert_predicted_kv_aliased(
+            self._aliased_in(_FakeGM({})),
+            ["buf_k_cache"],
+            engines_built=False,
+        )
+
+    def test_dryrun_alone_does_not_skip(self):
+        """``dryrun`` is not what the skip keys on. The engine converter accepts it,
+        never acts on it and builds an engine regardless, so treating it as "no
+        engines" there would turn a check the converter deliberately has no opt-out
+        for into one with an opt-out kwarg."""
+        with self.assertRaises(RuntimeError):
+            assert_predicted_kv_aliased(
+                self._aliased_in(_FakeGM({})),
+                ["buf_k_cache"],
+                CompilationSettings(dryrun=True),
+            )
+
+    def test_message_names_min_block_size(self):
+        """The classification runs before partitioning, so the usual cause is the
+        partitioner rejecting the subgraph the write landed in. Without the value in
+        force and the remedy, there is nothing in the error to act on."""
+        with self.assertRaises(RuntimeError) as caught:
+            assert_predicted_kv_aliased(
+                self._aliased_in(_FakeGM({})),
+                ["buf_k_cache"],
+                CompilationSettings(min_block_size=5),
+            )
+        message = str(caught.exception)
+        self.assertIn("min_block_size (5)", message)
+        self.assertIn("min_block_size=1", message)
+
 
 if __name__ == "__main__":
     run_tests()

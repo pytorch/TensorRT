@@ -144,7 +144,11 @@ def aliased_input_bindings(aliased_io_maps: Iterable[Any]) -> Set[str]:
 
 
 def assert_predicted_kv_aliased(
-    aliased_in: Set[str], predicted_kv_bindings: List[str]
+    aliased_in: Set[str],
+    predicted_kv_bindings: List[str],
+    settings: Optional[CompilationSettings] = None,
+    *,
+    engines_built: bool = True,
 ) -> None:
     """Ground-truth check for the KV predictions :func:`_kv_write_will_alias` made.
 
@@ -159,16 +163,37 @@ def assert_predicted_kv_aliased(
     ``aliased_in`` is the ground truth, supplied by the caller because the two entry
     points hold it in different shapes: :func:`compile` reads it off the compiled
     submodules, while the engine converter has it on the interpreter result.
+
+    ``engines_built=False`` says the caller produced no engine, so ``aliased_in`` is
+    empty for reasons that say nothing about the predictions and every one of them
+    would look unfulfilled. The check is skipped there instead. :func:`compile` passes
+    ``not settings.dryrun``, because a dryrun returns before conversion; the engine
+    converter takes ``dryrun`` too but never acts on it and builds either way, so it
+    keeps the default.
     """
     if not predicted_kv_bindings:
         return
+    if not engines_built:
+        logger.debug(
+            "no engines were built, so the predicted-KV aliasing check for "
+            "%s has nothing to verify against and is skipped",
+            predicted_kv_bindings,
+        )
+        return
     missing = [b for b in predicted_kv_bindings if b not in aliased_in]
     if missing:
+        cause = "the write did not end up inside a TensorRT engine"
+        if settings is not None:
+            cause += (
+                f", most often because min_block_size ({settings.min_block_size}) "
+                "rejected the subgraph it landed in; min_block_size=1 rules that out"
+            )
         raise RuntimeError(
             "lift_mutated_buffers classified these buffer writes as KV-cache "
             "(engine-aliased) and dropped their copy_, but the compiled engine "
             f"did not alias them (absent from aliased_io): {missing}. Their "
-            "write-back would be silently dropped."
+            "write-back would be silently dropped. The classification runs before "
+            f"partitioning, so this means {cause}."
         )
 
 
