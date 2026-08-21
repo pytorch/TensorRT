@@ -1284,21 +1284,40 @@ class ComplexGraphRewriter:
 
     @_complex_unpacker(torch.ops.aten._to_copy.default)
     def _rewrite_to_copy(self, node: Node) -> bool:
-        # complex target: remap dtype, [..., 2] layout unchanged
-        # real target: the cast discards the imaginary part, so select re
         kwargs = dict(node.kwargs)
         dtype = kwargs.get("dtype")
         inp = node.args[0]
-        to_real = dtype is not None and dtype not in COMPLEX_DTYPES
-        if dtype is not None and not to_real:
+        from_complex = self._is_complex_layout_node(inp)
+        to_complex = dtype is None or dtype in COMPLEX_DTYPES
+        if dtype is not None and to_complex:
             kwargs["dtype"] = COMPLEX_TO_REAL_DTYPE[dtype]
+
         with SubgraphBuilder(self.gm.graph, node) as b:
-            if to_real:
-                inp = b(torch.ops.aten.select.int, inp, -1, 0)
-            out = b(torch.ops.aten._to_copy.default, inp)
-            out.kwargs = kwargs
-            if not to_real:
+            if to_complex and from_complex:
+                # remap dtype, [..., 2] layout unchanged
+                out = b(torch.ops.aten._to_copy.default, inp)
+                out.kwargs = kwargs
                 out.meta["is_complex_layout"] = True
+            elif to_complex:
+                # a real input needs a zero imaginary half, so 1 -> [1, 0]
+                re = b(torch.ops.aten._to_copy.default, inp)
+                re.kwargs = kwargs
+                im = b(torch.ops.aten.zeros_like.default, re)
+                out = self._inline_cat_re_im(b, re, im)
+            elif dtype == torch.bool:
+                # bool(a+bi) tests both halves for nonzero, not just a
+                re = b(torch.ops.aten.select.int, inp, -1, 0)
+                im = b(torch.ops.aten.select.int, inp, -1, 1)
+                re_bool = b(torch.ops.aten._to_copy.default, re)
+                re_bool.kwargs = kwargs
+                im_bool = b(torch.ops.aten._to_copy.default, im)
+                im_bool.kwargs = kwargs
+                out = b(torch.ops.aten.logical_or.default, re_bool, im_bool)
+            else:
+                # a real target discards the imaginary half
+                re = b(torch.ops.aten.select.int, inp, -1, 0)
+                out = b(torch.ops.aten._to_copy.default, re)
+                out.kwargs = kwargs
             node.replace_all_uses_with(out)
             self.gm.graph.erase_node(node)
             return True

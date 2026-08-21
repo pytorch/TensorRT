@@ -639,6 +639,30 @@ def test_to_copy_complex_to_real():
 
 
 @pytest.mark.unit
+def test_to_copy_complex_to_bool():
+    """bool(0+1j) is True, so the imaginary half alone has to set the result."""
+
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._to_copy.default(z, dtype=torch.bool)
+
+    # len 3 so a surviving [..., 2] layout is a shape mismatch, not a silent pass
+    z = torch.tensor([0 + 1j, 0 + 0j, 2 - 3j], dtype=torch.complex64)
+    _check_op(M(), (z,), "to_copy_complex_to_bool")
+
+
+@pytest.mark.unit
+def test_to_copy_real_to_complex():
+    """x.to(complex) pairs each element with a zero imaginary half."""
+
+    class M(nn.Module):
+        def forward(self, x):
+            return torch.ops.aten._to_copy.default(x, dtype=torch.complex64)
+
+    _check_op(M(), (torch.tensor([1.0, 2.0, 3.0]),), "to_copy_real_to_complex")
+
+
+@pytest.mark.unit
 def test_reshape_batch():
     class M(nn.Module):
         def forward(self, z):
