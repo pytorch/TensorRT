@@ -1248,3 +1248,19 @@ def test_none_placeholder():
             return out
 
     _check_op(M(), (_z(), None), "none_placeholder")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "scale", [torch.tensor(2.0), 2, True], ids=["tensor", "int", "bool"]
+)
+def test_non_tensor_scalar_placeholder(scale):
+    class RotaryComplex(nn.Module):
+        def forward(self, xq, freqs_cis, scale):
+            xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
+            out = torch.view_as_real(xq_ * freqs_cis).flatten(3).type_as(xq)
+            return out * scale
+
+    xq = torch.randn(1, 2, 4, 8)
+    freqs = torch.polar(torch.ones(1, 2, 4, 4), torch.randn(1, 2, 4, 4))
+    _export_and_lower(RotaryComplex(), (xq, freqs, scale))

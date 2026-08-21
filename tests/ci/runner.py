@@ -119,7 +119,7 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "executorch":
         return [
             (
-                launcher + ["-m", "pip", "install", "pyyaml", "executorch>=1.3.1"],
+                launcher + ["-m", "pip", "install", "pyyaml", "executorch>=1.4.1,<1.5"],
                 REPO_ROOT,
             )
         ]

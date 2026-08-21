@@ -6,11 +6,17 @@ import torch
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
+from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import (
+    mark_constant_fold_exclusions,
+)
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     trace_intermediate_node_outputs,
 )
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
+from .complex_decomposition_adapter import (
+    complex_decomposition_adapter as _complex_decomposition_adapter_pass,
+)
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
@@ -35,9 +41,24 @@ pre_lowering_pass_list = [
     rule_based_autocast,
 ]
 
+
+def complex_lowering_pass(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> torch.fx.GraphModule:
+    """Select the complex-numerics lowering by settings flag (issue #4390).
+
+    ``use_complex_decomposition`` routes to PyTorch's upstream decomposition;
+    otherwise the legacy hand-rolled rewriter runs.
+    """
+    if getattr(settings, "use_complex_decomposition", False):
+        return _complex_decomposition_adapter_pass(gm, settings)
+    return complex_graph_detection(gm, settings)
+
+
 post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
+    mark_constant_fold_exclusions,
     constant_fold,
     repair_input_as_output,
     fuse_prims_broadcast,
@@ -45,7 +66,7 @@ post_lowering_pass_list = [
     fuse_pad_into_convolution,
     remove_assert_nodes,
     remove_num_users_is_0_nodes,
-    complex_graph_detection,
+    complex_lowering_pass,
     force_causal_efficient_attention,
     eliminate_sym_min_int64_max,
     normalize_negative_slice_stop,

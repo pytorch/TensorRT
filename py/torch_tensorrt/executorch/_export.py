@@ -238,6 +238,41 @@ def _declared_method_name(partitioner: Any) -> str | None:
     return None
 
 
+def _apply_weight_streaming_budget(
+    method_compile_specs: dict[str, list[Any]],
+    weight_streaming_budget_per_engine: Any,
+) -> None:
+    """Bake the per-engine weight streaming budget into every method's compile specs.
+
+    The raw compile spec is rejected even when no budget is given, because writing it
+    by hand skips the validation here and silently disagrees with a budget passed the
+    supported way.
+    """
+    from executorch.exir.backend.compile_spec_schema import CompileSpec
+    from torch_tensorrt.executorch.partitioner import (
+        normalize_weight_streaming_budget_per_engine,
+        WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY,
+    )
+
+    for name, specs in method_compile_specs.items():
+        if any(
+            getattr(spec, "key", None) == WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY
+            for spec in specs
+        ):
+            raise ValueError(
+                f"compile_specs for {name!r} carries a "
+                f"CompileSpec({WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY!r}, ...). Pass "
+                "weight_streaming_budget_per_engine instead."
+            )
+    spec_value = normalize_weight_streaming_budget_per_engine(
+        weight_streaming_budget_per_engine
+    )
+    if spec_value is None:
+        return
+    for specs in method_compile_specs.values():
+        specs.append(CompileSpec(WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY, spec_value))
+
+
 def _per_method_values(
     value: Sequence[Any] | Mapping[str, Sequence[Any] | None] | None,
     method_names: tuple[str, ...],
@@ -288,6 +323,7 @@ def export(
     compile_config: "EdgeCompileConfig | None" = None,
     constant_methods: Mapping[str, Any] | None = None,
     generate_etrecord: bool = False,
+    weight_streaming_budget_per_engine: int | None = None,
 ) -> "EdgeProgramManager":
     """Prepare TensorRT-compiled programs for composable ExecuTorch lowering.
 
@@ -362,6 +398,18 @@ def export(
             ``source``.
         generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.
             This copies the whole program, engines included.
+        weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that
+            may stay resident in GPU memory, with the rest streamed from host memory.
+            It applies to **each** TensorRT engine separately, not as a total for the
+            program, so a program with N engines can hold up to N times this value
+            resident: every delegate is initialized when its method loads and they stay
+            resident together. Requires the engine to have been compiled with
+            ``enable_weight_streaming=True``; it is ignored, with a log message, on an
+            engine that cannot stream. Leave it unset, the default, so each engine gets
+            TensorRT's own automatic budget, sized against free memory on the device it
+            actually loads on. This is a different unit from
+            ``torch_tensorrt.runtime.weight_streaming(...).device_budget``, which is a
+            program total split proportionally across engines.
 
     Returns:
         executorch.exir.EdgeProgramManager: The Edge program, ready for inspection,
@@ -404,6 +452,9 @@ def export(
     _reject_misnamed_partitioners(extra_partitioners)
     method_compile_specs = _per_method_values(
         compile_specs, method_names, "compile_specs"
+    )
+    _apply_weight_streaming_budget(
+        method_compile_specs, weight_streaming_budget_per_engine
     )
 
     if constant_methods is not None:
@@ -462,6 +513,15 @@ def export(
                 name,
                 engine_call_counts[name],
             )
+            if weight_streaming_budget_per_engine is not None:
+                logger.warning(
+                    "weight_streaming_budget_per_engine applies to each of those %d "
+                    "engines separately, not as a total, so resident weights for %s "
+                    "can reach %d times the value given.",
+                    engine_call_counts[name],
+                    name,
+                    engine_call_counts[name],
+                )
         # Drop this method's engine payloads as soon as they are in the graph.
         rewritten[name] = replace_execute_engine(program, resolved_engines.pop(name))
         method_partitioners[name] = [

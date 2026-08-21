@@ -145,6 +145,28 @@ class TestWhereConverter(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(Where(), input_specs)
 
+    @parameterized.expand(
+        [
+            (torch.bfloat16, torch.bfloat16),
+            (torch.float16, torch.bfloat16),
+            (torch.bfloat16, torch.float32),
+            (torch.bfloat16, torch.int32),
+        ]
+    )
+    def test_bf16_promotion(self, x_dtype, y_dtype):
+        class Where(nn.Module):
+            def forward(self, condition, x, y):
+                return torch.ops.aten.where.self(condition, x, y)
+
+        # Fractional values: int32 truncation would turn these into integers.
+        x = torch.tensor([[0.5, 1.5, -2.25, 3.75]], dtype=x_dtype)
+        if y_dtype == torch.int32:
+            y = torch.tensor([[0, 1, -2, 3]], dtype=y_dtype)
+        else:
+            y = torch.tensor([[0.25, -1.5, 2.75, -0.5]], dtype=y_dtype)
+        condition = torch.tensor([[True, False, True, False]])
+        self.run_test(Where(), (condition, x, y))
+
 
 if __name__ == "__main__":
     run_tests()

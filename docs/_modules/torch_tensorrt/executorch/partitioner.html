@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=1f89f020"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -515,7 +515,48 @@ document.write(`
 <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
     <span class="n">_TARGET_DEVICE_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"target_device"</span>
 
+<span class="c1"># Compile spec key that carries the TensorRT weight streaming budget into the</span>
+<span class="c1"># delegate. Must match kWeightStreamingBudgetKey on the C++ side</span>
+<span class="c1"># (cpp/include/torch_tensorrt/executorch/WeightStreamingBudget.h). The value is a</span>
+<span class="c1"># non-negative decimal integer of bytes (ASCII). The key is absent for the</span>
+<span class="c1"># automatic budget, which the delegate applies itself for streamable engines.</span>
+<span class="c1"># The delegate also reads this same key as a load-time backend option (runtime</span>
+<span class="c1"># spec), which takes precedence over this baked value when provided at load.</span>
+<span class="n">WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"weight_streaming_budget"</span>
+
+<span class="c1"># The C++ side parses the value into an int64_t, so anything at or above 2**63 has no</span>
+<span class="c1"># representation there.</span>
+<span class="n">WEIGHT_STREAMING_BUDGET_MAX_BYTES</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">63</span>
+
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_weight_streaming_budget_per_engine</span><span class="p">(</span>
+    <span class="n">weight_streaming_budget_per_engine</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bytes</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Validate a per-engine weight streaming budget and encode it for a CompileSpec.</span>
+
+<span class="sd">    ``None``, the default, means automatic: the delegate picks the budget at load time.</span>
+<span class="sd">    A non-negative integer is an explicit GPU budget in bytes. Returns the ASCII bytes</span>
+<span class="sd">    to store in the CompileSpec, or ``None`` when no budget was supplied.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">weight_streaming_budget_per_engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="c1"># bool is an int subclass, so reject it explicitly along with non-ints.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">weight_streaming_budget_per_engine</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="n">weight_streaming_budget_per_engine</span><span class="p">,</span> <span class="nb">int</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">"weight_streaming_budget_per_engine must be a non-negative int (number of "</span>
+            <span class="s2">"bytes) or None for automatic, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">weight_streaming_budget_per_engine</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">weight_streaming_budget_per_engine</span> <span class="o">&lt;</span> <span class="n">WEIGHT_STREAMING_BUDGET_MAX_BYTES</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"weight_streaming_budget_per_engine must be in [0, 2**63), got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">weight_streaming_budget_per_engine</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">weight_streaming_budget_per_engine</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="TensorRTPartitioner">

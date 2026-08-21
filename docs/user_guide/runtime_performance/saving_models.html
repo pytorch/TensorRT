@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=1f89f020"></script>
+    <script src="../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -886,7 +886,50 @@ asynchronous.</p>
 <p>If the runner reads a delegate’s outputs between calls (for example, an
 autoregressive decode loop), synchronize the shared stream before reading: the
 work may still be in flight when <code class="docutils literal notranslate"><span class="pre">execute()</span></code> returns, and a host-side copy on
-the default stream will not wait for a non-blocking stream.</p>
+the default stream will not wait for a non-blocking stream.
+<strong>ExecuTorch lowering options</strong></p>
+<p>When <code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code> forwards the following
+keyword arguments to ExecuTorch’s <code class="docutils literal notranslate"><span class="pre">to_edge_transform_and_lower(...)</span></code>. They are
+only consulted for the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> format; passing them with any other
+<code class="docutils literal notranslate"><span class="pre">output_format</span></code> logs a warning and is otherwise ignored.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">constant_methods</span></code> — a <code class="docutils literal notranslate"><span class="pre">dict</span></code> of extra constant methods to embed in the
+<code class="docutils literal notranslate"><span class="pre">.pte</span></code> (e.g. <code class="docutils literal notranslate"><span class="pre">{&quot;get_max_seq_len&quot;:</span> <span class="pre">2048}</span></code> for an LLM runner).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">transform_passes</span></code> — additional edge-dialect transform passes to run before
+lowering.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">compile_config</span></code> — an <code class="docutils literal notranslate"><span class="pre">EdgeCompileConfig</span></code>. When omitted, Torch-TensorRT
+supplies a default with <code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code> (the TensorRT
+<code class="docutils literal notranslate"><span class="pre">execute_engine</span></code> placeholder graph does not pass edge-IR validation). A
+caller-supplied config is forwarded <strong>verbatim</strong>, so if you pass your own and
+your graph carries TensorRT engines, set <code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code> explicitly.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">backend_config</span></code> — an <code class="docutils literal notranslate"><span class="pre">ExecutorchBackendConfig</span></code> forwarded to
+<code class="docutils literal notranslate"><span class="pre">to_executorch(...)</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">generate_etrecord</span></code> — a <code class="docutils literal notranslate"><span class="pre">bool</span></code> (default <code class="docutils literal notranslate"><span class="pre">False</span></code>). When <code class="docutils literal notranslate"><span class="pre">True</span></code>, an
+<a class="reference external" href="https://pytorch.org/executorch/stable/etrecord.html">ETRecord</a> is written
+next to the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> as <code class="docutils literal notranslate"><span class="pre">&lt;base&gt;_etrecord.bin</span></code> (e.g. <code class="docutils literal notranslate"><span class="pre">trt.pte</span></code> →
+<code class="docutils literal notranslate"><span class="pre">trt_etrecord.bin</span></code>) for use with the ExecuTorch Developer Tools <code class="docutils literal notranslate"><span class="pre">Inspector</span></code>.</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir</span><span class="w"> </span><span class="kn">import</span> <span class="n">EdgeCompileConfig</span>
+
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
+    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">constant_methods</span><span class="o">=</span><span class="p">{</span><span class="s2">"get_max_seq_len"</span><span class="p">:</span> <span class="mi">2048</span><span class="p">},</span>
+    <span class="n">compile_config</span><span class="o">=</span><span class="n">EdgeCompileConfig</span><span class="p">(</span><span class="n">_check_ir_validity</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+    <span class="n">generate_etrecord</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The ETRecord sidecar can be parsed back and paired with a runtime ETDump in the
+Developer Tools <code class="docutils literal notranslate"><span class="pre">Inspector</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.devtools</span><span class="w"> </span><span class="kn">import</span> <span class="n">Inspector</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.devtools.etrecord</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_etrecord</span>
+
+<span class="n">etrecord</span> <span class="o">=</span> <span class="n">parse_etrecord</span><span class="p">(</span><span class="s2">"trt_etrecord.bin"</span><span class="p">)</span>
+<span class="n">inspector</span> <span class="o">=</span> <span class="n">Inspector</span><span class="p">(</span><span class="n">etdump_path</span><span class="o">=</span><span class="s2">"etdump.etdp"</span><span class="p">,</span> <span class="n">etrecord</span><span class="o">=</span><span class="n">etrecord</span><span class="p">)</span>
+<span class="n">inspector</span><span class="o">.</span><span class="n">print_data_tabular</span><span class="p">()</span>
+</pre></div>
+</div>
 </section>
 </section>
 </section>

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=1f89f020"></script>
+    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -564,6 +564,7 @@ document.write(`
     <span class="n">dim_registry</span> <span class="o">=</span> <span class="n">build_dim_registry</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="p">)</span>
     <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_args</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">)</span>
     <span class="n">dynamic_shapes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">dim_registry</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Derived dynamic_shapes for export: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">dynamic_shapes</span><span class="p">)</span>
 
     <span class="n">export_context</span> <span class="o">=</span> <span class="n">nullcontext</span><span class="p">()</span>
 
@@ -616,6 +617,10 @@ document.write(`
 <span class="sd">    """</span>
     <span class="n">registry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">bounds</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="c1"># {name: ["input_ids[0]", ...]} -- every axis fused under each name. Recorded</span>
+    <span class="c1"># during the loop because ``registry`` only keeps name -&gt; Dim, losing the</span>
+    <span class="c1"># link back to the inputs that contributed it.</span>
+    <span class="n">usage</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">inp</span> <span class="ow">in</span> <span class="n">_collect_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span> <span class="o">+</span> <span class="n">_collect_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">):</span>
         <span class="n">shared_dims</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="s2">"shared_dims"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">shared_dims</span> <span class="ow">or</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">!=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
@@ -625,16 +630,32 @@ document.write(`
         <span class="n">max_shape</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]</span>
         <span class="k">for</span> <span class="n">axis</span><span class="p">,</span> <span class="n">dim_name</span> <span class="ow">in</span> <span class="n">shared_dims</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">min_shape</span><span class="p">[</span><span class="n">axis</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_shape</span><span class="p">[</span><span class="n">axis</span><span class="p">])</span>
+            <span class="n">site</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">inp</span><span class="o">.</span><span class="n">name</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">'&lt;unnamed&gt;'</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2">]"</span>
             <span class="k">if</span> <span class="n">dim_name</span> <span class="ow">in</span> <span class="n">bounds</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">bounds</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span> <span class="o">!=</span> <span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                         <span class="sa">f</span><span class="s2">"Dimension name '</span><span class="si">{</span><span class="n">dim_name</span><span class="si">}</span><span class="s2">' is used with conflicting ranges "</span>
-                        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">bounds</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span><span class="w"> </span><span class="n">hi</span><span class="p">)</span><span class="si">}</span><span class="s2">. A shared named dimension "</span>
+                        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">bounds</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span><span class="si">}</span><span class="s2"> on </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">usage</span><span class="p">[</span><span class="n">dim_name</span><span class="p">])</span><span class="si">}</span><span class="s2"> and "</span>
+                        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span><span class="w"> </span><span class="n">hi</span><span class="p">)</span><span class="si">}</span><span class="s2"> on </span><span class="si">{</span><span class="n">site</span><span class="si">}</span><span class="s2">. A shared named dimension "</span>
                         <span class="sa">f</span><span class="s2">"must have identical (min, max) on every input that uses it."</span>
                     <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">bounds</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span>
                 <span class="n">registry</span><span class="p">[</span><span class="n">dim_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">Dim</span><span class="p">(</span><span class="n">dim_name</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="n">lo</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="n">hi</span><span class="p">)</span>
+            <span class="n">usage</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">dim_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">site</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">registry</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">"Resolved </span><span class="si">%d</span><span class="s2"> shared dynamic dim(s) from Input specs: </span><span class="si">%s</span><span class="s2">. Axes listed "</span>
+            <span class="s2">"under one name are exported as a single symbol and are therefore "</span>
+            <span class="s2">"constrained equal at runtime."</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">registry</span><span class="p">),</span>
+            <span class="s2">"; "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' -&gt; [</span><span class="si">{</span><span class="n">bounds</span><span class="p">[</span><span class="n">name</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">bounds</span><span class="p">[</span><span class="n">name</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">] on "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">usage</span><span class="p">[</span><span class="n">name</span><span class="p">])</span><span class="si">}</span><span class="s2">"</span>
+                <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">registry</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
     <span class="k">return</span> <span class="n">registry</span>
 
 

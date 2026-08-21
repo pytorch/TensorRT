@@ -780,7 +780,9 @@ def save(
                 - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes
                   parameter takes precedence.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
-                ``compile_specs=``, and ``backend_config=`` are only used with
+                ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
+                ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``
+                and ``weight_streaming_budget_per_engine=`` are only used with
                 ``output_format="executorch"``; otherwise they are ignored with a
                 warning. Pass ``compile_specs=[CompileSpec("target_device",
                 b"cuda:<i>")]`` to override the default target device (``cuda:0``).
@@ -794,6 +796,25 @@ def save(
                 <executorch_save>` for the ``CudaPartitioner`` recipe, its
                 export-time requirements (CUDA backend + nvcc), and the external
                 ``.ptd`` weight caveats.
+                ``constant_methods=``, ``transform_passes=`` and
+                ``compile_config=`` are forwarded to
+                ``to_edge_transform_and_lower(...)``. When ``compile_config`` is
+                omitted it defaults to ``_check_ir_validity=False`` (the TRT engine
+                graph fails edge IR validation); a caller-supplied
+                ``compile_config`` is forwarded verbatim, so set
+                ``_check_ir_validity=False`` on it explicitly when the graph carries
+                TRT engines.
+                ``generate_etrecord=True`` writes an ETRecord to
+                ``<model>_etrecord.bin`` next to the ``.pte`` for use with the
+                ExecuTorch Inspector.
+                ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``
+                number of bytes of engine weights that may stay resident in GPU
+                memory, with the rest streamed from host memory. It applies to
+                **each** TensorRT engine separately, not as a total for the program,
+                so a program with N engines can hold up to N times this value
+                resident. Requires the engine to have been compiled with
+                ``enable_weight_streaming=True``. See
+                :func:`torch_tensorrt.executorch.export` for the full description.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -821,6 +842,13 @@ def save(
     executorch_partitioners = kwargs.pop("partitioners", None)
     executorch_compile_specs = kwargs.pop("compile_specs", None)
     executorch_backend_config = kwargs.pop("backend_config", None)
+    executorch_constant_methods = kwargs.pop("constant_methods", None)
+    executorch_transform_passes = kwargs.pop("transform_passes", None)
+    executorch_compile_config = kwargs.pop("compile_config", None)
+    executorch_generate_etrecord = kwargs.pop("generate_etrecord", False)
+    executorch_weight_streaming_budget_per_engine = kwargs.pop(
+        "weight_streaming_budget_per_engine", None
+    )
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -831,6 +859,25 @@ def save(
             "Saving in ExecuTorch format requires the executorch package "
             "with executorch.exir. Install with: pip install "
             "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
+        )
+    if output_format == "executorch":
+        # Every executorch option is popped above, so a leftover kwarg is a typo. Fail
+        # here rather than silently ignoring it, since nothing downstream reads kwargs.
+        if kwargs:
+            raise TypeError(
+                "save() received unexpected keyword argument(s) for "
+                f"output_format='executorch': {sorted(kwargs)}. Supported executorch "
+                "options are 'partitioners', 'compile_specs', 'backend_config', and "
+                "'weight_streaming_budget_per_engine'."
+            )
+        # Validate the budget before the input and model-shape checks below, so a wrong
+        # type is not reported as an unrelated failure.
+        from torch_tensorrt.executorch.partitioner import (
+            normalize_weight_streaming_budget_per_engine,
+        )
+
+        normalize_weight_streaming_budget_per_engine(
+            executorch_weight_streaming_budget_per_engine
         )
 
     def _all_are_input_objects(obj: Any) -> bool:
@@ -952,6 +999,35 @@ def save(
             "backend_config= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
+    if executorch_constant_methods and output_format != "executorch":
+        logger.warning(
+            "constant_methods= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if executorch_transform_passes and output_format != "executorch":
+        logger.warning(
+            "transform_passes= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if executorch_compile_config and output_format != "executorch":
+        logger.warning(
+            "compile_config= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if executorch_generate_etrecord and output_format != "executorch":
+        logger.warning(
+            "generate_etrecord= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if (
+        executorch_weight_streaming_budget_per_engine is not None
+        and output_format != "executorch"
+    ):
+        logger.warning(
+            "weight_streaming_budget_per_engine= is only used with "
+            "output_format='executorch' and will be ignored for "
+            f"output_format='{output_format}'."
+        )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
@@ -995,6 +1071,15 @@ def save(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
             if output_format == "exported_program":
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
+                # A retraced exported_program's signature omits the engines'
+                # aliased KV mutations, so declare them here -- before
+                # normalization, which rewrites the engine constants the pass
+                # reads aliased_io from.
+                module = _declare_aliased_kv_mutations_on_ep(module)
                 _normalize_engine_constants_to_python(module)
                 function_overload_with_kwargs(
                     torch.export.save,
@@ -1005,6 +1090,16 @@ def save(
                     **kwargs,
                 )
             elif output_format == "aot_inductor":
+                if any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.graph_module.named_modules()
+                ):
+                    logger.warning(
+                        "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                        "but output_format='aot_inductor' does not declare those aliased "
+                        "outputs as buffer mutations. The saved program's signature will "
+                        "not reflect the in-place update."
+                    )
                 inductor_configs = {}
                 if "inductor_configs" in kwargs:
                     inductor_configs = kwargs["inductor_configs"]
@@ -1021,6 +1116,11 @@ def save(
                     partitioners=executorch_partitioners,
                     compile_specs=executorch_compile_specs,
                     backend_config=executorch_backend_config,
+                    constant_methods=executorch_constant_methods,
+                    transform_passes=executorch_transform_passes,
+                    compile_config=executorch_compile_config,
+                    generate_etrecord=executorch_generate_etrecord,
+                    weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                 )
             else:
                 raise RuntimeError(
@@ -1040,6 +1140,14 @@ def save(
                 **kwargs,
             )
         else:
+            # torch.export truncates the engines' aliased KV outputs at the fx
+            # boundary, so a retraced program's signature omits an update the engine
+            # performs unless the mutations are re-declared; the legacy exporter
+            # instead exposes them at transform time. The declaration pass skips
+            # buffers that already carry a spec, so every branch below can run it
+            # whichever exporter produced the program. aot_inductor is left
+            # undeclared: whether an aliased in-place mutation survives
+            # functionalization under inductor is unverified.
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
@@ -1060,7 +1168,15 @@ def save(
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
                 )
+
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
                 if output_format == "exported_program":
+                    # Must precede normalization, which rewrites the engine constants
+                    # this pass reads aliased_io from.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1071,6 +1187,16 @@ def save(
                         **kwargs,
                     )
                 elif output_format == "aot_inductor":
+                    if any(
+                        getattr(sub, "aliased_io", None)
+                        for _sub_name, sub in module.named_modules()
+                    ):
+                        logger.warning(
+                            "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                            "but output_format='aot_inductor' does not declare those aliased "
+                            "outputs as buffer mutations. The saved program's signature will "
+                            "not reflect the in-place update."
+                        )
                     inductor_configs = {}
                     if "inductor_configs" in kwargs:
                         inductor_configs = kwargs["inductor_configs"]
@@ -1081,12 +1207,18 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
                         file_path,
                         partitioners=executorch_partitioners,
                         compile_specs=executorch_compile_specs,
                         backend_config=executorch_backend_config,
+                        constant_methods=executorch_constant_methods,
+                        transform_passes=executorch_transform_passes,
+                        compile_config=executorch_compile_config,
+                        generate_etrecord=executorch_generate_etrecord,
+                        weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                     )
                 else:
                     raise RuntimeError(
@@ -1147,7 +1279,25 @@ def save(
                         strict=False,
                     )
 
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
+                if output_format == "aot_inductor" and any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.named_modules()
+                ):
+                    logger.warning(
+                        "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                        "but output_format='aot_inductor' does not declare those aliased "
+                        "outputs as buffer mutations. The saved program's signature will "
+                        "not reflect the in-place update."
+                    )
+
                 if output_format == "exported_program":
+                    # Must precede normalization, which rewrites the engine constants
+                    # this pass reads aliased_io from.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1168,12 +1318,18 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
                         file_path,
                         partitioners=executorch_partitioners,
                         compile_specs=executorch_compile_specs,
                         backend_config=executorch_backend_config,
+                        constant_methods=executorch_constant_methods,
+                        transform_passes=executorch_transform_passes,
+                        compile_config=executorch_compile_config,
+                        generate_etrecord=executorch_generate_etrecord,
+                        weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                     )
                 else:
                     raise RuntimeError(
@@ -1230,15 +1386,32 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
                 "output_format='executorch'"
             )
 
+    generate_etrecord = kwargs.get("generate_etrecord", False)
+    # export() runs the TRT partitioner and to_edge_transform_and_lower itself; it
+    # defaults compile_config to get_edge_compile_config() (_check_ir_validity=False,
+    # since the TRT execute_engine placeholder graph fails edge IR validation) when a
+    # caller passes none, and forwards a caller-supplied compile_config verbatim.
     edge_program = export(
         exp_program,
         partitioners=kwargs.get("partitioners"),
         compile_specs=kwargs.get("compile_specs"),
+        transform_passes=kwargs.get("transform_passes"),
+        compile_config=kwargs.get("compile_config"),
+        constant_methods=kwargs.get("constant_methods"),
+        generate_etrecord=generate_etrecord,
+        weight_streaming_budget_per_engine=kwargs.get(
+            "weight_streaming_budget_per_engine"
+        ),
     )
     executorch_program = edge_program.to_executorch(config=kwargs.get("backend_config"))
     with open(file_path, "wb") as f:
         executorch_program.write_to_file(f)
     _write_external_tensor_data(executorch_program, file_path)
+    if generate_etrecord:
+        # Follows ExecuTorch's example convention (e.g. examples/cuda/scripts/export.py):
+        # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
+        etrecord_path = os.path.splitext(file_path)[0] + "_etrecord.bin"
+        executorch_program.get_etrecord().save(etrecord_path)
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:

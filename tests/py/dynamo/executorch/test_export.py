@@ -1557,13 +1557,19 @@ def test_export_warns_for_multiple_engines(monkeypatch, caplog):
     not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
     reason="Torch-TensorRT runtime operators are not available",
 )
-def test_rewrite_reuses_resolved_engines_instead_of_serializing_again(monkeypatch):
-    """The rewrite consumes what validation resolved instead of resolving again.
+def test_rewrite_reuses_resolved_metadata_instead_of_reading_it_again(monkeypatch):
+    """The rewrite consumes the metadata validation resolved instead of reading it again.
 
-    Reading an engine's state serializes it and base64 encodes the result, so resolving
-    the same engine in both steps doubles that cost. Staging hands the rewrite a
-    different program object holding the same node names, so the two programs here are
-    separate instances to match that.
+    Reading an engine's metadata serializes it on a runtime without the metadata
+    accessor, so re-reading it in both steps would double that cost. Staging hands the
+    rewrite a different program object holding the same node names, so the two programs
+    here are separate instances to match that.
+
+    The engine bytes are a separate read the tensor path owns, not part of the metadata
+    handoff: the record kept in ``resolved`` is metadata-only, so its ENGINE_IDX is
+    empty and the rewrite must never source the bytes from it. On this accessor-less
+    fake the tensor path falls back to one more full read, which is the second call
+    below; with the accessors present neither call serializes at all.
     """
     export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
     source, _, _, _ = _engine_program(lifted=False)
@@ -1572,9 +1578,9 @@ def test_rewrite_reuses_resolved_engines_instead_of_serializing_again(monkeypatc
     calls = []
     real_resolve = export_utils.get_engine_info_from_state
 
-    def counting_get_engine_info_from_state(engine_obj):
-        calls.append(engine_obj)
-        return real_resolve(engine_obj)
+    def counting_get_engine_info_from_state(engine_obj, *, metadata_only=False):
+        calls.append(metadata_only)
+        return real_resolve(engine_obj, metadata_only=metadata_only)
 
     monkeypatch.setattr(
         export_utils, "get_engine_info_from_state", counting_get_engine_info_from_state
@@ -1582,7 +1588,7 @@ def test_rewrite_reuses_resolved_engines_instead_of_serializing_again(monkeypatc
 
     resolved: dict = {}
     assert export_utils.validate_engine_program(source, resolved) == 1
-    assert len(calls) == 1
+    assert calls == [True], "validation reads metadata only, exactly once"
 
     # Staging preserves node identities, which is what lets the rewrite find the earlier
     # work on a different program object.
@@ -1592,5 +1598,7 @@ def test_rewrite_reuses_resolved_engines_instead_of_serializing_again(monkeypatc
 
     export_utils.replace_execute_engine(staged, resolved)
 
-    # Without the handoff the rewrite resolves the engine again and this becomes 2.
-    assert len(calls) == 1
+    # The metadata handoff means the rewrite never re-reads metadata; the one extra read
+    # is the tensor path fetching the bytes, which it re-resolves rather than trusting
+    # the metadata-only record. Without the handoff the first entry would repeat.
+    assert calls == [True, False]

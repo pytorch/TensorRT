@@ -14,6 +14,10 @@ set +x
 #   First argument: path to an existing .pte model.
 #   EXECUTORCH_SOURCE_DIR=/path/to/executorch
 #
+# Optional second argument: path to a caller-owned KV-cache decode .pte (see
+#   examples/torchtrt_executorch_example/export_kv_cache_decode.py). When given,
+#   kv_cache_decode_check is built and run against it as well.
+#
 # Optional:
 #   TensorRT_ROOT=/path/to/extracted/TensorRT
 #     If unset, the script reuses Bazel's fetched TensorRT SDK when available
@@ -29,13 +33,18 @@ set +x
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 PATH_TO_MODEL.pte" >&2
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "Usage: $0 PATH_TO_MODEL.pte [PATH_TO_KV_CACHE_DECODE.pte]" >&2
   exit 1
 fi
 model_path="$1"
 if [[ ! -f "${model_path}" ]]; then
   echo "ExecuTorch model not found: ${model_path}" >&2
+  exit 1
+fi
+kv_model_path="${2:-}"
+if [[ -n "${kv_model_path}" && ! -f "${kv_model_path}" ]]; then
+  echo "KV-cache decode model not found: ${kv_model_path}" >&2
   exit 1
 fi
 
@@ -164,7 +173,18 @@ download_tensorrt_root() {
   if [[ ! -f "${tensorrt_archive}" ]]; then
     curl -fL "${tensorrt_url}" -o "${tensorrt_archive}" || return 1
   fi
-  tar -xzf "${tensorrt_archive}" -C "${tensorrt_extract_dir}" || return 1
+  case "${tensorrt_archive}" in
+    *.tar.zst)
+      tar --zstd -xf "${tensorrt_archive}" -C "${tensorrt_extract_dir}" || return 1
+      ;;
+    *.tar.gz | *.tgz)
+      tar -xzf "${tensorrt_archive}" -C "${tensorrt_extract_dir}" || return 1
+      ;;
+    *)
+      echo "Unsupported TensorRT archive format: ${tensorrt_archive}" >&2
+      return 1
+      ;;
+  esac
 
   if [[ -n "${tensorrt_strip_prefix}" ]]; then
     tensorrt_root="${tensorrt_extract_dir}/${tensorrt_strip_prefix}"
@@ -261,6 +281,9 @@ require_tar_entry() {
 
 require_tar_entry "torch_tensorrt/src/torch_tensorrt/executorch/CMakeLists.txt"
 require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/CMakeLists.txt"
+require_tar_entry "torch_tensorrt/bin/example_executorch_runner"
+require_tar_entry "torch_tensorrt/lib/libextension_cuda.so"
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/kv_cache_decode_check.cpp"
 require_tar_entry "torch_tensorrt/BUILD"
 
 export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
@@ -282,25 +305,191 @@ fi
 
 cmake "${cmake_args[@]}"
 
+build_targets=(example_executorch_runner)
+if [[ -n "${kv_model_path}" ]]; then
+  build_targets+=(kv_cache_decode_check)
+fi
+
 cmake --build "${verify_root}/build-executorch-reference-runner" \
-  --target example_executorch_runner \
+  --target "${build_targets[@]}" \
   -j"${MAX_JOBS:-$(nproc)}"
 
 runner_log="${verify_root}/my_runner.log"
 runner_path="${verify_root}/build-executorch-reference-runner/example_executorch_runner"
-if command -v ldd >/dev/null 2>&1 &&
-  ldd "${runner_path}" |
+
+# Symbol/linkage inspection tools are mandatory on this Linux gate: silently
+# skipping them would let a broken single-TLS layout pass unnoticed.
+for _tool in ldd readelf nm; do
+  if ! command -v "${_tool}" >/dev/null 2>&1; then
+    echo "Required tool '${_tool}' not found; cannot verify caller-stream linkage" >&2
+    exit 1
+  fi
+done
+
+# Capture nm output instead of piping it into `grep -q`. grep exits at its first
+# match and closes the pipe, so nm dies of SIGPIPE and pipefail reports 141, which
+# reads as a false verdict in either direction.
+nm_matches() {
+  local _pattern="$1"
+  shift
+  local _symbols
+  _symbols="$(nm "$@" 2>/dev/null)"
+  grep -qE "${_pattern}" <<<"${_symbols}"
+}
+
+# The runner must not pull in libtorch: this native path is libtorch-free.
+if ldd "${runner_path}" |
     grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
   echo "example_executorch_runner links PyTorch/libtorch shared libraries" >&2
+  exit 1
+fi
+
+# The runner must declare a real DT_NEEDED dependency on libextension_cuda.so
+# (an ldd filename match alone would also accept a "=> not found" line).
+if ! readelf -d "${runner_path}" |
+    grep -E "\(NEEDED\).*libextension_cuda\.so" >&2; then
+  echo "example_executorch_runner has no DT_NEEDED entry for libextension_cuda.so" >&2
+  exit 1
+fi
+
+# ...and that dependency must actually resolve at load time.
+if ldd "${runner_path}" | grep -E "libextension_cuda\.so.*=>.*not found" >&2; then
+  echo "example_executorch_runner cannot resolve libextension_cuda.so at runtime" >&2
+  exit 1
+fi
+
+# The runner must import the caller-stream API from the shared library rather
+# than define it privately. A private definition means a second copy of the
+# thread-local, which silently breaks the cross-backend handshake. Assert the
+# import (in .dynsym) rather than the absence of a definition: absence-of-symbol
+# checks read .symtab, which is stripped from release binaries and would make
+# the assertion pass vacuously. A private definition would satisfy the reference
+# at link time and leave no import here.
+for _symbol in getCallerStream CallerStreamGuard; do
+  if ! nm_matches "${_symbol}" -D --undefined-only "${runner_path}"; then
+    echo "example_executorch_runner does not import ${_symbol} from libextension_cuda.so" >&2
+    exit 1
+  fi
+done
+
+# Validate the .so the runner ACTUALLY loads (resolved via ldd), not just a
+# packaged copy. The runner is CMake-built and may link the CMake-built
+# extension_cuda; whichever .so the loader binds to must export the accessor and
+# must be the sole definer the runner sees.
+loaded_extension_cuda="$(
+  ldd "${runner_path}" 2>/dev/null |
+    sed -n 's/.*libextension_cuda\.so[^ ]* => \([^ ]*\).*/\1/p'
+)"
+loaded_extension_cuda="${loaded_extension_cuda%%$'\n'*}"
+if [[ -z "${loaded_extension_cuda}" || ! -f "${loaded_extension_cuda}" ]]; then
+  echo "Could not resolve the libextension_cuda.so the runner loads" >&2
+  exit 1
+fi
+if ! nm_matches "getCallerStream" --defined-only --dynamic "${loaded_extension_cuda}"; then
+  echo "Loaded ${loaded_extension_cuda} does not export getCallerStream" >&2
+  exit 1
+fi
+
+# Packaging integrity (independent of the CMake runner): the Bazel-packaged .so
+# must exist and export the accessor, and no other packaged ELF may define the
+# caller-stream symbols -- a second definition would reintroduce a duplicate
+# thread-local in the shipped artifact.
+packaged_runner="${TORCH_TENSORRT_ROOT}/bin/example_executorch_runner"
+packaged_extension_cuda="${TORCH_TENSORRT_ROOT}/lib/libextension_cuda.so"
+if [[ ! -x "${packaged_runner}" ]]; then
+  echo "Packaged example_executorch_runner missing or not executable: ${packaged_runner}" >&2
+  exit 1
+fi
+if [[ ! -f "${packaged_extension_cuda}" ]]; then
+  echo "Packaged libextension_cuda.so missing at ${packaged_extension_cuda}" >&2
+  exit 1
+fi
+if ! nm_matches "getCallerStream" --defined-only --dynamic "${packaged_extension_cuda}"; then
+  echo "Packaged libextension_cuda.so does not export getCallerStream" >&2
+  exit 1
+fi
+if ! readelf -d "${packaged_runner}" |
+    grep -E "\(NEEDED\).*libextension_cuda\.so" >&2; then
+  echo "Packaged runner has no DT_NEEDED entry for libextension_cuda.so" >&2
+  exit 1
+fi
+if ldd "${packaged_runner}" | grep -E "libextension_cuda\.so.*=>.*not found" >&2; then
+  echo "Packaged runner cannot resolve libextension_cuda.so" >&2
+  exit 1
+fi
+for _symbol in getCallerStream CallerStreamGuard; do
+  if ! nm_matches "${_symbol}" -D --undefined-only "${packaged_runner}"; then
+    echo "Packaged runner does not import ${_symbol} from libextension_cuda.so" >&2
+    exit 1
+  fi
+done
+
+# No other packaged ELF may define the caller-stream symbols: a second
+# definition would reintroduce a duplicate thread-local.
+extra_defs="$(
+  find "${TORCH_TENSORRT_ROOT}/lib" -maxdepth 1 -type f -name '*.so*' \
+    ! -name 'libextension_cuda.so' -print0 2>/dev/null |
+    while IFS= read -r -d '' _so; do
+      if nm_matches "getCallerStream|CallerStreamGuard" --defined-only --dynamic "${_so}"; then
+        echo "${_so}"
+      fi
+    done
+)"
+if [[ -n "${extra_defs}" ]]; then
+  echo "Unexpected caller-stream definitions outside libextension_cuda.so:" >&2
+  echo "${extra_defs}" >&2
   exit 1
 fi
 
 "${runner_path}" \
   --model_path="${model_path}" \
   --num_runs=1 2>&1 | tee "${runner_log}"
+packaged_runner_log="${verify_root}/packaged_runner.log"
+"${packaged_runner}" \
+  --model_path="${model_path}" \
+  --num_runs=1 2>&1 | tee "${packaged_runner_log}"
 
-# The sample model is x + 1, and the reference runner fills inputs with 1.0f,
-# so the output sample should contain 2.0000.
-grep -q "Inference completed" "${runner_log}"
-grep -q "output\\[0\\] shape=" "${runner_log}"
-grep -Eq "first [0-9]+ values:.* 2\\.0000" "${runner_log}"
+# The sample model is x + 1 on a (2,3,4,4) input and both runners fill inputs with
+# 1.0f, so the shape is exactly [2,3,4,4] and every printed value is exactly 2.0000.
+# Assert both precisely. Matching only "shape=" accepts any shape, and matching one
+# 2.0000 anywhere on the values line accepts a line of wrong numbers that happens to
+# contain one right one, so neither catches a stream-ordering regression returning
+# stale or partial output. ET_LOG output is not part of the packaged runner contract
+# and may be compiled out, so nothing here depends on it.
+for _log in "${runner_log}" "${packaged_runner_log}"; do
+  if ! grep -q 'output\[0\] shape=\[2,3,4,4\]' "${_log}"; then
+    echo "Unexpected output shape in ${_log}:" >&2
+    grep 'output\[0\] shape=' "${_log}" >&2 || echo "  no shape line at all" >&2
+    exit 1
+  fi
+
+  _values="$(sed -n 's/.*first [0-9]* values://p' "${_log}")"
+  _values="${_values%%$'\n'*}"
+  if [[ -z "${_values}" ]]; then
+    echo "No output values line in ${_log}" >&2
+    exit 1
+  fi
+  for _value in ${_values}; do
+    if [[ "${_value}" != "2.0000" ]]; then
+      echo "Unexpected output value '${_value}' in ${_log}: ${_values}" >&2
+      exit 1
+    fi
+  done
+done
+
+if [[ -n "${kv_model_path}" ]]; then
+  # kv_cache_decode_check exits non-zero when a decode step does not observe the KV
+  # the previous step wrote; the grep additionally pins the assertion itself, so
+  # weakening the check inside the binary cannot quietly turn this into a no-op.
+  kv_check_log="${verify_root}/kv_cache_decode_check.log"
+  kv_check_path="${verify_root}/build-executorch-reference-runner/kv_cache_decode_check"
+  if command -v ldd >/dev/null 2>&1 &&
+    ldd "${kv_check_path}" |
+      grep -E "libtorch|libtorch_cpu|libtorch_cuda|libc10" >&2; then
+    echo "kv_cache_decode_check links PyTorch/libtorch shared libraries" >&2
+    exit 1
+  fi
+
+  "${kv_check_path}" --model_path="${kv_model_path}" 2>&1 | tee "${kv_check_log}"
+  grep -q "PASS: decode at pos=1 observed the KV written at pos=0" "${kv_check_log}"
+fi

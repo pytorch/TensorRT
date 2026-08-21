@@ -13,6 +13,7 @@ namespace executorch_backend {
 namespace {
 
 constexpr char TENSORRT_MAGIC[4] = {'T', 'R', '0', '1'};
+constexpr char TENSORRT_MAGIC_ALIASED_IO[4] = {'T', 'R', '0', '2'};
 constexpr uint32_t METADATA_OFFSET_FIELD_OFFSET = 4;
 constexpr uint32_t METADATA_SIZE_FIELD_OFFSET = 8;
 constexpr uint32_t ENGINE_OFFSET_FIELD_OFFSET = 12;
@@ -29,13 +30,16 @@ std::size_t align_up(std::size_t value, std::size_t alignment) {
   return ((value + alignment - 1) / alignment) * alignment;
 }
 
-std::vector<uint8_t> make_blob(const std::string& metadata, std::size_t engine_size = 4) {
+std::vector<uint8_t> make_blob(
+    const std::string& metadata,
+    std::size_t engine_size = 4,
+    const char* magic = TENSORRT_MAGIC) {
   const auto metadata_offset = static_cast<uint32_t>(HEADER_SIZE);
   const auto metadata_size = static_cast<uint32_t>(metadata.size());
   const auto engine_offset = static_cast<uint32_t>(align_up(metadata_offset + metadata_size, ENGINE_ALIGNMENT));
   std::vector<uint8_t> blob(static_cast<std::size_t>(engine_offset) + engine_size, 0);
 
-  std::memcpy(blob.data(), TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC));
+  std::memcpy(blob.data(), magic, sizeof(TENSORRT_MAGIC));
   write_field(blob, METADATA_OFFSET_FIELD_OFFSET, metadata_offset);
   write_field(blob, METADATA_SIZE_FIELD_OFFSET, metadata_size);
   write_field(blob, ENGINE_OFFSET_FIELD_OFFSET, engine_offset);
@@ -102,6 +106,81 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsEnginePastEndOfBlob) {
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsMissingIoBindingsMetadata) {
   const auto blob = make_blob(R"({"hardware_compatible":false})");
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIo) {
+  const std::string metadata = R"({"io_bindings":[{"name":"in_k","is_input":true},{"name":"out_k","is_input":false},)"
+                               R"({"name":"in_u","is_input":true},{"name":"out_u","is_input":false}],)"
+                               R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"},)"
+                               R"({"output":"out_u","input":"in_u","kind":"user"}],)"
+                               R"("hardware_compatible":false,"device_id":0})";
+  const auto blob = make_blob(metadata);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+
+  ASSERT_EQ(header.aliased_io.size(), 2u);
+  EXPECT_EQ(header.aliased_io[0].output, "out_k");
+  EXPECT_EQ(header.aliased_io[0].input, "in_k");
+  EXPECT_EQ(header.aliased_io[0].kind, "kv_cache_update");
+  EXPECT_EQ(header.aliased_io[1].output, "out_u");
+  EXPECT_EQ(header.aliased_io[1].input, "in_u");
+  EXPECT_EQ(header.aliased_io[1].kind, "user");
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, DefaultsMissingAliasedIo) {
+  // Blobs written before aliased_io existed omit the key; parsing must still
+  // succeed and leave aliased_io empty (backward compatible).
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+                R"("hardware_compatible":false,"device_id":0})");
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.aliased_io.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ParsesEmptyAliasedIo) {
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+                R"("aliased_io":[],"hardware_compatible":false,"device_id":0})");
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.aliased_io.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIoMagic) {
+  const std::string metadata = R"({"io_bindings":[{"name":"in_k","is_input":true},{"name":"out_k","is_input":false}],)"
+                               R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"}]})";
+  const auto blob = make_blob(metadata, 4, TENSORRT_MAGIC_ALIASED_IO);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  ASSERT_EQ(header.aliased_io.size(), 1u);
+  EXPECT_EQ(header.aliased_io[0].output, "out_k");
+  EXPECT_EQ(header.aliased_io[0].input, "in_k");
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, InputNamedAliasedIoWithNoAliasesStillParses) {
+  // A model input literally named "aliased_io" must not be mistaken for the
+  // real aliased_io array key.
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"aliased_io","is_input":true},{"name":"out_0","is_input":false}],)"
+                R"("hardware_compatible":false,"device_id":0})");
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.aliased_io.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
+  constexpr char kFutureMagic[4] = {'T', 'R', '0', '3'};
+  const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}]})";
+  const auto blob = make_blob(metadata, 4, kFutureMagic);
 
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));

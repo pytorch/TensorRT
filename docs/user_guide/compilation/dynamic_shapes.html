@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=1f89f020"></script>
+    <script src="../../_static/documentation_options.js?v=61128d90"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -634,6 +634,41 @@ shared <code class="docutils literal notranslate"><span class="pre">Dim</span></
 can be shared simultaneously with <code class="docutils literal notranslate"><span class="pre">shared_dims={0:</span> <span class="pre">&quot;B&quot;,</span> <span class="pre">1:</span> <span class="pre">&quot;S&quot;}</span></code>.</p>
 <p>See the full runnable example: <span class="xref std std-ref">shared_dynamic_dims</span>.</p>
 </section>
+<section id="namedtuple-shorthand-for-shared-dims">
+<h2>Namedtuple Shorthand for Shared Dims<a class="headerlink" href="#namedtuple-shorthand-for-shared-dims" title="Link to this heading">#</a></h2>
+<p>Passing a <code class="docutils literal notranslate"><span class="pre">namedtuple</span></code> as <code class="docutils literal notranslate"><span class="pre">min_shape</span></code> / <code class="docutils literal notranslate"><span class="pre">opt_shape</span></code> / <code class="docutils literal notranslate"><span class="pre">max_shape</span></code> is a
+shorthand for the <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> pattern above.  Field names become axis names
+automatically — no <code class="docutils literal notranslate"><span class="pre">shared_dims</span></code> kwarg required.  Dynamic axes (<code class="docutils literal notranslate"><span class="pre">min</span> <span class="pre">!=</span> <span class="pre">max</span></code>)
+with the same field name across inputs are exported as one shared
+<code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code>; static axes (<code class="docutils literal notranslate"><span class="pre">min</span> <span class="pre">==</span> <span class="pre">max</span></code>) are ignored.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">namedtuple</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyHFEncoder</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="n">S</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">"shape"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"batch"</span><span class="p">,</span> <span class="s2">"seq"</span><span class="p">])</span>
+
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+        <span class="n">min_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="n">opt_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="n">max_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"input_ids"</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+        <span class="n">min_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="n">opt_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="n">max_shape</span><span class="o">=</span><span class="n">S</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"attention_mask"</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">]</span>
+<span class="c1"># "batch" is dynamic (1→8) on both inputs → one shared Dim("batch")</span>
+<span class="c1"># "seq"   is static  (16==16)             → no Dim needed</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This is equivalent to passing <code class="docutils literal notranslate"><span class="pre">shared_dims={0:</span> <span class="pre">&quot;batch&quot;}</span></code> on each input
+individually.  The two styles cannot be combined on the same <code class="docutils literal notranslate"><span class="pre">Input</span></code> — use
+one or the other.</p>
+</section>
 <section id="dynamic-shapes-using-torch-compile-jit">
 <h2>Dynamic shapes using torch.compile (JIT)<a class="headerlink" href="#dynamic-shapes-using-torch-compile-jit" title="Link to this heading">#</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(model,</span> <span class="pre">inputs,</span> <span class="pre">ir=&quot;torch_compile&quot;)</span></code> returns a torch.compile boxed function with the backend
@@ -861,6 +896,7 @@ using <code class="docutils literal notranslate"><span class="pre">torch.export.
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#under-the-hood">Under the hood</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#custom-dynamic-shape-constraints">Custom Dynamic Shape Constraints</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sharing-a-dynamic-dimension-across-multiple-inputs">Sharing a Dynamic Dimension Across Multiple Inputs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#namedtuple-shorthand-for-shared-dims">Namedtuple Shorthand for Shared Dims</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamic-shapes-using-torch-compile-jit">Dynamic shapes using torch.compile (JIT)</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#saving-and-loading-models-with-dynamic-shapes">Saving and Loading Models with Dynamic Shapes</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#method-1-automatic-inference-from-torch-tensorrt-input">Method 1: Automatic Inference from torch_tensorrt.Input</a></li>

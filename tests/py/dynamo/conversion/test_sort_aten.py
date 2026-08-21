@@ -6,6 +6,7 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import sort_validator
 
 from .harness import DispatchTestCase
 
@@ -137,6 +138,31 @@ class TestSortValidatorDefaultDim(TestCase):
         )
         self.assertEqual(acc_count, 0)
         torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+
+class TestSortValidator(unittest.TestCase):
+    def _sort_node(self, fn):
+        class Mod(nn.Module):
+            def forward(self, x):
+                return fn(x)
+
+        gm = torch.export.export(Mod(), (torch.randn(4, 8),)).module()
+        return next(
+            n
+            for n in gm.graph.nodes
+            if n.op == "call_function" and n.target is torch.ops.aten.sort.default
+        )
+
+    def test_defaulted_dim_does_not_raise(self):
+        # export drops dim=-1, so args is (x,) only; indexing args[1] used to IndexError
+        node = self._sort_node(lambda x: torch.sort(x))
+        self.assertEqual(len(node.args), 1)
+        self.assertTrue(sort_validator(node))
+
+    def test_explicit_dim_still_works(self):
+        node = self._sort_node(lambda x: torch.sort(x, 0))
+        self.assertGreaterEqual(len(node.args), 2)
+        self.assertTrue(sort_validator(node))
 
 
 if __name__ == "__main__":
