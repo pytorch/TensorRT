@@ -1,8 +1,8 @@
 import ast
+import operator
+import struct
 from pathlib import Path
 from types import SimpleNamespace
-
-import struct
 
 import pytest
 
@@ -20,14 +20,14 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
     SERIALIZATION_LEN,
 )
 from torch_tensorrt.executorch.backend import (  # noqa: E402
-    _get_engine_info_from_edge_program,
     TensorRTBackend,
+    _get_engine_info_from_edge_program,
 )
 from torch_tensorrt.executorch.serialization import (  # noqa: E402
-    deserialize_engine,
     HEADER_FORMAT,
     HEADER_SIZE,
     TENSORRT_MAGIC,
+    deserialize_engine,
 )
 
 
@@ -77,7 +77,18 @@ def _build_edge_program(
         _ENGINE_OP,
         (engine_inputs, *engine_info),
     )
-    graph.output((engine_node,))
+    # A multi-output engine is consumed through one getitem per output binding, in
+    # index order; a single-output engine is returned unwrapped.
+    out_names = [n for n in str(engine_info[OUTPUT_BINDING_NAMES_IDX]).split("%") if n]
+    if len(out_names) > 1:
+        graph.output(
+            tuple(
+                graph.call_function(operator.getitem, (engine_node, i))
+                for i in range(len(out_names))
+            )
+        )
+    else:
+        graph.output((engine_node,))
 
     graph_signature = SimpleNamespace(
         input_specs=[
@@ -368,3 +379,61 @@ def test_preprocess_preserves_output_binding_order():
         False,
         False,
     ]
+
+
+def _engine_partition(output_indices):
+    """A one-engine partition whose graph outputs are getitem(engine, i) for each i
+    in `output_indices`, in that order."""
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    engine = g.call_function(
+        torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default, ([x],)
+    )
+    g.output(
+        tuple(g.call_function(operator.getitem, (engine, i)) for i in output_indices)
+    )
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+    return SimpleNamespace(graph_module=gm), engine
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_accepts_index_order():
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0, 1, 2])
+    _validate_output_binding_order(ep, engine, ["out0", "out1", "out2"])
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_rejects_permuted_outputs():
+    """The runtime binds output i to output_binding_names[i]. A pass that moved a
+    mutation output ahead of the user outputs would rename them silently."""
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([2, 0, 1])
+    with pytest.raises(ValueError, match="engine output indices"):
+        _validate_output_binding_order(ep, engine, ["out0", "out1", "out2"])
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_rejects_dropped_output():
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0, 1])
+    with pytest.raises(ValueError, match="engine output indices"):
+        _validate_output_binding_order(ep, engine, ["out0", "out1", "out2"])
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_accepts_unwrapped_single_output():
+    """A single-output engine is returned directly, not through a getitem."""
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    engine = g.call_function(
+        torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default, ([x],)
+    )
+    g.output((engine,))
+    ep = SimpleNamespace(graph_module=torch.fx.GraphModule(torch.nn.Module(), g))
+    _validate_output_binding_order(ep, engine, ["out"])

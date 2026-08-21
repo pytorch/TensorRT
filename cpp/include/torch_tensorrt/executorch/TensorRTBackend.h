@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  *
  * ExecuTorch backend delegate that runs TensorRT engines serialized by
- * torch_tensorrt. The processed blob uses the standalone TR01 wire format from
+ * torch_tensorrt. The processed blob uses the standalone wire format from
  * py/torch_tensorrt/executorch/serialization.py and is parsed directly here.
  * This runtime path intentionally does not depend on the legacy
  * Torch-TensorRT C++ runtime or libtorch.
@@ -59,6 +59,20 @@ struct EngineHandle {
   std::vector<size_t> cached_output_sizes;
   size_t num_inputs = 0;
   size_t num_outputs = 0;
+  // Per output binding [0..num_outputs): index into input_binding_names of the
+  // input it aliases (in-place KV-cache / user alias), or -1 for a normal output.
+  // Built at init from the blob's aliased_io. The KV buffers are threaded by
+  // ExecuTorch as caller-owned mutable-buffer delegate args (input AND aliased
+  // output): execute() binds each aliased TRT output binding to its aliased
+  // input's caller-provided pointer (in-place) and reflects the result into the
+  // delegate output EValue, which ExecuTorch's write-back copy_ then reads.
+  std::vector<int> output_aliased_input_idx;
+  // Per input binding [0..num_inputs): true if any output aliases this input, so
+  // its in-place (KV/user) update must land in the caller-owned storage. Built at
+  // init from aliased_io; execute() uses it to reject a non-device-resident
+  // aliased input instead of silently staging its update into delegate scratch.
+  std::vector<bool> input_is_alias_target;
+  size_t num_aliased_outputs = 0;
   int device_id = 0;
   bool unified_memory = false;
   std::mutex mu;

@@ -1,7 +1,8 @@
 import base64
 import copy
+import logging
 import operator
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch.utils._pytree as pytree
@@ -23,6 +24,8 @@ from torch.export.exported_program import (
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_lifted_custom_obj(
@@ -72,7 +75,9 @@ def export(
         inputs (torch.Tensor): Torch input tensors
         cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not
     """
-    patched_module = transform(gm, cross_compile_module)
+    patched_module = transform(
+        gm, cross_compile_module, expose_aliased_mutations=bool(use_legacy_exporter)
+    )
     if not use_legacy_exporter:
         args = ()
         if arg_inputs is not None:
@@ -97,6 +102,7 @@ def export(
 def transform(
     gm: torch.fx.GraphModule,
     cross_compile_module: Optional[bool] = False,
+    expose_aliased_mutations: bool = True,
 ) -> torch.fx.GraphModule:
     """
     Transforms the graphmodule by inlining Pytorch and TensorRT submodules.
@@ -115,7 +121,7 @@ def transform(
     gm = copy.deepcopy(gm)
 
     # Inline TensorRT submodules
-    inline_trt_modules(gm, cross_compile_module)
+    inline_trt_modules(gm, cross_compile_module, expose_aliased_mutations)
 
     # Inline pytorch submodules
     inline_torch_modules(gm)
@@ -367,12 +373,29 @@ def create_trt_exp_program(
     assert output_nodes
     output_nodes = output_nodes[0].args[0]
 
+    # Outputs tagged by `_expose_aliased_buffer_mutations` become BUFFER_MUTATION
+    # specs (their `_kv_mutation_target` meta names the backing buffer); the rest
+    # are ordinary user outputs, used below to rebuild the user-facing out_spec.
+    user_output_nodes = [
+        node for node in output_nodes if "_kv_mutation_target" not in node.meta
+    ]
+
     input_specs = [
         InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
         for node in input_nodes
     ]
     output_specs = [
-        OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=node.name), node.target)
+        (
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION,
+                TensorArgument(name=node.name),
+                node.meta["_kv_mutation_target"],
+            )
+            if "_kv_mutation_target" in node.meta
+            else OutputSpec(
+                OutputKind.USER_OUTPUT, TensorArgument(name=node.name), node.target
+            )
+        )
         for node in output_nodes
     ]
 
@@ -411,7 +434,9 @@ def create_trt_exp_program(
                 if set(kwarg_targets) == set(example_kwargs):
                     example_kwargs = {key: example_kwargs[key] for key in kwarg_targets}
             in_spec = pytree.tree_flatten((example_args, example_kwargs))[1]
-        out_spec = pytree.tree_flatten(tuple(output_nodes))[1]
+        # out_spec describes the user-visible return structure only; buffer
+        # mutations are stripped before unflatten.
+        out_spec = pytree.tree_flatten(tuple(user_output_nodes))[1]
         assert in_spec.num_leaves == len(input_nodes), (
             f"create_trt_exp_program: in_spec has {in_spec.num_leaves} leaves but "
             f"the graph has {len(input_nodes)} input placeholder(s)"
@@ -505,8 +530,175 @@ def create_trt_exp_program(
     return trt_exp_program
 
 
+def _declare_aliased_kv_mutations_on_ep(
+    exp_program: ExportedProgram,
+) -> ExportedProgram:
+    """Post-export pass: declare each engine's aliased KV output as a
+    BUFFER_MUTATION of its caller-owned buffer input.
+
+    Runs on both save() paths (retrace=True and retrace=False); it is idempotent
+    because it skips buffers that already carry a BUFFER_MUTATION spec (see
+    already_exposed below), so the legacy exporter's transform-time declaration is
+    not duplicated.
+
+    torch.export produces execute_engine nodes whose meta['val'] covers only the
+    user outputs (the aliased KV outputs are network bindings excluded at the fx
+    boundary), so the KV buffers -- though BUFFER inputs -- are never recorded as
+    mutated and get frozen downstream. This surfaces each aliased output as a
+    getitem and declares it a BUFFER_MUTATION of the aliased input's buffer,
+    mirroring create_trt_exp_program's handling on the retrace=False path. Returns
+    exp_program unchanged when no engine has aliased KV outputs.
+    """
+    from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+        ALIASED_IO_IDX,
+        INPUT_BINDING_NAMES_IDX,
+        OUTPUT_BINDING_NAMES_IDX,
+        deserialize_binding_names,
+    )
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        deserialize_aliased_io,
+    )
+
+    # Guard the import so a non-executorch save() (e.g. output_format=
+    # "exported_program" with no aliased KV outputs) doesn't hard-require the
+    # optional [executorch] extra: with no executorch there's no aliased_io to
+    # read and no declaration to make, so return unchanged.
+    try:
+        from torch_tensorrt.executorch.backend import _get_engine_info_for_node
+    except ImportError:
+        return exp_program
+
+    def _estr(engine_info: List[Any], idx: int) -> str:
+        if idx < 0 or idx >= len(engine_info) or engine_info[idx] is None:
+            return ""
+        v = engine_info[idx]
+        return v.decode("utf-8", "replace") if isinstance(v, bytes) else str(v)
+
+    gm = exp_program.graph_module
+    sig = exp_program.graph_signature
+    inputs_to_buffers = sig.inputs_to_buffers
+    output_node = next(n for n in gm.graph.nodes if n.op == "output")
+    exec_target = torch.ops.tensorrt.execute_engine.default
+
+    # Seeded from the incoming signature, not empty: exposure is decided both by
+    # the exporter (the legacy one declares at transform time) and by save()'s
+    # per-format branch, so this pass can run on a program whose mutations are
+    # already declared. Re-declaring appends a second spec for the same buffer and
+    # the ExportedProgram verifier then rejects the output ordering.
+    already_exposed: Set[str] = {
+        spec.target
+        for spec in sig.output_specs
+        if spec.kind == OutputKind.BUFFER_MUTATION and spec.target
+    }
+    mutation_outputs: List[Tuple[torch.fx.Node, str]] = []
+    for node in gm.graph.nodes:
+        if node.op != "call_function" or node.target is not exec_target:
+            continue
+        engine_info = _get_engine_info_for_node(exp_program, node)
+        aliased_io = deserialize_aliased_io(_estr(engine_info, ALIASED_IO_IDX))
+        if not aliased_io:
+            continue
+        in_names = deserialize_binding_names(
+            _estr(engine_info, INPUT_BINDING_NAMES_IDX)
+        )
+        out_names = deserialize_binding_names(
+            _estr(engine_info, OUTPUT_BINDING_NAMES_IDX)
+        )
+        input_nodes = list(node.args[0])
+        val_list = list(node.meta["val"])
+        for out_name in out_names:
+            if out_name not in aliased_io:
+                continue
+            in_name = aliased_io[out_name][0]
+            # The alias map comes from the engine's own bindings, so an entry that does
+            # not resolve to a delegate input arg means the map and the engine disagree.
+            # The mutation is then left undeclared and only surfaces as a delegate arity
+            # error at execute, so log which output was dropped.
+            if in_name not in in_names:
+                logger.warning(
+                    "Aliased output %s references input %s, which is not an engine "
+                    "input binding; leaving the mutation undeclared.",
+                    out_name,
+                    in_name,
+                )
+                continue
+            ii = in_names.index(in_name)
+            if ii >= len(input_nodes):
+                logger.warning(
+                    "Aliased output %s maps to input index %d, out of range for %d "
+                    "delegate args; leaving the mutation undeclared.",
+                    out_name,
+                    ii,
+                    len(input_nodes),
+                )
+                continue
+            buf_node = input_nodes[ii]
+            buf_fqn = inputs_to_buffers.get(getattr(buf_node, "name", None))
+            if buf_fqn is None:
+                # A caller-supplied cache that is not a registered buffer: there is no
+                # buffer to declare a mutation of, and the engine still has the output
+                # binding, so the delegate ends up one arg short at execute.
+                logger.warning(
+                    "Aliased output %s updates %s in place, but that input is not a "
+                    "registered buffer, so no buffer mutation is declared for it.",
+                    out_name,
+                    in_name,
+                )
+                continue
+            if buf_fqn in already_exposed:
+                # Already declared, by this pass for another engine sharing the buffer
+                # or by the exporter at transform time. Expected, not a fault.
+                logger.debug(
+                    "Buffer %s already carries a mutation spec; skipping aliased "
+                    "output %s.",
+                    buf_fqn,
+                    out_name,
+                )
+                continue
+            oi = out_names.index(out_name)
+            while len(val_list) <= oi:
+                val_list.append(buf_node.meta["val"])
+            val_list[oi] = buf_node.meta["val"]
+            with gm.graph.inserting_after(node):
+                getitem_node = gm.graph.call_function(operator.getitem, (node, oi))
+            getitem_node.meta["val"] = buf_node.meta["val"]
+            already_exposed.add(buf_fqn)
+            mutation_outputs.append((getitem_node, buf_fqn))
+        node.meta["val"] = tuple(val_list)
+
+    if not mutation_outputs:
+        return exp_program
+
+    # BUFFER_MUTATION outputs must precede USER_OUTPUTs (ExportedProgram verifier).
+    out_args = list(output_node.args[0])
+    output_node.args = (tuple([g for g, _ in mutation_outputs] + out_args),)
+    gm.graph.lint()
+    gm.recompile()
+
+    new_output_specs = [
+        OutputSpec(OutputKind.BUFFER_MUTATION, TensorArgument(name=g.name), fqn)
+        for g, fqn in mutation_outputs
+    ] + list(sig.output_specs)
+    new_signature = ExportGraphSignature(
+        input_specs=list(sig.input_specs), output_specs=new_output_specs
+    )
+    return ExportedProgram(
+        root=gm,
+        graph=gm.graph,
+        graph_signature=new_signature,
+        state_dict=exp_program.state_dict,
+        range_constraints=exp_program.range_constraints,
+        module_call_graph=exp_program.module_call_graph,
+        example_inputs=exp_program.example_inputs,
+        constants=exp_program.constants,
+        verifiers=exp_program.verifiers,
+    )
+
+
 def inline_trt_modules(
-    gm: torch.fx.GraphModule, cross_compile_module: Optional[bool] = False
+    gm: torch.fx.GraphModule,
+    cross_compile_module: Optional[bool] = False,
+    expose_aliased_mutations: bool = True,
 ) -> torch.fx.GraphModule:
     """
     Replace TRT submodules with trt engine nodes.
@@ -568,10 +760,136 @@ def inline_trt_modules(
             for idx, getitem_node in enumerate(getitem_nodes):
                 getitem_node.meta["val"] = trt_node.meta["val"][idx]
 
+        # Expose the engine's aliased (KV-cache) outputs as graph-level buffer
+        # mutations so the ExecuTorch path sees a real mutable buffer instead of
+        # a frozen constant. Only on the legacy (create_trt_exp_program) path,
+        # which declares the BUFFER_MUTATION specs; on the torch.export path the
+        # extra outputs would just perturb the user outputs (see save()'s
+        # post-export declaration for retrace=True). Non-cross-compile only.
+        if not cross_compile_module and expose_aliased_mutations:
+            _expose_aliased_buffer_mutations(gm, trt_node, trt_module, num_outputs)
+
         # Erase the TRT submodule (call_module) node.
         gm.graph.erase_node(trt_module_node)
 
     return gm
+
+
+def _expose_aliased_buffer_mutations(
+    gm: torch.fx.GraphModule,
+    trt_node: torch.fx.Node,
+    trt_module: Any,
+    num_user_outputs: int,
+) -> None:
+    """Surface an engine's aliased KV-cache outputs as graph buffer mutations.
+
+    The interpreter appends aliased layer outputs (e.g. ``IKVCacheUpdateLayer``)
+    to the engine's network bindings *after* the fx output boundary, so
+    ``trt_node.meta["val"]`` (and the partitioner-emitted getitems) only cover
+    the user outputs. Here we add a ``getitem`` for each aliased output binding
+    and route it to the graph output tagged as a buffer mutation of the aliased
+    input's backing buffer. ``create_trt_exp_program`` turns the tag into a
+    ``BUFFER_MUTATION`` OutputSpec, so ``torch.export``/``to_edge`` record the
+    cache in ``buffers_to_mutate`` -- without a graph ``copy_`` that
+    functionalization would fold away (the aliased output shares the buffer's
+    storage, so a ``copy_`` from it is a no-op self-copy).
+    """
+    aliased_io = getattr(trt_module, "aliased_io", None)
+    if not aliased_io:
+        return
+
+    in_names = list(getattr(trt_module, "input_binding_names", []))
+    out_names = list(getattr(trt_module, "output_binding_names", []))
+    input_arg_nodes = list(trt_node.args[0])
+
+    # Only get_attr nodes backed by a *registered buffer* can be declared
+    # BUFFER_MUTATION targets; a get_attr that lift() would classify as a
+    # constant (not in named_buffers) is not a valid mutation target.
+    registered_buffers = {name for name, _ in gm.named_buffers()}
+
+    # A buffer can be declared mutated at most once in the graph signature.
+    # Multiple engines can alias the same backing buffer (they share its
+    # storage), so dedup exposures across engines.
+    already_exposed = gm.meta.setdefault("_kv_exposed_mutation_targets", set())
+
+    output_node = next(node for node in gm.graph.nodes if node.op == "output")
+
+    val_list = list(trt_node.meta["val"])
+    new_mutation_outputs: List[torch.fx.Node] = []
+    for oi, out_name in enumerate(out_names):
+        if out_name not in aliased_io:
+            continue
+        in_name = aliased_io[out_name][0]
+        # The two checks below are internal invariant violations: aliased_io is
+        # built from the engine's own bindings, so an aliased output must map to a
+        # real input arg.
+        # If it doesn't, the mutation can't be wired and its in-place update would be
+        # silently dropped (a corrupted cache) -- fail loudly rather than degrade.
+        if in_name not in in_names:
+            raise RuntimeError(
+                f"Aliased output {out_name!r} references input {in_name!r} which is "
+                "not an engine input binding -- the engine's aliased_io map is "
+                "inconsistent with its input bindings."
+            )
+        ii = in_names.index(in_name)
+        if ii >= len(input_arg_nodes):
+            raise RuntimeError(
+                f"Aliased output {out_name!r} -> input {in_name!r} maps to arg index "
+                f"{ii}, out of range for {len(input_arg_nodes)} delegate args -- the "
+                "engine's aliased_io map is inconsistent with the delegate args."
+            )
+        buffer_node = input_arg_nodes[ii]
+        buf_target = getattr(buffer_node, "target", None)
+        if buffer_node.op != "get_attr" or not isinstance(buf_target, str):
+            logger.warning(
+                "Aliased input %s for engine output %s is not a buffer get_attr "
+                "(op=%s); skipping buffer-mutation exposure.",
+                in_name,
+                out_name,
+                buffer_node.op,
+            )
+            continue
+        if buf_target not in registered_buffers:
+            logger.warning(
+                "Aliased input %s for engine output %s resolves to get_attr %s "
+                "which is not a registered buffer; skipping buffer-mutation exposure.",
+                in_name,
+                out_name,
+                buf_target,
+            )
+            continue
+        if buf_target in already_exposed:
+            logger.warning(
+                "Buffer %s (engine output %s / input %s) already exposed as a "
+                "mutation by another engine; skipping duplicate.",
+                buf_target,
+                out_name,
+                in_name,
+            )
+            continue
+        already_exposed.add(buf_target)
+
+        # Ensure the engine node advertises at least oi+1 outputs so getitem(oi)
+        # is in range; the aliased output has the shape/dtype of its input buffer.
+        while len(val_list) <= oi:
+            val_list.append(buffer_node.meta["val"])
+        val_list[oi] = buffer_node.meta["val"]
+
+        with gm.graph.inserting_after(trt_node):
+            getitem_node = gm.graph.call_function(operator.getitem, (trt_node, oi))
+        getitem_node.meta["val"] = buffer_node.meta["val"]
+        getitem_node.meta["_kv_mutation_target"] = buf_target
+        new_mutation_outputs.append(getitem_node)
+
+    if not new_mutation_outputs:
+        return
+
+    trt_node.meta["val"] = tuple(val_list)
+    # BUFFER_MUTATION outputs must precede USER_OUTPUTs (the ExportedProgram
+    # verifier treats output_nodes[num_tokens:num_tokens+num_mutations] as the
+    # mutations), so prepend.
+    out_args = list(output_node.args[0])
+    output_node.args = (tuple(new_mutation_outputs + out_args),)
 
 
 def replace_execute_engine_no_op_node(

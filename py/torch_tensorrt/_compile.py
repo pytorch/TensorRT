@@ -1071,6 +1071,15 @@ def save(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
             if output_format == "exported_program":
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
+                # A retraced exported_program's signature omits the engines'
+                # aliased KV mutations, so declare them here -- before
+                # normalization, which rewrites the engine constants the pass
+                # reads aliased_io from.
+                module = _declare_aliased_kv_mutations_on_ep(module)
                 _normalize_engine_constants_to_python(module)
                 function_overload_with_kwargs(
                     torch.export.save,
@@ -1081,6 +1090,16 @@ def save(
                     **kwargs,
                 )
             elif output_format == "aot_inductor":
+                if any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.graph_module.named_modules()
+                ):
+                    logger.warning(
+                        "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                        "but output_format='aot_inductor' does not declare those aliased "
+                        "outputs as buffer mutations. The saved program's signature will "
+                        "not reflect the in-place update."
+                    )
                 inductor_configs = {}
                 if "inductor_configs" in kwargs:
                     inductor_configs = kwargs["inductor_configs"]
@@ -1121,6 +1140,14 @@ def save(
                 **kwargs,
             )
         else:
+            # torch.export truncates the engines' aliased KV outputs at the fx
+            # boundary, so a retraced program's signature omits an update the engine
+            # performs unless the mutations are re-declared; the legacy exporter
+            # instead exposes them at transform time. The declaration pass skips
+            # buffers that already carry a spec, so every branch below can run it
+            # whichever exporter produced the program. aot_inductor is left
+            # undeclared: whether an aliased in-place mutation survives
+            # functionalization under inductor is unverified.
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
@@ -1141,7 +1168,15 @@ def save(
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
                 )
+
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
                 if output_format == "exported_program":
+                    # Must precede normalization, which rewrites the engine constants
+                    # this pass reads aliased_io from.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1152,6 +1187,16 @@ def save(
                         **kwargs,
                     )
                 elif output_format == "aot_inductor":
+                    if any(
+                        getattr(sub, "aliased_io", None)
+                        for _sub_name, sub in module.named_modules()
+                    ):
+                        logger.warning(
+                            "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                            "but output_format='aot_inductor' does not declare those aliased "
+                            "outputs as buffer mutations. The saved program's signature will "
+                            "not reflect the in-place update."
+                        )
                     inductor_configs = {}
                     if "inductor_configs" in kwargs:
                         inductor_configs = kwargs["inductor_configs"]
@@ -1162,6 +1207,7 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
                         file_path,
@@ -1233,7 +1279,25 @@ def save(
                         strict=False,
                     )
 
+                from torch_tensorrt.dynamo._exporter import (
+                    _declare_aliased_kv_mutations_on_ep,
+                )
+
+                if output_format == "aot_inductor" and any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.named_modules()
+                ):
+                    logger.warning(
+                        "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                        "but output_format='aot_inductor' does not declare those aliased "
+                        "outputs as buffer mutations. The saved program's signature will "
+                        "not reflect the in-place update."
+                    )
+
                 if output_format == "exported_program":
+                    # Must precede normalization, which rewrites the engine constants
+                    # this pass reads aliased_io from.
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1254,6 +1318,7 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
+                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                     _save_as_executorch(
                         exp_program,
                         file_path,
