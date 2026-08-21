@@ -6,6 +6,7 @@ from torch.fx.graph_module import GraphModule
 from torch.fx.node import Target
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
+from torch_tensorrt._utils import trt_rtx_targets_turing
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
@@ -167,6 +168,31 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         return False
 
     @staticmethod
+    def _has_bf16_on_turing(
+        node: torch.fx.Node, settings: Optional[object] = None
+    ) -> bool:
+        """Return True if this node touches bfloat16 while targeting Turing (SM 7.5).
+
+        Turing has no bfloat16 hardware -- PyTorch only reports support there because
+        it counts emulation. TensorRT-RTX has no such fallback, and compiling a bf16
+        node for SM 7.5 crashes the process (SIGSEGV) rather than reporting an error,
+        so these nodes must run in the PyTorch fallback.
+
+        This is checked at the partitioner rather than per-converter because the crash
+        is not specific to any one operator.
+        """
+        if not trt_rtx_targets_turing(settings):
+            return False
+
+        def _dtype(n: torch.fx.Node) -> Optional[torch.dtype]:
+            val = n.meta.get("val")
+            return getattr(val, "dtype", None) if val is not None else None
+
+        if _dtype(node) == torch.bfloat16:
+            return True
+        return any(_dtype(arg) == torch.bfloat16 for arg in node.all_input_nodes)
+
+    @staticmethod
     def _requires_output_allocator(node: torch.fx.Node) -> bool:
         # True if the converter selected for this node needs a TRT output allocator,
         # i.e. the node has a data-dependent output shape (e.g. nonzero or boolean
@@ -191,6 +217,15 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
             return False
 
         settings = CONVERTERS.compilation_settings
+        if self._has_bf16_on_turing(node, settings):
+            # bfloat16 has no Turing hardware; compiling it for SM 7.5 crashes the
+            # process, so force the PyTorch fallback.
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            return False
+
         if (
             settings is not None
             and settings.fallback_data_dependent_ops

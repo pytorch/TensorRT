@@ -89,6 +89,34 @@ def infer_module_output_dtypes_for_test(
 
 
 # this is to enable dynamo tracer as True in the converter test files batch by batch
+def skip_if_trt_rtx_turing(test_case: TestCase, what: str) -> None:
+    """Skip a converter test for a case TensorRT-RTX cannot serve on Turing (SM 7.5).
+
+    TensorRT-RTX documents that on compute capability 7.5 it does not support FP32
+    GEMMs or 3D convolutions, and Turing has no bfloat16 hardware at all. In a normal
+    ``torch_tensorrt.compile`` these fall back to PyTorch, either via a converter
+    capability validator or via the partitioner.
+
+    Converter unit tests get neither. ``DispatchTestCase.run_test`` hands the graph
+    straight to ``TRTInterpreter``, skipping the partitioner, and the graphs it builds
+    carry **empty node meta** -- so a dtype-based capability validator cannot even see
+    the operand types here. A rejected node therefore raises
+    ``UnsupportedOperatorException`` rather than falling back, and an unsupported one
+    that is not rejected reaches TensorRT-RTX and fails (or, for bf16, crashes the
+    process). Hence the explicit skip.
+    """
+    import torch_tensorrt
+
+    if (
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
+        and torch.cuda.is_available()
+        and torch.cuda.get_device_capability() == (7, 5)
+    ):
+        test_case.skipTest(
+            f"{what} is not supported on TensorRT-RTX for Turing (SM 7.5)"
+        )
+
+
 def get_use_dynamo_tracer(use_dynamo_tracer: Any) -> bool:
     # if in our converter tests we specifically set use_dynamo_tracer field, honor it
     if use_dynamo_tracer is not None and isinstance(use_dynamo_tracer, bool):

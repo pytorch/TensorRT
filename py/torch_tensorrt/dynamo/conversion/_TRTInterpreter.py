@@ -15,6 +15,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -51,8 +52,6 @@ from torch_tensorrt.dynamo.utils import (
     validate_optimization_profiles,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -384,6 +383,35 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 builder_config.l2_limit_for_tiling = (
                     self.compilation_settings.l2_limit_for_tiling
                 )
+
+        # TensorRT-RTX ahead-of-time targeting. Left unset, TensorRT-RTX compiles for
+        # whatever device is present at build time, which is right for
+        # compile-here-run-here but cannot produce an artifact for another
+        # architecture. Turing in particular is opt-in: including it by default may
+        # cost performance elsewhere. The same setting drives the capability
+        # validators, so partitioning and engine targeting cannot drift apart.
+        if (
+            ENABLED_FEATURES.tensorrt_rtx
+            and self.compilation_settings.target_compute_capabilities
+        ):
+            targets = self.compilation_settings.target_compute_capabilities
+            builder_config.num_compute_capabilities = len(targets)
+            for idx, (major, minor) in enumerate(targets):
+                name = f"SM{major}{minor}"
+                compute_capability = getattr(trt.ComputeCapability, name, None)
+                if compute_capability is None:
+                    supported = [
+                        m for m in dir(trt.ComputeCapability) if m.startswith("SM")
+                    ]
+                    raise ValueError(
+                        f"TensorRT-RTX has no compute capability {name} for requested "
+                        f"target ({major}, {minor}). Supported: {supported}"
+                    )
+                if not builder_config.set_compute_capability(compute_capability, idx):
+                    raise RuntimeError(
+                        f"Failed to set TensorRT-RTX compute capability {name}"
+                    )
+            _LOGGER.info(f"Targeting TensorRT-RTX compute capabilities {targets}")
 
         return builder_config
 

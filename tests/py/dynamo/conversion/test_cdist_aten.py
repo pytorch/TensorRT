@@ -3,7 +3,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestCdistConverter(DispatchTestCase):
@@ -21,6 +21,11 @@ class TestCdistConverter(DispatchTestCase):
         ]
     )
     def test_cdist_float_same_shape(self, name, shape, p, compute_mode):
+        # cdist with p=2 is computed as an FP32 GEMM, which TensorRT-RTX does
+        # not support on Turing.
+        if p == 2:
+            skip_if_trt_rtx_turing(self, "cdist with p=2 (an FP32 GEMM)")
+
         class Cdist(nn.Module):
             def forward(self, x1, x2):
                 return torch.ops.aten._cdist_forward.default(x1, x2, p, compute_mode)
@@ -47,6 +52,11 @@ class TestCdistConverter(DispatchTestCase):
     def test_cdist_float_broadcast_and_diff_shape(
         self, name, shape_1, shape_2, p, compute_mode
     ):
+        # cdist with p=2 is computed as an FP32 GEMM, which TensorRT-RTX does
+        # not support on Turing.
+        if p == 2:
+            skip_if_trt_rtx_turing(self, "cdist with p=2 (an FP32 GEMM)")
+
         class Cdist(nn.Module):
             def forward(self, x1, x2):
                 return torch.ops.aten._cdist_forward.default(x1, x2, p, compute_mode)
@@ -69,6 +79,11 @@ class TestCdistConverter(DispatchTestCase):
         ]
     )
     def test_cdist_p_2_compute_mode(self, name, shape_1, shape_2, p, compute_mode):
+        # cdist with p=2 is computed as an FP32 GEMM, which TensorRT-RTX does
+        # not support on Turing.
+        if p == 2:
+            skip_if_trt_rtx_turing(self, "cdist with p=2 (an FP32 GEMM)")
+
         class Cdist(nn.Module):
             def forward(self, x1, x2):
                 return torch.ops.aten._cdist_forward.default(x1, x2, p, compute_mode)
@@ -85,6 +100,11 @@ class TestCdistConverter(DispatchTestCase):
     def test_cdist_efficiency_p_2_compute_mode(
         self, name, shape_1, shape_2, p, compute_mode
     ):
+        # cdist with p=2 is computed as an FP32 GEMM, which TensorRT-RTX does
+        # not support on Turing.
+        if p == 2:
+            skip_if_trt_rtx_turing(self, "cdist with p=2 (an FP32 GEMM)")
+
         class Cdist(nn.Module):
             def forward(self, x1, x2):
                 return torch.ops.aten._cdist_forward.default(x1, x2, p, compute_mode)
