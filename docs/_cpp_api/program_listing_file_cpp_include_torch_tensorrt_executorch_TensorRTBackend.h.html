@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=61128d90"></script>
+    <script src="../_static/documentation_options.js?v=716941e7"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -495,7 +495,7 @@ document.write(`
 <span class="cm"> * LICENSE file in the root directory of this source tree.</span>
 <span class="cm"> *</span>
 <span class="cm"> * ExecuTorch backend delegate that runs TensorRT engines serialized by</span>
-<span class="cm"> * torch_tensorrt. The processed blob uses the standalone TR01 wire format from</span>
+<span class="cm"> * torch_tensorrt. The processed blob uses the standalone wire format from</span>
 <span class="cm"> * py/torch_tensorrt/executorch/serialization.py and is parsed directly here.</span>
 <span class="cm"> * This runtime path intentionally does not depend on the legacy</span>
 <span class="cm"> * Torch-TensorRT C++ runtime or libtorch.</span>
@@ -549,6 +549,20 @@ document.write(`
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cached_output_sizes</span><span class="p">;</span>
 <span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 <span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// Per output binding [0..num_outputs): index into input_binding_names of the</span>
+<span class="w">  </span><span class="c1">// input it aliases (in-place KV-cache / user alias), or -1 for a normal output.</span>
+<span class="w">  </span><span class="c1">// Built at init from the blob's aliased_io. The KV buffers are threaded by</span>
+<span class="w">  </span><span class="c1">// ExecuTorch as caller-owned mutable-buffer delegate args (input AND aliased</span>
+<span class="w">  </span><span class="c1">// output): execute() binds each aliased TRT output binding to its aliased</span>
+<span class="w">  </span><span class="c1">// input's caller-provided pointer (in-place) and reflects the result into the</span>
+<span class="w">  </span><span class="c1">// delegate output EValue, which ExecuTorch's write-back copy_ then reads.</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">output_aliased_input_idx</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// Per input binding [0..num_inputs): true if any output aliases this input, so</span>
+<span class="w">  </span><span class="c1">// its in-place (KV/user) update must land in the caller-owned storage. Built at</span>
+<span class="w">  </span><span class="c1">// init from aliased_io; execute() uses it to reject a non-device-resident</span>
+<span class="w">  </span><span class="c1">// aliased input instead of silently staging its update into delegate scratch.</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">input_is_alias_target</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_aliased_outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 <span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">device_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 <span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">unified_memory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">mutex</span><span class="w"> </span><span class="n">mu</span><span class="p">;</span>

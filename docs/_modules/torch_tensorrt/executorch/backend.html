@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
+    <script src="../../../_static/documentation_options.js?v=716941e7"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -479,6 +479,7 @@ document.write(`
   <h1>Source code for torch_tensorrt.executorch.backend</h1><div class="highlight"><pre>
 <span></span><span class="c1"># ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">final</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -491,6 +492,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.exported_program</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">_resolve_lifted_custom_obj</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ALIASED_IO_IDX</span><span class="p">,</span>
     <span class="n">DEVICE_IDX</span><span class="p">,</span>
     <span class="n">ENGINE_IDX</span><span class="p">,</span>
     <span class="n">HW_COMPATIBLE_IDX</span><span class="p">,</span>
@@ -499,6 +501,7 @@ document.write(`
     <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">,</span>
     <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">,</span>
     <span class="n">TARGET_PLATFORM_IDX</span><span class="p">,</span>
+    <span class="n">deserialize_aliased_io</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">TensorRTBlobMetadata</span><span class="p">,</span>
@@ -697,14 +700,26 @@ document.write(`
 <span class="sd">    first arg lists its input nodes in binding order, so sort the names by each</span>
 <span class="sd">    node's slot among the graph placeholders (its runtime delegate-arg position).</span>
 
-<span class="sd">    Only inputs need this. Outputs are also bound positionally by the runtime,</span>
-<span class="sd">    but they are ``getitem(engine_node, idx)`` nodes whose index order equals the</span>
-<span class="sd">    engine output-binding order. ExecuTorch lowering can reorder delegate outputs</span>
-<span class="sd">    (``arrange_graph_outputs`` moves buffer-mutation outputs ahead of user</span>
-<span class="sd">    outputs), but a TensorRT delegate partition is a functional inference engine</span>
-<span class="sd">    with no mutation outputs, so that pass is a no-op here and the output order is</span>
-<span class="sd">    preserved. If a TRT partition ever produced mutation outputs, outputs would</span>
-<span class="sd">    need the same node-identity reordering as inputs.</span>
+<span class="sd">    Only inputs need this. Outputs are also bound positionally, but they are</span>
+<span class="sd">    ``getitem(engine_node, idx)`` nodes whose index order equals the engine</span>
+<span class="sd">    output-binding order, and that order survives lowering -- though not because</span>
+<span class="sd">    the partition is mutation-free. With aliased-I/O (KV-cache) support a TensorRT</span>
+<span class="sd">    partition *does* produce mutation outputs, and ``arrange_graph_outputs`` does</span>
+<span class="sd">    move buffer-mutation outputs ahead of user outputs. It stays a no-op here</span>
+<span class="sd">    because ``_keep_mutated_buffers_above_delegate`` (``partitioner.py``) strips</span>
+<span class="sd">    the ``delegation_tag`` from mutated buffer placeholders, so they stay out of</span>
+<span class="sd">    the delegate's state dict and constants; ExecuTorch's ``_get_new_signature``</span>
+<span class="sd">    then records the mutation as a plain ``USER_OUTPUT`` rather than a</span>
+<span class="sd">    ``BUFFER_MUTATION`` (it uses the latter only when the delegate itself consumes</span>
+<span class="sd">    the buffer). The lowered submodule therefore has no mutation specs, so</span>
+<span class="sd">    ``arrange_graph_outputs`` computes the identity permutation and the getitem</span>
+<span class="sd">    indices still line up with the engine's output bindings.</span>
+
+<span class="sd">    That guarantee is conditional, not structural: if a mutated buffer is ever</span>
+<span class="sd">    tagged into a delegate its spec becomes ``BUFFER_MUTATION``, the delegate's</span>
+<span class="sd">    outputs are permuted, and they would need the same node-identity reordering as</span>
+<span class="sd">    the inputs below. ``_validate_output_binding_order`` checks that correspondence</span>
+<span class="sd">    on every preprocess, so it would fail loudly rather than mis-bind.</span>
 <span class="sd">    """</span>
     <span class="n">input_nodes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">engine_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_names</span><span class="p">):</span>
@@ -730,6 +745,57 @@ document.write(`
     <span class="k">return</span> <span class="p">[</span><span class="n">input_names</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">order</span><span class="p">]</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_validate_output_binding_order</span><span class="p">(</span>
+    <span class="n">edge_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">output_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Check the delegate's outputs are the engine's output bindings, in order.</span>
+
+<span class="sd">    The runtime binds output ``i`` to ``output_binding_names[i]``, and nothing</span>
+<span class="sd">    downstream re-derives that correspondence: it holds because the partition's</span>
+<span class="sd">    outputs are ``getitem(engine_node, i)`` in index order. A pass that reordered</span>
+<span class="sd">    them -- ``arrange_graph_outputs`` moves buffer mutations ahead of user outputs,</span>
+<span class="sd">    which only stays a no-op here while the mutated buffers are kept above the</span>
+<span class="sd">    delegate -- would swap the names silently. Inputs cannot rely on position at</span>
+<span class="sd">    all and recover their order by node identity in</span>
+<span class="sd">    ``_reorder_input_names_for_executorch``.</span>
+<span class="sd">    """</span>
+    <span class="n">output_node</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
+        <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"output"</span>
+    <span class="p">)</span>
+    <span class="n">out_args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="c1"># A single-output engine is returned directly rather than through a getitem,</span>
+    <span class="c1"># and one binding has no order to get wrong.</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">out_args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">out_args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="n">engine_node</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"TensorRT ExecuTorch backend: the delegate returns the engine node "</span>
+                <span class="sa">f</span><span class="s2">"directly but the engine declares </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> output "</span>
+                <span class="s2">"bindings; only a single-output engine can be returned unwrapped."</span>
+            <span class="p">)</span>
+        <span class="k">return</span>
+    <span class="n">indices</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">out_args</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">"call_function"</span>
+            <span class="ow">or</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">operator</span><span class="o">.</span><span class="n">getitem</span>
+            <span class="ow">or</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">engine_node</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"TensorRT ExecuTorch backend: delegate output "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="s1">'name'</span><span class="p">,</span><span class="w"> </span><span class="n">node</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> is not a getitem of the engine "</span>
+                <span class="s2">"node; cannot establish a reliable output binding order."</span>
+            <span class="p">)</span>
+        <span class="n">indices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">indices</span> <span class="o">!=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">))):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TensorRT ExecuTorch backend: delegate outputs map to engine output "</span>
+            <span class="sa">f</span><span class="s2">"indices </span><span class="si">{</span><span class="n">indices</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)))</span><span class="si">}</span><span class="s2"> -- the "</span>
+            <span class="s2">"runtime binds output i to output_binding_names[i], so a permuted or "</span>
+            <span class="s2">"incomplete output list would bind the wrong tensors."</span>
+        <span class="p">)</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="k">if</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">index</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">engine_info</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">default</span>
@@ -748,7 +814,7 @@ document.write(`
 <span class="w">    </span><span class="sd">"""Backend that serializes TensorRT engines for the native ExecuTorch runtime.</span>
 
 <span class="sd">    The partition contains a single execute_engine node; we extract the engine</span>
-<span class="sd">    and metadata and encode them as a standalone TR01 blob. The C++ runtime</span>
+<span class="sd">    and metadata and encode them as a standalone blob. The C++ runtime</span>
 <span class="sd">    backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.</span>
 <span class="sd">    """</span>
 
@@ -783,12 +849,19 @@ document.write(`
         <span class="n">output_names</span> <span class="o">=</span> <span class="n">_split_binding_names</span><span class="p">(</span>
             <span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">_validate_output_binding_order</span><span class="p">(</span><span class="n">edge_program</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">,</span> <span class="n">output_names</span><span class="p">)</span>
         <span class="n">io_bindings</span> <span class="o">=</span> <span class="p">[</span>
             <span class="n">TensorRTIOBinding</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">is_input</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">input_names</span>
         <span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">TensorRTIOBinding</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">is_input</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">output_names</span><span class="p">]</span>
 
+        <span class="c1"># Carry the KV-cache / user aliasing (out-&gt;in, kind) into the blob so the</span>
+        <span class="c1"># C++ backend binds each aliased output to its aliased input's tensor</span>
+        <span class="c1"># (in-place) and reflects the update back into the delegate output.</span>
+        <span class="n">aliased_io</span> <span class="o">=</span> <span class="n">deserialize_aliased_io</span><span class="p">(</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">ALIASED_IO_IDX</span><span class="p">))</span>
+
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">TensorRTBlobMetadata</span><span class="p">(</span>
             <span class="n">io_bindings</span><span class="o">=</span><span class="n">io_bindings</span><span class="p">,</span>
+            <span class="n">aliased_io</span><span class="o">=</span><span class="n">aliased_io</span><span class="p">,</span>
             <span class="n">hardware_compatible</span><span class="o">=</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">HW_COMPATIBLE_IDX</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span><span class="p">,</span>
             <span class="n">device_id</span><span class="o">=</span><span class="n">_parse_device_id</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">DEVICE_IDX</span><span class="p">]),</span>
             <span class="n">serialized_metadata</span><span class="o">=</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">),</span>

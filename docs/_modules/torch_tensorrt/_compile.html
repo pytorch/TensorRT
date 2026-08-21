@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=61128d90"></script>
+    <script src="../../_static/documentation_options.js?v=716941e7"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1561,6 +1561,15 @@ document.write(`
                     <span class="s2">"Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"</span>
                 <span class="p">)</span>
             <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"exported_program"</span><span class="p">:</span>
+                <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                    <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="c1"># A retraced exported_program's signature omits the engines'</span>
+                <span class="c1"># aliased KV mutations, so declare them here -- before</span>
+                <span class="c1"># normalization, which rewrites the engine constants the pass</span>
+                <span class="c1"># reads aliased_io from.</span>
+                <span class="n">module</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
                 <span class="n">_normalize_engine_constants_to_python</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
                 <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
                     <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
@@ -1571,6 +1580,16 @@ document.write(`
                     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"aot_inductor"</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="s2">"aliased_io"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">_sub_name</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">named_modules</span><span class="p">()</span>
+                <span class="p">):</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">"Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "</span>
+                        <span class="s2">"but output_format='aot_inductor' does not declare those aliased "</span>
+                        <span class="s2">"outputs as buffer mutations. The saved program's signature will "</span>
+                        <span class="s2">"not reflect the in-place update."</span>
+                    <span class="p">)</span>
                 <span class="n">inductor_configs</span> <span class="o">=</span> <span class="p">{}</span>
                 <span class="k">if</span> <span class="s2">"inductor_configs"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
                     <span class="n">inductor_configs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"inductor_configs"</span><span class="p">]</span>
@@ -1611,6 +1630,14 @@ document.write(`
                 <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># torch.export truncates the engines' aliased KV outputs at the fx</span>
+            <span class="c1"># boundary, so a retraced program's signature omits an update the engine</span>
+            <span class="c1"># performs unless the mutations are re-declared; the legacy exporter</span>
+            <span class="c1"># instead exposes them at transform time. The declaration pass skips</span>
+            <span class="c1"># buffers that already carry a spec, so every branch below can run it</span>
+            <span class="c1"># whichever exporter produced the program. aot_inductor is left</span>
+            <span class="c1"># undeclared: whether an aliased in-place mutation survives</span>
+            <span class="c1"># functionalization under inductor is unverified.</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">retrace</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
 
@@ -1631,7 +1658,15 @@ document.write(`
                     <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
                     <span class="n">use_legacy_exporter</span><span class="o">=</span><span class="n">_use_legacy</span><span class="p">,</span>
                 <span class="p">)</span>
+
+                <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                    <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">,</span>
+                <span class="p">)</span>
+
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"exported_program"</span><span class="p">:</span>
+                    <span class="c1"># Must precede normalization, which rewrites the engine constants</span>
+                    <span class="c1"># this pass reads aliased_io from.</span>
+                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
                     <span class="n">_normalize_engine_constants_to_python</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
                     <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
                         <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
@@ -1642,6 +1677,16 @@ document.write(`
                         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"aot_inductor"</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+                        <span class="nb">getattr</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="s2">"aliased_io"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">_sub_name</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">named_modules</span><span class="p">()</span>
+                    <span class="p">):</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="s2">"Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "</span>
+                            <span class="s2">"but output_format='aot_inductor' does not declare those aliased "</span>
+                            <span class="s2">"outputs as buffer mutations. The saved program's signature will "</span>
+                            <span class="s2">"not reflect the in-place update."</span>
+                        <span class="p">)</span>
                     <span class="n">inductor_configs</span> <span class="o">=</span> <span class="p">{}</span>
                     <span class="k">if</span> <span class="s2">"inductor_configs"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
                         <span class="n">inductor_configs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"inductor_configs"</span><span class="p">]</span>
@@ -1652,6 +1697,7 @@ document.write(`
                         <span class="n">package_path</span><span class="o">=</span><span class="n">file_path</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"executorch"</span><span class="p">:</span>
+                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
                     <span class="n">_save_as_executorch</span><span class="p">(</span>
                         <span class="n">exp_program</span><span class="p">,</span>
                         <span class="n">file_path</span><span class="p">,</span>
@@ -1723,7 +1769,25 @@ document.write(`
                         <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                     <span class="p">)</span>
 
+                <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                    <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"aot_inductor"</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="s2">"aliased_io"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">_sub_name</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">named_modules</span><span class="p">()</span>
+                <span class="p">):</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">"Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "</span>
+                        <span class="s2">"but output_format='aot_inductor' does not declare those aliased "</span>
+                        <span class="s2">"outputs as buffer mutations. The saved program's signature will "</span>
+                        <span class="s2">"not reflect the in-place update."</span>
+                    <span class="p">)</span>
+
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"exported_program"</span><span class="p">:</span>
+                    <span class="c1"># Must precede normalization, which rewrites the engine constants</span>
+                    <span class="c1"># this pass reads aliased_io from.</span>
+                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
                     <span class="n">_normalize_engine_constants_to_python</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
                     <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
                         <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
@@ -1744,6 +1808,7 @@ document.write(`
                         <span class="n">package_path</span><span class="o">=</span><span class="n">file_path</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"executorch"</span><span class="p">:</span>
+                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
                     <span class="n">_save_as_executorch</span><span class="p">(</span>
                         <span class="n">exp_program</span><span class="p">,</span>
                         <span class="n">file_path</span><span class="p">,</span>

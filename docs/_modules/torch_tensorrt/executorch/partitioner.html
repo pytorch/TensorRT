@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
+    <script src="../../../_static/documentation_options.js?v=716941e7"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -559,6 +559,28 @@ document.write(`
     <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">weight_streaming_budget_per_engine</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">)</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_keep_mutated_buffers_above_delegate</span><span class="p">(</span><span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Undo tag_constant_data freezing a delegate-mutated buffer as constant.</span>
+
+<span class="sd">    tag_constant_data detects a mutated buffer only via its *direct* users, so a</span>
+<span class="sd">    buffer whose mutation is produced inside the delegate (the mutation is a</span>
+<span class="sd">    getitem off the call_delegate, not a direct user of the buffer placeholder)</span>
+<span class="sd">    is misclassified as constant data and tagged into the delegate. A TensorRT</span>
+<span class="sd">    engine is stateless across executions, so an absorbed mutable buffer would be</span>
+<span class="sd">    a frozen constant (the KV-cache update would be lost). Strip the delegation</span>
+<span class="sd">    tag from any buffer that is a mutation target so it stays a caller-owned</span>
+<span class="sd">    mutable buffer owned above the delegate.</span>
+<span class="sd">    """</span>
+    <span class="n">sig</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_signature</span>
+    <span class="n">mutated_buffer_targets</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">sig</span><span class="o">.</span><span class="n">buffers_to_mutate</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span>
+            <span class="ow">and</span> <span class="n">sig</span><span class="o">.</span><span class="n">inputs_to_buffers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="ow">in</span> <span class="n">mutated_buffer_targets</span>
+        <span class="p">):</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"delegation_tag"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="TensorRTPartitioner">
 <a class="viewcode-back" href="../../../py_api/executorch.html#torch_tensorrt.executorch.TensorRTPartitioner">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">TensorRTPartitioner</span><span class="p">(</span><span class="n">Partitioner</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
@@ -662,6 +684,7 @@ document.write(`
                 <span class="p">)</span>
 
         <span class="n">tag_constant_data</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
+        <span class="n">_keep_mutated_buffers_above_delegate</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">PartitionResult</span><span class="p">(</span>
             <span class="n">tagged_exported_program</span><span class="o">=</span><span class="n">exported_program</span><span class="p">,</span>
