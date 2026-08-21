@@ -20,10 +20,16 @@ jobs:
     if: ${{ ! contains(github.actor, 'pytorchbot') }}
     environment: pytorchbot-env
     container:
-      image: pytorch/manylinux2_28-builder:cuda13.0
+      # Unlike the other jobs, this one does not run packaging/pre_build_script.sh, so it builds
+      # against the checked-in MODULE.bazel instead of one rendered from
+      # toolchains/ci_workspaces/MODULE.bazel.tmpl. That means the ${CUDA_HOME} substitution never
+      # happens here and Bazel reads the literal path in MODULE.bazel. Keep this tag's CUDA version
+      # equal to the cuda new_local_repository path in MODULE.bazel or the build fails to fetch
+      # @cuda and the lockfile silently stops being refreshed.
+      image: pytorch/manylinux2_28-builder:cuda13.2
       options: --gpus all
       env:
-        CUDA_VERSION: 13.0
+        CUDA_VERSION: 13.2
         CUDA_HOME: /usr/local/cuda
 
     steps:
