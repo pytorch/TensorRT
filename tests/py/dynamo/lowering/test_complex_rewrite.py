@@ -1251,7 +1251,9 @@ def test_none_placeholder():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("scale", [torch.tensor(2.0), 2, True], ids=["tensor", "int", "bool"])
+@pytest.mark.parametrize(
+    "scale", [torch.tensor(2.0), 2, True], ids=["tensor", "int", "bool"]
+)
 def test_non_tensor_scalar_placeholder(scale):
     class RotaryComplex(nn.Module):
         def forward(self, xq, freqs_cis, scale):
