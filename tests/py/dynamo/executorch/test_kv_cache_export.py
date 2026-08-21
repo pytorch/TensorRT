@@ -454,6 +454,74 @@ def test_declare_aliased_kv_mutations_skips_already_declared_copyback(monkeypatc
 
 
 @pytest.mark.unit
+def test_declare_copyback_is_idempotent(monkeypatch):
+    """A second run is a no-op. The copy-back slice is positional over the trailing
+    outputs, so slicing twice detaches a genuine user output and the saved program then
+    fails to load."""
+    pytest.importorskip("executorch.exir")
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.placeholder("state_in")
+    state_new = g.call_function(torch.add, (state_in, x))
+    user_out = g.call_function(torch.mul, (x, x))
+    g.output((user_out, state_new))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    sig = SimpleNamespace(
+        inputs_to_buffers={"state_in": "state_0"},
+        input_specs=[
+            InputSpec(
+                InputKind.BUFFER, TensorArgument(name="state_in"), "state_0", True
+            ),
+            InputSpec(InputKind.USER_INPUT, TensorArgument(name="x"), None),
+        ],
+        output_specs=[
+            OutputSpec(
+                OutputKind.USER_OUTPUT, TensorArgument(name=user_out.name), None
+            ),
+            OutputSpec(
+                OutputKind.USER_OUTPUT, TensorArgument(name=state_new.name), None
+            ),
+        ],
+    )
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=sig,
+        state_dict={},
+        range_constraints={},
+        module_call_graph=[],
+        constants={},
+        example_inputs=_EXAMPLE_INPUTS,
+        verifiers=[Verifier],
+    )
+
+    class _CapturingEP:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+            # A real ExportedProgram builds a *new* GraphModule and shallow-copies
+            # root.meta into it, so the marker the pass sets on root before
+            # construction is readable off the resulting program's graph_module --
+            # which is what lets a program the pass produced be fed back through it.
+            # Exposing root directly reproduces that readback. The mechanism the real
+            # class relies on is the meta copy, and it is the part a torch upgrade
+            # could take away.
+            self.graph_module = kwargs["root"]
+
+    monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
+
+    first = E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
+    second = E._declare_aliased_kv_mutations_on_ep(first, copyback_buffers=["state_0"])
+
+    assert second is first
+    specs = second.graph_signature.output_specs
+    mutations = [s for s in specs if s.kind == OutputKind.BUFFER_MUTATION]
+    assert [s.target for s in mutations] == ["state_0"]
+    user_outputs = [s for s in specs if s.kind == OutputKind.USER_OUTPUT]
+    assert [s.arg.name for s in user_outputs] == [user_out.name]
+
+
+@pytest.mark.unit
 def test_declare_copyback_runs_without_executorch_extra(monkeypatch):
     """Pins that an unimportable ``torch_tensorrt.executorch.backend`` does not suppress
     copy-back declaration: the trailing copy-back value is still reclassified as a

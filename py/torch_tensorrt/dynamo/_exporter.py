@@ -403,6 +403,9 @@ def create_trt_exp_program(
         for _n, _buf in zip(_outs[-len(_copyback) :], _copyback):
             if isinstance(_n, torch.fx.Node):
                 _n.meta["_kv_mutation_target"] = _buf
+        # Read by _declare_aliased_kv_mutations_on_ep, which must not consume these
+        # trailing values a second time.
+        gm.meta["_copyback_mutations_declared"] = True
 
         def _is_mut(_n: Any) -> bool:
             return isinstance(_n, torch.fx.Node) and "_kv_mutation_target" in _n.meta
@@ -578,10 +581,13 @@ def _declare_aliased_kv_mutations_on_ep(
     BUFFER_MUTATION of its caller-owned buffer input, and reclassify any copy-back
     outputs as BUFFER_MUTATIONs of their buffers.
 
-    Runs on both save() paths (retrace=True and retrace=False); it is idempotent
-    because it skips buffers that already carry a BUFFER_MUTATION spec (see
-    already_exposed below), so the legacy exporter's transform-time declaration is
-    not duplicated.
+    Safe to call more than once on the same program, by two separate mechanisms. The
+    KV half skips any buffer that already carries a BUFFER_MUTATION spec (see
+    already_exposed below), which is also how the legacy exporter's transform-time
+    declaration survives. The copy-back half cannot skip one buffer at a time, because
+    it detaches its outputs by position rather than by name; it skips the whole slice
+    instead, keyed on ``gm.meta['_copyback_mutations_declared']``, which every step
+    that consumes those trailing values sets.
 
     torch.export produces execute_engine nodes whose meta['val'] covers only the
     user outputs (the aliased KV outputs are network bindings excluded at the fx
@@ -603,9 +609,11 @@ def _declare_aliased_kv_mutations_on_ep(
             ``gm.meta['_copyback_mutation_buffers']`` by ``save()``; empty/None means
             KV-only (no copy-back).
 
-    Returns exp_program unchanged when there are no copy-back buffers and no engine
-    contributes an aliased KV output -- either because none has one, or because the
-    optional [executorch] extra is not importable and the engines cannot be read.
+    Returns exp_program unchanged when there is nothing to declare: no copy-back
+    buffers and no engine contributing an aliased KV output -- either because none has
+    one, or because the optional [executorch] extra is not importable and the engines
+    cannot be read -- or when the only candidate was a copy-back slice that a previous
+    run already consumed.
     """
     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
         ALIASED_IO_IDX,
@@ -760,6 +768,20 @@ def _declare_aliased_kv_mutations_on_ep(
         for spec in orig_specs
         if spec.kind == OutputKind.BUFFER_MUTATION and isinstance(spec.target, str)
     }
+    # A BUFFER_MUTATION spec does not say whether the trailing value is still there:
+    # torch.export declares the mutation and leaves the value, while a previous run of
+    # this pass declares it and consumes the value, so it is the consuming step that
+    # records the marker.
+    # The marker is a property of the graph rather than of the buffer list handed in:
+    # it is set on the GraphModule by whichever step consumed the trailing values, and
+    # read back off the GraphModule this pass is later given. stage_exported_program
+    # copies gm.meta's entries into the staged module, so a staged copy sees what its
+    # source recorded before staging. The two mappings are separate objects, so what a
+    # staged copy records afterwards is not visible on the source.
+    if num_copyback and gm.meta.get("_copyback_mutations_declared"):
+        num_copyback = 0
+        if not mutation_outputs:
+            return exp_program
     if num_copyback:
         if len(out_args) < num_copyback:
             raise RuntimeError(
@@ -778,6 +800,7 @@ def _declare_aliased_kv_mutations_on_ep(
                     OutputKind.BUFFER_MUTATION, TensorArgument(name=value.name), buf
                 )
             )
+        gm.meta["_copyback_mutations_declared"] = True
 
     # BUFFER_MUTATIONs (KV + copy-back) must precede USER_OUTPUTs (verifier).
     output_node.args = (tuple(kv_getitems + copyback_getitems + out_args),)
