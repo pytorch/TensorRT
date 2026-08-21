@@ -31,6 +31,7 @@ from torch.export import export
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+    aliased_input_bindings,
     assert_predicted_kv_aliased,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
@@ -570,6 +571,14 @@ class TestPredictedKvAssertion(TestCase):
     appear in a compiled engine's `aliased_io`, else its write-back would be
     silently dropped."""
 
+    @staticmethod
+    def _aliased_in(gm):
+        """Ground truth the way ``compile()`` assembles it, off the compiled
+        submodules."""
+        return aliased_input_bindings(
+            getattr(sub, "aliased_io", None) for _name, sub in gm.named_children()
+        )
+
     def test_passes_when_predicted_kv_is_aliased(self):
         gm = _FakeGM(
             {
@@ -579,7 +588,7 @@ class TestPredictedKvAssertion(TestCase):
             }
         )
         # buf_k_cache is aliased -> no error.
-        assert_predicted_kv_aliased(gm, ["buf_k_cache"])
+        assert_predicted_kv_aliased(self._aliased_in(gm), ["buf_k_cache"])
 
     def test_raises_when_predicted_kv_not_aliased(self):
         # Predicted KV for buf_conv_state, but the engine aliased only buf_k_cache
@@ -593,7 +602,7 @@ class TestPredictedKvAssertion(TestCase):
             }
         )
         with self.assertRaises(RuntimeError):
-            assert_predicted_kv_aliased(gm, ["buf_conv_state"])
+            assert_predicted_kv_aliased(self._aliased_in(gm), ["buf_conv_state"])
 
     def test_aggregates_aliased_io_across_engines(self):
         gm = _FakeGM(
@@ -607,10 +616,12 @@ class TestPredictedKvAssertion(TestCase):
             }
         )
         # Both predicted-KV bindings are aliased across the two engines -> no error.
-        assert_predicted_kv_aliased(gm, ["buf_k_cache", "buf_v_cache"])
+        assert_predicted_kv_aliased(
+            self._aliased_in(gm), ["buf_k_cache", "buf_v_cache"]
+        )
 
     def test_noop_when_no_prediction(self):
-        assert_predicted_kv_aliased(_FakeGM({}), [])
+        assert_predicted_kv_aliased(self._aliased_in(_FakeGM({})), [])
 
 
 if __name__ == "__main__":

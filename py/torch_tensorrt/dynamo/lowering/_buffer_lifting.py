@@ -28,7 +28,7 @@ This module provides:
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -128,8 +128,23 @@ def _kv_write_will_alias(
     return False
 
 
+def aliased_input_bindings(aliased_io_maps: Iterable[Any]) -> Set[str]:
+    """Collect the input-binding side of one or more ``aliased_io`` maps.
+
+    Each map is ``output binding -> (input binding, kind)``, and a bare input binding
+    is tolerated in place of the pair.
+    """
+    bindings: Set[str] = set()
+    for amap in aliased_io_maps:
+        if not amap:
+            continue
+        for v in amap.values():
+            bindings.add(v[0] if isinstance(v, (tuple, list)) else v)
+    return bindings
+
+
 def assert_predicted_kv_aliased(
-    gm: torch.fx.GraphModule, predicted_kv_bindings: List[str]
+    aliased_in: Set[str], predicted_kv_bindings: List[str]
 ) -> None:
     """Ground-truth check for the KV predictions :func:`_kv_write_will_alias` made.
 
@@ -140,15 +155,13 @@ def assert_predicted_kv_aliased(
     appears in a compiled engine's ``aliased_io``, and raise loudly otherwise.
     Keyed on the ``buf_*`` binding name, which is stable across the later buffer
     rename and is what ``aliased_io`` records on the input side.
+
+    ``aliased_in`` is the ground truth, supplied by the caller because the two entry
+    points hold it in different shapes: :func:`compile` reads it off the compiled
+    submodules, while the engine converter has it on the interpreter result.
     """
     if not predicted_kv_bindings:
         return
-    aliased_in: set = set()
-    for _name, sub in gm.named_children():
-        amap = getattr(sub, "aliased_io", None)
-        if amap:
-            for v in amap.values():
-                aliased_in.add(v[0] if isinstance(v, (tuple, list)) else v)
     missing = [b for b in predicted_kv_bindings if b not in aliased_in]
     if missing:
         raise RuntimeError(

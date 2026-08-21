@@ -45,6 +45,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+    aliased_input_bindings,
     assert_predicted_kv_aliased,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
@@ -864,7 +865,12 @@ def compile(
     # Ground-truth check: every write lift classified as KV (engine-aliased, so its
     # copy_ was dropped) must actually appear in a compiled engine's aliased_io,
     # else its write-back would be silently lost -- fail loudly instead.
-    assert_predicted_kv_aliased(trt_gm, _predicted_kv_bindings)
+    assert_predicted_kv_aliased(
+        aliased_input_bindings(
+            getattr(sub, "aliased_io", None) for _name, sub in trt_gm.named_children()
+        ),
+        _predicted_kv_bindings,
+    )
     if lifted_buffers:
         # Inline buffers into the compiled gm as get_attr nodes + registered
         # buffers. The resulting gm's forward takes only user inputs; buffers
@@ -1812,6 +1818,12 @@ def convert_exported_program_to_serialized_trt_engine(
     automatically; this lower-level entry point exposes the same machinery
     for callers that want to manage the bindings themselves.
 
+    Only writes the engine can alias in place are supported here. A mutation the
+    engine cannot alias needs its new value copied back into the buffer after the
+    call, and this entry point reports neither which output carries which buffer nor
+    performs the copy, so it raises rather than returning an engine whose buffer
+    would never update. Use :func:`torch_tensorrt.dynamo.compile` for those models.
+
     Arguments:
         exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
         inputs (Optional[Sequence[Sequence[Any]]]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
@@ -1895,6 +1907,11 @@ def convert_exported_program_to_serialized_trt_engine(
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
+    Raises:
+        RuntimeError: if ``lift_mutable_buffers=True`` and the model mutates a buffer
+            the engine cannot alias in place, or if a write predicted to be aliased is
+            absent from the built engine's ``aliased_io``. Either way the buffer would
+            silently never update.
     """
 
     if kwargs.get("debug", False):
@@ -2083,8 +2100,23 @@ def convert_exported_program_to_serialized_trt_engine(
     # resulting bindings at runtime — they are appended after the user inputs
     # in the order returned here.
     lifted_buffers: List[Tuple[str, str, torch.Tensor]] = []
+    predicted_kv_bindings: List[str] = []
     if lift_mutable_buffers:
         gm, lifted_buffers = lift_mutated_buffers(gm, settings)
+        # Read before lowering: `gm` is replaced below and the meta does not follow it.
+        predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
+        # A write the engine cannot alias in place is classified as copy-back: its
+        # new value is appended as an extra engine output and the buffer is updated
+        # afterwards. This entry point reports neither which output carries which
+        # buffer nor performs that update, so the caller has no way to complete it.
+        copyback_buffers = gm.meta.get("_copyback_mutation_buffers", [])
+        if copyback_buffers:
+            raise RuntimeError(
+                "convert_exported_program_to_serialized_trt_engine cannot express the "
+                f"write-back for mutable buffer(s) {copyback_buffers}: the engine "
+                "cannot alias them in place, so the buffers would never update. Use "
+                "torch_tensorrt.dynamo.compile, which performs the write-back itself."
+            )
         if lifted_buffers:
             buffer_tensors = [t for _, _, t in lifted_buffers]
             buffer_inputs = prepare_inputs(buffer_tensors)
@@ -2184,6 +2216,11 @@ def convert_exported_program_to_serialized_trt_engine(
             exc_info=True,
         )
         raise RuntimeError(f"While interpreting the module got an error: {e}") from e
+
+    assert_predicted_kv_aliased(
+        aliased_input_bindings([interpreter_result.aliased_io]),
+        predicted_kv_bindings,
+    )
 
     serialized_engine: bytes = interpreter_result.serialized_engine
     return serialized_engine

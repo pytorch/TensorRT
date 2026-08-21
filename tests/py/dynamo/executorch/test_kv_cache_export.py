@@ -817,3 +817,33 @@ def test_saved_copyback_program_reloads_and_keeps_its_user_output(tmp_path, use_
     assert len(outputs) == 1
     torch.testing.assert_close(outputs[0], torch.full((8,), 3.0))
     assert not torch.allclose(dict(module.named_buffers())["state"], before)
+
+
+@pytest.mark.unit
+def test_serialized_engine_rejects_copyback_buffers():
+    """``lift_mutable_buffers=True`` on a buffer whose write the engine cannot alias
+    raises, instead of returning an engine whose buffer never updates."""
+    from torch_tensorrt.dynamo._compiler import (
+        convert_exported_program_to_serialized_trt_engine,
+    )
+
+    class M(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("state", torch.zeros(4))
+
+        def forward(self, x):
+            self.state.add_(x)
+            return self.state.sum()
+
+    exp_program = torch.export.export(M(), (torch.ones(4),))
+
+    with pytest.raises(RuntimeError, match="cannot express the write-back") as excinfo:
+        convert_exported_program_to_serialized_trt_engine(
+            exp_program,
+            arg_inputs=[torch.ones(4)],
+            lift_mutable_buffers=True,
+            min_block_size=1,
+        )
+    # The offending buffer has to be named, or the user cannot act on the error.
+    assert "state" in str(excinfo.value)
