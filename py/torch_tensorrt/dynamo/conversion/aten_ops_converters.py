@@ -2,7 +2,18 @@
 
 import logging
 import operator
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import numpy as np
 import torch
@@ -488,6 +499,10 @@ def aten_ops_hardtanh(
     )
 
 
+def _get_glu_dim(args: Tuple[Argument, ...], kwargs: Mapping[str, Argument]) -> int:
+    return cast(int, kwargs.get("dim", args_bounds_check(args, 1, -1)))
+
+
 def glu_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     input_meta = node.args[0].meta
     input_val = input_meta.get("tensor_meta")
@@ -501,10 +516,14 @@ def glu_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
         return False
 
     input_shape = input_val.shape
-    dim = get_positive_dim(args_bounds_check(node.args, 1, -1), len(input_shape))
+    dim = get_positive_dim(_get_glu_dim(node.args, node.kwargs), len(input_shape))
     split_dim_size = input_shape[dim]
 
-    return isinstance(split_dim_size, int) and split_dim_size % 2 == 0
+    return (
+        isinstance(split_dim_size, int)
+        and split_dim_size > 0
+        and split_dim_size % 2 == 0
+    )
 
 
 @dynamo_tensorrt_converter(
@@ -525,7 +544,7 @@ def aten_ops_glu(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = args[0]
-    dim = get_positive_dim(args_bounds_check(args, 1, -1), len(input_val.shape))
+    dim = get_positive_dim(_get_glu_dim(args, kwargs), len(input_val.shape))
     split_size = input_val.shape[dim] // 2
     first, second = impl.split.split(
         ctx, target, SourceIR.ATEN, f"{name}_split", input_val, split_size, dim
