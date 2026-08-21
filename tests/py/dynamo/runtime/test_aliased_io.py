@@ -54,6 +54,29 @@ def _find_aliased_io(compiled):
     return {}
 
 
+class TestSliceScatterFallback(TestCase):
+    def test_strided_slice_uses_scatter_fallback(self):
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                out = torch.ops.aten.slice_scatter.default(cache, update, 2, 0, 16, 2)
+                return out + 0
+
+        cache = torch.zeros(2, 4, 16, 8, device="cuda")
+        update = torch.ones(2, 4, 8, 8, device="cuda")
+        compiled = _compile_cpp(M().cuda(), (cache.clone(), update.clone()))
+
+        # A strided update is not eligible for the contiguous KV-cache layer.
+        self.assertEqual(_find_aliased_io(compiled), {})
+
+        cache_run = cache.clone()
+        actual = compiled(cache_run, update)
+        actual = actual[0] if isinstance(actual, tuple) else actual
+        expected = torch.ops.aten.slice_scatter.default(cache, update, 2, 0, 16, 2)
+
+        self.assertTrue(torch.allclose(actual, expected))
+        self.assertTrue(torch.equal(cache_run, cache))
+
+
 class TestUserInputKVCache(TestCase):
     """User passes the cache tensor on every call; engine mutates in place."""
 
