@@ -382,7 +382,11 @@ def test_declare_aliased_kv_mutations_skips_already_declared_copyback(monkeypatc
     torch.export moves a mutation it recognises to the front of the outputs. The
     trailing value lift appended for that same buffer is internal plumbing, so it must
     be detached either way, otherwise it stays a user output and the saved model gains
-    a return it never had."""
+    a return it never had.
+
+    The legacy exporter's shape -- mutation declared *and* the trailing value already
+    consumed -- never reaches here: ``save()`` passes no ``copyback_buffers`` on that
+    path (see ``test_saved_copyback_program_reloads_and_keeps_its_user_output``)."""
     pytest.importorskip("executorch.exir")
 
     g = torch.fx.Graph()
@@ -430,18 +434,19 @@ def test_declare_aliased_kv_mutations_skips_already_declared_copyback(monkeypatc
 
     class _CapturingEP:
         def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
             captured.update(kwargs)
 
     monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
 
-    E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
+    result = E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
 
-    new_specs = captured["graph_signature"].output_specs
+    specs = result.graph_signature.output_specs
     # state_0 keeps its single existing mutation spec; no second one is added.
-    mutations = [s for s in new_specs if s.kind == OutputKind.BUFFER_MUTATION]
+    mutations = [s for s in specs if s.kind == OutputKind.BUFFER_MUTATION]
     assert [s.target for s in mutations] == ["state_0"]
     # The trailing copy-back value is gone from the user outputs.
-    user_outputs = [s for s in new_specs if s.kind == OutputKind.USER_OUTPUT]
+    user_outputs = [s for s in specs if s.kind == OutputKind.USER_OUTPUT]
     assert [s.arg.name for s in user_outputs] == ["user_out"]
 
     out_node = next(n for n in gm.graph.nodes if n.op == "output")
@@ -680,3 +685,64 @@ def test_save_warns_when_copyback_cannot_be_declared(
 
     warned = any("copy-back" in r.message for r in caplog.records)
     assert warned is expect_warning
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("use_legacy", [True, False])
+def test_saved_copyback_program_reloads_and_keeps_its_user_output(tmp_path, use_legacy):
+    """A saved copy-back program declares the mutation, returns exactly the outputs the
+    source module returned, and updates the buffer when run after a reload.
+
+    ``create_trt_exp_program`` declares the mutation itself and consumes the trailing
+    value while doing so, so re-declaring it slices a genuine user output and relabels
+    it as the buffer's new contents; the saved program then fails to load."""
+    pytest.importorskip("executorch.exir")
+
+    import torch_tensorrt
+    from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+        inline_lifted_buffers_into_gm,
+        lift_mutated_buffers,
+    )
+
+    class _CopyBackModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("state", torch.zeros(4))
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            self.state.copy_(self.state + x.sum())
+            return x * 3.0
+
+    dim = torch.export.Dim("d", min=2, max=64)
+    ep = torch.export.export(
+        _CopyBackModel(), (torch.ones(8),), dynamic_shapes={"x": {0: dim}}
+    )
+    gm, lifted = lift_mutated_buffers(ep.module())
+    gm = inline_lifted_buffers_into_gm(gm, lifted)
+    assert gm.meta["_copyback_mutation_buffers"] == ["state"]
+
+    path = str(tmp_path / "out.pt2")
+    torch_tensorrt.save(
+        gm,
+        path,
+        output_format="exported_program",
+        retrace=True,
+        use_legacy_exporter=use_legacy,
+        dynamic_shapes={"x": {0: dim}},
+        arg_inputs=(torch.ones(8),),
+    )
+
+    loaded = torch.export.load(path)
+    mutations = [
+        s.target
+        for s in loaded.graph_signature.output_specs
+        if s.kind == OutputKind.BUFFER_MUTATION
+    ]
+    assert mutations == ["state"]
+
+    module = loaded.module()
+    before = dict(module.named_buffers())["state"].clone()
+    outputs = torch.utils._pytree.tree_leaves(module(torch.ones(8)))
+    assert len(outputs) == 1
+    torch.testing.assert_close(outputs[0], torch.full((8,), 3.0))
+    assert not torch.allclose(dict(module.named_buffers())["state"], before)

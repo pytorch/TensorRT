@@ -1149,11 +1149,8 @@ def save(
             # undeclared: whether an aliased in-place mutation survives
             # functionalization under inductor is unverified.
             #
-            # Copy-back buffers need the same declaration, but only the retrace=True
-            # branches pass them. Unlike the KV path the pass reclassifies the trailing
-            # copyback_buffers outputs unconditionally, so running it on a program the
-            # legacy exporter already declared would re-slice outputs that are no
-            # longer the trailing ones.
+            # Copy-back is gated per-branch below: the legacy exporter declares it
+            # itself and consumes the trailing values while doing so.
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
@@ -1251,6 +1248,7 @@ def save(
                     if node.op == "placeholder" and "val" in node.meta
                     for dim in getattr(node.meta["val"], "shape", [])
                 )
+                _use_legacy = False
                 if has_symbolic_metadata and dynamic_shapes is not None:
                     from torch_tensorrt.dynamo._exporter import export
 
@@ -1299,7 +1297,15 @@ def save(
                     _declare_aliased_kv_mutations_on_ep,
                 )
 
-                _copyback_bufs = module.meta.get("_copyback_mutation_buffers", [])
+                # create_trt_exp_program already declares the copy-back mutations and
+                # consumes their trailing outputs, so what trails the graph on that path
+                # is a genuine user output. Only the torch.export paths leave the values
+                # to be reclassified.
+                _copyback_bufs = (
+                    []
+                    if _use_legacy
+                    else module.meta.get("_copyback_mutation_buffers", [])
+                )
 
                 if output_format == "aot_inductor" and any(
                     getattr(sub, "aliased_io", None)
