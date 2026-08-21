@@ -201,7 +201,10 @@ if RELEASE:
 else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
-EXECUTORCH_REQUIREMENT = "executorch>=1.4.0"
+# Upper-bounded because the ExecuTorch delegate is compiled against the exact source
+# revision pinned in MODULE.bazel, and ExecuTorch's C++ runtime API is not stable across
+# minor releases. An unbounded floor would resolve a future minor against that backend.
+EXECUTORCH_REQUIREMENT = "executorch>=1.4.1,<1.5"
 # TODO: Enable this once the runtime wheel is published to the PyTorch index.
 # EXECUTORCH_RUNTIME_REQUIREMENT = (
 #     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
