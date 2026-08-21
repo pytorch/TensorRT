@@ -26,10 +26,13 @@ also honors aliasing by binding the aliased output to the source input's
 storage; :class:`TestPythonRuntimeAliasedIO` exercises that path directly.
 """
 
+import unittest
+
 import torch
 import torch_tensorrt
 from torch.export import export
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
 
@@ -274,13 +277,23 @@ class TestAliasedIORegressions(TestCase):
         self.assertAlmostEqual(got, expected, places=3)
 
 
+@unittest.skipIf(
+    ENABLED_FEATURES.torch_tensorrt_runtime and ENABLED_FEATURES.tensorrt_rtx,
+    "Hand-built Python TRTEngine is not a configuration TensorRT-RTX produces "
+    "when the C++ runtime is available",
+)
 class TestPythonRuntimeAliasedIO(TestCase):
     """The Python ``TRTEngine`` honors aliasing (in-place write-through).
 
-    In a build with the C++ runtime available, ``TorchTensorRTModule`` always
-    backs itself with the C++ engine, so we drive the Python ``TRTEngine``
-    directly from the compiled module's serialized info (the same tuple both
-    runtimes consume) to exercise its aliasing path.
+    The engine is built directly from the compiled module's serialized info (the
+    same tuple both runtimes consume) to reach the aliasing path without going
+    through ``forward``.
+
+    Skipped only on TensorRT-RTX builds that also have the C++ runtime: there the
+    module always picks the C++ engine, so a hand-built Python engine is a
+    configuration the library never produces and the RTX runtime-cache plumbing
+    is not wired for it. On standard TensorRT that plumbing is short-circuited
+    (``ensure_initialized`` returns early), so the test stays live there.
     """
 
     def _python_engine_for(self, model, args):
