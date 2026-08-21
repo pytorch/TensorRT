@@ -454,6 +454,77 @@ def test_declare_aliased_kv_mutations_skips_already_declared_copyback(monkeypatc
 
 
 @pytest.mark.unit
+def test_declare_copyback_runs_without_executorch_extra(monkeypatch):
+    """Pins that an unimportable ``torch_tensorrt.executorch.backend`` does not suppress
+    copy-back declaration: the trailing copy-back value is still reclassified as a
+    BUFFER_MUTATION of its buffer.
+
+    The graph carries an ``execute_engine`` node so the engine loop is reachable. Without
+    one the loop filters every node on target anyway and the skip goes untested."""
+    import sys
+
+    # Make `from torch_tensorrt.executorch.backend import ...` raise ImportError,
+    # simulating a plain install without the [executorch] extra.
+    monkeypatch.setitem(sys.modules, "torch_tensorrt.executorch.backend", None)
+
+    g = torch.fx.Graph()
+    x = g.placeholder("x")
+    state_in = g.placeholder("state_in")
+    engine = g.placeholder("engine")
+    eng = g.call_function(torch.ops.tensorrt.execute_engine.default, ([x], engine))
+    eng.meta["val"] = [torch.zeros(1)]
+    state_new = g.call_function(torch.add, (state_in, x))
+    user_out = g.call_function(torch.mul, (x, x))
+    # lift appended the copy-back value (state_new) as the trailing user output; the
+    # mutation is not yet declared.
+    g.output((user_out, state_new))
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    sig = SimpleNamespace(
+        inputs_to_buffers={"state_in": "state_0"},
+        input_specs=[
+            InputSpec(
+                InputKind.BUFFER, TensorArgument(name="state_in"), "state_0", True
+            ),
+            InputSpec(InputKind.USER_INPUT, TensorArgument(name="x"), None),
+            InputSpec(InputKind.USER_INPUT, TensorArgument(name="engine"), None),
+        ],
+        output_specs=[
+            OutputSpec(
+                OutputKind.USER_OUTPUT, TensorArgument(name=user_out.name), None
+            ),
+            OutputSpec(
+                OutputKind.USER_OUTPUT, TensorArgument(name=state_new.name), None
+            ),
+        ],
+    )
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=sig,
+        state_dict={},
+        range_constraints={},
+        module_call_graph=[],
+        constants={},
+        example_inputs=_EXAMPLE_INPUTS,
+        verifiers=[Verifier],
+    )
+
+    class _CapturingEP:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    monkeypatch.setattr(E, "ExportedProgram", _CapturingEP)
+
+    result = E._declare_aliased_kv_mutations_on_ep(ep, copyback_buffers=["state_0"])
+
+    specs = result.graph_signature.output_specs
+    mutations = [s for s in specs if s.kind == OutputKind.BUFFER_MUTATION]
+    assert [s.target for s in mutations] == ["state_0"]
+    user_outputs = [s for s in specs if s.kind == OutputKind.USER_OUTPUT]
+    assert [s.arg.name for s in user_outputs] == [user_out.name]
+
+
+@pytest.mark.unit
 def test_declare_aliased_kv_mutations_pairs_copyback_by_position(monkeypatch):
     """With a mix of declared and undeclared buffers, each remaining copy-back value
     is paired with the buffer lift appended it for.

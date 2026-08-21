@@ -603,8 +603,9 @@ def _declare_aliased_kv_mutations_on_ep(
             ``gm.meta['_copyback_mutation_buffers']`` by ``save()``; empty/None means
             KV-only (no copy-back).
 
-    Returns exp_program unchanged when no engine has aliased KV outputs and there are
-    no copy-back buffers.
+    Returns exp_program unchanged when there are no copy-back buffers and no engine
+    contributes an aliased KV output -- either because none has one, or because the
+    optional [executorch] extra is not importable and the engines cannot be read.
     """
     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
         ALIASED_IO_IDX,
@@ -616,14 +617,15 @@ def _declare_aliased_kv_mutations_on_ep(
         deserialize_aliased_io,
     )
 
-    # Guard the import so a non-executorch save() (e.g. output_format=
-    # "exported_program" with no aliased KV outputs) doesn't hard-require the
-    # optional [executorch] extra: with no executorch there's no aliased_io to
-    # read and no declaration to make, so return unchanged.
+    # The [executorch] extra is optional, so this import can fail on a plain install.
     try:
         from torch_tensorrt.executorch.backend import _get_engine_info_for_node
     except ImportError:
-        return exp_program
+        _get_engine_info_for_node = None
+        logger.debug(
+            "Could not import torch_tensorrt.executorch.backend; engine aliased-KV "
+            "mutations will not be declared on this program."
+        )
 
     def _estr(engine_info: List[Any], idx: int) -> str:
         if idx < 0 or idx >= len(engine_info) or engine_info[idx] is None:
@@ -648,7 +650,10 @@ def _declare_aliased_kv_mutations_on_ep(
         if spec.kind == OutputKind.BUFFER_MUTATION and spec.target
     }
     mutation_outputs: List[Tuple[torch.fx.Node, str]] = []
-    for node in gm.graph.nodes:
+    # Reading an engine needs the [executorch] helper imported above; without it
+    # there is nothing to scan.
+    nodes_to_scan = gm.graph.nodes if _get_engine_info_for_node is not None else ()
+    for node in nodes_to_scan:
         if node.op != "call_function" or node.target is not exec_target:
             continue
         engine_info = _get_engine_info_for_node(exp_program, node)
