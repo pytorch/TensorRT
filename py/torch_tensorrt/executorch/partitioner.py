@@ -158,7 +158,10 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
                     f"expected exactly 1 engine node in partition "
                     f"{getattr(partition, 'id', '?')}, found {len(engine_nodes)}"
                 )
-            engine_info = _get_engine_info_for_node(exported_program, engine_nodes[0])
+            # Only DEVICE_IDX is read, never the engine itself.
+            engine_info = _get_engine_info_for_node(
+                exported_program, engine_nodes[0], metadata_only=True
+            )
             return f"cuda:{_parse_device_id(engine_info[DEVICE_IDX])}".encode()
         except Exception as e:
             # Broad by design: any extraction failure must fall back, not abort

@@ -664,7 +664,8 @@ def _declare_aliased_kv_mutations_on_ep(
     for node in nodes_to_scan:
         if node.op != "call_function" or node.target is not exec_target:
             continue
-        engine_info = _get_engine_info_for_node(exp_program, node)
+        # Only the binding names and aliased_io are read, never the engine itself.
+        engine_info = _get_engine_info_for_node(exp_program, node, metadata_only=True)
         aliased_io = deserialize_aliased_io(_estr(engine_info, ALIASED_IO_IDX))
         if not aliased_io:
             continue

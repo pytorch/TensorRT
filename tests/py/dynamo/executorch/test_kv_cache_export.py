@@ -75,6 +75,62 @@ def test_declare_aliased_kv_mutations_is_noop_without_engines():
 
 
 @pytest.mark.unit
+def test_declare_aliased_kv_mutations_reads_engine_metadata_only(monkeypatch):
+    """The pass reads binding names and aliased_io and never the engine payload, so
+    it must ask for the metadata-only record. Reading the full record re-serializes
+    the ICudaEngine -- 0.4 s and a 67 MB transient string for a ~50 MB engine -- and
+    the loop runs before the pass can tell whether any engine has aliased I/O at all,
+    so a program with no aliased KV pays that per engine and then returns unchanged.
+    """
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt.dynamo.runtime._serialized_engine_layout as L
+    import torch_tensorrt.dynamo.runtime._TorchTensorRTModule as M
+    import torch_tensorrt.executorch.backend as B
+
+    exec_target = torch.ops.tensorrt.execute_engine.default
+
+    g = torch.fx.Graph()
+    tokens = g.placeholder("tokens")
+    engine = g.placeholder("engine")
+    eng = g.call_function(exec_target, ([tokens], engine))
+    user_out = g.call_function(operator.getitem, (eng, 0))
+    g.output((user_out,))
+
+    out_val = torch.zeros(1)
+    tokens.meta["val"] = torch.zeros(1)
+    engine.meta["val"] = None
+    eng.meta["val"] = [out_val]
+    user_out.meta["val"] = out_val
+    gm = torch.fx.GraphModule(torch.nn.Module(), g)
+
+    ep = SimpleNamespace(
+        graph_module=gm,
+        graph_signature=SimpleNamespace(
+            inputs_to_buffers={},
+            input_specs=[],
+            output_specs=[
+                OutputSpec(
+                    OutputKind.USER_OUTPUT, TensorArgument(name=user_out.name), None
+                )
+            ],
+        ),
+    )
+
+    calls = []
+    info = ["x"] * (L.ALIASED_IO_IDX + 1)
+
+    def _spy(ep_, node, **kwargs):
+        calls.append(kwargs)
+        return info
+
+    monkeypatch.setattr(B, "_get_engine_info_for_node", _spy)
+    monkeypatch.setattr(M, "deserialize_aliased_io", lambda s: {})
+
+    assert E._declare_aliased_kv_mutations_on_ep(ep) is ep
+    assert calls == [{"metadata_only": True}]
+
+
+@pytest.mark.unit
 def test_declare_aliased_kv_mutations_is_idempotent(monkeypatch):
     """Running on a program whose mutation is already declared must be a no-op.
 
@@ -136,7 +192,7 @@ def test_declare_aliased_kv_mutations_is_idempotent(monkeypatch):
     info = ["x"] * (L.ALIASED_IO_IDX + 1)
     info[L.INPUT_BINDING_NAMES_IDX] = "IN"
     info[L.OUTPUT_BINDING_NAMES_IDX] = "OUT"
-    monkeypatch.setattr(B, "_get_engine_info_for_node", lambda ep_, n: info)
+    monkeypatch.setattr(B, "_get_engine_info_for_node", lambda ep_, n, **kw: info)
     monkeypatch.setattr(
         M, "deserialize_aliased_io", lambda s: {"out_k": ("k_in", "kv_cache_update")}
     )
@@ -214,7 +270,7 @@ def test_declare_aliased_kv_mutations_declares_buffer_mutation(monkeypatch):
     info = ["x"] * (L.ALIASED_IO_IDX + 1)
     info[L.INPUT_BINDING_NAMES_IDX] = "IN"
     info[L.OUTPUT_BINDING_NAMES_IDX] = "OUT"
-    monkeypatch.setattr(B, "_get_engine_info_for_node", lambda ep_, n: info)
+    monkeypatch.setattr(B, "_get_engine_info_for_node", lambda ep_, n, **kw: info)
     monkeypatch.setattr(
         M, "deserialize_aliased_io", lambda s: {"out_k": ("k_in", "kv_cache_update")}
     )
