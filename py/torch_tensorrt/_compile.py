@@ -1090,6 +1090,16 @@ def save(
                     **kwargs,
                 )
             elif output_format == "aot_inductor":
+                if any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.graph_module.named_modules()
+                ):
+                    logger.warning(
+                        "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                        "but output_format='aot_inductor' does not declare those aliased "
+                        "outputs as buffer mutations. The saved program's signature will "
+                        "not reflect the in-place update."
+                    )
                 inductor_configs = {}
                 if "inductor_configs" in kwargs:
                     inductor_configs = kwargs["inductor_configs"]
@@ -1177,6 +1187,16 @@ def save(
                         **kwargs,
                     )
                 elif output_format == "aot_inductor":
+                    if any(
+                        getattr(sub, "aliased_io", None)
+                        for _sub_name, sub in module.named_modules()
+                    ):
+                        logger.warning(
+                            "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                            "but output_format='aot_inductor' does not declare those aliased "
+                            "outputs as buffer mutations. The saved program's signature will "
+                            "not reflect the in-place update."
+                        )
                     inductor_configs = {}
                     if "inductor_configs" in kwargs:
                         inductor_configs = kwargs["inductor_configs"]
