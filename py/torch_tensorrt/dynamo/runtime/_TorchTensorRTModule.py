@@ -357,6 +357,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def _resolve_runtime_cache(self, rs: RuntimeSettings) -> RuntimeSettings:
         """Normalize ``rs.runtime_cache`` to ``None`` | ``RuntimeCache`` (never a path str).
 
+        This module is the only place a path string is resolved; engines reject
+        one (see ``TRTRuntimeConfig._apply_settings``), so the returned settings
+        must never carry a ``str``.
+
         Manages the ``_implicit_cache_handle`` slot as a side effect: builds a
         fresh wrapper for a new path, reuses the existing one for the same
         path, releases it (with save-on-swap) for non-path inputs.
@@ -372,7 +376,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if not (isinstance(rc, str) and rc):
             if rc is not self._implicit_cache_handle:
                 self._set_managed_handle(None)
-            return rs
+            # An empty string means "no cache", but engines take only None or a
+            # RuntimeCache -- normalize so no str ever reaches one.
+            return rs.merge(runtime_cache=None) if isinstance(rc, str) else rs
 
         # Branch 2: same path + wrapper still usable -> reuse. Keeps the CM
         # enter/exit cycle cheap (no teardown/rebuild loses in-memory kernels).
