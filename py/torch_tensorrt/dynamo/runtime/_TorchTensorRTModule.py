@@ -566,9 +566,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.settings = metadata["settings"]
             self.symbolic_shape_expressions = metadata["inout_symexprs"]
 
-            # RuntimeSettings are NOT serialized; restore defaults. Caller can
-            # reapply via ``mod.runtime_settings = ...`` (per submodule) or a CM after load.
-            self._runtime_settings = RuntimeSettings()
+            # RuntimeSettings are NOT serialized; the reset leaves no runtime
+            # cache, matching the freshly-built engine below. A caller who wants
+            # one reapplies via ``mod.runtime_settings = ...`` (per submodule) or
+            # a CM after load.
+            self._runtime_settings = RuntimeSettings(runtime_cache=None)
             # Mirror the settings reset on the implicit cache handle so a
             # stale wrapper from prior use doesn't survive load_state_dict and
             # silently write the fresh engine's cache bytes to the old path.
@@ -682,7 +684,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        state.setdefault("_runtime_settings", RuntimeSettings())
+        state.setdefault("_runtime_settings", RuntimeSettings(runtime_cache=None))
         state.setdefault("_implicit_cache_handle", None)
         set_state = getattr(super(), "__setstate__", None)
         if set_state is not None:
