@@ -63,6 +63,10 @@ ENABLE_WEIGHT_STREAMING = False
 ENABLE_CROSS_COMPILE_FOR_WINDOWS = False
 TILING_OPTIMIZATION_LEVEL = "none"
 L2_LIMIT_FOR_TILING = -1
+# None means "target the current device". Set explicitly to build an engine deployable
+# on other architectures; see torch_tensorrt._utils for why capability validators must
+# consult this rather than the build host's device.
+TARGET_COMPUTE_CAPABILITIES = None
 USE_DISTRIBUTED_MODE_TRACE = False
 OFFLOAD_MODULE_TO_CPU = False
 ENABLE_AUTOCAST = False

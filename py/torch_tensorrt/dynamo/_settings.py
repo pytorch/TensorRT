@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Collection, Optional, Set, Tuple, Union
+from typing import Any, Collection, List, Optional, Set, Tuple, Union
 
 import tensorrt as trt
 import torch
@@ -47,6 +47,7 @@ from torch_tensorrt.dynamo._defaults import (
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
     STRIP_ENGINE_WEIGHTS,
+    TARGET_COMPUTE_CAPABILITIES,
     TILING_OPTIMIZATION_LEVEL,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
@@ -71,7 +72,10 @@ def _normalize_disabled_constant_fold_exclusions(
         validate_disabled_constant_fold_exclusions,
     )
 
-    return validate_disabled_constant_fold_exclusions(rule_ids)
+    # Bind to a typed local: the imported helper is untyped from mypy's view here,
+    # and returning it directly trips --strict's no-any-return.
+    normalized: Set[str] = validate_disabled_constant_fold_exclusions(rule_ids)
+    return normalized
 
 
 @dataclass
@@ -106,6 +110,7 @@ class CompilationSettings:
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to None, meaning the current device. TensorRT-RTX only. This drives both engine targeting and op partitioning: a compiled artifact carries a single partitioning, so an op unsupported on any listed target falls back to PyTorch for all of them.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
@@ -181,6 +186,9 @@ class CompilationSettings:
     enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
     tiling_optimization_level: str = TILING_OPTIMIZATION_LEVEL
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
+    target_compute_capabilities: Optional[List[Tuple[int, int]]] = (
+        TARGET_COMPUTE_CAPABILITIES
+    )
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
     offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
     enable_autocast: bool = ENABLE_AUTOCAST
@@ -245,6 +253,10 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "sparse_weights",
     "engine_capability",
     "hardware_compatible",
+    # An engine built for one set of compute capabilities cannot be reused for a
+    # compile targeting a different set -- doing so would silently reintroduce ops the
+    # target architecture cannot execute.
+    "target_compute_capabilities",
     "refit_identical_engine_weights",
     "immutable_weights",
     "enable_weight_streaming",

@@ -10,7 +10,10 @@ from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
-from torch_tensorrt._utils import is_tensorrt_version_supported
+from torch_tensorrt._utils import (
+    is_tensorrt_version_supported,
+    trt_rtx_targets_turing,
+)
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -776,12 +779,75 @@ def aten_ops_gelu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.matmul.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.bmm.default, supports_dynamic_shapes=True)
+def gemm_capability_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject FP32 GEMMs on TensorRT-RTX when Turing (SM 7.5) is a build target.
+
+    TensorRT-RTX documents that on compute capability 7.5 it does not support FP32
+    GEMMs. The two shape regimes fail differently, and the dynamic one is why this
+    guard cannot be limited to static shapes:
+
+      * static shapes  -- createExecutionContext() returns nullptr, surfacing as
+        "Unable to (re)create TensorRT execution context". Loud, easy to spot.
+      * dynamic shapes -- the engine builds, runs, and returns an all-zero tensor of
+        the correct shape and dtype, with no exception and no NaN.
+
+    Only the operand dtype matters. fp16 GEMMs accumulating in fp32 (``use_fp32_acc``)
+    are unaffected and keep running on TensorRT.
+
+    Note this relies on ``meta["val"]`` being populated, as every validator in this
+    module does. Graphs produced by ``torch.export`` always populate it. The converter
+    unit-test harness (``DispatchTestCase``) does not populate node meta at all, so
+    dtype cannot be determined there; those tests guard themselves with ``skipTest``
+    instead.
+    """
+    if not trt_rtx_targets_turing(settings):
+        return True
+
+    for arg in node.args[:2]:
+        val = arg.meta.get("val") if hasattr(arg, "meta") else None
+        if val is not None and getattr(val, "dtype", None) == torch.float32:
+            _LOGGER.debug(
+                "FP32 GEMM '%s' is not supported on TensorRT-RTX for Turing "
+                "(SM 7.5). Falling back to PyTorch.",
+                node.name,
+            )
+            return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.matmul,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.matmul.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.dot.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.mm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.mv.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bmm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_matmul(
     ctx: ConversionContext,
     target: Target,
@@ -3039,6 +3105,22 @@ def convolution_capability_validator(
         )
         return False
 
+    # TensorRT-RTX does not support 3D convolutions on Turing (SM 7.5): the engine
+    # builds, but createExecutionContext() then returns nullptr because the JIT
+    # compiler finds no valid kernel config for 3D ConvFwd on SM 7.5.
+    # Transposed 3D convolution is a distinct layer and is unaffected, so this
+    # deliberately does not fire for deconvolution.
+    # aten.convolution input is (N, C, *spatial), so 5 dims means 3 spatial dims.
+    if trt_rtx_targets_turing(settings) and not args_bounds_check(node.args, 6):
+        val = node.args[0].meta.get("val") if hasattr(node.args[0], "meta") else None
+        if val is not None and val.ndim == 5:
+            _LOGGER.debug(
+                "3D convolution '%s' is not supported on TensorRT-RTX for Turing "
+                "(SM 7.5). Falling back to PyTorch.",
+                node.name,
+            )
+            return False
+
     return True
 
 
@@ -3474,7 +3556,11 @@ def aten_ops_argmin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.addmm.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.addmm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

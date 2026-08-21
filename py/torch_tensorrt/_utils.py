@@ -7,7 +7,7 @@ import sys
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import tensorrt as trt
 import torch
@@ -380,3 +380,49 @@ def load_tensorrt_llm_for_nccl() -> bool:
         plugin_lib_path = download_and_get_plugin_lib_path()
         return load_and_initialize_trtllm_plugin(plugin_lib_path)  # type: ignore[arg-type]
     return False
+
+
+# --- TensorRT-RTX architecture targeting -------------------------------------
+#
+# TensorRT-RTX runs on SM 7.5 and up, but its support matrix carves Turing out of
+# several paths: FP32 GEMMs and 3D convolutions are documented as unsupported on
+# compute capability 7.5, and bfloat16 has no Turing hardware at all. It also notes
+# that Turing "compatibility is not included by default because including it may
+# impact model performance", so targeting Turing is opt-in.
+#
+# These helpers exist so capability validators key off the compute capabilities the
+# engine is being *built for*, not the machine doing the building. Calling
+# torch.cuda.get_device_capability() inside a validator bakes the build host into the
+# artifact, which is wrong for ahead-of-time deployment: a module compiled on Ampere
+# and shipped to Turing would retain ops Turing cannot execute.
+
+TURING_COMPUTE_CAPABILITY = (7, 5)
+
+
+def get_target_compute_capabilities(
+    settings: Optional[Any] = None,
+) -> Tuple[Tuple[int, int], ...]:
+    """Compute capabilities this compilation targets.
+
+    Returns the explicitly declared targets when the caller set them, otherwise the
+    capability of the current device.
+    """
+    targets = (
+        getattr(settings, "target_compute_capabilities", None) if settings else None
+    )
+    if targets:
+        return tuple((int(major), int(minor)) for major, minor in targets)
+    return (torch.cuda.get_device_capability(),)
+
+
+def trt_rtx_targets_turing(settings: Optional[Any] = None) -> bool:
+    """True when TensorRT-RTX is in use and SM 7.5 is among the build targets.
+
+    A single compiled artifact carries a single partitioning, so an op unsupported on
+    *any* targeted architecture must fall back to PyTorch for all of them.
+    """
+    from torch_tensorrt._features import ENABLED_FEATURES
+
+    if not ENABLED_FEATURES.tensorrt_rtx:
+        return False
+    return TURING_COMPUTE_CAPABILITY in get_target_compute_capabilities(settings)
