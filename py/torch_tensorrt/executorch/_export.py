@@ -473,6 +473,29 @@ def export(
     )
     program_map = {"forward": programs} if not isinstance(programs, dict) else programs
     copyback_by_method = _copyback_buffers_by_method(source, method_names)
+    copyback_names = sorted({n for ns in copyback_by_method.values() for n in ns})
+    if copyback_names:
+        # Engine-aliased KV buffers are declared mutated as well, so ExecuTorch
+        # serializes only their shape and dtype too; they are left out of the warning
+        # below on purpose. An aliased write is a cache-position write on the sequence
+        # axis -- the only form IKVCacheUpdateLayer expresses -- and such a model is
+        # assumed to read the cache under that same position, through a bounded slice
+        # or a position mask, so slots no step has written should not reach the
+        # output. Nothing here verifies that; it is a property of the model. On that
+        # assumption initializing a cache buys nothing, and it would cost what is
+        # typically the model's largest tensor, written whole into the .pte.
+        logger.warning(
+            "Copy-back mutable buffer(s) %s are declared mutated, so ExecuTorch "
+            "serializes only their shape and dtype, not their value, unless a pass "
+            'marks them meta["et_init_buffer"]; without that, a buffer read before '
+            "it is written starts from whatever the allocation held. ExecuTorch's "
+            "own warning names InitializedMutableBufferPass for this. That pass "
+            "reads the buffer host-side to serialize it, so it works while the "
+            "buffer is on CPU and segfaults the export, rather than raising, once "
+            "the buffer is CUDA-resident -- which is what exporting the model on "
+            "CUDA leaves behind.",
+            copyback_names,
+        )
     extra_partitioners = _per_method_values(partitioners, method_names, "partitioners")
     _reject_misnamed_partitioners(extra_partitioners)
     method_compile_specs = _per_method_values(
