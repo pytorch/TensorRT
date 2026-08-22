@@ -87,18 +87,24 @@ def is_tensorrt_version_supported(min_version: str) -> bool:
 
 
 def is_tegra_platform() -> bool:
+    if not torch.cuda.is_available():
+        return False
     if torch.cuda.get_device_capability() in [(8, 7), (7, 2)]:
         return True
     return False
 
 
 def is_orin() -> bool:
+    if not torch.cuda.is_available():
+        return False
     if torch.cuda.get_device_capability() in [(8, 7)]:
         return True
     return False
 
 
 def is_thor() -> bool:
+    if not torch.cuda.is_available():
+        return False
     if torch.cuda.get_device_capability() in [(11, 0)]:
         return True
     return False
