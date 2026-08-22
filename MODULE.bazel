@@ -73,6 +73,9 @@ new_local_repository(
 
 # CUDA should be installed on the system locally
 # for linux x86_64 and aarch64
+# Jobs that render MODULE.bazel from toolchains/ci_workspaces/MODULE.bazel.tmpl substitute
+# ${CUDA_HOME} here. Jobs that use this file directly, such as .github/workflows/uv-update.yml,
+# need a container that actually provides the path below.
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",

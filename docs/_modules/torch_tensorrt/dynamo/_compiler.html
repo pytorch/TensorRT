@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=61128d90"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -481,13 +481,13 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
-
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">sympy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.graph_signature</span><span class="w"> </span><span class="kn">import</span> <span class="n">InputKind</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">_PyTreeCodeGen</span><span class="p">,</span> <span class="n">_PyTreeInfo</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Target</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.utils._sympy.numbers</span><span class="w"> </span><span class="kn">import</span> <span class="n">int_oo</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
@@ -560,6 +560,7 @@ document.write(`
     <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">truncate_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
+    <span class="n">use_complex_decomposition</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_COMPLEX_DECOMPOSITION</span><span class="p">,</span>
     <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -593,6 +594,9 @@ document.write(`
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
+    <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span>
+        <span class="nb">str</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span><span class="p">,</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
     <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -639,6 +643,7 @@ document.write(`
 <span class="sd">        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
 <span class="sd">        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
 <span class="sd">        truncate_double (bool): Truncate weights provided in double (float64) to float32</span>
+<span class="sd">        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch&gt;=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.</span>
 <span class="sd">        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch</span>
 <span class="sd">        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT</span>
 <span class="sd">        torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True</span>
@@ -677,6 +682,11 @@ document.write(`
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
 <span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
 <span class="sd">            the final output back to FP16.</span>
+<span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
+<span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
+<span class="sd">            implementations and enabled by default; compilation users do not</span>
+<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
+<span class="sd">            foldable. Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">        **kwargs: Any,</span>
@@ -779,7 +789,7 @@ document.write(`
             <span class="s2">"'arg_inputs' and 'inputs' should not be used at the same time."</span>
         <span class="p">)</span>
 
-    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">arg_inputs</span>
 
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -805,6 +815,7 @@ document.write(`
         <span class="s2">"version_compatible"</span><span class="p">:</span> <span class="n">version_compatible</span><span class="p">,</span>
         <span class="s2">"optimization_level"</span><span class="p">:</span> <span class="n">optimization_level</span><span class="p">,</span>
         <span class="s2">"truncate_double"</span><span class="p">:</span> <span class="n">truncate_double</span><span class="p">,</span>
+        <span class="s2">"use_complex_decomposition"</span><span class="p">:</span> <span class="n">use_complex_decomposition</span><span class="p">,</span>
         <span class="s2">"use_fast_partitioner"</span><span class="p">:</span> <span class="n">use_fast_partitioner</span><span class="p">,</span>
         <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>
         <span class="s2">"enable_experimental_decompositions"</span><span class="p">:</span> <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
@@ -833,6 +844,7 @@ document.write(`
         <span class="s2">"cpu_memory_budget"</span><span class="p">:</span> <span class="n">cpu_memory_budget</span><span class="p">,</span>
         <span class="s2">"dynamically_allocate_resources"</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
         <span class="s2">"decompose_attention"</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
+        <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">:</span> <span class="n">disabled_constant_fold_exclusions</span><span class="p">,</span>
         <span class="s2">"attn_bias_is_causal"</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
         <span class="s2">"fallback_data_dependent_ops"</span><span class="p">:</span> <span class="n">fallback_data_dependent_ops</span><span class="p">,</span>
     <span class="p">}</span>
@@ -914,6 +926,7 @@ document.write(`
     <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">truncate_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
+    <span class="n">use_complex_decomposition</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_COMPLEX_DECOMPOSITION</span><span class="p">,</span>
     <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -960,6 +973,9 @@ document.write(`
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
+    <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span>
+        <span class="nb">str</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span><span class="p">,</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
     <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -1008,6 +1024,7 @@ document.write(`
 <span class="sd">        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
 <span class="sd">        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
 <span class="sd">        truncate_double (bool): Truncate weights provided in double (float64) to float32</span>
+<span class="sd">        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch&gt;=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.</span>
 <span class="sd">        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch</span>
 <span class="sd">        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT</span>
 <span class="sd">        torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True</span>
@@ -1054,6 +1071,11 @@ document.write(`
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
 <span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
 <span class="sd">            the final output back to FP16.</span>
+<span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
+<span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
+<span class="sd">            implementations and enabled by default; compilation users do not</span>
+<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
+<span class="sd">            foldable. Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">        **kwargs: Any,</span>
@@ -1172,7 +1194,7 @@ document.write(`
             <span class="s2">"'arg_inputs' and 'inputs' should not be used at the same time."</span>
         <span class="p">)</span>
 
-    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">arg_inputs</span>
 
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -1206,6 +1228,7 @@ document.write(`
         <span class="s2">"version_compatible"</span><span class="p">:</span> <span class="n">version_compatible</span><span class="p">,</span>
         <span class="s2">"optimization_level"</span><span class="p">:</span> <span class="n">optimization_level</span><span class="p">,</span>
         <span class="s2">"truncate_double"</span><span class="p">:</span> <span class="n">truncate_double</span><span class="p">,</span>
+        <span class="s2">"use_complex_decomposition"</span><span class="p">:</span> <span class="n">use_complex_decomposition</span><span class="p">,</span>
         <span class="s2">"use_fast_partitioner"</span><span class="p">:</span> <span class="n">use_fast_partitioner</span><span class="p">,</span>
         <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>
         <span class="s2">"enable_experimental_decompositions"</span><span class="p">:</span> <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
@@ -1243,6 +1266,7 @@ document.write(`
         <span class="s2">"cpu_memory_budget"</span><span class="p">:</span> <span class="n">cpu_memory_budget</span><span class="p">,</span>
         <span class="s2">"dynamically_allocate_resources"</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
         <span class="s2">"decompose_attention"</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
+        <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">:</span> <span class="n">disabled_constant_fold_exclusions</span><span class="p">,</span>
         <span class="s2">"attn_bias_is_causal"</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
         <span class="s2">"fallback_data_dependent_ops"</span><span class="p">:</span> <span class="n">fallback_data_dependent_ops</span><span class="p">,</span>
     <span class="p">}</span>
@@ -1393,32 +1417,64 @@ document.write(`
         <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="c1"># --- Output boundary: view_as_complex for complex outputs from TRT blocks ---</span>
-    <span class="k">if</span> <span class="n">complex_output_indices</span><span class="p">:</span>
-        <span class="n">output_node</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="n">outputs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">complex_output_indices</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
-                <span class="k">continue</span>
-            <span class="n">src</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">):</span>
-                <span class="k">continue</span>
-            <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_module"</span> <span class="ow">and</span> <span class="p">(</span>
-                <span class="s2">"_run_on_acc"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"_run_on_gpu"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
-            <span class="p">):</span>
-                <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">output_node</span><span class="p">):</span>
-                    <span class="n">complex_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
-                        <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">view_as_complex</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">src</span><span class="p">,)</span>
-                    <span class="p">)</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"Inserted view_as_complex for complex output index </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2"> "</span>
-                    <span class="sa">f</span><span class="s2">"from TRT block '</span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">'"</span>
+    <span class="c1"># Also runs when there's no complex output (complex_output_indices empty)</span>
+    <span class="c1"># but there IS complex input (function didn't early-return above): a</span>
+    <span class="c1"># single-output graph's output node arg is a bare Node rather than a</span>
+    <span class="c1"># tuple/list of Nodes, and _PyTreeCodeGen's generated forward() requires</span>
+    <span class="c1"># the tuple-wrapped form to correctly unflatten the result -- otherwise</span>
+    <span class="c1"># it hands the bare result tensor itself to tree_unflatten, which reads</span>
+    <span class="c1"># its first dim as a (wrong) leaf count.</span>
+    <span class="n">output_node</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">output_arg</span> <span class="o">=</span> <span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">outputs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">list</span><span class="p">(</span><span class="n">output_arg</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">output_arg</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">output_arg</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">complex_output_indices</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_module"</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="s2">"_run_on_acc"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"_run_on_gpu"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">output_node</span><span class="p">):</span>
+                <span class="n">complex_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">view_as_complex</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">src</span><span class="p">,)</span>
                 <span class="p">)</span>
-                <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">complex_node</span>
-                <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
-        <span class="n">output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">),)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Inserted view_as_complex for complex output index </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2"> "</span>
+                <span class="sa">f</span><span class="s2">"from TRT block '</span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">'"</span>
+            <span class="p">)</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">complex_node</span>
+            <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">output_arg</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+        <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">),)</span>
 
     <span class="k">if</span> <span class="n">graph_modified</span><span class="p">:</span>
         <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+        <span class="n">partitioned_module</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
+
+    <span class="c1"># Ensure the final module's own forward() unflattens its result back to</span>
+    <span class="c1"># the user's original return shape (e.g. a bare tensor instead of a</span>
+    <span class="c1"># 1-tuple). complex_decomposition_adapter's make_fx retrace produces a</span>
+    <span class="c1"># plain (non-pytree) codegen partway through the pipeline, and that loss</span>
+    <span class="c1"># survives partitioning. Applied here -- after partitioning and boundary</span>
+    <span class="c1"># adapter insertion, once the module's true final leaf count is settled</span>
+    <span class="c1"># -- because setting it earlier (on the pre-partition graph) mismatches</span>
+    <span class="c1"># the leaf count at that intermediate stage and crashes on unflatten.</span>
+    <span class="n">in_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">"_in_spec"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">out_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">"_out_spec"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">in_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">out_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">orig_args</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">name</span>
+            <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span>
+        <span class="p">]</span>
+        <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">_codegen</span> <span class="o">=</span> <span class="n">_PyTreeCodeGen</span><span class="p">(</span>
+            <span class="n">_PyTreeInfo</span><span class="p">(</span><span class="n">orig_args</span><span class="p">,</span> <span class="n">in_spec</span><span class="p">,</span> <span class="n">out_spec</span><span class="p">)</span>
+        <span class="p">)</span>
         <span class="n">partitioned_module</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
 
 
@@ -1957,7 +2013,10 @@ document.write(`
     <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
         <span class="n">output_node</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="c1"># A single-output graph's output node arg is a bare Node rather</span>
+            <span class="c1"># than a tuple/list of Nodes.</span>
+            <span class="n">outputs</span> <span class="o">=</span> <span class="n">arg</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">arg</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">outputs</span><span class="p">:</span>
                 <span class="n">target</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">target</span>
                 <span class="k">if</span> <span class="s2">"_run_on_acc"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
                     <span class="k">continue</span>
@@ -2166,6 +2225,7 @@ document.write(`
     <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">truncate_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
+    <span class="n">use_complex_decomposition</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_COMPLEX_DECOMPOSITION</span><span class="p">,</span>
     <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2196,6 +2256,9 @@ document.write(`
     <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">OFFLOAD_MODULE_TO_CPU</span><span class="p">,</span>
     <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_DISTRIBUTED_MODE_TRACE</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
+    <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span>
+        <span class="nb">str</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span><span class="p">,</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
     <span class="n">lift_mutable_buffers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">arg_input_binding_names</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2258,6 +2321,7 @@ document.write(`
 <span class="sd">        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
 <span class="sd">        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
 <span class="sd">        truncate_double (bool): Truncate weights provided in double (float64) to float32</span>
+<span class="sd">        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch&gt;=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.</span>
 <span class="sd">        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch</span>
 <span class="sd">        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT</span>
 <span class="sd">        torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True</span>
@@ -2294,6 +2358,11 @@ document.write(`
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
 <span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
 <span class="sd">            the final output back to FP16.</span>
+<span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
+<span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
+<span class="sd">            implementations and enabled by default; compilation users do not</span>
+<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
+<span class="sd">            foldable. Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
@@ -2398,7 +2467,7 @@ document.write(`
             <span class="s2">"'arg_inputs' and 'inputs' should not be used at the same time."</span>
         <span class="p">)</span>
 
-    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">arg_inputs</span>
 
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -2432,6 +2501,7 @@ document.write(`
         <span class="s2">"version_compatible"</span><span class="p">:</span> <span class="n">version_compatible</span><span class="p">,</span>
         <span class="s2">"optimization_level"</span><span class="p">:</span> <span class="n">optimization_level</span><span class="p">,</span>
         <span class="s2">"truncate_double"</span><span class="p">:</span> <span class="n">truncate_double</span><span class="p">,</span>
+        <span class="s2">"use_complex_decomposition"</span><span class="p">:</span> <span class="n">use_complex_decomposition</span><span class="p">,</span>
         <span class="s2">"use_fast_partitioner"</span><span class="p">:</span> <span class="n">use_fast_partitioner</span><span class="p">,</span>
         <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>
         <span class="s2">"enable_experimental_decompositions"</span><span class="p">:</span> <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
@@ -2459,6 +2529,7 @@ document.write(`
         <span class="s2">"offload_module_to_cpu"</span><span class="p">:</span> <span class="n">offload_module_to_cpu</span><span class="p">,</span>
         <span class="s2">"use_distributed_mode_trace"</span><span class="p">:</span> <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
         <span class="s2">"decompose_attention"</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
+        <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">:</span> <span class="n">disabled_constant_fold_exclusions</span><span class="p">,</span>
         <span class="s2">"attn_bias_is_causal"</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
     <span class="p">}</span>
 

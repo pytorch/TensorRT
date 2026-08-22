@@ -56,5 +56,7 @@ Classes
 -------
 
 
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding`
+
 - :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader`
 

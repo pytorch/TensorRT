@@ -119,7 +119,7 @@ jobs:
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         # this is to verify the end user's workflow
-        python -m pip install pyyaml "executorch>=1.4.0"
+        python -m pip install pyyaml "executorch>=1.4.1,<1.5"
         python examples/torchtrt_executorch_example/export_static_shape.py \
           --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
         .github/scripts/verify-executorch-reference-runner.sh \
