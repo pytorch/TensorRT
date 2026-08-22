@@ -25,6 +25,8 @@ These tests verify:
 """
 
 import inspect
+import unittest
+from unittest import mock
 
 import torch
 from torch.export import export
@@ -658,6 +660,121 @@ class TestPredictedKvAssertion(TestCase):
         message = str(caught.exception)
         self.assertIn("min_block_size (5)", message)
         self.assertIn("min_block_size=1", message)
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
+class TestCompileSeam(TestCase):
+    """End-to-end coverage of the wire between the two halves of the design.
+
+    ``lift_mutated_buffers`` classifies each write before partitioning and
+    ``assert_predicted_kv_aliased`` re-checks that classification after conversion.
+    Every other test in this file drives one half directly, so the two could be
+    disconnected in ``_compiler.py`` -- the copy-back list never reaching
+    ``trt_gm.meta``, or the cross-check never being called -- without a single
+    failure. These go through ``compile()`` so that wiring is observed.
+    """
+
+    @staticmethod
+    def _compile(model, args, **kwargs):
+        import torch_tensorrt
+
+        ep = torch.export.export(model, args, strict=False)
+        return torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=list(args),
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            **kwargs,
+        )
+
+    @staticmethod
+    def _kv_model(batch):
+        """A model and inputs whose single-position cache write lift classifies as
+        engine-aliased, so it drops the ``copy_`` and the cross-check has something
+        to be right or wrong about."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(batch, 4, 16, 8).cuda())
+
+            def forward(self, x):
+                self.cache[:, :, 3:4, :] = x
+                return self.cache.sum()
+
+        return M().cuda().eval(), (torch.ones(batch, 4, 1, 8).cuda(),)
+
+    def test_compile_threads_copyback_buffers_into_trt_gm_meta(self):
+        """The copy-back list ``lift_mutated_buffers`` records has to survive
+        ``compile_module`` and land on the compiled module's meta -- that is the only
+        channel by which ``save()`` learns which trailing outputs to reclassify as
+        BUFFER_MUTATIONs."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                return self.state.sum()
+
+        x = torch.arange(8, dtype=torch.float32).cuda()
+        trt_gm = self._compile(M().cuda().eval(), (x,), min_block_size=1)
+
+        self.assertEqual(trt_gm.meta.get("_copyback_mutation_buffers"), ["state"])
+        # The recorded name must resolve to a buffer that still exists, else the
+        # ExportedProgram verifier rejects the BUFFER_MUTATION downstream.
+        self.assertIn("state", dict(trt_gm.named_buffers()))
+
+        # The copy-back value is a real trailing output carrying the post-write
+        # buffer, not a stale read.
+        outs = trt_gm(x)
+        self.assertIsInstance(outs, (tuple, list))
+        self.assertEqual(len(outs), 2)
+        self.assertTrue(torch.allclose(outs[-1].float().cpu(), x.cpu()))
+
+    def test_compile_runs_the_predicted_kv_cross_check(self):
+        """``compile()`` must actually call ``assert_predicted_kv_aliased`` with the
+        predictions lift made; without that call a mis-classified write silently
+        loses its write-back."""
+        from torch_tensorrt.dynamo import _compiler as C
+
+        model, args = self._kv_model(1)
+        calls = []
+        original = C.assert_predicted_kv_aliased
+
+        def _spy(aliased_in, bindings, settings=None, **kwargs):
+            calls.append(list(bindings))
+            return original(aliased_in, bindings, settings, **kwargs)
+
+        with mock.patch.object(C, "assert_predicted_kv_aliased", _spy):
+            self._compile(model, args, min_block_size=1)
+
+        self.assertEqual(calls, [["buf_cache"]])
+
+    def test_compile_raises_when_a_predicted_kv_write_is_not_aliased(self):
+        """The cross-check is load-bearing, not decorative: a write predicted to alias
+        whose node the partitioner then leaves out of every engine (here via the
+        default ``min_block_size``) fails the compile instead of returning a module
+        whose buffer never updates."""
+        model, args = self._kv_model(2)
+
+        with self.assertRaisesRegex(RuntimeError, "did not alias them"):
+            self._compile(model, args, min_block_size=5)
+
+    def test_compile_does_not_cross_check_a_dryrun(self):
+        """A dryrun returns before any engine is built, so every prediction is absent
+        from ``aliased_io`` for a reason that says nothing about the prediction.
+
+        ``compile()`` is the only caller that knows this, so it is the only one that
+        tells the check -- the check itself cannot read it off ``dryrun``, which the
+        engine converter accepts while building anyway. Nothing else observes that
+        ``compile()`` says so, and a run whose only job is to report would otherwise
+        fail outright."""
+        model, args = self._kv_model(1)
+
+        self._compile(model, args, dryrun=True, min_block_size=1)
 
 
 if __name__ == "__main__":
