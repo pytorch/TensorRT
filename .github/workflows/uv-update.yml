@@ -80,8 +80,14 @@ jobs:
         run: |
           set -euo pipefail
           set -x
-          if ! uv sync --frozen; then
-            echo "Error: Failed to run uv sync --frozen"
+          # --no-install-project keeps this a lockfile check. Installing the root
+          # project runs its PEP 517 backend, which shells out to Bazel and needs
+          # CUDA at the exact path MODULE.bazel names; that is what has failed
+          # every run since the CUDA 13.2 upgrade. Dependencies are still
+          # downloaded and hash-verified, so a broken lock is still caught.
+          # --locked rather than --frozen because --frozen accepts a stale lock.
+          if ! uv sync --locked --no-install-project; then
+            echo "Error: Failed to run uv sync --locked --no-install-project"
             exit 1
           fi
           echo "valid_changes=true" >> "$GITHUB_OUTPUT"
