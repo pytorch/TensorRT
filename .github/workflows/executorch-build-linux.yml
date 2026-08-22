@@ -120,6 +120,22 @@ jobs:
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         # this is to verify the end user's workflow
         python -m pip install pyyaml "executorch>=1.4.1,<1.5"
+        # The wheel this job downloads is ambiguous: the standard and
+        # PYTHON_ONLY=1 channels publish byte-different wheels under one
+        # artifact name, so download-artifact resolves whichever has the higher
+        # id at that moment. When it lands on the slim one, torch_tensorrt ships
+        # no libtorchtrt.so, ENABLED_FEATURES.torch_tensorrt_runtime is False
+        # and the export below fails in _compile.py. Build the wheel from this
+        # checkout so the job cannot depend on which upload won the race.
+        # CI_BUILD=1 selects //toolchains:ci_rhel_x86_64_linux, matching how the
+        # standard wheel is built in this image. RELEASE is deliberately unset:
+        # setup.py reads __version__ from BUILD_VERSION when RELEASE=1, and this
+        # job never sets BUILD_VERSION, so the dev version is the correct one.
+        CI_BUILD=1 python -m pip wheel --no-build-isolation --no-deps \
+          --wheel-dir "${RUNNER_TEMP}/torchtrt-wheel" .
+        python -m pip install --force-reinstall --no-deps \
+          "${RUNNER_TEMP}"/torchtrt-wheel/torch_tensorrt-*.whl
+        python -c 'from torch_tensorrt._features import ENABLED_FEATURES as f; assert f.torch_tensorrt_runtime, f'
         python examples/torchtrt_executorch_example/export_static_shape.py \
           --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
         .github/scripts/verify-executorch-reference-runner.sh \
