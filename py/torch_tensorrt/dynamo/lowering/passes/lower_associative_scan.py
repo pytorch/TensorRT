@@ -8,9 +8,9 @@ combine pattern this pass accepts is Mamba's first-order linear recurrence::
 which is ``h_t = a_t * h_{t-1} + b_t``. Anything else is left alone.
 
 For a static scan length the HOP is replaced with a Hillis–Steele inclusive
-scan built from ``slice`` / ``cat`` / ``mul`` / ``add`` / ``ones_like`` /
-``zeros_like`` — all of which already have converters. Dynamic sequence
-lengths are declined so today's PyTorch fallback behaviour is preserved.
+scan built from ``slice`` / ``cat`` / ``mul`` / ``add`` — all of which already
+have converters. Dynamic sequence lengths are declined so today's PyTorch
+fallback behaviour is preserved.
 """
 
 from __future__ import annotations
@@ -54,7 +54,9 @@ def _is_add(n: torch.fx.Node, x: torch.fx.Node, y: torch.fx.Node) -> bool:
     )
 
 
-def _unwrap_output_pair(output_node: torch.fx.Node) -> Optional[Tuple[torch.fx.Node, torch.fx.Node]]:
+def _unwrap_output_pair(
+    output_node: torch.fx.Node,
+) -> Optional[Tuple[torch.fx.Node, torch.fx.Node]]:
     out_args = output_node.args[0]
     # wrap_combine_fn_flat may nest the pair as a list/tuple of length 1
     while isinstance(out_args, (list, tuple)) and len(out_args) == 1:
@@ -124,36 +126,41 @@ def _hillis_steele_scan(
 ) -> Tuple[torch.fx.Node, torch.fx.Node]:
     """Inclusive Hillis–Steele scan of ``(a, b)`` along dim 0.
 
-    Identity for the affine combine is ``(1, 0)``. Positions ``i < step`` keep
-    their value because they are combined with that identity.
+    Each stage combines position ``i`` with ``i - step``. The leading ``step``
+    positions have no left operand, so they are carried through unchanged.
     """
     with gm.graph.inserting_before(before):
         for d in range(math.ceil(math.log2(scan_len)) if scan_len > 1 else 0):
             step = 1 << d
-            a_prefix = gm.graph.call_function(
-                torch.ops.aten.slice.Tensor, (a, 0, 0, scan_len - step, 1)
-            )
-            b_prefix = gm.graph.call_function(
-                torch.ops.aten.slice.Tensor, (b, 0, 0, scan_len - step, 1)
-            )
             a_head = gm.graph.call_function(
                 torch.ops.aten.slice.Tensor, (a, 0, 0, step, 1)
             )
             b_head = gm.graph.call_function(
                 torch.ops.aten.slice.Tensor, (b, 0, 0, step, 1)
             )
-            ones = gm.graph.call_function(torch.ops.aten.ones_like.default, (a_head,))
-            zeros = gm.graph.call_function(torch.ops.aten.zeros_like.default, (b_head,))
             a_left = gm.graph.call_function(
-                torch.ops.aten.cat.default, ([ones, a_prefix], 0)
+                torch.ops.aten.slice.Tensor, (a, 0, 0, scan_len - step, 1)
             )
             b_left = gm.graph.call_function(
-                torch.ops.aten.cat.default, ([zeros, b_prefix], 0)
+                torch.ops.aten.slice.Tensor, (b, 0, 0, scan_len - step, 1)
             )
-            a_new = gm.graph.call_function(torch.ops.aten.mul.Tensor, (a_left, a))
-            tmp = gm.graph.call_function(torch.ops.aten.mul.Tensor, (a, b_left))
-            b_new = gm.graph.call_function(torch.ops.aten.add.Tensor, (tmp, b))
-            a, b = a_new, b_new
+            a_right = gm.graph.call_function(
+                torch.ops.aten.slice.Tensor, (a, 0, step, scan_len, 1)
+            )
+            b_right = gm.graph.call_function(
+                torch.ops.aten.slice.Tensor, (b, 0, step, scan_len, 1)
+            )
+            a_tail = gm.graph.call_function(
+                torch.ops.aten.mul.Tensor, (a_left, a_right)
+            )
+            tmp = gm.graph.call_function(torch.ops.aten.mul.Tensor, (a_right, b_left))
+            b_tail = gm.graph.call_function(torch.ops.aten.add.Tensor, (tmp, b_right))
+            a = gm.graph.call_function(
+                torch.ops.aten.cat.default, ([a_head, a_tail], 0)
+            )
+            b = gm.graph.call_function(
+                torch.ops.aten.cat.default, ([b_head, b_tail], 0)
+            )
     return a, b
 
 
