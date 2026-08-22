@@ -13,7 +13,11 @@ import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering import get_decompositions, post_lowering, pre_export_lowering
+from torch_tensorrt.dynamo.lowering import (
+    get_decompositions,
+    post_lowering,
+    pre_export_lowering,
+)
 from torch_tensorrt.dynamo.lowering.passes.lower_associative_scan import (
     _is_mamba_affine_combine,
     lower_associative_scan,
@@ -61,6 +65,11 @@ def _has_associative_scan(gm: torch.fx.GraphModule) -> bool:
     return False
 
 
+def _pytorch_segments(compiled) -> list:
+    """Names of the segments the partitioner left in PyTorch."""
+    return [name for name, _ in compiled.named_children() if "_run_on_gpu" in name]
+
+
 def _lower_exported(model, inputs, experimental: bool = False):
     settings = CompilationSettings(min_block_size=1)
     with torch.no_grad():
@@ -91,6 +100,9 @@ class TestLowerAssociativeScan(TestCase):
         self.assertIn(torch.ops.aten.cat.default, targets)
         self.assertIn(torch.ops.aten.mul.Tensor, targets)
         self.assertIn(torch.ops.aten.add.Tensor, targets)
+        # ones_like / zeros_like have no converter after run_decompositions.
+        for op in (torch.ops.aten.ones_like.default, torch.ops.aten.zeros_like.default):
+            self.assertNotIn(op, targets)
 
     def test_pointwise_scan_numerics_match_eager(self):
         b, d, s, n = 1, 2, 8, 4
@@ -114,6 +126,9 @@ class TestLowerAssociativeScan(TestCase):
             enabled_precisions={torch.float32},
             min_block_size=1,
         )
+        self.assertEqual(
+            _pytorch_segments(compiled), [], "the scan must run entirely in TRT"
+        )
         trt_out = compiled(*[t.clone() for t in inputs])
         torch.testing.assert_close(trt_out, ref, rtol=1e-3, atol=1e-3)
 
@@ -125,16 +140,29 @@ class TestLowerAssociativeScan(TestCase):
             torch.randn(b, d, s, n, device="cuda"),
             torch.randn(b, s, n, device="cuda"),
         )
-        gm, _ = _lower_exported(model, inputs)
+        gm, ep = _lower_exported(model, inputs)
         self.assertFalse(_has_associative_scan(gm))
+
+        ref = model(*[t.clone() for t in inputs])
         torch.testing.assert_close(
-            gm(*[t.clone() for t in inputs]),
-            model(*[t.clone() for t in inputs]),
-            rtol=1e-4,
-            atol=1e-4,
+            gm(*[t.clone() for t in inputs]), ref, rtol=1e-4, atol=1e-4
         )
-        # ceil(log2(7)) == 3 stages
-        self.assertEqual(math.ceil(math.log2(s)), 3)
+        # One add per stage; a-chain cats are DCE'd since only b is consumed.
+        adds = [n for n in gm.graph.nodes if n.target is torch.ops.aten.add.Tensor]
+        self.assertEqual(len(adds), math.ceil(math.log2(s)))
+
+        compiled = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=list(inputs),
+            enabled_precisions={torch.float32},
+            min_block_size=1,
+        )
+        self.assertEqual(
+            _pytorch_segments(compiled), [], "the scan must run entirely in TRT"
+        )
+        torch.testing.assert_close(
+            compiled(*[t.clone() for t in inputs]), ref, rtol=1e-3, atol=1e-3
+        )
 
     def test_decline_non_mamba_combine(self):
         """A different associative combine must keep the HOP."""
@@ -178,7 +206,9 @@ class TestLowerAssociativeScan(TestCase):
             def forward(self, a_l, b_l, a_r, b_r):
                 return a_l + a_r, b_l + b_r
 
-        self.assertFalse(_is_mamba_affine_combine(torch.fx.symbolic_trace(BadCombine())))
+        self.assertFalse(
+            _is_mamba_affine_combine(torch.fx.symbolic_trace(BadCombine()))
+        )
 
 
 if __name__ == "__main__":
