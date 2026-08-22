@@ -154,7 +154,7 @@ jobs:
         if: ${{ inputs.additional-artifact != '' }}
         uses: actions/download-artifact@v7
         with:
-          name: ${{ inputs.additional-artifact }}
+          name: ${{ inputs.additional-artifact }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ inputs.architecture }}
           path: /opt/torch-tensorrt-builds/
       - name: Pack script
         continue-on-error: ${{ inputs.continue-on-error }}
@@ -212,7 +212,7 @@ jobs:
         uses: actions/upload-artifact@v6
         if: ${{ inputs.upload-artifact != '' }}
         with:
-          name: ${{ inputs.upload-artifact }}
+          name: ${{ inputs.upload-artifact }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ inputs.architecture }}
           path: ${{ inputs.repository }}/dist/
           if-no-files-found: error
 
