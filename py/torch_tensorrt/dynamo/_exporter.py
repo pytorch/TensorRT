@@ -2,7 +2,7 @@ import base64
 import copy
 import logging
 import operator
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch.utils._pytree as pytree
@@ -371,7 +371,49 @@ def create_trt_exp_program(
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
     assert output_nodes
-    output_nodes = output_nodes[0].args[0]
+    _output_node = output_nodes[0]
+    output_nodes = _output_node.args[0]
+
+    # Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer):
+    # lift_mutated_buffers appended each buffer's new-value as a trailing graph output. Tag it
+    # BUFFER_MUTATION (reusing the KV `_kv_mutation_target` path) so the runtime
+    # threads it and ExecuTorch copies it back to the caller-owned buffer, then move
+    # all mutation outputs before the user outputs (ExportedProgram verifier requires
+    # BUFFER_MUTATIONs to be contiguous at the front).
+    _copyback = gm.meta.get("_copyback_mutation_buffers", [])
+    if _copyback:
+        # A write-only buffer -- every reader served by the value being written
+        # -- has a dead get_attr, and `transform` already ran DCE. `lift` derives
+        # BUFFER input specs from get_attr nodes alone, so without one the
+        # BUFFER_MUTATION declared below names a buffer the signature never
+        # declares. An unused get_attr is enough: `lift` rewrites it to a
+        # placeholder, which fx's dead-code pass never removes. Must be a
+        # registered buffer, else `lift` makes it a parameter or constant.
+        _attrs = {n.target for n in gm.graph.nodes if n.op == "get_attr"}
+        _registered = dict(gm.named_buffers())
+        _first_node = next(iter(gm.graph.nodes))
+        for _buf in _copyback:
+            if _buf in _attrs or _buf not in _registered:
+                continue
+            with gm.graph.inserting_before(_first_node):
+                gm.graph.get_attr(_buf)
+            _attrs.add(_buf)
+
+        _outs = list(output_nodes)
+        for _n, _buf in zip(_outs[-len(_copyback) :], _copyback):
+            if isinstance(_n, torch.fx.Node):
+                _n.meta["_kv_mutation_target"] = _buf
+        # Read by _declare_aliased_kv_mutations_on_ep, which must not consume these
+        # trailing values a second time.
+        gm.meta["_copyback_mutations_declared"] = True
+
+        def _is_mut(_n: Any) -> bool:
+            return isinstance(_n, torch.fx.Node) and "_kv_mutation_target" in _n.meta
+
+        output_nodes = [_n for _n in _outs if _is_mut(_n)] + [
+            _n for _n in _outs if not _is_mut(_n)
+        ]
+        _output_node.args = (tuple(output_nodes),)
 
     # Outputs tagged by `_expose_aliased_buffer_mutations` become BUFFER_MUTATION
     # specs (their `_kv_mutation_target` meta names the backing buffer); the rest
@@ -532,22 +574,45 @@ def create_trt_exp_program(
 
 def _declare_aliased_kv_mutations_on_ep(
     exp_program: ExportedProgram,
+    copyback_buffers: Optional[List[str]] = None,
 ) -> ExportedProgram:
     """Post-export pass: declare each engine's aliased KV output as a
-    BUFFER_MUTATION of its caller-owned buffer input.
+    BUFFER_MUTATION of its caller-owned buffer input, and reclassify any copy-back
+    outputs as BUFFER_MUTATIONs of their buffers.
 
-    Runs on both save() paths (retrace=True and retrace=False); it is idempotent
-    because it skips buffers that already carry a BUFFER_MUTATION spec (see
-    already_exposed below), so the legacy exporter's transform-time declaration is
-    not duplicated.
+    Safe to call more than once on the same program, by two separate mechanisms. The
+    KV half skips any buffer that already carries a BUFFER_MUTATION spec (see
+    already_exposed below), which is also how the legacy exporter's transform-time
+    declaration survives. The copy-back half cannot skip one buffer at a time, because
+    it detaches its outputs by position rather than by name; it skips the whole slice
+    instead, keyed on ``gm.meta['_copyback_mutations_declared']``, which every step
+    that consumes those trailing values sets.
 
     torch.export produces execute_engine nodes whose meta['val'] covers only the
     user outputs (the aliased KV outputs are network bindings excluded at the fx
     boundary), so the KV buffers -- though BUFFER inputs -- are never recorded as
     mutated and get frozen downstream. This surfaces each aliased output as a
     getitem and declares it a BUFFER_MUTATION of the aliased input's buffer,
-    mirroring create_trt_exp_program's handling on the retrace=False path. Returns
-    exp_program unchanged when no engine has aliased KV outputs.
+    mirroring create_trt_exp_program's handling on the retrace=False path.
+
+    Non-KV mutable buffers (e.g. a convolution-state ring-buffer) have no engine
+    aliasing: lift_mutated_buffers appended their new values as trailing user outputs, which
+    torch.export kept as the last ``len(copyback_buffers)`` outputs. Those are
+    reclassified from USER_OUTPUT to BUFFER_MUTATION here so ExecuTorch copies them
+    back to the caller-owned buffers after the delegate runs.
+
+    Args:
+        exp_program: the retraced ExportedProgram to rewrite.
+        copyback_buffers: buffer FQNs, in output order, for the trailing copy-back
+            outputs to reclassify as BUFFER_MUTATION. Threaded from
+            ``gm.meta['_copyback_mutation_buffers']`` by ``save()``; empty/None means
+            KV-only (no copy-back).
+
+    Returns exp_program unchanged when there is nothing to declare: no copy-back
+    buffers and no engine contributing an aliased KV output -- either because none has
+    one, or because the optional [executorch] extra is not importable and the engines
+    cannot be read -- or when the only candidate was a copy-back slice that a previous
+    run already consumed.
     """
     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
         ALIASED_IO_IDX,
@@ -559,14 +624,18 @@ def _declare_aliased_kv_mutations_on_ep(
         deserialize_aliased_io,
     )
 
-    # Guard the import so a non-executorch save() (e.g. output_format=
-    # "exported_program" with no aliased KV outputs) doesn't hard-require the
-    # optional [executorch] extra: with no executorch there's no aliased_io to
-    # read and no declaration to make, so return unchanged.
+    # The [executorch] extra is optional, so this import can fail on a plain install.
+    read_engine_info: Optional[Callable[..., List[Any]]]
     try:
         from torch_tensorrt.executorch.backend import _get_engine_info_for_node
+
+        read_engine_info = _get_engine_info_for_node
     except ImportError:
-        return exp_program
+        read_engine_info = None
+        logger.debug(
+            "Could not import torch_tensorrt.executorch.backend; engine aliased-KV "
+            "mutations will not be declared on this program."
+        )
 
     def _estr(engine_info: List[Any], idx: int) -> str:
         if idx < 0 or idx >= len(engine_info) or engine_info[idx] is None:
@@ -591,10 +660,15 @@ def _declare_aliased_kv_mutations_on_ep(
         if spec.kind == OutputKind.BUFFER_MUTATION and spec.target
     }
     mutation_outputs: List[Tuple[torch.fx.Node, str]] = []
-    for node in gm.graph.nodes:
+    # Reading an engine needs the [executorch] helper imported above; without it
+    # there is nothing to scan.
+    nodes_to_scan = gm.graph.nodes if read_engine_info is not None else ()
+    for node in nodes_to_scan:
         if node.op != "call_function" or node.target is not exec_target:
             continue
-        engine_info = _get_engine_info_for_node(exp_program, node)
+        assert read_engine_info is not None
+        # Only the binding names and aliased_io are read, never the engine itself.
+        engine_info = read_engine_info(exp_program, node, metadata_only=True)
         aliased_io = deserialize_aliased_io(_estr(engine_info, ALIASED_IO_IDX))
         if not aliased_io:
             continue
@@ -666,29 +740,111 @@ def _declare_aliased_kv_mutations_on_ep(
             mutation_outputs.append((getitem_node, buf_fqn))
         node.meta["val"] = tuple(val_list)
 
-    if not mutation_outputs:
+    copyback_buffers = copyback_buffers or []
+    num_copyback = len(copyback_buffers)
+    if not mutation_outputs and not num_copyback:
         return exp_program
 
-    # BUFFER_MUTATION outputs must precede USER_OUTPUTs (ExportedProgram verifier).
     out_args = list(output_node.args[0])
-    output_node.args = (tuple([g for g, _ in mutation_outputs] + out_args),)
+    orig_specs = list(sig.output_specs)
+
+    kv_getitems = [g for g, _ in mutation_outputs]
+    kv_specs = [
+        OutputSpec(OutputKind.BUFFER_MUTATION, TensorArgument(name=g.name), fqn)
+        for g, fqn in mutation_outputs
+    ]
+
+    # Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer): lift
+    # appended each buffer's new-value as a trailing user output, in copyback_buffers
+    # order. Those appended values are internal plumbing, so the whole run leaves the
+    # user outputs whether or not torch.export also recorded the mutation itself. It
+    # does record it when it recognises the write, and then places that BUFFER_MUTATION
+    # ahead of the user outputs because the verifier requires mutations to come first;
+    # re-declaring such a buffer here would describe one mutation twice. So detach the
+    # full run first and pair it positionally with the full buffer list, then keep only
+    # the buffers not already declared. Filtering before slicing would pair a value with
+    # the wrong buffer, and the runtime would copy it into a buffer of a different shape.
+    copyback_getitems: List[torch.fx.Node] = []
+    copyback_specs: List[OutputSpec] = []
+    remaining_specs = orig_specs
+    already_mutated = {
+        spec.target
+        for spec in orig_specs
+        if spec.kind == OutputKind.BUFFER_MUTATION and isinstance(spec.target, str)
+    }
+    # A BUFFER_MUTATION spec does not say whether the trailing value is still there:
+    # torch.export declares the mutation and leaves the value, while a previous run of
+    # this pass declares it and consumes the value, so it is the consuming step that
+    # records the marker.
+    # The marker is a property of the graph rather than of the buffer list handed in:
+    # it is set on the GraphModule by whichever step consumed the trailing values, and
+    # read back off the GraphModule this pass is later given. stage_exported_program
+    # copies gm.meta's entries into the staged module, so a staged copy sees what its
+    # source recorded before staging. The two mappings are separate objects, so what a
+    # staged copy records afterwards is not visible on the source.
+    if num_copyback and gm.meta.get("_copyback_mutations_declared"):
+        num_copyback = 0
+        if not mutation_outputs:
+            return exp_program
+    if num_copyback:
+        if len(out_args) < num_copyback:
+            raise RuntimeError(
+                f"Expected at least {num_copyback} trailing outputs to pair with "
+                f"copy-back buffers {copyback_buffers}, found only {len(out_args)}."
+            )
+        trailing = list(out_args[-num_copyback:])
+        out_args = out_args[:-num_copyback]
+        remaining_specs = orig_specs[:-num_copyback]
+        for value, buf in zip(trailing, copyback_buffers):
+            if not isinstance(value, torch.fx.Node) or buf in already_mutated:
+                continue
+            copyback_getitems.append(value)
+            copyback_specs.append(
+                OutputSpec(
+                    OutputKind.BUFFER_MUTATION, TensorArgument(name=value.name), buf
+                )
+            )
+        gm.meta["_copyback_mutations_declared"] = True
+
+    # BUFFER_MUTATIONs (KV + copy-back) must precede USER_OUTPUTs (verifier).
+    output_node.args = (tuple(kv_getitems + copyback_getitems + out_args),)
     gm.graph.lint()
     gm.recompile()
 
-    new_output_specs = [
-        OutputSpec(OutputKind.BUFFER_MUTATION, TensorArgument(name=g.name), fqn)
-        for g, fqn in mutation_outputs
-    ] + list(sig.output_specs)
+    new_output_specs = kv_specs + copyback_specs + list(remaining_specs)
     new_signature = ExportGraphSignature(
         input_specs=list(sig.input_specs), output_specs=new_output_specs
     )
+
+    # Copy-back outputs were user returns in the retraced program, so torch.export's
+    # out_spec counts them; after detaching them only the real user outputs remain.
+    # Rebuild the top-level out_spec (mirroring create_trt_exp_program) so to_edge's
+    # unflatten sees the right leaf count. Keyed on num_copyback, not on the specs we
+    # added, because an already-declared buffer still had its value detached above.
+    module_call_graph = exp_program.module_call_graph
+    if num_copyback and module_call_graph:
+        new_out_spec = pytree.tree_flatten(tuple(out_args))[1]
+        _e0 = module_call_graph[0]
+        _sig0 = _e0.signature
+        module_call_graph = [
+            ModuleCallEntry(
+                _e0.fqn,
+                ModuleCallSignature(
+                    inputs=_sig0.inputs if _sig0 is not None else [],
+                    outputs=[],
+                    in_spec=_sig0.in_spec if _sig0 is not None else None,
+                    out_spec=new_out_spec,
+                ),
+            )
+        ] + list(module_call_graph[1:])
+
     return ExportedProgram(
         root=gm,
         graph=gm.graph,
         graph_signature=new_signature,
         state_dict=exp_program.state_dict,
         range_constraints=exp_program.range_constraints,
-        module_call_graph=exp_program.module_call_graph,
+        module_call_graph=module_call_graph,
         example_inputs=exp_program.example_inputs,
         constants=exp_program.constants,
         verifiers=exp_program.verifiers,
