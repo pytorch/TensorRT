@@ -319,6 +319,70 @@ def test_declare_aliased_kv_mutations_declares_buffer_mutation(monkeypatch):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("module_type", ["ep", "fx_retrace", "fx_no_retrace"])
+@pytest.mark.parametrize("output_format", ["exported_program", "executorch"])
+def test_save_declares_aliased_mutations_on_every_serializing_branch(
+    monkeypatch, tmp_path, module_type, output_format
+):
+    """Every ``save()`` branch that serializes a signature runs the declaration pass.
+
+    torch.export drops an engine's aliased KV outputs at the fx boundary, so a branch
+    that serializes without declaring writes a program whose delegate carries fewer
+    outputs than the engine has output bindings, and whose copy-back buffers load
+    frozen. The declaration is reached two different ways -- ``save()`` calls the pass
+    itself before ``torch.export.save``, while the ``executorch`` branches get it from
+    ``_save_as_executorch`` handing the program to ``torch_tensorrt.executorch.export``
+    -- and neither route is visible from the other, so all six combinations are swept
+    here. aot_inductor is excluded on purpose: it warns instead of declaring.
+
+    Sweeping is not the same as constraining. ``save()``'s own call sites already
+    reach the pass on five of the six; only ``[executorch-ep]`` fails if
+    ``torch_tensorrt.executorch.export`` stops calling it. The other five are here so
+    that a branch losing its declaration is caught wherever the loss happens, not
+    because each one pins a caller of its own.
+
+    The pass itself runs for real, so this stays a test of which branch reaches it.
+    """
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt
+
+    calls = []
+    declare = E._declare_aliased_kv_mutations_on_ep
+
+    def _spy(exp_program, **kwargs):
+        calls.append(exp_program)
+        return declare(exp_program, **kwargs)
+
+    monkeypatch.setattr(E, "_declare_aliased_kv_mutations_on_ep", _spy)
+
+    class _Model(torch.nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x * 3.0
+
+    program = torch.export.export(_Model(), (torch.ones(4),))
+    if module_type == "ep":
+        source, save_kwargs = program, {}
+    else:
+        source = program.module()
+        save_kwargs = {
+            "arg_inputs": (torch.ones(4),),
+            "retrace": module_type == "fx_retrace",
+        }
+
+    suffix = "pte" if output_format == "executorch" else "pt2"
+    torch_tensorrt.save(
+        source,
+        str(tmp_path / f"out.{suffix}"),
+        output_format=output_format,
+        **save_kwargs,
+    )
+
+    # Not an exact count: an fx source saved as executorch is declared in save() and
+    # again inside export(), which is what the pass's idempotency is for.
+    assert calls
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("output_format", ["exported_program", "executorch"])
 @pytest.mark.parametrize("use_legacy", [True, False])
 def test_save_declares_aliased_mutations_without_retrace(
