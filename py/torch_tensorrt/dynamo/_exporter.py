@@ -2,7 +2,7 @@ import base64
 import copy
 import logging
 import operator
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch.utils._pytree as pytree
@@ -410,11 +410,10 @@ def create_trt_exp_program(
         def _is_mut(_n: Any) -> bool:
             return isinstance(_n, torch.fx.Node) and "_kv_mutation_target" in _n.meta
 
-        output_nodes = tuple(
-            [_n for _n in _outs if _is_mut(_n)]
-            + [_n for _n in _outs if not _is_mut(_n)]
-        )
-        _output_node.args = (output_nodes,)
+        output_nodes = [_n for _n in _outs if _is_mut(_n)] + [
+            _n for _n in _outs if not _is_mut(_n)
+        ]
+        _output_node.args = (tuple(output_nodes),)
 
     # Outputs tagged by `_expose_aliased_buffer_mutations` become BUFFER_MUTATION
     # specs (their `_kv_mutation_target` meta names the backing buffer); the rest
@@ -626,10 +625,13 @@ def _declare_aliased_kv_mutations_on_ep(
     )
 
     # The [executorch] extra is optional, so this import can fail on a plain install.
+    read_engine_info: Optional[Callable[..., List[Any]]]
     try:
         from torch_tensorrt.executorch.backend import _get_engine_info_for_node
+
+        read_engine_info = _get_engine_info_for_node
     except ImportError:
-        _get_engine_info_for_node = None
+        read_engine_info = None
         logger.debug(
             "Could not import torch_tensorrt.executorch.backend; engine aliased-KV "
             "mutations will not be declared on this program."
@@ -660,12 +662,13 @@ def _declare_aliased_kv_mutations_on_ep(
     mutation_outputs: List[Tuple[torch.fx.Node, str]] = []
     # Reading an engine needs the [executorch] helper imported above; without it
     # there is nothing to scan.
-    nodes_to_scan = gm.graph.nodes if _get_engine_info_for_node is not None else ()
+    nodes_to_scan = gm.graph.nodes if read_engine_info is not None else ()
     for node in nodes_to_scan:
         if node.op != "call_function" or node.target is not exec_target:
             continue
+        assert read_engine_info is not None
         # Only the binding names and aliased_io are read, never the engine itself.
-        engine_info = _get_engine_info_for_node(exp_program, node, metadata_only=True)
+        engine_info = read_engine_info(exp_program, node, metadata_only=True)
         aliased_io = deserialize_aliased_io(_estr(engine_info, ALIASED_IO_IDX))
         if not aliased_io:
             continue

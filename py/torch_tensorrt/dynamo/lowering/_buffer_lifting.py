@@ -121,7 +121,7 @@ def _kv_write_will_alias(
             _index_copy_kv_eligible,
         )
 
-        return _index_copy_kv_eligible(value_node)
+        return bool(_index_copy_kv_eligible(value_node))
 
     if value_node.target is torch.ops.aten.slice_scatter.default:
         from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
@@ -149,7 +149,7 @@ def _kv_write_will_alias(
         # OK is the only status that resolves all three bounds to Python ints.
         assert start is not None and end is not None
         eligible, _reason = _kv_eligible(tuple(cache_shape), dim, start, end - start)
-        return eligible
+        return bool(eligible)
 
     return False
 
