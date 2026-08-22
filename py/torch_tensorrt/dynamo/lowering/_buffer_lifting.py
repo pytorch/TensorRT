@@ -23,6 +23,25 @@ This module provides:
   threaded internally via the fx graph). Because everything is fx +
   module state, the result serializes naturally through
   ``torch_tensorrt.save`` / ``torch.export``.
+
+What copy-back costs: only an engine-aliased (KV) write is free. A write routed to
+copy-back re-attaches the *whole post-write buffer* as a graph output, because a
+BUFFER_MUTATION output is defined as the buffer's new contents rather than the slice
+that changed. Each call therefore pays, per copy-back buffer:
+
+* the graph materializing the full buffer as that output — whatever applied the
+  update produces the whole tensor rather than the changed slice, whether that is a
+  scatter inside an engine or an op the partitioner left in PyTorch — and
+* ExecuTorch's write-back pass copying that output into the caller-owned buffer
+  after the delegate returns.
+
+For a decode step writing one position into a multi-megabyte KV cache, that is a
+full-cache-sized materialization plus a full-cache-sized copy to record a
+single-slot update, per buffer, per call, and easily dominates the step. It is the
+right correctness tradeoff — the alternative is silently losing the write — but it
+is why the classifier routes a cache write to engine aliasing instead, and why a
+model that unexpectedly lands in copy-back comes out slow rather than wrong.
+``gm.meta['_copyback_mutation_buffers']`` lists which buffers are paying it.
 """
 
 from __future__ import annotations
@@ -237,7 +256,8 @@ def lift_mutated_buffers(
     in output order, in ``gm.meta['_copyback_mutation_buffers']`` -- the
     downstream exporters (``create_trt_exp_program`` /
     ``_declare_aliased_kv_mutations_on_ep``) read that list to reclassify those
-    outputs as BUFFER_MUTATIONs.
+    outputs as BUFFER_MUTATIONs. Copy-back is correct but not free; see the module
+    docstring for what each such buffer costs per call.
     """
     # Find all aten.copy_(get_attr_X, _) calls. The first arg's target is
     # the buffer name. Some EPs emit copy_.default, others copy_.
