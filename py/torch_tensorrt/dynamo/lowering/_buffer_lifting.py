@@ -72,7 +72,10 @@ def _kv_write_will_alias(
 
     Eligibility depends on the write dim, static shapes, and the cache being a
     direct network input, so this reuses the converters' own eligibility
-    predicates. A ``slice_scatter`` / ``index_copy`` that is not eligible is
+    predicates -- and, for ``slice_scatter``, the converter's own derivation of
+    the arguments those predicates take (:func:`resolve_slice_scatter_write`), since
+    a divergence there mis-predicts just as effectively as a divergence in the
+    predicate. A ``slice_scatter`` / ``index_copy`` that is not eligible is
     lowered to a non-aliasing scatter, so its write-back is kept as a
     BUFFER_MUTATION output (copy-back) rather than dropped. Imports are local to
     avoid a lowering<->conversion import cycle.
@@ -102,27 +105,31 @@ def _kv_write_will_alias(
         return _index_copy_kv_eligible(value_node)
 
     if value_node.target is torch.ops.aten.slice_scatter.default:
-        from torch_tensorrt.dynamo.conversion.impl.slice_scatter import _kv_eligible
+        from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
+            KVWriteStatus,
+            _kv_eligible,
+            resolve_slice_scatter_write,
+        )
 
-        dim = args[2] if len(args) > 2 and isinstance(args[2], int) else 0
-        start = args[3] if len(args) > 3 and isinstance(args[3], int) else 0
-        # Prefer the source's extent along `dim` for the write length; fall back
-        # to end-start from the slice bounds.
-        update_len = None
-        src = args[1] if len(args) > 1 else None
-        if isinstance(src, torch.fx.Node):
-            src_val = src.meta.get("val")
-            if src_val is not None and dim < len(src_val.shape):
-                s = src_val.shape[dim]
-                update_len = s if isinstance(s, int) else None
-        if update_len is None:
-            end = (
-                args[4]
-                if len(args) > 4 and isinstance(args[4], int)
-                else (cache_shape[dim] if dim < len(cache_shape) else 0)
-            )
-            update_len = max(end - start, 0)
-        eligible, _reason = _kv_eligible(tuple(cache_shape), dim, start, update_len)
+        # Any status other than OK is a case in which the converter returns or
+        # raises before it reaches _kv_eligible, so nothing aliases the cache.
+        # Returning False keeps the copy_. A full overwrite needs that: it returns
+        # the source, emits no KV layer, and its write still has to be copied back.
+        # The other two statuses raise out of the converter, so the compile aborts
+        # and nothing is copied back at all.
+        dim = args[2] if len(args) > 2 else 0
+        start, end, _step, status = resolve_slice_scatter_write(
+            tuple(cache_shape),
+            dim,
+            args[3] if len(args) > 3 else None,
+            args[4] if len(args) > 4 else None,
+            args[5] if len(args) > 5 else None,
+        )
+        if status is not KVWriteStatus.OK:
+            return False
+        # OK is the only status that resolves all three bounds to Python ints.
+        assert start is not None and end is not None
+        eligible, _reason = _kv_eligible(tuple(cache_shape), dim, start, end - start)
         return eligible
 
     return False

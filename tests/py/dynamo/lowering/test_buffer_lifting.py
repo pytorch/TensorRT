@@ -550,6 +550,118 @@ class TestCopyBackClassification(TestCase):
         self.assertEqual(erasable, [])
 
 
+class TestSliceScatterDerivationIsShared(TestCase):
+    """The predictor and the converter must derive ``_kv_eligible``'s arguments
+    the same way.
+
+    ``_kv_write_will_alias`` reuses the converter's eligibility predicate, but a
+    predicate is only as good as what it is handed: computing ``start`` /
+    ``update_len`` differently on the two sides mis-predicts just as effectively
+    as a different predicate would. ``resolve_slice_scatter_write`` is the single
+    derivation both sides call, and these pin the corners where an independent
+    derivation would part company with the converter.
+    """
+
+    @staticmethod
+    def _classify(cache_shape, src_shape, *slice_args):
+        """Route a hand-built ``slice_scatter`` through the predictor."""
+        from torch_tensorrt.dynamo.lowering._buffer_lifting import _kv_write_will_alias
+
+        graph = torch.fx.Graph()
+        cache = graph.placeholder("cache")
+        cache.meta["val"] = torch.empty(cache_shape, device="meta")
+        src = graph.placeholder("src")
+        src.meta["val"] = torch.empty(src_shape, device="meta")
+        node = graph.call_function(
+            torch.ops.aten.slice_scatter.default, args=(cache, src, *slice_args)
+        )
+        return _kv_write_will_alias(node, tuple(cache_shape))
+
+    def test_full_overwrite_is_not_kv(self):
+        """The converter short-circuits a full overwrite by returning the source,
+        so it emits no KV layer and nothing aliases the cache."""
+        self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 16, 8), 2, 0, 16))
+        # Same slice written implicitly (no start/end args).
+        self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 16, 8), 2))
+
+    def test_open_ended_slice_is_not_kv(self):
+        """``cache[:, :, 3:, :]`` lowers with ``end == INT64_MAX``. The converter
+        takes its write length from ``end - start``, which fails the ``start +
+        update_len <= s_max`` bound, so the predictor has to read the length the
+        same way rather than from the source's extent along the dim."""
+        self.assertFalse(
+            self._classify((2, 4, 16, 8), (2, 4, 13, 8), 2, 3, 9223372036854775807)
+        )
+
+    def test_negative_start_is_normalised(self):
+        """A negative ``start`` counts from the end for the converter, so the
+        predictor must normalise it before applying the ``start + update_len <=
+        s_max`` bound rather than passing the raw negative through."""
+        # -4 normalises to 12; 12 + 4 == s_max, so this is eligible.
+        self.assertTrue(self._classify((2, 4, 16, 8), (2, 4, 4, 8), 2, -4, 16))
+        # -4 normalises to 12 but the write runs past s_max, so it is not.
+        self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 8, 8), 2, -4, 20))
+
+    def test_non_int_start_is_not_kv(self):
+        """A non-constant bound makes the converter raise rather than emit a KV
+        layer, so it cannot be predicted to alias. Reading it as ``start = 0``
+        would predict aliasing for a write that never gets converted at all."""
+        graph = torch.fx.Graph()
+        pos = graph.placeholder("pos")
+        self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 1, 8), 2, pos, 4))
+
+    def test_strided_write_still_takes_the_kv_path(self):
+        """Guard against the shared derivation quietly changing ``step``
+        handling: ``_kv_eligible`` does not look at ``step``, so a strided write
+        with concrete bounds is classified as KV-eligible. Whether it should be
+        is a separate question this test deliberately does not settle -- it only
+        pins the answer against accidental change."""
+        self.assertTrue(self._classify((2, 4, 16, 8), (2, 4, 4, 8), 2, 0, 8, 2))
+
+    def test_resolve_reports_the_converter_early_exits(self):
+        """Each status comes back with the bounds its contract promises, since a
+        caller reads the bounds on the strength of the status alone."""
+        from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
+            KVWriteStatus,
+            resolve_slice_scatter_write,
+        )
+
+        shape = (2, 4, 16, 8)
+        self.assertEqual(
+            resolve_slice_scatter_write(shape, 2, 3, 4, 1), (3, 4, 1, KVWriteStatus.OK)
+        )
+        # Defaults filled in and negative indices counted from the end.
+        self.assertEqual(
+            resolve_slice_scatter_write(shape, 2, -4, None, None),
+            (12, 16, 1, KVWriteStatus.OK),
+        )
+        self.assertEqual(
+            resolve_slice_scatter_write(shape, 2, None, None, None),
+            (0, 16, 1, KVWriteStatus.FULL_OVERWRITE),
+        )
+
+        class _StepEqualToOne:
+            """A step that is not an ``int`` but compares equal to 1, which is what a
+            symbolic step out of a dynamic-shape trace can be."""
+
+            def __eq__(self, other):
+                return other == 1
+
+        self.assertEqual(
+            resolve_slice_scatter_write(shape, 2, 0, 16, _StepEqualToOne()),
+            (0, 16, 1, KVWriteStatus.FULL_OVERWRITE),
+        )
+        # Nothing resolved, so nothing is reported as resolved.
+        self.assertEqual(
+            resolve_slice_scatter_write(shape, 2, "sym", 4, 1),
+            (None, None, None, KVWriteStatus.DYNAMIC_BOUNDS),
+        )
+        self.assertEqual(
+            resolve_slice_scatter_write(shape, 9, 0, 4, 1),
+            (None, None, None, KVWriteStatus.BAD_DIM),
+        )
+
+
 class _FakeEngine:
     """Stand-in for a compiled TRT submodule exposing an ``aliased_io`` map."""
 
