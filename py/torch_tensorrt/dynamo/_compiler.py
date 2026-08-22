@@ -322,8 +322,12 @@ def cross_compile_for_windows(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(
+        arg_inputs, disable_memory_format_check=True
+    )
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(
+        kwarg_inputs, disable_memory_format_check=True
+    )
     device = to_torch_tensorrt_device(device)
 
     compilation_options = {
@@ -725,8 +729,12 @@ def compile(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(
+        arg_inputs, disable_memory_format_check=True
+    )
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(
+        kwarg_inputs, disable_memory_format_check=True
+    )
     device = to_torch_tensorrt_device(device)
 
     engine_cache = None
@@ -1995,8 +2003,12 @@ def convert_exported_program_to_serialized_trt_engine(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(kwarg_inputs)
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(
+        arg_inputs, disable_memory_format_check=True
+    )
+    trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(
+        kwarg_inputs, disable_memory_format_check=True
+    )
     device = to_torch_tensorrt_device(device)
 
     engine_cache = None
