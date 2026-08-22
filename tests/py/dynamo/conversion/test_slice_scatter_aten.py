@@ -95,6 +95,22 @@ class TestSliceScatterFallback(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(module, input_specs)
 
+    def test_fallback_open_end_step_two(self):
+        # Mode A: export open-end sentinel with step=2.
+        open_end = 2**63 - 1
+        module = _SliceScatterNotInputModule(2, 0, open_end, step=2)
+        cache = torch.randn(2, 4, 16, 8)
+        update = torch.randn(2, 4, 8, 8)
+        self.run_test(module, [cache, update])
+
+    def test_fallback_open_end_interior_start(self):
+        # Mode B: interior start with open end.
+        open_end = 2**63 - 1
+        module = _SliceScatterNotInputModule(2, 3, open_end, step=1)
+        cache = torch.randn(2, 4, 16, 8)
+        update = torch.randn(2, 4, 13, 8)
+        self.run_test(module, [cache, update])
+
     def test_full_overwrite_is_identity(self):
         """When start=0, end=dim_size, step=1, the converter short-circuits
         and returns ``src`` directly. Wrap the returned tensor in a small op
