@@ -1,0 +1,13 @@
+.. _exhale_function_trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447:
+
+Function trtorch::get_build_info
+================================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::get_build_info()

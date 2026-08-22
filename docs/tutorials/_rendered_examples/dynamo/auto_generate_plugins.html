@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -660,21 +660,21 @@ def elementwise_scale_mul_kernel(X, Y, Z, a, b, BLOCK_SIZE: tl.constexpr):
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@torch.library.custom_op(&quot;torchtrt_ex::elementwise_scale_mul&quot;, mutates_args=())  # type: ignore[misc]
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@torch.library.custom_op("torchtrt_ex::elementwise_scale_mul", mutates_args=())  # type: ignore[misc]
 def elementwise_scale_mul(
     X: torch.Tensor, Y: torch.Tensor, b: float = 0.2, a: int = 2
 ) -&gt; torch.Tensor:
-    assert X.is_cuda and Y.is_cuda, &quot;Tensors must be on CUDA device.&quot;
-    assert X.shape == Y.shape, &quot;Tensors must have the same shape.&quot;
+    assert X.is_cuda and Y.is_cuda, "Tensors must be on CUDA device."
+    assert X.shape == Y.shape, "Tensors must have the same shape."
 
     Z = torch.empty_like(X)
     BLOCK_SIZE = 1024
-    grid = lambda meta: (X.numel() // meta[&quot;BLOCK_SIZE&quot;],)
+    grid = lambda meta: (X.numel() // meta["BLOCK_SIZE"],)
     elementwise_scale_mul_kernel[grid](X, Y, Z, a, b, BLOCK_SIZE=BLOCK_SIZE)
     return Z
 
 
-@torch.library.register_fake(&quot;torchtrt_ex::elementwise_scale_mul&quot;)
+@torch.library.register_fake("torchtrt_ex::elementwise_scale_mul")
 def _(x: torch.Tensor, y: torch.Tensor, b: float = 0.2, a: int = 2) -&gt; torch.Tensor:
     # Elementwise — output has the same shape and dtype as the first input.
     return x
@@ -697,7 +697,7 @@ def _(x: torch.Tensor, y: torch.Tensor, b: float = 0.2, a: int = 2) -&gt; torch.
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>torch_tensorrt.dynamo.conversion.plugins.generate_plugin(
-    &quot;torchtrt_ex::elementwise_scale_mul&quot;
+    "torchtrt_ex::elementwise_scale_mul"
 )
 </pre></div>
 </div>
@@ -724,7 +724,7 @@ def _(x: torch.Tensor, y: torch.Tensor, b: float = 0.2, a: int = 2) -&gt; torch.
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
-    &quot;torchtrt_ex::elementwise_scale_mul&quot;,
+    "torchtrt_ex::elementwise_scale_mul",
     supports_dynamic_shapes=True,
     requires_output_allocator=False,
 )
@@ -733,7 +733,7 @@ def _(x: torch.Tensor, y: torch.Tensor, b: float = 0.2, a: int = 2) -&gt; torch.
 </div>
 <p>The two calls above can be combined into one:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">plugins</span><span class="o">.</span><span class="n">custom_op</span><span class="p">(</span>
-    <span class="s2">&quot;torchtrt_ex::elementwise_scale_mul&quot;</span><span class="p">,</span>
+    <span class="s2">"torchtrt_ex::elementwise_scale_mul"</span><span class="p">,</span>
     <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">requires_output_allocator</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
@@ -763,9 +763,9 @@ def _(x: torch.Tensor, y: torch.Tensor, b: float = 0.2, a: int = 2) -&gt; torch.
         return res
 
 
-my_model = MyModel().to(&quot;cuda&quot;).eval()
-m = torch.randint(0, 5, (64, 64), device=&quot;cuda&quot;, dtype=torch.float)
-n = torch.randint(0, 5, (64, 64), device=&quot;cuda&quot;, dtype=torch.float)
+my_model = MyModel().to("cuda").eval()
+m = torch.randint(0, 5, (64, 64), device="cuda", dtype=torch.float)
+n = torch.randint(0, 5, (64, 64), device="cuda", dtype=torch.float)
 
 with torch_tensorrt.logging.errors():
     model_trt = torch_tensorrt.compile(my_model, inputs=[m, n], min_block_size=1)
@@ -774,7 +774,7 @@ with torch_tensorrt.logging.errors():
             res = model_trt(m, n)
             assert torch.allclose(res, my_model(m, n))
 
-print(&quot;Ran with custom plugin!&quot;)
+print("Ran with custom plugin!")
 </pre></div>
 </div>
 </div>

@@ -5,13 +5,13 @@ import logging
 import os
 import platform
 import warnings
-
 from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
 import torch
 from torch.export import ExportedProgram
 from torch.export.graph_signature import InputKind
+from torch.fx.graph import _PyTreeCodeGen, _PyTreeInfo
 from torch.fx.node import Target
 from torch.utils._sympy.numbers import int_oo
 from torch_tensorrt._Device import Device
@@ -84,6 +84,7 @@ def cross_compile_for_windows(
     dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    use_complex_decomposition: bool = _defaults.USE_COMPLEX_DECOMPOSITION,
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
@@ -117,6 +118,9 @@ def cross_compile_for_windows(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    disabled_constant_fold_exclusions: Collection[
+        str
+    ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
@@ -163,6 +167,7 @@ def cross_compile_for_windows(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_double (bool): Truncate weights provided in double (float64) to float32
+        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch>=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
@@ -201,6 +206,11 @@ def cross_compile_for_windows(
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
             the final output back to FP16.
+        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
+            Torch-TensorRT rules to disable. Rules are registered by lowering
+            implementations and enabled by default; compilation users do not
+            need to register them. Disabling a rule makes its matching nodes
+            foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -303,7 +313,7 @@ def cross_compile_for_windows(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -329,6 +339,7 @@ def cross_compile_for_windows(
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "truncate_double": truncate_double,
+        "use_complex_decomposition": use_complex_decomposition,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
         "enable_experimental_decompositions": enable_experimental_decompositions,
@@ -357,6 +368,7 @@ def cross_compile_for_windows(
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
+        "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
     }
@@ -436,6 +448,7 @@ def compile(
     dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    use_complex_decomposition: bool = _defaults.USE_COMPLEX_DECOMPOSITION,
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
@@ -482,6 +495,9 @@ def compile(
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    disabled_constant_fold_exclusions: Collection[
+        str
+    ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
@@ -530,6 +546,7 @@ def compile(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_double (bool): Truncate weights provided in double (float64) to float32
+        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch>=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
@@ -576,6 +593,11 @@ def compile(
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
             the final output back to FP16.
+        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
+            Torch-TensorRT rules to disable. Rules are registered by lowering
+            implementations and enabled by default; compilation users do not
+            need to register them. Disabling a rule makes its matching nodes
+            foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -694,7 +716,7 @@ def compile(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -728,6 +750,7 @@ def compile(
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "truncate_double": truncate_double,
+        "use_complex_decomposition": use_complex_decomposition,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
         "enable_experimental_decompositions": enable_experimental_decompositions,
@@ -765,6 +788,7 @@ def compile(
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
+        "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
     }
@@ -914,32 +938,64 @@ def _insert_complex_io_adapters(
         graph_modified = True
 
     # --- Output boundary: view_as_complex for complex outputs from TRT blocks ---
-    if complex_output_indices:
-        output_node = list(partitioned_module.graph.nodes)[-1]
-        outputs = list(output_node.args[0])
-        for idx in complex_output_indices:
-            if idx >= len(outputs):
-                continue
-            src = outputs[idx]
-            if not isinstance(src, torch.fx.Node):
-                continue
-            if src.op == "call_module" and (
-                "_run_on_acc" in str(src.target) or "_run_on_gpu" in str(src.target)
-            ):
-                with partitioned_module.graph.inserting_before(output_node):
-                    complex_node = partitioned_module.graph.call_function(
-                        torch.ops.aten.view_as_complex.default, args=(src,)
-                    )
-                logger.info(
-                    f"Inserted view_as_complex for complex output index {idx} "
-                    f"from TRT block '{src.target}'"
+    # Also runs when there's no complex output (complex_output_indices empty)
+    # but there IS complex input (function didn't early-return above): a
+    # single-output graph's output node arg is a bare Node rather than a
+    # tuple/list of Nodes, and _PyTreeCodeGen's generated forward() requires
+    # the tuple-wrapped form to correctly unflatten the result -- otherwise
+    # it hands the bare result tensor itself to tree_unflatten, which reads
+    # its first dim as a (wrong) leaf count.
+    output_node = list(partitioned_module.graph.nodes)[-1]
+    output_arg = output_node.args[0]
+    outputs = (
+        list(output_arg) if isinstance(output_arg, (list, tuple)) else [output_arg]
+    )
+    for idx in complex_output_indices:
+        if idx >= len(outputs):
+            continue
+        src = outputs[idx]
+        if not isinstance(src, torch.fx.Node):
+            continue
+        if src.op == "call_module" and (
+            "_run_on_acc" in str(src.target) or "_run_on_gpu" in str(src.target)
+        ):
+            with partitioned_module.graph.inserting_before(output_node):
+                complex_node = partitioned_module.graph.call_function(
+                    torch.ops.aten.view_as_complex.default, args=(src,)
                 )
-                outputs[idx] = complex_node
-                graph_modified = True
-        output_node.args = (tuple(outputs),)
+            logger.info(
+                f"Inserted view_as_complex for complex output index {idx} "
+                f"from TRT block '{src.target}'"
+            )
+            outputs[idx] = complex_node
+            graph_modified = True
+    if not isinstance(output_arg, (list, tuple)):
+        graph_modified = True
+    output_node.args = (tuple(outputs),)
 
     if graph_modified:
         partitioned_module.graph.lint()
+        partitioned_module.recompile()
+
+    # Ensure the final module's own forward() unflattens its result back to
+    # the user's original return shape (e.g. a bare tensor instead of a
+    # 1-tuple). complex_decomposition_adapter's make_fx retrace produces a
+    # plain (non-pytree) codegen partway through the pipeline, and that loss
+    # survives partitioning. Applied here -- after partitioning and boundary
+    # adapter insertion, once the module's true final leaf count is settled
+    # -- because setting it earlier (on the pre-partition graph) mismatches
+    # the leaf count at that intermediate stage and crashes on unflatten.
+    in_spec = getattr(gm, "_in_spec", None)
+    out_spec = getattr(gm, "_out_spec", None)
+    if in_spec is not None and out_spec is not None:
+        orig_args = [
+            node.name
+            for node in partitioned_module.graph.nodes
+            if node.op == "placeholder"
+        ]
+        partitioned_module.graph._codegen = _PyTreeCodeGen(
+            _PyTreeInfo(orig_args, in_spec, out_spec)
+        )
         partitioned_module.recompile()
 
 
@@ -1478,7 +1534,10 @@ def compile_module(
     if not settings.dryrun:
         output_node = list(partitioned_module.graph.nodes)[-1]
         for arg in output_node.args:
-            for output in arg:
+            # A single-output graph's output node arg is a bare Node rather
+            # than a tuple/list of Nodes.
+            outputs = arg if isinstance(arg, (list, tuple)) else [arg]
+            for output in outputs:
                 target = output.target
                 if "_run_on_acc" not in str(target):
                     continue
@@ -1685,6 +1744,7 @@ def convert_exported_program_to_serialized_trt_engine(
     dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    use_complex_decomposition: bool = _defaults.USE_COMPLEX_DECOMPOSITION,
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
@@ -1715,6 +1775,9 @@ def convert_exported_program_to_serialized_trt_engine(
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
+    disabled_constant_fold_exclusions: Collection[
+        str
+    ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     lift_mutable_buffers: bool = False,
     arg_input_binding_names: Any = None,
@@ -1777,6 +1840,7 @@ def convert_exported_program_to_serialized_trt_engine(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_double (bool): Truncate weights provided in double (float64) to float32
+        use_complex_decomposition (bool): Use PyTorch's upstream complex decomposition (requires torch>=2.14) instead of the legacy hand-rolled complex rewriter. Falls back to the legacy pass when unavailable.
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
@@ -1813,6 +1877,11 @@ def convert_exported_program_to_serialized_trt_engine(
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
             the final output back to FP16.
+        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
+            Torch-TensorRT rules to disable. Rules are registered by lowering
+            implementations and enabled by default; compilation users do not
+            need to register them. Disabling a rule makes its matching nodes
+            foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:
@@ -1917,7 +1986,7 @@ def convert_exported_program_to_serialized_trt_engine(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    arg_inputs = inputs or arg_inputs
+    arg_inputs = inputs if inputs is not None else arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
@@ -1951,6 +2020,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "truncate_double": truncate_double,
+        "use_complex_decomposition": use_complex_decomposition,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
         "enable_experimental_decompositions": enable_experimental_decompositions,
@@ -1978,6 +2048,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "offload_module_to_cpu": offload_module_to_cpu,
         "use_distributed_mode_trace": use_distributed_mode_trace,
         "decompose_attention": decompose_attention,
+        "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
     }
 

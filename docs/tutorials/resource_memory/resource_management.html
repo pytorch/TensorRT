@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -663,7 +663,7 @@ large models (LLMs, diffusion models) that exceed available VRAM.</p>
 <p><strong>Enable during compilation:</strong></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
-    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">enable_weight_streaming</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
@@ -685,10 +685,10 @@ streaming from CPU:</p>
 <p><strong>Query available budget information:</strong></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">weight_streaming</span><span class="p">(</span><span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">ctx</span><span class="p">:</span>
     <span class="c1"># Total streamable bytes across all TRT submodules</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total streamable: </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">total_device_budget</span><span class="si">}</span><span class="s2"> bytes&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total streamable: </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">total_device_budget</span><span class="si">}</span><span class="s2"> bytes"</span><span class="p">)</span>
     <span class="c1"># Automatically selected optimal budget</span>
     <span class="n">auto_budget</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_automatic_weight_streaming_budget</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Auto budget: </span><span class="si">{</span><span class="n">auto_budget</span><span class="si">}</span><span class="s2"> bytes&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Auto budget: </span><span class="si">{</span><span class="n">auto_budget</span><span class="si">}</span><span class="s2"> bytes"</span><span class="p">)</span>
     <span class="n">ctx</span><span class="o">.</span><span class="n">device_budget</span> <span class="o">=</span> <span class="n">auto_budget</span>
     <span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
@@ -711,7 +711,7 @@ and freed per forward call rather than held for the module lifetime.</p>
 the cost of slightly higher per-call latency:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResourceAllocationStrategy</span>
 
-<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="k">with</span> <span class="n">ResourceAllocationStrategy</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="n">dynamically_allocate_resources</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
     <span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -524,7 +524,7 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">user_output_count</span><span class="p">(</span>
     <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">aliased_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Derive the boundary between user-visible outputs and side-effect</span>
+<span class="w">    </span><span class="sd">"""Derive the boundary between user-visible outputs and side-effect</span>
 <span class="sd">    aliased outputs.</span>
 
 <span class="sd">    By convention the TRTInterpreter appends side-effect aliased outputs</span>
@@ -536,7 +536,7 @@ document.write(`
 <span class="sd">    Returns ``len(output_binding_names)`` if no outputs are aliased OR</span>
 <span class="sd">    if every output is aliased (in which case we conservatively treat</span>
 <span class="sd">    them all as user-returned — a pure-side-effect engine is degenerate).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">aliased_io</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_binding_names</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">output_binding_names</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
@@ -546,30 +546,30 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">serialize_aliased_io</span><span class="p">(</span><span class="n">aliased_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Encode aliased_io to ``output@input@kind`` records joined by ``%``.</span>
+<span class="w">    </span><span class="sd">"""Encode aliased_io to ``output@input@kind`` records joined by ``%``.</span>
 
 <span class="sd">    Mirrors ``serialize_aliased_io`` in ``core/runtime/runtime_utils.cpp``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">aliased_io</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">""</span>
     <span class="n">parts</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">out_name</span><span class="p">,</span> <span class="p">(</span><span class="n">in_name</span><span class="p">,</span> <span class="n">kind</span><span class="p">)</span> <span class="ow">in</span> <span class="n">aliased_io</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">out_name</span><span class="si">}{</span><span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="si">}{</span><span class="n">in_name</span><span class="si">}</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="si">}{</span><span class="n">kind</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_name</span><span class="si">}{</span><span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="si">}{</span><span class="n">in_name</span><span class="si">}</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="si">}{</span><span class="n">kind</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">SERIALIZED_ALIASED_IO_RECORD_DELIM</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">))</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">deserialize_aliased_io</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode the wire format produced by :func:`serialize_aliased_io`.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Decode the wire format produced by :func:`serialize_aliased_io`."""</span>
     <span class="n">out</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">out</span>
     <span class="k">for</span> <span class="n">rec</span> <span class="ow">in</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">SERIALIZED_ALIASED_IO_RECORD_DELIM</span><span class="p">):</span>
         <span class="n">fields</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">SERIALIZED_ALIASED_IO_FIELD_DELIM</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Skipping malformed aliased_io record: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">rec</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">"Skipping malformed aliased_io record: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">rec</span><span class="p">)</span>
             <span class="k">continue</span>
         <span class="n">out_name</span><span class="p">,</span> <span class="n">in_name</span><span class="p">,</span> <span class="n">kind</span> <span class="o">=</span> <span class="n">fields</span>
         <span class="n">out</span><span class="p">[</span><span class="n">out_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">in_name</span><span class="p">,</span> <span class="n">kind</span><span class="p">)</span>
@@ -579,7 +579,7 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">TorchTensorRTModule</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;``nn.Module`` that runs a TensorRT engine inside PyTorch.</span>
+<span class="w">    </span><span class="sd">"""``nn.Module`` that runs a TensorRT engine inside PyTorch.</span>
 
 <span class="sd">    When the C++ Torch-TensorRT runtime is available, execution uses</span>
 <span class="sd">    ``torch.classes.tensorrt.Engine`` and ``torch.ops.tensorrt.execute_engine``.</span>
@@ -588,7 +588,7 @@ document.write(`
 <span class="sd">    compiled graph works with either runtime transparently.</span>
 
 <span class="sd">    Supports ``torch.save`` / ``torch.load`` via ``get_extra_state`` / ``set_extra_state``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="TorchTensorRTModule.__init__">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.__init__">[docs]</a>
@@ -598,14 +598,14 @@ document.write(`
         <span class="n">input_binding_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
-        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span>
         <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
         <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">requires_native_multidevice</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">aliased_io</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
+<span class="w">        </span><span class="sd">"""Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines</span>
 
 <span class="sd">        If binding names are not provided, it is assumed that the engine binding names follow the following convention:</span>
@@ -635,9 +635,9 @@ document.write(`
 
 <span class="sd">                trt_module = TorchTensorRTModule(</span>
 <span class="sd">                    engine_str,</span>
-<span class="sd">                    input_binding_names=[&quot;x&quot;],</span>
-<span class="sd">                    output_binding_names=[&quot;output&quot;],</span>
-<span class="sd">                    name=&quot;my_module&quot;,</span>
+<span class="sd">                    input_binding_names=["x"],</span>
+<span class="sd">                    output_binding_names=["output"],</span>
+<span class="sd">                    name="my_module",</span>
 <span class="sd">                    settings=CompilationSettings(device=torch.cuda.current_device)</span>
 <span class="sd">                )</span>
 
@@ -649,7 +649,7 @@ document.write(`
 <span class="sd">            settings: Compilation/runtime settings (device, lazy init, cross-compile, etc.).</span>
 <span class="sd">            requires_output_allocator: Engine needs TRT dynamic output allocation.</span>
 <span class="sd">            symbolic_shape_expressions: Optional symbolic shape metadata from compile.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span> <span class="o">=</span> <span class="p">(</span>
@@ -692,7 +692,7 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;TorchTensorRTModule&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">"TorchTensorRTModule"</span><span class="p">:</span>
         <span class="c1"># The C++ TRTEngine is not safely deep-copyable for distributed (NCCL)</span>
         <span class="c1"># engines — creating a new execution context during copy can crash at</span>
         <span class="c1"># destruction time.  Since the exporter only reads the engine (never</span>
@@ -701,17 +701,17 @@ document.write(`
         <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
         <span class="n">memo</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)]</span> <span class="o">=</span> <span class="n">result</span>
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">&quot;engine&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">"engine"</span><span class="p">:</span>
                 <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>  <span class="c1"># shallow: reuse the same C++ Engine</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">memo</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">result</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_target_device</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resolve the engine&#39;s target CUDA device from compilation settings.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Resolve the engine's target CUDA device from compilation settings."""</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">gpu_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cuda:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">gpu_id</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cuda:</span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_pack_engine_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]:</span>
         <span class="n">target_device</span> <span class="o">=</span> <span class="p">(</span>
@@ -720,22 +720,22 @@ document.write(`
             <span class="k">else</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span>
         <span class="p">)</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span>
-            <span class="s2">&quot;inout_symexprs&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span><span class="p">,</span>
-            <span class="s2">&quot;output_tensors_are_unowned&quot;</span><span class="p">:</span> <span class="p">(</span>
+            <span class="s2">"settings"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span>
+            <span class="s2">"inout_symexprs"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span><span class="p">,</span>
+            <span class="s2">"output_tensors_are_unowned"</span><span class="p">:</span> <span class="p">(</span>
                 <span class="kc">False</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span>
                 <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">are_output_tensors_unowned</span><span class="p">()</span>
             <span class="p">),</span>
         <span class="p">}</span>
-        <span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">SERIALIZATION_LEN</span>
+        <span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">""</span><span class="p">]</span> <span class="o">*</span> <span class="n">SERIALIZATION_LEN</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">ABI_TARGET_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ABI_VERSION</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span>
             <span class="k">else</span> <span class="n">ABI_VERSION</span>
         <span class="p">)</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">NAME_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_engine&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span> <span class="k">else</span> <span class="s2">&quot;tensorrt_engine&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">"_engine"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">""</span> <span class="k">else</span> <span class="s2">"tensorrt_engine"</span>
         <span class="p">)</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">DEVICE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">target_device</span><span class="o">.</span><span class="n">_to_serialized_rt_device</span><span class="p">()</span>
@@ -761,7 +761,7 @@ document.write(`
             <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="p">)</span>
         <span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;PROVIDED RESOURCE ALLOCATION STRATEGY: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"PROVIDED RESOURCE ALLOCATION STRATEGY: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">RESOURCE_ALLOCATION_STRATEGY_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
             <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span><span class="p">)</span>
@@ -771,20 +771,20 @@ document.write(`
         <span class="p">)</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">serialize_aliased_io</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">)</span>
         <span class="c1"># rank/world_size are runtime facts; queried from ProcessGroup at execution time.</span>
-        <span class="c1"># RuntimeSettings are intentionally NOT serialized: they&#39;re per-engine, in-memory</span>
-        <span class="c1"># init values, not part of the engine&#39;s identity (see pytorch/TensorRT#4310).</span>
+        <span class="c1"># RuntimeSettings are intentionally NOT serialized: they're per-engine, in-memory</span>
+        <span class="c1"># init values, not part of the engine's identity (see pytorch/TensorRT#4310).</span>
         <span class="k">return</span> <span class="n">engine_info</span>
 
 <div class="viewcode-block" id="TorchTensorRTModule.get_engine">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.get_engine">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the underlying engine, raising if it has not been set up.</span>
+<span class="w">        </span><span class="sd">"""Return the underlying engine, raising if it has not been set up.</span>
 
 <span class="sd">        Used by every engine-accessing method except the hot ``forward`` path,</span>
 <span class="sd">        which intentionally skips the check to avoid per-call overhead.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Engine has not been setup yet.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Engine has not been setup yet."</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span></div>
 
 
@@ -803,10 +803,10 @@ document.write(`
             <span class="n">budget_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_streamable_device_memory_budget</span><span class="p">()</span>
         <span class="n">engine</span><span class="o">.</span><span class="n">device_memory_budget</span> <span class="o">=</span> <span class="n">budget_bytes</span>
         <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">device_memory_budget</span> <span class="o">!=</span> <span class="n">budget_bytes</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to set weight streaming budget to </span><span class="si">{</span><span class="n">budget_bytes</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to set weight streaming budget to </span><span class="si">{</span><span class="n">budget_bytes</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="n">budget_bytes</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">device_memory_budget</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_streamable_device_memory_budget</span><span class="p">()</span> <span class="o">==</span> <span class="n">budget_bytes</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Weight streaming is disabled&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">"Weight streaming is disabled"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">budget_bytes</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_reset_captured_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -824,12 +824,12 @@ document.write(`
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">runtime_settings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeSettings</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The current ``RuntimeSettings``. Snapshot used by ``runtime_config`` CM enter/exit.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The current ``RuntimeSettings``. Snapshot used by ``runtime_config`` CM enter/exit."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span>
 
     <span class="nd">@runtime_settings</span><span class="o">.</span><span class="n">setter</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">runtime_settings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply ``RuntimeSettings`` to this engine (or stash for ``setup_engine``).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Apply ``RuntimeSettings`` to this engine (or stash for ``setup_engine``)."""</span>
         <span class="c1"># 1. Normalize: path-string -&gt; managed handle; everything else passes through.</span>
         <span class="n">rs_resolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_runtime_cache</span><span class="p">(</span><span class="n">rs</span><span class="p">)</span>
         <span class="c1"># 2. Push to the engine if it exists; if not we stash for later.</span>
@@ -839,18 +839,18 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span> <span class="o">=</span> <span class="n">rs_resolved</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeSettings</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Normalize ``rs.runtime_cache`` to ``None`` | ``RuntimeCache`` (never a path str).</span>
+<span class="w">        </span><span class="sd">"""Normalize ``rs.runtime_cache`` to ``None`` | ``RuntimeCache`` (never a path str).</span>
 
 <span class="sd">        Manages the ``_implicit_cache_handle`` slot as a side effect: builds a</span>
 <span class="sd">        fresh wrapper for a new path, reuses the existing one for the same</span>
 <span class="sd">        path, releases it (with save-on-swap) for non-path inputs.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeCache</span>
 
         <span class="n">rc</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">runtime_cache</span>
 
         <span class="c1"># Branch 1: not a non-empty path string (None / empty / handle / torchbind).</span>
-        <span class="c1"># Caller owns the handle&#39;s lifecycle -- release ours, pass rs through.</span>
+        <span class="c1"># Caller owns the handle's lifecycle -- release ours, pass rs through.</span>
         <span class="c1"># Guard: if ``rc`` IS our managed wrapper (e.g. setup_engine re-applying</span>
         <span class="c1"># a resolved rs), this is a no-op self-passback, not a release.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">rc</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">rc</span><span class="p">):</span>
@@ -876,36 +876,36 @@ document.write(`
             <span class="n">new</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Failed to warm-load implicit runtime cache from </span><span class="si">{</span><span class="n">rc</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">"Failed to warm-load implicit runtime cache from </span><span class="si">{</span><span class="n">rc</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_managed_handle</span><span class="p">(</span><span class="n">new</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">rs</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">new</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_set_managed_handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Install ``new`` as the implicit handle; save the prior wrapper if displaced.</span>
+<span class="w">        </span><span class="sd">"""Install ``new`` as the implicit handle; save the prior wrapper if displaced.</span>
 
 <span class="sd">        Save errors are swallowed (logged) so a transient disk failure during</span>
-<span class="sd">        a settings swap can&#39;t crash the user&#39;s assignment.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        a settings swap can't crash the user's assignment.</span>
+<span class="sd">        """</span>
         <span class="n">old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span>
         <span class="k">if</span> <span class="n">old</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">old</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">new</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">old</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Failed to save prior implicit runtime cache on swap: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Failed to save prior implicit runtime cache on swap: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span> <span class="o">=</span> <span class="n">new</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_wrapper_still_attached</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">w</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Is ``w`` reusable for the current runtime? Python rt always</span>
+<span class="w">        </span><span class="sd">"""Is ``w`` reusable for the current runtime? Python rt always</span>
 <span class="sd">        accepts; cpp rt needs the torchbind sibling live (else the cpp</span>
 <span class="sd">        engine has no way to hold the same underlying ``IRuntimeCache``).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span> <span class="ow">or</span> <span class="n">w</span><span class="o">.</span><span class="n">is_cpp_runtime</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_send_to_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Push ``rs`` to whichever engine flavor is attached.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Push ``rs`` to whichever engine flavor is attached."""</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">_to_torchbind_handle</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -929,14 +929,14 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule.setup_engine">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.setup_engine">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">setup_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Setup engine for a module which has deferred engine setup.</span>
 
 <span class="sd">        Will setup the TensorRT engine for this module in the case that setup has been</span>
 <span class="sd">        deferred. In the case that the engine has already been setup, will return without</span>
 <span class="sd">        changing anything. Assumes that serialized engine and settings have already been passed</span>
 <span class="sd">        to the module.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
 
@@ -980,20 +980,20 @@ document.write(`
 
             <span class="c1"># Register the C++ engine for teardown tracking so</span>
             <span class="c1"># distributed_context().__exit__ can release the NCCL comm even</span>
-            <span class="c1"># for torch.compile models where the engine lives in dynamo&#39;s</span>
-            <span class="c1"># code cache and isn&#39;t reachable via module tree walking.</span>
+            <span class="c1"># for torch.compile models where the engine lives in dynamo's</span>
+            <span class="c1"># code cache and isn't reachable via module tree walking.</span>
             <span class="n">register_md_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">encode_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metadata</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
         <span class="n">dumped_metadata</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
-        <span class="n">encoded_metadata</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">dumped_metadata</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+        <span class="n">encoded_metadata</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">dumped_metadata</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">encoded_metadata</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">decode_metadata</span><span class="p">(</span><span class="n">encoded_metadata</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-        <span class="n">dumped_metadata</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">encoded_metadata</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+        <span class="n">dumped_metadata</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">encoded_metadata</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">))</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">dumped_metadata</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">metadata</span>
 
@@ -1055,15 +1055,15 @@ document.write(`
             <span class="c1"># bytes-typed format and never updated.</span>
             <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
             <span class="n">metadata</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;inout_symexprs&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"inout_symexprs"</span><span class="p">]</span>
 
             <span class="c1"># RuntimeSettings are NOT serialized; restore defaults. Caller can</span>
             <span class="c1"># reapply via ``mod.runtime_settings = ...`` (per submodule) or a CM after load.</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">()</span>
             <span class="c1"># Mirror the settings reset on the implicit cache handle so a</span>
-            <span class="c1"># stale wrapper from prior use doesn&#39;t survive load_state_dict and</span>
-            <span class="c1"># silently write the fresh engine&#39;s cache bytes to the old path.</span>
+            <span class="c1"># stale wrapper from prior use doesn't survive load_state_dict and</span>
+            <span class="c1"># silently write the fresh engine's cache bytes to the old path.</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
@@ -1073,7 +1073,7 @@ document.write(`
                 <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">set_output_tensors_as_unowned</span><span class="p">(</span>
-                <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;output_tensors_are_unowned&quot;</span><span class="p">]</span>
+                <span class="n">metadata</span><span class="p">[</span><span class="s2">"output_tensors_are_unowned"</span><span class="p">]</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>
@@ -1088,13 +1088,13 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule.set_optimization_profile">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.set_optimization_profile">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">set_optimization_profile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profile</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Select the active TRT optimization profile for this engine.</span>
+<span class="w">        </span><span class="sd">"""Select the active TRT optimization profile for this engine.</span>
 
-<span class="sd">        ``profile`` may be a profile index (``int``), the string ``&quot;auto&quot;`` to</span>
+<span class="sd">        ``profile`` may be a profile index (``int``), the string ``"auto"`` to</span>
 <span class="sd">        enable shape-based auto-selection, or ``None`` to clear any pin / auto</span>
 <span class="sd">        setting and reset to the default profile (index 0).</span>
 <span class="sd">        See :func:`torch_tensorrt.runtime.optimization_profile`.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -1102,28 +1102,28 @@ document.write(`
         <span class="c1"># Drive the primitive engine API (set_active_profile / _auto_select_profiles)</span>
         <span class="c1"># that both the Python and C++ runtimes expose under the same names, so</span>
         <span class="c1"># this works regardless of the active runtime.</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;set_active_profile&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"set_active_profile"</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                <span class="s2">&quot;This engine does not support optimization profile selection.&quot;</span>
+                <span class="s2">"This engine does not support optimization profile selection."</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="n">profile</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">engine</span><span class="o">.</span><span class="n">_auto_select_profiles</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="n">engine</span><span class="o">.</span><span class="n">set_active_profile</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
             <span class="k">return</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">profile</span> <span class="o">==</span> <span class="s2">&quot;auto&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">profile</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">:</span>
             <span class="n">engine</span><span class="o">.</span><span class="n">_auto_select_profiles</span> <span class="o">=</span> <span class="kc">True</span>
             <span class="k">return</span>
         <span class="c1"># Validate the profile index. ``num_optimization_profiles`` is exposed by</span>
         <span class="c1"># both the Python and C++ runtimes under the same name.</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Optimization profile must be an integer index, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">"Optimization profile must be an integer index, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
         <span class="n">num_profiles</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">num_optimization_profiles</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">profile</span> <span class="o">&lt;</span> <span class="n">num_profiles</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Optimization profile index </span><span class="si">{</span><span class="n">profile</span><span class="si">}</span><span class="s2"> out of range &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;[0, </span><span class="si">{</span><span class="n">num_profiles</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="sa">f</span><span class="s2">"Optimization profile index </span><span class="si">{</span><span class="n">profile</span><span class="si">}</span><span class="s2"> out of range "</span>
+                <span class="sa">f</span><span class="s2">"[0, </span><span class="si">{</span><span class="n">num_profiles</span><span class="si">}</span><span class="s2">)"</span>
             <span class="p">)</span>
         <span class="n">engine</span><span class="o">.</span><span class="n">_auto_select_profiles</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="n">engine</span><span class="o">.</span><span class="n">set_active_profile</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span></div>
@@ -1132,15 +1132,15 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule.get_optimization_profile_state">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.get_optimization_profile_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_optimization_profile_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the engine&#39;s current ``(auto, active)`` profile state.</span>
+<span class="w">        </span><span class="sd">"""Return the engine's current ``(auto, active)`` profile state.</span>
 
 <span class="sd">        Used by the :func:`optimization_profile` context manager to save/restore</span>
 <span class="sd">        state across a ``with`` block. Returns ``None`` if unsupported.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;_active_profile_index&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"_active_profile_index"</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="n">engine</span><span class="o">.</span><span class="n">_auto_select_profiles</span><span class="p">,</span>
@@ -1153,11 +1153,11 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">restore_optimization_profile_state</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore profile state captured by :meth:`get_optimization_profile_state`.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Restore profile state captured by :meth:`get_optimization_profile_state`."""</span>
         <span class="k">if</span> <span class="n">state</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;set_active_profile&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"set_active_profile"</span><span class="p">):</span>
             <span class="k">return</span>
         <span class="n">auto</span><span class="p">,</span> <span class="n">active</span> <span class="o">=</span> <span class="n">state</span>
         <span class="n">engine</span><span class="o">.</span><span class="n">_auto_select_profiles</span> <span class="o">=</span> <span class="n">auto</span>
@@ -1165,7 +1165,7 @@ document.write(`
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Exclude per-engine, in-memory state from the pickle stream.</span>
+<span class="w">        </span><span class="sd">"""Exclude per-engine, in-memory state from the pickle stream.</span>
 
 <span class="sd">        Mirrors the ``set_extra_state`` reset so that</span>
 <span class="sd">        ``torch.save(module)`` / ``torch.load`` behaves the same way as</span>
@@ -1176,17 +1176,17 @@ document.write(`
 
 <span class="sd">        ``_implicit_cache_handle`` is dropped alongside ``_runtime_settings``</span>
 <span class="sd">        because it aliases the same ``RuntimeCache`` instance.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">get_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">&quot;__getstate__&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="sd">        """</span>
+        <span class="n">get_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">"__getstate__"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span> <span class="o">=</span> <span class="p">(</span><span class="n">get_state</span><span class="p">()</span> <span class="k">if</span> <span class="n">get_state</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;_runtime_settings&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;_implicit_cache_handle&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"_runtime_settings"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"_implicit_cache_handle"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">state</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;_runtime_settings&quot;</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">())</span>
-        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;_implicit_cache_handle&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="n">set_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">&quot;__setstate__&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_runtime_settings"</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">())</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_implicit_cache_handle"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">set_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">"__setstate__"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">set_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">set_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
@@ -1197,10 +1197,10 @@ document.write(`
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">pre_allocated_outputs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pre-allocated output tensors currently held by the underlying engine.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Pre-allocated output tensors currently held by the underlying engine."""</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[]</span>
-        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;pre_allocated_outputs&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"pre_allocated_outputs"</span><span class="p">,</span> <span class="p">[])</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">set_use_output_allocator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">get_engine</span><span class="p">()</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span> <span class="o">=</span> <span class="n">enable</span>
@@ -1208,18 +1208,18 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule.forward">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.forward">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the TensorRT engine on GPU tensors (non-tensor args are cast to CUDA tensors).</span>
+<span class="w">        </span><span class="sd">"""Run the TensorRT engine on GPU tensors (non-tensor args are cast to CUDA tensors).</span>
 
 <span class="sd">        Note: callers are responsible for ensuring the engine has been set up;</span>
 <span class="sd">        the hot path intentionally omits a ``self.engine is None`` guard so</span>
 <span class="sd">        that a properly-bound module avoids the per-call attribute check.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_device</span>
         <span class="n">binding_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span>
         <span class="c1"># len-check inlined (cheaper than keeping an f-string around the hot path)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">binding_names</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Wrong number of inputs, expected </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">binding_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="sa">f</span><span class="s2">"Wrong number of inputs, expected </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">binding_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
             <span class="p">)</span>
 
         <span class="c1"># If the inputs are not Torch Tensors, which can occur in scenarios such as shape tensors</span>
@@ -1232,9 +1232,9 @@ document.write(`
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">i</span><span class="o">.</span><span class="n">is_cuda</span><span class="p">:</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                        <span class="s2">&quot;Input tensor is not on a CUDA device. Moving it to CUDA automatically. &quot;</span>
-                        <span class="s2">&quot;For best performance, ensure all inputs are on the correct CUDA device &quot;</span>
-                        <span class="s2">&quot;before calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device)).&quot;</span>
+                        <span class="s2">"Input tensor is not on a CUDA device. Moving it to CUDA automatically. "</span>
+                        <span class="s2">"For best performance, ensure all inputs are on the correct CUDA device "</span>
+                        <span class="s2">"before calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device))."</span>
                     <span class="p">)</span>
                     <span class="n">i</span> <span class="o">=</span> <span class="n">i</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
                 <span class="n">input_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
@@ -1245,7 +1245,7 @@ document.write(`
             <span class="nb">list</span><span class="p">(</span><span class="n">input_tensors</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span>
         <span class="p">)</span>
 
-        <span class="c1"># The interpreter may have appended extra &quot;side-effect&quot; outputs to</span>
+        <span class="c1"># The interpreter may have appended extra "side-effect" outputs to</span>
         <span class="c1"># satisfy the network-output requirement of aliased layers (e.g.</span>
         <span class="c1"># IKVCacheUpdateLayer). Truncate to the user-facing count; mutation</span>
         <span class="c1"># effects are visible on the corresponding input tensors. The</span>
@@ -1271,16 +1271,16 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">enable_profiling</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">profiling_results_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">profile_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;perfetto&quot;</span><span class="p">,</span>
+        <span class="n">profile_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"perfetto"</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Enable engine profiling (optional path prefix and format for tracing output).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Enable engine profiling (optional path prefix and format for tracing output)."""</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_engine</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="n">profiling_results_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">engine</span><span class="o">.</span><span class="n">profile_path_prefix</span> <span class="o">=</span> <span class="n">profiling_results_dir</span>
 
         <span class="n">engine</span><span class="o">.</span><span class="n">enable_profiling</span><span class="p">()</span>
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;set_profile_format&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"set_profile_format"</span><span class="p">):</span>
             <span class="n">engine</span><span class="o">.</span><span class="n">set_profile_format</span><span class="p">(</span><span class="n">profile_format</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span> <span class="o">=</span> <span class="kc">True</span></div>
 
@@ -1294,7 +1294,7 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule.disable_profiling">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.disable_profiling">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">disable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Disable engine profiling and clear the profiling flag on this module.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Disable engine profiling and clear the profiling flag on this module."""</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_engine</span><span class="p">()</span>
         <span class="n">engine</span><span class="o">.</span><span class="n">disable_profiling</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span> <span class="o">=</span> <span class="kc">False</span></div>
@@ -1303,12 +1303,12 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule.get_layer_info">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.get_layer_info">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_layer_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a JSON string containing the layer information encoded by the TensorRT engine in this module</span>
+<span class="w">        </span><span class="sd">"""Get a JSON string containing the layer information encoded by the TensorRT engine in this module</span>
 
 <span class="sd">        Returns:</span>
 
 <span class="sd">            str: A JSON string which contains the layer information of the engine incapsulated in this module</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">layer_info</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_engine</span><span class="p">()</span><span class="o">.</span><span class="n">get_engine_layer_info</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">layer_info</span></div>
 
@@ -1316,7 +1316,7 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule.dump_layer_info">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.dump_layer_info">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">dump_layer_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump layer information encoded by the TensorRT engine in this module to STDOUT&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Dump layer information encoded by the TensorRT engine in this module to STDOUT"""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">get_engine</span><span class="p">()</span><span class="o">.</span><span class="n">dump_engine_layer_info</span><span class="p">()</span></div>
 </div>
 

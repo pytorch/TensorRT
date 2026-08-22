@@ -1,0 +1,78 @@
+
+.. _file_cpp_api_include_trtorch_trtorch.h:
+
+File trtorch.h
+==============
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp_api_include_trtorch>` (``cpp/api/include/trtorch``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+Definition (``cpp/api/include/trtorch/trtorch.h``)
+--------------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+
+   program_listing_file_cpp_api_include_trtorch_trtorch.h.rst
+
+
+
+
+
+Includes
+--------
+
+
+- ``memory``
+
+- ``string``
+
+- ``trtorch/macros.h`` (:ref:`file_cpp_api_include_trtorch_macros.h`)
+
+- ``vector``
+
+
+
+
+
+
+Namespaces
+----------
+
+
+- :ref:`namespace_trtorch`
+
+
+Classes
+-------
+
+
+- :ref:`exhale_struct_structtrtorch_1_1ExtraInfo`
+
+- :ref:`exhale_struct_structtrtorch_1_1ExtraInfo_1_1InputRange`
+
+- :ref:`exhale_class_classtrtorch_1_1ExtraInfo_1_1DataType`
+
+- :ref:`exhale_class_classtrtorch_1_1ExtraInfo_1_1DeviceType`
+
+
+Functions
+---------
+
+
+- :ref:`exhale_function_trtorch_8h_1ab01696cfe08b6a5293c55935a9713c25`
+
+- :ref:`exhale_function_trtorch_8h_1ae38897d1ca4438227c970029d0f76fb5`
+
+- :ref:`exhale_function_trtorch_8h_1a536bba54b70e44554099d23fa3d7e804`
+
+- :ref:`exhale_function_trtorch_8h_1a726f6e7091b6b7be45b5a4275b2ffb10`
+
+- :ref:`exhale_function_trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447`
+

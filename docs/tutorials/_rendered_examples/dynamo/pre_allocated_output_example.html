@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -672,20 +672,20 @@ from transformers import BertModel
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load bert model
 model = (
-    BertModel.from_pretrained(&quot;bert-base-uncased&quot;, torchscript=True)
-    .to(&quot;cuda&quot;)
+    BertModel.from_pretrained("bert-base-uncased", torchscript=True)
+    .to("cuda")
     .half()
     .eval()
 )
 # Define sample inputs
 inputs = [
-    torch.randint(0, 5, (1, 128), dtype=torch.int32).to(&quot;cuda&quot;),
-    torch.randint(0, 5, (1, 128), dtype=torch.int32).to(&quot;cuda&quot;),
+    torch.randint(0, 5, (1, 128), dtype=torch.int32).to("cuda"),
+    torch.randint(0, 5, (1, 128), dtype=torch.int32).to("cuda"),
 ]
 # Next, we compile the model using torch_tensorrt.compile
 optimized_model = torch_tensorrt.compile(
     model,
-    ir=&quot;dynamo&quot;,
+    ir="dynamo",
     inputs=inputs,
 )
 </pre></div>
@@ -720,8 +720,8 @@ with torch.no_grad():
     time_opt_ms = time_opt * 1000
     time_normal_ms = time_normal * 1000
 
-    print(f&quot;normal trt model time: {time_normal_ms:.3f} ms&quot;)
-    print(f&quot;pre-allocated output buffer model time: {time_opt_ms:.3f} ms&quot;)
+    print(f"normal trt model time: {time_normal_ms:.3f} ms")
+    print(f"pre-allocated output buffer model time: {time_opt_ms:.3f} ms")
 </pre></div>
 </div>
 </div>

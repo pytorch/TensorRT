@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -621,7 +621,7 @@ from torch_tensorrt.dynamo import refit_module_weights
 
 np.random.seed(0)
 torch.manual_seed(0)
-inputs = [torch.rand((1, 3, 224, 224)).to(&quot;cuda&quot;)]
+inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 </pre></div>
 </div>
 </div>
@@ -635,7 +635,7 @@ inputs = [torch.rand((1, 3, 224, 224)).to(&quot;cuda&quot;)]
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model = models.resnet18(pretrained=False).to(&quot;cuda&quot;).eval()
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model = models.resnet18(pretrained=False).to("cuda").eval()
 exp_program = torch.export.export(model, tuple(inputs))
 workspace_size = 20 &lt;&lt; 30
 min_block_size = 0
@@ -650,7 +650,7 @@ trt_gm = torch_trt.dynamo.compile(
 )  # Output is a torch.fx.GraphModule
 
 # Save the graph module as an exported program
-torch_trt.save(trt_gm, &quot;./compiled.ep&quot;, inputs=inputs)
+torch_trt.save(trt_gm, "./compiled.ep", inputs=inputs)
 </pre></div>
 </div>
 </div>
@@ -663,11 +663,11 @@ torch_trt.save(trt_gm, &quot;./compiled.ep&quot;, inputs=inputs)
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Create and compile the updated model
-model2 = models.resnet18(pretrained=True).to(&quot;cuda&quot;).eval()
+model2 = models.resnet18(pretrained=True).to("cuda").eval()
 exp_program2 = torch.export.export(model2, tuple(inputs))
 
 
-compiled_trt_ep = torch_trt.load(&quot;./compiled.ep&quot;)
+compiled_trt_ep = torch_trt.load("./compiled.ep")
 
 # This returns a new module with updated weights
 new_trt_gm = refit_module_weights(
@@ -685,9 +685,9 @@ with torch.no_grad():
     for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
         assert torch.allclose(
             expected_output, refitted_output, 1e-2, 1e-2
-        ), &quot;Refit Result is not correct. Refit failed&quot;
+        ), "Refit Result is not correct. Refit failed"
 
-print(&quot;Refit successfully!&quot;)
+print("Refit successfully!")
 </pre></div>
 </div>
 </div>

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -560,12 +560,12 @@ module contains TRT engine subgraphs.</p></li>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">example_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">),)</span>
+<span class="n">example_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">"cuda"</span><span class="p">),)</span>
 
 <span class="c1"># Step 1 — export with optional dynamic shapes</span>
-<span class="n">batch_dim</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+<span class="n">batch_dim</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"batch"</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
 <span class="n">exported</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span> <span class="n">example_inputs</span><span class="p">,</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">batch_dim</span><span class="p">}}</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">example_inputs</span><span class="p">,</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">batch_dim</span><span class="p">}}</span>
 <span class="p">)</span>
 
 <span class="c1"># Step 2 — compile with Torch-TensorRT</span>
@@ -585,8 +585,8 @@ module contains TRT engine subgraphs.</p></li>
 <span class="c1"># Step 3 — package into a .pt2 file</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
     <span class="n">trt_gm</span><span class="p">,</span>
-    <span class="s2">&quot;model.pt2&quot;</span><span class="p">,</span>
-    <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;aot_inductor&quot;</span><span class="p">,</span>
+    <span class="s2">"model.pt2"</span><span class="p">,</span>
+    <span class="n">output_format</span><span class="o">=</span><span class="s2">"aot_inductor"</span><span class="p">,</span>
     <span class="n">retrace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">,</span>
 <span class="p">)</span>
@@ -602,11 +602,11 @@ ops that fell back to PyTorch.</p>
 is needed at inference time:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_inductor</span><span class="o">.</span><span class="n">aoti_load_package</span><span class="p">(</span><span class="s2">&quot;model.pt2&quot;</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_inductor</span><span class="o">.</span><span class="n">aoti_load_package</span><span class="p">(</span><span class="s2">"model.pt2"</span><span class="p">)</span>
 
 <span class="c1"># Works with any batch size within the compiled range</span>
-<span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span>
-<span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">"cuda"</span><span class="p">))</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">"cuda"</span><span class="p">))</span>
 </pre></div>
 </div>
 </section>
@@ -615,13 +615,13 @@ is needed at inference time:</p>
 <h2>C++ Inference<a class="headerlink" href="#c-inference" title="Link to this heading">#</a></h2>
 <p>The same <code class="docutils literal notranslate"><span class="pre">.pt2</span></code> package runs in C++ via <code class="docutils literal notranslate"><span class="pre">AOTIModelPackageLoader</span></code>, with no Python
 or Torch-TensorRT dependency:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/torch.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/csrc/inductor/aoti_package/model_package_loader.h&quot;</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/torch.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/csrc/inductor/aoti_package/model_package_loader.h"</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">c10</span><span class="o">::</span><span class="n">InferenceMode</span><span class="w"> </span><span class="n">mode</span><span class="p">;</span>
 
-<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">inductor</span><span class="o">::</span><span class="n">AOTIModelPackageLoader</span><span class="w"> </span><span class="n">loader</span><span class="p">(</span><span class="s">&quot;model.pt2&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">inductor</span><span class="o">::</span><span class="n">AOTIModelPackageLoader</span><span class="w"> </span><span class="n">loader</span><span class="p">(</span><span class="s">"model.pt2"</span><span class="p">);</span>
 
 <span class="w">    </span><span class="c1">// Batch size 8</span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">},</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">)};</span>

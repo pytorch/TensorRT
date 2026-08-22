@@ -1,0 +1,60 @@
+
+.. _file_cpp_include_trtorch_macros.h:
+
+File macros.h
+=============
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp_include_trtorch>` (``cpp/include/trtorch``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+Definition (``cpp/include/trtorch/macros.h``)
+---------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+
+   program_listing_file_cpp_include_trtorch_macros.h.rst
+
+
+
+
+
+
+
+Included By
+-----------
+
+
+- :ref:`file_cpp_include_trtorch_logging.h`
+
+- :ref:`file_cpp_include_trtorch_trtorch.h`
+
+
+
+
+Defines
+-------
+
+
+- :ref:`exhale_define_macros_8h_1a18d295a837ac71add5578860b55e5502`
+
+- :ref:`exhale_define_macros_8h_1a20c1fbeb21757871c52299dc52351b5f`
+
+- :ref:`exhale_define_macros_8h_1a25ee153c325dfc7466a33cbd5c1ff055`
+
+- :ref:`exhale_define_macros_8h_1a48d6029a45583a06848891cb0e86f7ba`
+
+- :ref:`exhale_define_macros_8h_1ae1c56ab8a40af292a9a4964651524d84`
+
+- :ref:`exhale_define_macros_8h_1a71b02dddfabe869498ad5a88e11c440f`
+
+- :ref:`exhale_define_macros_8h_1a9d31d0569348d109b1b069b972dd143e`
+
+- :ref:`exhale_define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da`
+

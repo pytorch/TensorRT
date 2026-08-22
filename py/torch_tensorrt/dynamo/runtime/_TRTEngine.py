@@ -1341,12 +1341,15 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 engine_stream.wait_stream(caller_stream)
             with torch.cuda.stream(engine_stream):
                 if self.resource_allocation_strategy:
+                    workspace_bytes = self.cuda_engine.device_memory_size_v2
                     self._dynamic_workspace = torch.empty(
-                        self.cuda_engine.device_memory_size_v2,
+                        workspace_bytes,
                         dtype=torch.uint8,
                         device=torch.cuda.current_device(),
                     )
-                    self.context.set_device_memory(self._dynamic_workspace.data_ptr())
+                    self.context.set_device_memory(
+                        self._dynamic_workspace.data_ptr(), workspace_bytes
+                    )
 
                 if effective_cudagraphs:
                     if need_cudagraphs_record:

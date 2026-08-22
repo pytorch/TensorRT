@@ -24,6 +24,8 @@ Classes
 -------
 
 
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding`
+
 - :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle`
 
 - :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds`
@@ -32,11 +34,18 @@ Classes
 
 - :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter`
 
-- :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard`
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1WsBudget`
 
 - :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend`
 
 - :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger`
+
+
+Functions
+---------
+
+
+- :ref:`exhale_function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40`
 
 
 Typedefs
@@ -44,3 +53,10 @@ Typedefs
 
 
 - :ref:`exhale_typedef_TensorRTBackend_8h_1acdb398aaccae05cc399de3a885797c13`
+
+
+Variables
+---------
+
+
+- :ref:`exhale_variable_WeightStreamingBudget_8h_1ad1ed7a6ead3130000477ab49482906ff`

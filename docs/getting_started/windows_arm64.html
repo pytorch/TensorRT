@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -540,7 +540,7 @@ ARM64 as the target architecture.</p>
 interpreter:</p>
 <div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>C<span class="p">:</span><span class="nl">\path\to\arm64-python\python.exe</span><span class="c1"> -m venv .venv</span>
 <span class="k">call</span> .venv\Scripts\activate.bat
-python -c <span class="s2">&quot;import platform; print(platform.machine())&quot;</span>
+python -c <span class="s2">"import platform; print(platform.machine())"</span>
 </pre></div>
 </div>
 <p>The last command must print <code class="docutils literal notranslate"><span class="pre">ARM64</span></code>. Install the compatible ARM64 PyTorch
@@ -548,8 +548,8 @@ wheel and the prerequisite packages listed above in this environment.</p>
 </li>
 <li><p>Configure CUDA and tell setuptools to reuse the active Visual Studio
 environment:</p>
-<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">set</span> <span class="s2">&quot;CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4&quot;</span>
-<span class="k">set</span> <span class="s2">&quot;CUDA_HOME=</span><span class="nv">%CUDA_PATH%</span><span class="s2">&quot;</span>
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">set</span> <span class="s2">"CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4"</span>
+<span class="k">set</span> <span class="s2">"CUDA_HOME=</span><span class="nv">%CUDA_PATH%</span><span class="s2">"</span>
 <span class="k">set</span> <span class="nv">DISTUTILS_USE_SDK</span><span class="p">=</span>1
 </pre></div>
 </div>
@@ -559,7 +559,7 @@ environment:</p>
 python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
 
 # Install the Windows ARM64 PyTorch 2.14 nightly.
-python -m pip install --pre <span class="s2">&quot;torch&gt;=2.14.0.dev,&lt;2.15.0&quot;</span> --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
+python -m pip install --pre <span class="s2">"torch&gt;=2.14.0.dev,&lt;2.15.0"</span> --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
 
 # build the native windows on arm TensorRT-RTX wheel
 python setup.py bdist_wheel --use-rtx
@@ -572,7 +572,7 @@ Windows ARM64 Bazel platform, and produces a wheel tagged
 <li><p>Confirm the wheel tag and test it in the ARM64 environment:</p>
 <div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">dir</span> dist\*win_arm64.whl
 python -m pip install C:\path\to\the\generated-win_arm64.whl
-python -c <span class="s2">&quot;import torch_tensorrt; print(torch_tensorrt.__version__)&quot;</span>
+python -c <span class="s2">"import torch_tensorrt; print(torch_tensorrt.__version__)"</span>
 </pre></div>
 </div>
 </li>
@@ -588,7 +588,7 @@ and the resulting Torch-TensorRT wheel target CPython 3.13.</p>
 <ol class="arabic">
 <li><p>Open an x64-to-ARM64 Visual Studio 2022 cross-tools prompt, or initialize
 one from <code class="docutils literal notranslate"><span class="pre">cmd.exe</span></code>:</p>
-<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">call</span> <span class="s2">&quot;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat&quot;</span> amd64_arm64
+<div class="highlight-bat notranslate"><div class="highlight"><pre><span></span><span class="k">call</span> <span class="s2">"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"</span> amd64_arm64
 <span class="k">echo</span> Host=<span class="nv">%VSCMD_ARG_HOST_ARCH%</span>
 <span class="k">echo</span> Target=<span class="nv">%VSCMD_ARG_TGT_ARCH%</span>
 <span class="k">echo</span> Tools=<span class="nv">%VCToolsInstallDir%</span>
@@ -602,7 +602,7 @@ PyTorch package so that <code class="docutils literal notranslate"><span class="
 packages listed above:</p>
 <div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>C<span class="p">:</span><span class="nl">\path\to\x64-python\python.exe</span><span class="c1"> -m venv .venv-cross</span>
 <span class="k">call</span> .venv-cross\Scripts\activate.bat
-python -c <span class="s2">&quot;import platform; print(platform.machine())&quot;</span>
+python -c <span class="s2">"import platform; print(platform.machine())"</span>
 </pre></div>
 </div>
 <p>The last command should print <code class="docutils literal notranslate"><span class="pre">AMD64</span></code>.</p>
@@ -635,7 +635,7 @@ toolchain and emits a <code class="docutils literal notranslate"><span class="pr
 cross-build. Copy the wheel to a Windows ARM64 machine, install it into a
 matching ARM64 Python environment, and run:</p>
 <div class="highlight-bat notranslate"><div class="highlight"><pre><span></span>python -m pip install C:\path\to\the\generated-win_arm64.whl
-python -c <span class="s2">&quot;import torch_tensorrt; print(torch_tensorrt.__version__)&quot;</span>
+python -c <span class="s2">"import torch_tensorrt; print(torch_tensorrt.__version__)"</span>
 </pre></div>
 </div>
 </li>

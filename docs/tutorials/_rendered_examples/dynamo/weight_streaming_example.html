@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -615,34 +615,34 @@ from transformers import AutoModelForCausalLM
 
 
 def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
-    &quot;&quot;&quot;
+    """
     Exports the LLM model into an ExportedProgram with dynamic shapes.
     In the case of guard failures due to some PyTorch kernel implements, we also
     try to re-export the graph by expressing them as runtime assert nodes
-    &quot;&quot;&quot;
+    """
     with torch.no_grad():
         # max=1024 has contraint violation error. https://github.com/pytorch/pytorch/issues/125604
-        seq_len = torch.export.Dim(&quot;seq_len&quot;, min=min_seq_len, max=max_seq_len)
+        seq_len = torch.export.Dim("seq_len", min=min_seq_len, max=max_seq_len)
         position_ids = torch.arange(inputs.shape[1]).unsqueeze(0).to(inputs.device)
         try:
-            print(&quot;Trying to export the model using torch.export.export()..&quot;)
+            print("Trying to export the model using torch.export.export()..")
             # strict=False only enables aotautograd tracing and excludes dynamo.
             ep = torch.export.export(
                 model,
                 args=(inputs,),
-                kwargs={&quot;position_ids&quot;: position_ids},
+                kwargs={"position_ids": position_ids},
                 dynamic_shapes=({1: seq_len}, {1: seq_len}),
                 strict=False,
             )
         except:
             print(
-                &quot;Trying torch.export._trace._export to trace the graph since torch.export.export() failed&quot;
+                "Trying torch.export._trace._export to trace the graph since torch.export.export() failed"
             )
             # This API is used to express the constraint violation guards as asserts in the graph.
             ep = torch.export._trace._export(
                 model,
                 args=(inputs,),
-                kwargs={&quot;position_ids&quot;: position_ids},
+                kwargs={"position_ids": position_ids},
                 dynamic_shapes=({1: seq_len}, {1: seq_len}),
                 strict=False,
                 prefer_deferred_runtime_asserts_over_guards=True,
@@ -652,9 +652,9 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
 
 
 def time_generate(model, inputs, output_seq_length, iterations=10):
-    &quot;&quot;&quot;
+    """
     Measure the time for generating a sentence over certain number of iterations
-    &quot;&quot;&quot;
+    """
     # We only support single input (B x seq_len) for LLMs now
     input_seq = inputs[0]
     with torch.no_grad():
@@ -680,11 +680,11 @@ def time_generate(model, inputs, output_seq_length, iterations=10):
 
 
 # Load the LLaMA-2 model
-DEVICE = torch.device(&quot;cuda:0&quot;)
-llama_path = &quot;meta-llama/Llama-2-7b-chat-hf&quot;
+DEVICE = torch.device("cuda:0")
+llama_path = "meta-llama/Llama-2-7b-chat-hf"
 with torch.no_grad():
     model = AutoModelForCausalLM.from_pretrained(
-        llama_path, use_cache=False, attn_implementation=&quot;eager&quot;
+        llama_path, use_cache=False, attn_implementation="eager"
     ).eval()
 
 # Set input and output sequence lengths
@@ -739,7 +739,7 @@ weight_budget_pct = (
     weight_streaming_ctx.device_budget / weight_streaming_ctx.total_device_budget * 100
 )
 print(
-    f&quot;Set weight streaming budget as {weight_budget_pct}%. {weight_streaming_ctx.device_budget} bytes out of {weight_streaming_ctx.total_device_budget}. mean latency = {mean_latency} ms&quot;
+    f"Set weight streaming budget as {weight_budget_pct}%. {weight_streaming_ctx.device_budget} bytes out of {weight_streaming_ctx.total_device_budget}. mean latency = {mean_latency} ms"
 )
 </pre></div>
 </div>
@@ -771,7 +771,7 @@ with torch_tensorrt.runtime.weight_streaming(trt_model) as weight_streaming_ctx:
         * 100
     )
     print(
-        f&quot;Set auto weight streaming budget as {weight_budget_pct}%. {weight_streaming_ctx.device_budget} bytes out of {weight_streaming_ctx.total_device_budget}. mean latency = {mean_latency} ms&quot;
+        f"Set auto weight streaming budget as {weight_budget_pct}%. {weight_streaming_ctx.device_budget} bytes out of {weight_streaming_ctx.total_device_budget}. mean latency = {mean_latency} ms"
     )
 
     # Scenario 2: Manual 10% weight streaming budget
@@ -787,7 +787,7 @@ with torch_tensorrt.runtime.weight_streaming(trt_model) as weight_streaming_ctx:
         * 100
     )
     print(
-        f&quot;Set weight streaming budget as {weight_budget_pct}%. {weight_streaming_ctx.device_budget} bytes out of {weight_streaming_ctx.total_device_budget}. mean latency = {mean_latency} ms&quot;
+        f"Set weight streaming budget as {weight_budget_pct}%. {weight_streaming_ctx.device_budget} bytes out of {weight_streaming_ctx.total_device_budget}. mean latency = {mean_latency} ms"
     )
 </pre></div>
 </div>

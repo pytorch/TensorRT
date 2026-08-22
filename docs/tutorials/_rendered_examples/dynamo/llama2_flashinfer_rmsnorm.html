@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -531,20 +531,20 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 from transformers import LlamaConfig, LlamaForCausalLM
 
 
-@torch.library.custom_op(&quot;flashinfer::rmsnorm&quot;, mutates_args=())  # type: ignore[misc]
+@torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
 def flashinfer_rmsnorm(
     input: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6
 ) -&gt; torch.Tensor:
     return flashinfer.norm.rmsnorm(input, weight)
 
 
-@torch.library.register_fake(&quot;flashinfer::rmsnorm&quot;)
+@torch.library.register_fake("flashinfer::rmsnorm")
 def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -&gt; torch.Tensor:
     return input
 
 
 torch_tensorrt.dynamo.conversion.plugins.custom_op(
-    &quot;flashinfer::rmsnorm&quot;, supports_dynamic_shapes=True
+    "flashinfer::rmsnorm", supports_dynamic_shapes=True
 )
 
 
@@ -555,7 +555,7 @@ def replace_rmsnorm(
     for node in gm.graph.nodes:
         if (
             node.target == torch.ops.aten._to_copy.default
-            and node.kwargs.get(&quot;dtype&quot;) is torch.float32
+            and node.kwargs.get("dtype") is torch.float32
             and len(node.users) == 2
         ):
             if (
@@ -593,17 +593,17 @@ def replace_rmsnorm(
                                     weight = weight_mul_node.args[0]
 
                                     original_meta = weight_mul_node.meta.get(
-                                        &quot;tensor_meta&quot;, {}
+                                        "tensor_meta", {}
                                     )
                                     memory_format = original_meta.memory_format
 
                                     with gm.graph.inserting_after(weight_mul_node):
                                         b = gm.graph.create_node(
-                                            op=&quot;call_function&quot;,
+                                            op="call_function",
                                             target=torch.ops.aten.sym_size.int,
                                             args=(node.args[0], 0),
                                         )
-                                        b.meta[&quot;tensor_meta&quot;] = TensorMetadata(
+                                        b.meta["tensor_meta"] = TensorMetadata(
                                             shape=torch.Size([1]),
                                             dtype=torch.int64,
                                             requires_grad=False,
@@ -613,14 +613,14 @@ def replace_rmsnorm(
                                             qparams={},
                                         )
                                         s = gm.graph.create_node(
-                                            op=&quot;call_function&quot;,
+                                            op="call_function",
                                             target=torch.ops.aten.sym_size.int,
                                             args=(node.args[0], 1),
                                         )
                                         s.meta.update(b.meta)
 
                                         d = gm.graph.create_node(
-                                            op=&quot;call_function&quot;,
+                                            op="call_function",
                                             target=torch.ops.aten.sym_size.int,
                                             args=(node.args[0], 2),
                                         )
@@ -628,7 +628,7 @@ def replace_rmsnorm(
 
                                     with gm.graph.inserting_after(b):
                                         new_first_dim = gm.graph.create_node(
-                                            op=&quot;call_function&quot;,
+                                            op="call_function",
                                             target=torch.ops.aten.mul.Scalar,
                                             args=(b, s),
                                         )
@@ -637,7 +637,7 @@ def replace_rmsnorm(
                                     with gm.graph.inserting_after(new_first_dim):
                                         # with gm.graph.inserting_after(weight_mul_node):
                                         reshape_node = gm.graph.create_node(
-                                            op=&quot;call_function&quot;,
+                                            op="call_function",
                                             target=torch.ops.aten.reshape.default,
                                             args=(node.args[0], [new_first_dim, d]),
                                         )
@@ -645,7 +645,7 @@ def replace_rmsnorm(
                                         s_val = original_meta.shape[1]
                                         d_val = original_meta.shape[2]
 
-                                        reshape_node.meta[&quot;tensor_meta&quot;] = (
+                                        reshape_node.meta["tensor_meta"] = (
                                             TensorMetadata(
                                                 shape=torch.Size(
                                                     [b_val * s_val, d_val]
@@ -661,7 +661,7 @@ def replace_rmsnorm(
 
                                     with gm.graph.inserting_after(reshape_node):
                                         flashinfer_rmsnorm_node = gm.graph.create_node(
-                                            op=&quot;call_function&quot;,
+                                            op="call_function",
                                             target=torch.ops.flashinfer.rmsnorm.default,
                                             args=(
                                                 reshape_node,
@@ -677,7 +677,7 @@ def replace_rmsnorm(
                                         flashinfer_rmsnorm_node
                                     ):
                                         reshapback_node = gm.graph.create_node(
-                                            op=&quot;call_function&quot;,
+                                            op="call_function",
                                             target=torch.ops.aten.reshape.default,
                                             args=(
                                                 flashinfer_rmsnorm_node,
@@ -738,7 +738,7 @@ print(output)
 
 # Export validation
 
-DEVICE = torch.device(&quot;cuda:0&quot;)
+DEVICE = torch.device("cuda:0")
 
 with torch_tensorrt.logging.errors():
     trt_model = torch_tensorrt.dynamo.compile(

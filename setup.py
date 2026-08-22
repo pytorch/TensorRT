@@ -201,7 +201,12 @@ if RELEASE:
 else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
-EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
+# The delegate is compiled from the ExecuTorch source revision pinned in MODULE.bazel, so the
+# installed wheel should agree with it. The upper bound is the load-bearing half: ExecuTorch's C++
+# runtime API is not stable across minor releases, and an unbounded floor would resolve a future
+# minor against a backend built for this one. Patch releases stay allowed because they come off the
+# same release branch; the exact pin belongs in the runtime package, which does derive it.
+EXECUTORCH_REQUIREMENT = "executorch>=1.4.1,<1.5"
 # TODO: Enable this once the runtime wheel is published to the PyTorch index.
 # EXECUTORCH_RUNTIME_REQUIREMENT = (
 #     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
@@ -600,6 +605,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.debug",
     "torch_tensorrt.dynamo.lowering",
     "torch_tensorrt.dynamo.lowering.passes",
+    "torch_tensorrt.dynamo.lowering.constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.tools",
@@ -638,6 +644,7 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.debug": "py/torch_tensorrt/dynamo/debug",
     "torch_tensorrt.dynamo.lowering": "py/torch_tensorrt/dynamo/lowering",
     "torch_tensorrt.dynamo.lowering.passes": "py/torch_tensorrt/dynamo/lowering/passes",
+    "torch_tensorrt.dynamo.lowering.constant_fold_exclusions": "py/torch_tensorrt/dynamo/lowering/constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",

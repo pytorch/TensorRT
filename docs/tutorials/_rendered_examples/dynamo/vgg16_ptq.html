@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -557,7 +557,7 @@ class VGG(nn.Module):
         layers = []
         in_channels = 3
         for l in layer_spec:
-            if l == &quot;pool&quot;:
+            if l == "pool":
                 layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
             else:
                 layers += [
@@ -584,7 +584,7 @@ class VGG(nn.Module):
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode=&quot;fan_out&quot;, nonlinearity=&quot;relu&quot;)
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d):
@@ -606,43 +606,43 @@ def vgg16(num_classes=1000, init_weights=False):
     vgg16_cfg = [
         64,
         64,
-        &quot;pool&quot;,
+        "pool",
         128,
         128,
-        &quot;pool&quot;,
+        "pool",
         256,
         256,
         256,
-        &quot;pool&quot;,
+        "pool",
         512,
         512,
         512,
-        &quot;pool&quot;,
+        "pool",
         512,
         512,
         512,
-        &quot;pool&quot;,
+        "pool",
     ]
     return VGG(vgg16_cfg, num_classes, init_weights)
 
 
 PARSER = argparse.ArgumentParser(
-    description=&quot;Load pre-trained VGG model and then tune with FP8 and PTQ. For having a pre-trained VGG model, please refer to https://github.com/pytorch/TensorRT/tree/main/examples/int8/training/vgg16&quot;
+    description="Load pre-trained VGG model and then tune with FP8 and PTQ. For having a pre-trained VGG model, please refer to https://github.com/pytorch/TensorRT/tree/main/examples/int8/training/vgg16"
 )
 PARSER.add_argument(
-    &quot;--ckpt&quot;, type=str, required=True, help=&quot;Path to the pre-trained checkpoint&quot;
+    "--ckpt", type=str, required=True, help="Path to the pre-trained checkpoint"
 )
 PARSER.add_argument(
-    &quot;--batch-size&quot;,
+    "--batch-size",
     default=128,
     type=int,
-    help=&quot;Batch size for tuning the model with PTQ and FP8&quot;,
+    help="Batch size for tuning the model with PTQ and FP8",
 )
 PARSER.add_argument(
-    &quot;--quantize-type&quot;,
-    default=&quot;int8&quot;,
+    "--quantize-type",
+    default="int8",
     type=str,
-    help=&quot;quantization type, currently supported int8 or fp8 for PTQ&quot;,
+    help="quantization type, currently supported int8 or fp8 for PTQ",
 )
 args = PARSER.parse_args()
 
@@ -659,7 +659,7 @@ model = model.cuda().eval()
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ckpt = torch.load(args.ckpt)
-weights = ckpt[&quot;model_state_dict&quot;]
+weights = ckpt["model_state_dict"]
 
 if torch.cuda.device_count() &gt; 1:
     from collections import OrderedDict
@@ -671,7 +671,7 @@ if torch.cuda.device_count() &gt; 1:
     weights = new_state_dict
 
 model.load_state_dict(weights)
-# Don&#39;t forget to set the model to evaluation mode!
+# Don't forget to set the model to evaluation mode!
 model.eval()
 </pre></div>
 </div>
@@ -684,7 +684,7 @@ model.eval()
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>training_dataset = datasets.CIFAR10(
-    root=&quot;./data&quot;,
+    root="./data",
     train=True,
     download=True,
     transform=transforms.Compose(
@@ -731,7 +731,7 @@ crit = nn.CrossEntropyLoss()
         total += labels.size(0)
         correct += (preds == labels).sum().item()
 
-    print(&quot;PTQ Loss: {:.5f} Acc: {:.2f}%&quot;.format(loss / total, 100 * correct / total))
+    print("PTQ Loss: {:.5f} Acc: {:.2f}%".format(loss / total, 100 * correct / total))
 </pre></div>
 </div>
 </div>
@@ -742,9 +742,9 @@ crit = nn.CrossEntropyLoss()
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if args.quantize_type == &quot;int8&quot;:
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if args.quantize_type == "int8":
     quant_cfg = mtq.INT8_DEFAULT_CFG
-elif args.quantize_type == &quot;fp8&quot;:
+elif args.quantize_type == "fp8":
     quant_cfg = mtq.FP8_DEFAULT_CFG
 # PTQ with in-place replacement to quantized modules
 mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
@@ -761,7 +761,7 @@ mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load the testing dataset
 testing_dataset = datasets.CIFAR10(
-    root=&quot;./data&quot;,
+    root="./data",
     train=False,
     download=True,
     transform=transforms.Compose(
@@ -792,7 +792,7 @@ with torch.no_grad():
             min_block_size=1,
         )
         # You can also use torch compile path to compile the model with Torch-TensorRT:
-        # trt_model = torch.compile(model, backend=&quot;tensorrt&quot;)
+        # trt_model = torch.compile(model, backend="tensorrt")
 
         # Inference compiled Torch-TensorRT model over the testing dataset
         total = 0
@@ -816,7 +816,7 @@ with torch.no_grad():
             test_loss = loss / total
             test_acc = correct / total
             print(
-                &quot;Test Loss: {:.5f} Test Acc: {:.2f}%&quot;.format(test_loss, 100 * test_acc)
+                "Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc)
             )
 </pre></div>
 </div>

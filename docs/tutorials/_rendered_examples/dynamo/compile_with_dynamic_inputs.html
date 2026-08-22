@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -597,7 +597,7 @@ x = torch.randn(4, 196, 768).cuda()
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>x1 = x.clone()
 torch._dynamo.mark_dynamic(x1, index=0, min=2, max=32)
-trt_module = torch.compile(model, backend=&quot;tensorrt&quot;)
+trt_module = torch.compile(model, backend="tensorrt")
 out1 = trt_module(x1)
 </pre></div>
 </div>
@@ -624,7 +624,7 @@ example_input = torch_tensorrt.Input(
     max_shape=[32, 196, 768],
     dtype=torch.float32,
 )
-trt_module = torch_tensorrt.compile(model, ir=&quot;dynamo&quot;, inputs=example_input)
+trt_module = torch_tensorrt.compile(model, ir="dynamo", inputs=example_input)
 out2 = trt_module(x2)
 </pre></div>
 </div>
@@ -645,8 +645,8 @@ out2 = trt_module(x2)
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>x3 = x.clone()
-bs = torch.export.Dim(&quot;bs&quot;, min=1, max=32)
-dynamic_shapes = {&quot;x&quot;: {0: bs}}
+bs = torch.export.Dim("bs", min=1, max=32)
+dynamic_shapes = {"x": {0: bs}}
 exp_program = torch.export.export(model, (x3,), dynamic_shapes=dynamic_shapes)
 trt_module = torch_tensorrt.dynamo.compile(exp_program, (x3,))
 out3 = trt_module(x3)
@@ -665,7 +665,7 @@ out3 = trt_module(x3)
 assert torch.allclose(out1, out3)
 assert torch.allclose(out2, out3)
 
-print(&quot;All three approaches produced identical results!&quot;)
+print("All three approaches produced identical results!")
 </pre></div>
 </div>
 </div>

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -531,8 +531,8 @@ from torch.export import export
         self.write_pos = write_pos
 
         # Static KV cache — fixed shape across the whole generation.
-        self.register_buffer(&quot;cache_k&quot;, torch.zeros(batch, n_heads, max_seq, head_dim))
-        self.register_buffer(&quot;cache_v&quot;, torch.zeros(batch, n_heads, max_seq, head_dim))
+        self.register_buffer("cache_k", torch.zeros(batch, n_heads, max_seq, head_dim))
+        self.register_buffer("cache_v", torch.zeros(batch, n_heads, max_seq, head_dim))
 
         self.norm = torch.nn.LayerNorm(self.hidden)
         self.q_proj = torch.nn.Linear(self.hidden, self.hidden, bias=False)
@@ -569,12 +569,12 @@ from torch.export import export
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>torch.manual_seed(0)
 model = StaticKVAttention().cuda()
-hidden = torch.randn(1, 1, model.hidden, device=&quot;cuda&quot;)
+hidden = torch.randn(1, 1, model.hidden, device="cuda")
 
 ep = export(model, (hidden.clone(),))
 compiled = torch_tensorrt.compile(
     ep,
-    ir=&quot;dynamo&quot;,
+    ir="dynamo",
     inputs=[hidden.clone()],
     enabled_precisions={torch.float32},
     min_block_size=1,
@@ -591,11 +591,11 @@ compiled = torch_tensorrt.compile(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>for _, mod in compiled.named_modules():
-    if hasattr(mod, &quot;aliased_io&quot;) and mod.aliased_io:
-        print(f&quot;Engine input bindings: {list(mod.input_binding_names)}&quot;)
-        print(f&quot;Engine output bindings: {list(mod.output_binding_names)}&quot;)
+    if hasattr(mod, "aliased_io") and mod.aliased_io:
+        print(f"Engine input bindings: {list(mod.input_binding_names)}")
+        print(f"Engine output bindings: {list(mod.output_binding_names)}")
         for out, (inp, kind) in mod.aliased_io.items():
-            print(f&quot;  {out}  &lt;-aliased-&gt;  {inp}  (kind={kind})&quot;)
+            print(f"  {out}  &lt;-aliased-&gt;  {inp}  (kind={kind})")
 </pre></div>
 </div>
 </div>
@@ -610,18 +610,18 @@ compiled = torch_tensorrt.compile(
 eager_model.load_state_dict(model.state_dict())
 eager_out = eager_model(hidden.clone())
 
-# Reset the compiled cache to match eager&#39;s fresh state
+# Reset the compiled cache to match eager's fresh state
 compiled.cache_k.zero_()
 compiled.cache_v.zero_()
 compiled_out = compiled(hidden.clone())
 compiled_val = compiled_out[0] if isinstance(compiled_out, tuple) else compiled_out
 
-print(f&quot;\nmax output diff: {(compiled_val - eager_out).abs().max().item():.6f}&quot;)
+print(f"\nmax output diff: {(compiled_val - eager_out).abs().max().item():.6f}")
 print(
-    f&quot;cache_k matches eager: {torch.allclose(compiled.cache_k, eager_model.cache_k, atol=1e-4)}&quot;
+    f"cache_k matches eager: {torch.allclose(compiled.cache_k, eager_model.cache_k, atol=1e-4)}"
 )
 print(
-    f&quot;cache_v matches eager: {torch.allclose(compiled.cache_v, eager_model.cache_v, atol=1e-4)}&quot;
+    f"cache_v matches eager: {torch.allclose(compiled.cache_v, eager_model.cache_v, atol=1e-4)}"
 )
 </pre></div>
 </div>
@@ -637,11 +637,11 @@ print(
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>compiled.cache_k.zero_()
 compiled.cache_v.zero_()
 for step in range(3):
-    h = torch.randn(1, 1, model.hidden, device=&quot;cuda&quot;)
+    h = torch.randn(1, 1, model.hidden, device="cuda")
     out = compiled(h)
     print(
-        f&quot;step {step}: cache_k.norm()={compiled.cache_k.norm().item():.4f}, &quot;
-        f&quot;out.norm()={(out[0] if isinstance(out, tuple) else out).norm().item():.4f}&quot;
+        f"step {step}: cache_k.norm()={compiled.cache_k.norm().item():.4f}, "
+        f"out.norm()={(out[0] if isinstance(out, tuple) else out).norm().item():.4f}"
     )
 </pre></div>
 </div>

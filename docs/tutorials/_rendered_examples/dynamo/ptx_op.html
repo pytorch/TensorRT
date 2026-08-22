@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -636,12 +636,12 @@ import torch_tensorrt.kernels as ttk
 # Step 1: obtain PTX
 # ---------------------------------------------------------------------------
 # In real use, ``GELU_PTX`` could be loaded from a file, fetched from a cache,
-# or emitted by a Triton kernel&#39;s ``.asm[&quot;ptx&quot;]``. Here we NVRTC-compile a
+# or emitted by a Triton kernel's ``.asm["ptx"]``. Here we NVRTC-compile a
 # small CUDA source on the fly so the example is self-contained — the point
 # of ptx_op is that this step is *separate* from registration.
 
-CU_GELU = r&quot;&quot;&quot;
-extern &quot;C&quot; __global__ void my_gelu(
+CU_GELU = r"""
+extern "C" __global__ void my_gelu(
         const float* __restrict__ x, int n, float* __restrict__ y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i &lt; n) {
@@ -652,20 +652,20 @@ extern &quot;C&quot; __global__ void my_gelu(
         y[i] = 0.5f * xi * (1.f + tanhf(inner));
     }
 }
-&quot;&quot;&quot;
+"""
 
 _device = _Device()
 _device.set_current()
 _opts = _ProgramOptions(
-    std=&quot;c++17&quot;,
-    arch=f&quot;sm_{_device.arch}&quot;,
-    include_path=[&quot;/usr/local/cuda/include&quot;],
+    std="c++17",
+    arch=f"sm_{_device.arch}",
+    include_path=["/usr/local/cuda/include"],
 )
-_module = _Program(CU_GELU, code_type=&quot;c++&quot;, options=_opts).compile(
-    &quot;ptx&quot;, name_expressions=(&quot;my_gelu&quot;,)
+_module = _Program(CU_GELU, code_type="c++", options=_opts).compile(
+    "ptx", name_expressions=("my_gelu",)
 )
 GELU_PTX: bytes = _module.code
-_gelu_kernel = _module.get_kernel(&quot;my_gelu&quot;)
+_gelu_kernel = _module.get_kernel("my_gelu")
 
 
 # ---------------------------------------------------------------------------
@@ -675,7 +675,7 @@ _gelu_kernel = _module.get_kernel(&quot;my_gelu&quot;)
 #
 #   * meta_fn   : shape/dtype inference for FakeTensors (torch.compile path).
 #                  The torch op schema is inferred from its type hints if you
-#                  don&#39;t pass ``schema=`` explicitly.
+#                  don't pass ``schema=`` explicitly.
 #   * eager_fn  : the CUDA launch that runs under PyTorch eager.
 #   * aot_fn    : returns (KernelLaunchParams, SymExprs) for TRT engine build.
 
@@ -685,7 +685,7 @@ def _gelu_meta(x: torch.Tensor) -&gt; torch.Tensor:
 
 
 class _PTStream:
-    &quot;&quot;&quot;Adapter so cuda.core.Stream uses PyTorch&#39;s current stream.&quot;&quot;&quot;
+    """Adapter so cuda.core.Stream uses PyTorch's current stream."""
 
     def __cuda_stream__(self):
         return (0, torch.cuda.current_stream().cuda_stream)
@@ -726,9 +726,9 @@ def _gelu_aot(inputs, outputs, tactic):
 # torch.compile, and torch_tensorrt.compile — same as ``cuda_kernel_op``.
 
 ttk.ptx_op(
-    op_name=&quot;ptx_ex::gelu&quot;,
+    op_name="ptx_ex::gelu",
     ptx=GELU_PTX,
-    kernel_name=&quot;my_gelu&quot;,
+    kernel_name="my_gelu",
     meta_fn=_gelu_meta,
     eager_fn=_gelu_eager,
     aot_fn=_gelu_aot,
@@ -746,14 +746,14 @@ class GeluModel(torch.nn.Module):
         return torch.ops.ptx_ex.gelu(x)
 
 
-if __name__ == &quot;__main__&quot;:
-    x = torch.randn(4, 128, device=&quot;cuda&quot;, dtype=torch.float32)
-    ref = torch.nn.functional.gelu(x, approximate=&quot;tanh&quot;)
+if __name__ == "__main__":
+    x = torch.randn(4, 128, device="cuda", dtype=torch.float32)
+    ref = torch.nn.functional.gelu(x, approximate="tanh")
     model = GeluModel().cuda().eval()
 
     eager_out = model(x)
     print(
-        f&quot;[gelu] eager matches reference: {torch.allclose(eager_out, ref, atol=1e-3)}&quot;
+        f"[gelu] eager matches reference: {torch.allclose(eager_out, ref, atol=1e-3)}"
     )
 
     trt_model = torch_tensorrt.compile(
@@ -765,8 +765,8 @@ if __name__ == &quot;__main__&quot;:
     with torch.no_grad():
         for _ in range(5):
             out = trt_model(x)
-            assert torch.allclose(out, ref, atol=1e-2, rtol=1e-2), &quot;gelu: mismatch&quot;
-    print(&quot;[gelu] TRT compile + run successful&quot;)
+            assert torch.allclose(out, ref, atol=1e-2, rtol=1e-2), "gelu: mismatch"
+    print("[gelu] TRT compile + run successful")
 </pre></div>
 </div>
 </div>

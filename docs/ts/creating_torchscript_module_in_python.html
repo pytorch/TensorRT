@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -581,20 +581,20 @@ in a intermediate representation that Torch-TensorRT can consume.</p>
 <p>Here is what the LeNet traced module IR looks like:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%self.1 : __torch__.___torch_mangle_10.LeNet,
     %input.1 : Float(1, 1, 32, 32)):
-    %129 : __torch__.___torch_mangle_9.LeNetClassifier = prim::GetAttr[name=&quot;classifier&quot;](%self.1)
-    %119 : __torch__.___torch_mangle_5.LeNetFeatExtractor = prim::GetAttr[name=&quot;feat&quot;](%self.1)
-    %137 : Tensor = prim::CallMethod[name=&quot;forward&quot;](%119, %input.1)
-    %138 : Tensor = prim::CallMethod[name=&quot;forward&quot;](%129, %137)
+    %129 : __torch__.___torch_mangle_9.LeNetClassifier = prim::GetAttr[name="classifier"](%self.1)
+    %119 : __torch__.___torch_mangle_5.LeNetFeatExtractor = prim::GetAttr[name="feat"](%self.1)
+    %137 : Tensor = prim::CallMethod[name="forward"](%119, %input.1)
+    %138 : Tensor = prim::CallMethod[name="forward"](%129, %137)
     return (%138)
 </pre></div>
 </div>
 <p>and the LeNet scripted module IR:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%self : __torch__.LeNet,
     %x.1 : Tensor):
-    %2 : __torch__.LeNetFeatExtractor = prim::GetAttr[name=&quot;feat&quot;](%self)
-    %x.3 : Tensor = prim::CallMethod[name=&quot;forward&quot;](%2, %x.1) # x.py:38:12
-    %5 : __torch__.LeNetClassifier = prim::GetAttr[name=&quot;classifier&quot;](%self)
-    %x.5 : Tensor = prim::CallMethod[name=&quot;forward&quot;](%5, %x.3) # x.py:39:12
+    %2 : __torch__.LeNetFeatExtractor = prim::GetAttr[name="feat"](%self)
+    %x.3 : Tensor = prim::CallMethod[name="forward"](%2, %x.1) # x.py:38:12
+    %5 : __torch__.LeNetClassifier = prim::GetAttr[name="classifier"](%self)
+    %x.5 : Tensor = prim::CallMethod[name="forward"](%5, %x.3) # x.py:39:12
     return (%x.5)
 </pre></div>
 </div>
@@ -613,7 +613,7 @@ and optimize the module on the fly and then returns the results.</p>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">LeNet</span><span class="p">()</span>
 <span class="n">script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
-<span class="n">script_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;lenet_scripted.ts&quot;</span><span class="p">)</span>
+<span class="n">script_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"lenet_scripted.ts"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

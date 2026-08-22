@@ -84,13 +84,18 @@ def lift_mutated_buffers(
 
     for copy_node, get_attr_node in mutation_pairs:
         buffer_name = get_attr_node.target
-        if not hasattr(gm, buffer_name):
+        # A get_attr target is fully qualified, so a buffer owned by a submodule
+        # arrives as "layers.0.self_attn.kv_cache.k_cache". getattr does not walk a
+        # dotted path, so it reports every nested buffer as missing; get_buffer
+        # resolves through the submodules.
+        try:
+            buffer_tensor = gm.get_buffer(buffer_name)
+        except AttributeError:
             logger.warning(
                 "lift_mutated_buffers: get_attr target %s not found on gm; skipping",
                 buffer_name,
             )
             continue
-        buffer_tensor = getattr(gm, buffer_name)
         if not isinstance(buffer_tensor, torch.Tensor):
             logger.debug(
                 "lift_mutated_buffers: attribute %s is not a Tensor; skipping",

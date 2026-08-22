@@ -1,0 +1,14 @@
+.. _exhale_function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5:
+
+Function torch_tensorrt::logging::set_is_colored_output_on
+==========================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_logging.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::logging::set_is_colored_output_on(bool)
+   :project: Torch-TensorRT

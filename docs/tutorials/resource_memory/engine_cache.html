@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -619,7 +619,7 @@ persisting compiled engines to disk and reloading them on a cache hit.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._engine_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiskEngineCache</span>
 
 <span class="n">my_cache</span> <span class="o">=</span> <span class="n">DiskEngineCache</span><span class="p">(</span>
-    <span class="n">engine_cache_dir</span><span class="o">=</span><span class="s2">&quot;/data/trt_cache&quot;</span><span class="p">,</span>
+    <span class="n">engine_cache_dir</span><span class="o">=</span><span class="s2">"/data/trt_cache"</span><span class="p">,</span>
     <span class="n">engine_cache_size</span><span class="o">=</span><span class="mi">20</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">,</span>  <span class="c1"># 20 GB</span>
 <span class="p">)</span>
 
@@ -693,7 +693,7 @@ a cold engine cache, because TRT can skip re-benchmarking known-fast kernels.</p
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">timing_cache_path</span><span class="o">=</span><span class="s2">&quot;/data/trt_cache/timing_cache.bin&quot;</span><span class="p">,</span>
+    <span class="n">timing_cache_path</span><span class="o">=</span><span class="s2">"/data/trt_cache/timing_cache.bin"</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -716,7 +716,7 @@ persisted to disk via <code class="docutils literal notranslate"><span class="pr
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">runtime_cache_path</span><span class="o">=</span><span class="s2">&quot;/data/trt_cache/runtime_cache.bin&quot;</span><span class="p">,</span>
+    <span class="n">runtime_cache_path</span><span class="o">=</span><span class="s2">"/data/trt_cache/runtime_cache.bin"</span><span class="p">,</span>
     <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
@@ -736,21 +736,21 @@ a database), implement the <code class="docutils literal notranslate"><span clas
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">S3EngineCache</span><span class="p">(</span><span class="n">BaseEngineCache</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bucket</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;trt_engines/&quot;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bucket</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"trt_engines/"</span><span class="p">):</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">boto3</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">s3</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s2">&quot;s3&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">s3</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s2">"s3"</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">bucket</span> <span class="o">=</span> <span class="n">bucket</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">blob</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}{</span><span class="nb">hash</span><span class="si">}</span><span class="s2">/blob.bin&quot;</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}{</span><span class="nb">hash</span><span class="si">}</span><span class="s2">/blob.bin"</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">put_object</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">Key</span><span class="o">=</span><span class="n">key</span><span class="p">,</span> <span class="n">Body</span><span class="o">=</span><span class="n">blob</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bytes</span><span class="p">]:</span>
-        <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}{</span><span class="nb">hash</span><span class="si">}</span><span class="s2">/blob.bin&quot;</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}{</span><span class="nb">hash</span><span class="si">}</span><span class="s2">/blob.bin"</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">resp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">get_object</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">Key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">resp</span><span class="p">[</span><span class="s2">&quot;Body&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">resp</span><span class="p">[</span><span class="s2">"Body"</span><span class="p">]</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
         <span class="k">except</span> <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NoSuchKey</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
 
@@ -759,7 +759,7 @@ a database), implement the <code class="docutils literal notranslate"><span clas
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">custom_engine_cache</span><span class="o">=</span><span class="n">S3EngineCache</span><span class="p">(</span><span class="s2">&quot;my-model-cache-bucket&quot;</span><span class="p">),</span>
+    <span class="n">custom_engine_cache</span><span class="o">=</span><span class="n">S3EngineCache</span><span class="p">(</span><span class="s2">"my-model-cache-bucket"</span><span class="p">),</span>
 <span class="p">)</span>
 </pre></div>
 </div>

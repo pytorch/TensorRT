@@ -112,12 +112,21 @@ jobs:
   # ExecuTorch runtime is supported by the standard TensorRT wheel only. Wait
   # for the standard channel to upload its wheel artifact, but still build the
   # runtime if a standard test fails.
+  #
+  # A standard channel that was CANCELLED is different from one that failed a test:
+  # it uploaded no wheel, so this job has nothing to download and dies with
+  # "Artifact not found for name: pytorch_tensorrt__<py>_<cu>_x86_64" after burning a
+  # runner. That is reported as a failure and drags `gate` down with it, which is why
+  # main shows ten red ExecuTorch rows whenever two commits land close together. The
+  # standard channel has its own concurrency group, so it can be cancelled on its own
+  # while this run continues.
   executorch-runtime-build:
     needs: [decide, generate-matrix, standard]
     if: >-
-      always() &&
+      !cancelled() &&
       needs.decide.result == 'success' &&
       needs.generate-matrix.result == 'success' &&
+      needs.standard.result != 'cancelled' &&
       needs.decide.outputs.lane != 'skip' &&
       needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/executorch-build-linux.yml

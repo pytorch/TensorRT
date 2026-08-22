@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=2a67feac"></script>
+    <script src="../../_static/documentation_options.js?v=6f046ade"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -623,7 +623,7 @@ compiles its own TRT engine independently.</p>
 <span class="k">with</span> <span class="n">distributed_state</span><span class="o">.</span><span class="n">split_between_processes</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span> <span class="k">as</span> <span class="n">local_inputs</span><span class="p">:</span>
     <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
         <span class="n">model</span><span class="p">,</span>
-        <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+        <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span>
         <span class="n">arg_inputs</span><span class="o">=</span><span class="n">local_inputs</span><span class="p">,</span>
         <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="p">)</span>
@@ -663,29 +663,29 @@ inference in <code class="docutils literal notranslate"><span class="pre">distri
 <span class="p">)</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
-<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">&quot;nccl&quot;</span><span class="p">)</span>
-<span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="n">tp_mesh</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">device_mesh</span><span class="o">.</span><span class="n">init_device_mesh</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">(),))</span>
+<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">"nccl"</span><span class="p">)</span>
+<span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cuda:</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="n">tp_mesh</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">device_mesh</span><span class="o">.</span><span class="n">init_device_mesh</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">,</span> <span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">(),))</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 <span class="n">parallelize_module</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">tp_mesh</span><span class="p">,</span>
     <span class="p">{</span>
-        <span class="s2">&quot;attn.q_proj&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
-        <span class="s2">&quot;attn.o_proj&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(),</span>
-        <span class="s2">&quot;mlp.gate_proj&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
-        <span class="s2">&quot;mlp.down_proj&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(),</span>
+        <span class="s2">"attn.q_proj"</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+        <span class="s2">"attn.o_proj"</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(),</span>
+        <span class="s2">"mlp.gate_proj"</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+        <span class="s2">"mlp.down_proj"</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(),</span>
     <span class="p">},</span>
 <span class="p">)</span>
 
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
-    <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span>
+    <span class="n">backend</span><span class="o">=</span><span class="s2">"torch_tensorrt"</span><span class="p">,</span>
     <span class="n">dynamic</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">options</span><span class="o">=</span><span class="p">{</span>
-        <span class="s2">&quot;use_distributed_mode_trace&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">"use_distributed_mode_trace"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
     <span class="p">},</span>
 <span class="p">)</span>
 
@@ -761,7 +761,7 @@ row-parallel layers.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">_c10d_functional</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="s2">&quot;sum&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_name</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">_c10d_functional</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="s2">"sum"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_name</span><span class="p">)</span>
         <span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">_c10d_functional</span><span class="o">.</span><span class="n">wait_tensor</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">out</span>
 
@@ -785,7 +785,7 @@ row-parallel layers.</p>
 <span class="p">)</span>
 
 <span class="c1"># Save per-rank engine</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep&quot;</span><span class="p">,</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep"</span><span class="p">,</span>
                     <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">input_ids</span><span class="p">],</span> <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -800,13 +800,13 @@ row-parallel layers.</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed</span><span class="w"> </span><span class="kn">import</span> <span class="n">setup_nccl_for_torch_tensorrt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._nccl_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">initialize_nccl_comm</span>
 
-<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">&quot;nccl&quot;</span><span class="p">)</span>
+<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">"nccl"</span><span class="p">)</span>
 <span class="n">setup_nccl_for_torch_tensorrt</span><span class="p">()</span>
 <span class="n">initialize_nccl_comm</span><span class="p">()</span>  <span class="c1"># eagerly create NCCL communicator for TRT</span>
 <span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
 
 <span class="c1"># Load the per-rank engine</span>
-<span class="n">loaded</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep&quot;</span><span class="p">)</span>
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="sa">f</span><span class="s2">"/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep"</span><span class="p">)</span>
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 
 <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">group</span><span class="o">.</span><span class="n">WORLD</span><span class="p">,</span> <span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">model</span><span class="p">:</span>
@@ -826,14 +826,14 @@ in the loaded module and get the configured model back as the context value:</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed</span><span class="w"> </span><span class="kn">import</span> <span class="n">setup_nccl_for_torch_tensorrt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._nccl_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">initialize_nccl_comm</span>
 
-<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">&quot;nccl&quot;</span><span class="p">)</span>
+<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s2">"nccl"</span><span class="p">)</span>
 <span class="n">setup_nccl_for_torch_tensorrt</span><span class="p">()</span>
 <span class="n">initialize_nccl_comm</span><span class="p">()</span>
 
 <span class="n">tp_group</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">new_group</span><span class="p">(</span><span class="n">ranks</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>  <span class="c1"># tensor-parallel ranks</span>
 <span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
 
-<span class="n">loaded</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep&quot;</span><span class="p">)</span>
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="sa">f</span><span class="s2">"/engines/model_rank</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.ep"</span><span class="p">)</span>
 <span class="n">raw_model</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 
 <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">tp_group</span><span class="p">,</span> <span class="n">raw_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">trt_model</span><span class="p">:</span>
@@ -902,25 +902,25 @@ the library already resident in the process.</p></li>
 <p><strong>Manual setup (without</strong> <code class="docutils literal notranslate"><span class="pre">torchtrtrun</span></code> <strong>):</strong></p>
 <p>If you prefer to launch processes yourself, replicate the NCCL setup manually:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Step 1 — create the libnccl.so symlink</span>
-python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span>
 <span class="s2">from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt</span>
 <span class="s2">setup_nccl_for_torch_tensorrt()</span>
-<span class="s2">&quot;</span>
+<span class="s2">"</span>
 
 <span class="c1"># Step 2 — find the NCCL lib directory</span>
-<span class="nv">NCCL_LIB</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+<span class="nv">NCCL_LIB</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span>
 <span class="s2">from torch_tensorrt.distributed._nccl_utils import get_nccl_library_path</span>
 <span class="s2">print(get_nccl_library_path())</span>
-<span class="s2">&quot;</span><span class="k">)</span>
+<span class="s2">"</span><span class="k">)</span>
 
 <span class="c1"># Step 3 — launch with LD_PRELOAD and LD_LIBRARY_PATH set before the process starts</span>
 <span class="c1"># Node 0:</span>
-<span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NCCL_LIB</span><span class="s2">/libnccl.so.2&quot;</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NCCL_LIB</span><span class="s2">:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="s2">"</span><span class="nv">$NCCL_LIB</span><span class="s2">/libnccl.so.2"</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$NCCL_LIB</span><span class="s2">:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">RANK</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="nv">WORLD_SIZE</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">MASTER_ADDR</span><span class="o">=</span>&lt;node0-ip&gt;<span class="w"> </span><span class="nv">MASTER_PORT</span><span class="o">=</span><span class="m">29500</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>python<span class="w"> </span>tensor_parallel_llama_multinode.py
 
 <span class="c1"># Node 1:</span>
-<span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NCCL_LIB</span><span class="s2">/libnccl.so.2&quot;</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NCCL_LIB</span><span class="s2">:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="s2">"</span><span class="nv">$NCCL_LIB</span><span class="s2">/libnccl.so.2"</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$NCCL_LIB</span><span class="s2">:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">RANK</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">WORLD_SIZE</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">MASTER_ADDR</span><span class="o">=</span>&lt;node0-ip&gt;<span class="w"> </span><span class="nv">MASTER_PORT</span><span class="o">=</span><span class="m">29500</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>python<span class="w"> </span>tensor_parallel_llama_multinode.py
 </pre></div>
@@ -1035,11 +1035,11 @@ active. Without it, the FX tracer may not see the collective ops at all.</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 
 <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">native_trt_collectives</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Native TRT DistCollective (TRT 10.16+)&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Native TRT DistCollective (TRT 10.16+)"</span><span class="p">)</span>
 <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">trtllm_for_nccl</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;TRT-LLM plugin&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"TRT-LLM plugin"</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;PyTorch fallback — collectives will NOT be inside the TRT engine&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"PyTorch fallback — collectives will NOT be inside the TRT engine"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -1061,7 +1061,7 @@ makes <code class="docutils literal notranslate"><span class="pre">dist.destroy_
 </ol>
 <p><em>module</em> may be a single compiled module, a list of modules, or omitted:</p>
 <p><strong>Single module</strong> — yields the module as the context value:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"torch_tensorrt"</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>  <span class="c1"># warmup — triggers engine build</span>
 <span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
 
@@ -1093,7 +1093,7 @@ that both need NCCL teardown:</p>
 <p><strong>Without module</strong> — use at compile time when the model is created inside the
 block:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">distributed_context</span><span class="p">(</span><span class="n">tp_group</span><span class="p">):</span>
-    <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+    <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"torch_tensorrt"</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
     <span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>
 </pre></div>
 </div>

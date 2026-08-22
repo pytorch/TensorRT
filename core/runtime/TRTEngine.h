@@ -272,6 +272,21 @@ struct TRTEngine : torch::CustomClassHolder {
   // Serde re-export functionality
   FlattenedState __obj_flatten__();
   std::vector<std::string> serialize();
+  // serialize() packs both the metadata and the engine into one vector of strings,
+  // which forces the engine through base64. A caller that wants only metadata pays
+  // that encode for nothing; a caller that wants the engine pays it and then decodes
+  // it back. These expose each half on its own. serialize() still returns the full
+  // base64 record, so serialized engines and .pte artifacts are unaffected.
+  //
+  // The returned record is SERIALIZATION_LEN long with a valid ABI tag and an empty
+  // engine slot, so verify_serialization_fmt accepts it: passing it back to
+  // TRTEngine(std::vector<std::string>) constructs an engine from zero bytes rather
+  // than failing. It is for reading metadata, not for round-tripping.
+  std::vector<std::string> serialize_metadata_only();
+  // Returns uint8 tensor, not std::string: TorchScript maps std::string to a
+  // Python str and engine bytes are not valid UTF-8. A tensor is also the shape
+  // consumers want, so they need not rebuild one from decoded bytes.
+  at::Tensor serialized_engine_tensor();
 
   // CUDAGraph-Related Functionality
   // Keep the captured graph so its executable can be instantiated explicitly.
