@@ -206,10 +206,11 @@ def slice_scatter(
 
     update_len = end - start
 
-    # KV fast path.
-    kv_out = try_emit_kv_cache_update(ctx, name, input, src, dim, start, update_len)
-    if kv_out is not None:
-        return kv_out
+    # IKVCacheUpdateLayer only supports contiguous updates.
+    if step == 1:
+        kv_out = try_emit_kv_cache_update(ctx, name, input, src, dim, start, update_len)
+        if kv_out is not None:
+            return kv_out
 
     # Fallback: build broadcast indices and scatter.
     indices_np: np.ndarray = np.arange(start, end, step, dtype=np.int64)
