@@ -1,6 +1,3 @@
-import os
-
-import pytest
 import torch
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import (
@@ -16,9 +13,6 @@ from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
 from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import (
     mark_constant_fold_exclusions,
 )
-
-# pytest-forked is POSIX-only; Windows relies on the per-test cleanup below.
-pytestmark = [pytest.mark.forked] if hasattr(os, "fork") else []
 
 TEST_RULE_ID_PREFIX = "test_arbitrary_node"
 
