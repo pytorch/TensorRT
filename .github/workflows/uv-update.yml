@@ -20,12 +20,11 @@ jobs:
     if: ${{ ! contains(github.actor, 'pytorchbot') }}
     environment: pytorchbot-env
     container:
-      # Unlike the other jobs, this one does not run packaging/pre_build_script.sh, so it builds
-      # against the checked-in MODULE.bazel instead of one rendered from
-      # toolchains/ci_workspaces/MODULE.bazel.tmpl. That means the ${CUDA_HOME} substitution never
-      # happens here and Bazel reads the literal path in MODULE.bazel. Keep this tag's CUDA version
-      # equal to the cuda new_local_repository path in MODULE.bazel or the build fails to fetch
-      # @cuda and the lockfile silently stops being refreshed.
+      # Unlike the other jobs, this one does not run packaging/pre_build_script.sh, so Bazel reads
+      # the literal CUDA path in the checked-in MODULE.bazel rather than one rendered from
+      # toolchains/ci_workspaces/MODULE.bazel.tmpl with ${CUDA_HOME} substituted. No step here
+      # builds the project, so that path does not have to exist in this image and this tag does
+      # not have to track it.
       image: pytorch/manylinux2_28-builder:cuda13.2
       options: --gpus all
       env:
@@ -80,8 +79,19 @@ jobs:
         run: |
           set -euo pipefail
           set -x
-          if ! uv sync --frozen; then
-            echo "Error: Failed to run uv sync --frozen"
+          # --no-install-project keeps this a lockfile check. Installing the root
+          # project runs a full Bazel build of the native library, which this job
+          # does not need and which ties it to the CUDA toolkit path MODULE.bazel
+          # names. Dependencies are still downloaded and hash-verified, so a
+          # broken lock is still caught.
+          # --prerelease=allow has to match the lock step above: uv records the
+          # resolution mode in uv.lock and --locked rejects a lock resolved under
+          # a different mode.
+          # --all-extras so the optional dependencies are covered too. Dependency
+          # groups are not covered: --all-groups on its own is rejected, because
+          # pyproject.toml declares test_ext and quantization as conflicting.
+          if ! uv sync --locked --prerelease=allow --no-install-project --all-extras; then
+            echo "Error: Failed to run uv sync --locked --prerelease=allow --no-install-project --all-extras"
             exit 1
           fi
           echo "valid_changes=true" >> "$GITHUB_OUTPUT"
