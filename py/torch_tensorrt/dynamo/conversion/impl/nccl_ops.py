@@ -1,15 +1,20 @@
 import logging
 import os
 from enum import IntEnum, IntFlag, auto
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import tensorrt as trt
 from torch.fx.node import Argument, Target
+from torch_tensorrt import _enums
 from torch_tensorrt._features import needs_native_collectives
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import set_layer_name
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_trt_tensor,
+    set_layer_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +83,150 @@ def _get_distributed_rank_and_world_size() -> Tuple[int, int]:
         world_size = int(_world_size)
         rank = int(os.environ.get("RANK", 0))
         return rank, world_size
+
+
+def _collective_group_ranks(group_name: Optional[str], world_size: int) -> np.ndarray:
+    """Global ranks of the collective's process group.
+
+    The native ``add_dist_collective`` layer needs the set of ranks that participate in
+    *this* collective. Resolving it from the op's ``group_name`` lets a collective target a
+    process **subgroup** (e.g. context/sequence-parallel over one subgroup while tensor-parallel
+    uses another -- a 2-D device mesh) instead of always the whole world. Falls back to the world
+    group when the group cannot be resolved (single-program / group not created in this process).
+    """
+    if group_name:
+        try:
+            import torch.distributed as dist
+            from torch.distributed.distributed_c10d import _resolve_process_group
+
+            ranks = dist.get_process_group_ranks(_resolve_process_group(group_name))
+            return np.array(sorted(ranks), dtype=np.int64)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                f"Could not resolve process group '{group_name}' ({e}); using world group"
+            )
+    return np.arange(world_size, dtype=np.int64)
+
+
+def _collective_boundary_dtype(ctx: ConversionContext) -> Optional[trt.DataType]:
+    """Boundary precision for the Myelin fusion wall, or ``None`` when disabled.
+
+    Myelin folds identity / same-dtype casts away, so only a genuine dtype *reformat*
+    keeps a native collective out of a ``ForeignNode`` (see pytorch/TensorRT#4381).
+    Controlled by ``CompilationSettings.native_collective_boundary_dtype``.
+    """
+    boundary = ctx.compilation_settings.native_collective_boundary_dtype
+    if boundary is None:
+        return None
+    return _enums.dtype._from(boundary).to(trt.DataType)
+
+
+def _coll_boundary(
+    ctx: ConversionContext,
+    t: trt.ITensor,
+    name: str,
+    where: str,
+    orig_dtype: Optional[trt.DataType] = None,
+) -> trt.ITensor:
+    """Insert a dtype reformat around a DistCollective so Myelin will not fuse it.
+
+    ``where='in'`` casts the collective input to the boundary dtype (the collective then
+    runs at that precision); ``where='out'`` casts the output back to ``orig_dtype``, the
+    dtype the collective input had before the ``'in'`` cast. A no-op when the boundary
+    dtype is disabled or already matches.
+
+    The caller threads ``orig_dtype`` explicitly rather than the converter stashing it in
+    module state, so nothing survives across compilations.
+    """
+    boundary_dtype = _collective_boundary_dtype(ctx)
+    if boundary_dtype is None:
+        return t
+    target = boundary_dtype if where == "in" else orig_dtype
+    if target is None:
+        return t
+    if where == "in" and t.dtype == boundary_dtype:
+        logger.warning(
+            f"native_collective_boundary_dtype ({boundary_dtype}) matches the dtype of "
+            f"'{name}', so no reformat is inserted and Myelin may still absorb the "
+            f"collective into a ForeignNode. Pick a different dtype to get a fusion "
+            f"barrier for this network."
+        )
+    return cast_trt_tensor(ctx, t, target, f"{name}_myelin_bnd_{where}")
+
+
+def _all_gather_as_all_reduce(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_tensor: trt.ITensor,
+    groups: np.ndarray,
+    rank: int,
+) -> trt.ITensor:
+    """Build ``all_gather`` out of a zero-padded buffer and ``ALL_REDUCE(SUM)``.
+
+    Why this exists: TensorRT infers a native ``ALL_GATHER``'s output shape from the
+    *graph* world size (set through ``myelinGraphSetWorldSize``), which Torch-TensorRT
+    never sets at build time. A fused ``ALL_GATHER`` is therefore rejected with
+    "AllGather requires world_size (>1) to be set for shape inference", even with
+    ``ILayer.num_ranks`` set on the layer itself. ``ALL_REDUCE``'s output shape equals
+    its input shape, so it needs no build-time world size.
+
+    Each rank materialises the *gathered* buffer explicitly -- zeros, its own slice at its
+    own slot, zeros -- and sums it over the group, which yields exactly the concatenation
+    ``ALL_GATHER`` would have produced. The cost is ``len(groups)`` times the
+    communication volume of a real all_gather, hence the opt-in
+    ``all_gather_via_all_reduce`` setting.
+    """
+    shape = [int(d) for d in input_tensor.shape]
+    if any(d < 0 for d in shape):
+        raise RuntimeError(
+            f"all_gather_via_all_reduce=True requires a statically shaped input, but "
+            f"'{name}' has shape {tuple(input_tensor.shape)}. The gathered buffer is "
+            f"assembled from constant zero blocks, which cannot be sized at build time "
+            f"for a dynamic dimension. Either keep this collective's input static or "
+            f"set all_gather_via_all_reduce=False to emit a native ALL_GATHER."
+        )
+
+    num_ranks = int(len(groups))
+    group_ranks = [int(r) for r in groups.tolist()]
+    slot = group_ranks.index(rank) if rank in group_ranks else 0
+    rows_per_rank = shape[0]
+
+    def _zeros(num_rows: int, suffix: str) -> trt.ITensor:
+        return get_trt_tensor(
+            ctx,
+            np.zeros([num_rows] + shape[1:], dtype=np.float32),
+            f"{name}_{suffix}",
+            dtype=input_tensor.dtype,
+        )
+
+    parts: List[trt.ITensor] = []
+    if slot > 0:
+        parts.append(_zeros(slot * rows_per_rank, "pad_before"))
+    parts.append(input_tensor)
+    if num_ranks - 1 - slot > 0:
+        parts.append(_zeros((num_ranks - 1 - slot) * rows_per_rank, "pad_after"))
+
+    concat = ctx.net.add_concatenation(parts)
+    concat.axis = 0
+    set_layer_name(concat, target, f"{name}_scatter_into_slot", source_ir)
+
+    # The concat itself is not a Myelin fusion barrier, so keep the same precision
+    # boundary the native path uses around the collective.
+    collective_input = _coll_boundary(ctx, concat.get_output(0), name, "in")
+    layer = ctx.net.add_dist_collective(
+        collective_input,
+        trt.CollectiveOperation.ALL_REDUCE,
+        trt.ReduceOperation.SUM,
+        -1,
+        groups,
+    )
+    set_layer_name(layer, target, name, source_ir)
+    # num_ranks must be set BEFORE get_output(0) so TensorRT can infer the collective's
+    # output shape.
+    layer.num_ranks = num_ranks
+    return _coll_boundary(ctx, layer.get_output(0), name, "out", input_tensor.dtype)
 
 
 def nccl_all_gather(
@@ -228,6 +377,7 @@ def nccl_all_gather_native(
     source_ir: Optional[SourceIR],
     name: str,
     plug_inputs: Tuple[Argument, ...],
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement all_gather using native TensorRT DistCollective API.
@@ -253,17 +403,22 @@ def nccl_all_gather_native(
         f"Adding native all_gather: name={name}, rank={rank}, world_size={world_size}"
     )
 
-    # Get the input tensor
-    input_tensor = plug_inputs[0]
-
     try:
         # Use native TensorRT DistCollective API for ALL_GATHER
         # For ALL_GATHER, the reduce operation and root rank parameters are ignored
         # The last parameter (group) can be None to include all ranks
-        import numpy as np
 
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
+
+        if ctx.compilation_settings.all_gather_via_all_reduce:
+            return _all_gather_as_all_reduce(
+                ctx, target, source_ir, name, plug_inputs[0], groups, rank
+            )
+
+        # Get the input tensor
+        orig_dtype = plug_inputs[0].dtype
+        input_tensor = _coll_boundary(ctx, plug_inputs[0], name, "in")
 
         logger.debug(
             f"Creating ALL_GATHER layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -284,8 +439,10 @@ def nccl_all_gather_native(
 
         set_layer_name(layer, target, name, source_ir)
 
-        output = layer.get_output(0)
-        layer.num_ranks = world_size
+        # num_ranks must be set BEFORE get_output(0) so Myelin can infer the collective's
+        # output shape (e.g. all_gather dim0 = in_dim0 * num_ranks) for shape inference.
+        layer.num_ranks = len(groups)
+        output = _coll_boundary(ctx, layer.get_output(0), name, "out", orig_dtype)
 
         return output
 
@@ -302,6 +459,7 @@ def nccl_reduce_scatter_native(
     name: str,
     plug_inputs: Tuple[Argument, ...],
     reduce_op: str = "sum",
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement reduce_scatter using native TensorRT DistCollective API.
@@ -331,7 +489,8 @@ def nccl_reduce_scatter_native(
         return plug_inputs[0]
 
     # Get the input tensor
-    input_tensor = plug_inputs[0]
+    orig_dtype = plug_inputs[0].dtype
+    input_tensor = _coll_boundary(ctx, plug_inputs[0], name, "in")
 
     reduce_op_map = {
         "sum": trt.ReduceOperation.SUM,
@@ -350,7 +509,7 @@ def nccl_reduce_scatter_native(
     trt_reduce_op = reduce_op_map[reduce_op.lower()]
 
     try:
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         layer = ctx.net.add_dist_collective(
             input_tensor,
@@ -362,8 +521,10 @@ def nccl_reduce_scatter_native(
 
         set_layer_name(layer, target, name, source_ir)
 
-        output = layer.get_output(0)
-        layer.num_ranks = world_size
+        # num_ranks must be set BEFORE get_output(0) so Myelin can infer the collective's
+        # output shape (e.g. all_gather dim0 = in_dim0 * num_ranks) for shape inference.
+        layer.num_ranks = len(groups)
+        output = _coll_boundary(ctx, layer.get_output(0), name, "out", orig_dtype)
         logger.debug(
             f"Successfully created native REDUCE_SCATTER layer: {name}, reduce_op={reduce_op}, groups={groups.tolist()}"
         )
@@ -383,6 +544,7 @@ def nccl_all_reduce_native(
     name: str,
     plug_inputs: Tuple[Argument, ...],
     reduce_op: str = "sum",
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement all_reduce using native TensorRT DistCollective API.
@@ -413,7 +575,8 @@ def nccl_all_reduce_native(
         f"Adding native all_reduce: name={name}, rank={rank}, world_size={world_size}, reduce_op={reduce_op}"
     )
 
-    input_tensor = plug_inputs[0]
+    orig_dtype = plug_inputs[0].dtype
+    input_tensor = _coll_boundary(ctx, plug_inputs[0], name, "in")
 
     reduce_op_map = {
         "sum": trt.ReduceOperation.SUM,
@@ -435,7 +598,7 @@ def nccl_all_reduce_native(
         # Create array of all participating rank IDs [0, 1, ..., world_size-1]
         # Passing None for groups can be treated as a no-op by TRT; use an explicit
         # rank array (same as ALL_GATHER) to ensure the reduction is performed.
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         layer = ctx.net.add_dist_collective(
             input_tensor,
@@ -447,8 +610,10 @@ def nccl_all_reduce_native(
 
         set_layer_name(layer, target, name, source_ir)
 
-        output = layer.get_output(0)
-        layer.num_ranks = world_size
+        # num_ranks must be set BEFORE get_output(0) so Myelin can infer the collective's
+        # output shape (e.g. all_gather dim0 = in_dim0 * num_ranks) for shape inference.
+        layer.num_ranks = len(groups)
+        output = _coll_boundary(ctx, layer.get_output(0), name, "out", orig_dtype)
         logger.debug(
             f"Successfully created native ALL_REDUCE layer: {name}, reduce_op={reduce_op}, groups={groups.tolist()}"
         )
@@ -467,6 +632,7 @@ def nccl_all_to_all_native(
     source_ir: Optional[SourceIR],
     name: str,
     plug_inputs: Tuple[Argument, ...],
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement all_to_all using native TensorRT DistCollective API.
@@ -494,16 +660,16 @@ def nccl_all_to_all_native(
     )
 
     # Get the input tensor
-    input_tensor = plug_inputs[0]
+    orig_dtype = plug_inputs[0].dtype
+    input_tensor = _coll_boundary(ctx, plug_inputs[0], name, "in")
 
     try:
         # Use native TensorRT DistCollective API for ALL_TO_ALL
         # For ALL_TO_ALL, the reduce operation and root rank parameters are ignored
         # The last parameter (group) can be None to include all ranks
-        import numpy as np
 
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         logger.debug(
             f"Creating ALL_TO_ALL layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -524,8 +690,10 @@ def nccl_all_to_all_native(
 
         set_layer_name(layer, target, name, source_ir)
 
-        output = layer.get_output(0)
-        layer.num_ranks = world_size
+        # num_ranks must be set BEFORE get_output(0) so Myelin can infer the collective's
+        # output shape (e.g. all_gather dim0 = in_dim0 * num_ranks) for shape inference.
+        layer.num_ranks = len(groups)
+        output = _coll_boundary(ctx, layer.get_output(0), name, "out", orig_dtype)
 
         return output
 
@@ -542,6 +710,7 @@ def nccl_scatter_native(
     name: str,
     plug_inputs: Tuple[Argument, ...],
     root: int = 0,
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement scatter using native TensorRT DistCollective API.
@@ -568,16 +737,16 @@ def nccl_scatter_native(
     )
 
     # Get the input tensor
-    input_tensor = plug_inputs[0]
+    orig_dtype = plug_inputs[0].dtype
+    input_tensor = _coll_boundary(ctx, plug_inputs[0], name, "in")
 
     try:
         # Use native TensorRT DistCollective API for SCATTER
         # For SCATTER, the reduce operation parameter is ignored
         # The last parameter (group) can be None to include all ranks
-        import numpy as np
 
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         logger.debug(
             f"Creating scatter layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -598,8 +767,10 @@ def nccl_scatter_native(
 
         set_layer_name(layer, target, name, source_ir)
 
-        output = layer.get_output(0)
-        layer.num_ranks = world_size
+        # num_ranks must be set BEFORE get_output(0) so Myelin can infer the collective's
+        # output shape (e.g. all_gather dim0 = in_dim0 * num_ranks) for shape inference.
+        layer.num_ranks = len(groups)
+        output = _coll_boundary(ctx, layer.get_output(0), name, "out", orig_dtype)
 
         return output
 
@@ -616,6 +787,7 @@ def nccl_gather_native(
     name: str,
     plug_inputs: Tuple[Argument, ...],
     root: int = 0,
+    group_name: Optional[str] = None,
 ) -> trt.ITensor:
     """
     Implement gather using native TensorRT DistCollective API.
@@ -642,16 +814,16 @@ def nccl_gather_native(
     )
 
     # Get the input tensor
-    input_tensor = plug_inputs[0]
+    orig_dtype = plug_inputs[0].dtype
+    input_tensor = _coll_boundary(ctx, plug_inputs[0], name, "in")
 
     try:
         # Use native TensorRT DistCollective API for GATHER
         # For GATHER, the reduce operation parameter is ignored
         # The last parameter (group) can be None to include all ranks
-        import numpy as np
 
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = np.arange(world_size, dtype=np.int64)
+        groups = _collective_group_ranks(group_name, world_size)
 
         logger.debug(
             f"Creating gather layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -672,8 +844,10 @@ def nccl_gather_native(
 
         set_layer_name(layer, target, name, source_ir)
 
-        output = layer.get_output(0)
-        layer.num_ranks = world_size
+        # num_ranks must be set BEFORE get_output(0) so Myelin can infer the collective's
+        # output shape (e.g. all_gather dim0 = in_dim0 * num_ranks) for shape inference.
+        layer.num_ranks = len(groups)
+        output = _coll_boundary(ctx, layer.get_output(0), name, "out", orig_dtype)
 
         return output
 

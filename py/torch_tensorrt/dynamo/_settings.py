@@ -7,6 +7,7 @@ from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
+    ALL_GATHER_VIA_ALL_REDUCE,
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     ATTN_BIAS_IS_CAUSAL,
     AUTOCAST_CALIBRATION_DATALOADER,
@@ -38,6 +39,7 @@ from torch_tensorrt.dynamo._defaults import (
     LAZY_ENGINE_INIT,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
+    NATIVE_COLLECTIVE_BOUNDARY_DTYPE,
     NUM_AVG_TIMING_ITERS,
     OFFLOAD_MODULE_TO_CPU,
     OPTIMIZATION_LEVEL,
@@ -142,6 +144,27 @@ class CompilationSettings:
             foldable. Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
+        native_collective_boundary_dtype (Optional[Union[torch.dtype, dtype]]): Precision of the
+            reformat inserted on the input and output of every native TensorRT distributed
+            collective layer. The reformat acts as a Myelin fusion barrier: without a genuine
+            precision change Myelin absorbs the collective into a ``ForeignNode`` and the build
+            fails with ``CollectiveOperation ... not supported In toMyelinCommKind``
+            (pytorch/TensorRT#4381). Identity / same-dtype casts are folded away, so the dtype
+            must differ from the collective input's own dtype for the barrier to exist. Default is
+            ``dtype.f32``, which is also the safest accumulation precision for the reducing
+            collectives (all_reduce / reduce_scatter). On an fp16/bf16 network this widens the
+            transferred payload; a same-width dtype (e.g. ``torch.float16`` for a bf16 network)
+            keeps the communication volume unchanged, at the cost of fp16's narrower exponent
+            range. Set to ``None`` to insert no reformat at all.
+        all_gather_via_all_reduce (bool): Lower ``all_gather`` as "place this rank's slice into a
+            zero-padded buffer of the gathered size, then ALL_REDUCE(SUM)" instead of emitting a
+            native ALL_GATHER. Myelin infers an ALL_GATHER's output shape from the graph world
+            size (``myelinGraphSetWorldSize``), which Torch-TensorRT does not set at build time,
+            so a fused ALL_GATHER can be rejected with "AllGather requires world_size (>1) to be
+            set for shape inference"; ALL_REDUCE's output shape equals its input shape and needs
+            no build-time world size. Numerically identical to ALL_GATHER, but multiplies the
+            communication volume by the group size, and requires a static shape on the
+            collective's input. Default is False.
     """
 
     workspace_size: int = WORKSPACE_SIZE
@@ -205,6 +228,8 @@ class CompilationSettings:
     )
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
     fallback_data_dependent_ops: bool = FALLBACK_DATA_DEPENDENT_OPS
+    native_collective_boundary_dtype: Optional[dtype] = NATIVE_COLLECTIVE_BOUNDARY_DTYPE
+    all_gather_via_all_reduce: bool = ALL_GATHER_VIA_ALL_REDUCE
 
     def __post_init__(self) -> None:
         self.disabled_constant_fold_exclusions = (
@@ -233,6 +258,10 @@ class CompilationSettings:
             )
         )
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
+        state.setdefault(
+            "native_collective_boundary_dtype", NATIVE_COLLECTIVE_BOUNDARY_DTYPE
+        )
+        state.setdefault("all_gather_via_all_reduce", ALL_GATHER_VIA_ALL_REDUCE)
         self.__dict__.update(state)
 
 
@@ -260,6 +289,8 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "decompose_attention",
     "disabled_constant_fold_exclusions",
     "attn_bias_is_causal",
+    "native_collective_boundary_dtype",
+    "all_gather_via_all_reduce",
 }
 
 
