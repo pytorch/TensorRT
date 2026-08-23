@@ -30,12 +30,13 @@ def embedding(
 ) -> TRTTensor:
     indices_tensor = input
     embedding_tensor = weight
-    if isinstance(indices_tensor, torch.Tensor) and indices_tensor.dtype == torch.int64:
-        raise RuntimeError(
-            "The `embedding` op has indices_tensor dtype=int64. This is incorrect since it has to be int32 to run on TRT."
-        )
     indices_tensor = get_trt_tensor(ctx, indices_tensor, f"{name}_indices_tensor")
     embedding_tensor = get_trt_tensor(ctx, embedding_tensor, f"{name}_embedding_tensor")
+    if indices_tensor.dtype not in (trt.int32, trt.int64):
+        raise RuntimeError(
+            "The `embedding` op requires int32 or int64 indices, "
+            f"but received {indices_tensor.dtype}."
+        )
     # unsupported parameters
     # ignore padding_idx, scale_grad_by_freq, and sparse
     # since they are meaningful for training only

@@ -72,6 +72,7 @@ def load_dep_info():
     global __tensorrt_version__
     global __tensorrt_rtx_version__
     global __tensorrt_llm_version__
+    global __executorch_version__
     with open("dev_dep_versions.yml", "r") as stream:
         versions = yaml.safe_load(stream)
         if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
@@ -83,6 +84,7 @@ def load_dep_info():
         __tensorrt_version__ = versions["__tensorrt_version__"]
         __tensorrt_rtx_version__ = versions["__tensorrt_rtx_version__"]
         __tensorrt_llm_version__ = versions["__tensorrt_llm_version__"]
+        __executorch_version__ = versions["__executorch_version__"]
 
 
 load_dep_info()
@@ -201,7 +203,16 @@ if RELEASE:
 else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
-EXECUTORCH_REQUIREMENT = "executorch>=1.3.1"
+# The delegate is compiled from the ExecuTorch source revision pinned in MODULE.bazel, so the
+# installed wheel should agree with it. The upper bound is the load-bearing half: ExecuTorch's C++
+# runtime API is not stable across minor releases, and an unbounded floor would resolve a future
+# minor against a backend built for this one. Patch releases stay allowed because they come off the
+# same release branch; the exact pin belongs in the runtime package, which does derive it.
+_executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
+EXECUTORCH_REQUIREMENT = (
+    f"executorch>={__executorch_version__},"
+    f"<{_executorch_major}.{int(_executorch_minor) + 1}"
+)
 # TODO: Enable this once the runtime wheel is published to the PyTorch index.
 # EXECUTORCH_RUNTIME_REQUIREMENT = (
 #     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
@@ -600,6 +611,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.debug",
     "torch_tensorrt.dynamo.lowering",
     "torch_tensorrt.dynamo.lowering.passes",
+    "torch_tensorrt.dynamo.lowering.constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.tools",
@@ -638,6 +650,7 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.debug": "py/torch_tensorrt/dynamo/debug",
     "torch_tensorrt.dynamo.lowering": "py/torch_tensorrt/dynamo/lowering",
     "torch_tensorrt.dynamo.lowering.passes": "py/torch_tensorrt/dynamo/lowering/passes",
+    "torch_tensorrt.dynamo.lowering.constant_fold_exclusions": "py/torch_tensorrt/dynamo/lowering/constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
@@ -972,7 +985,7 @@ def get_sbsa_requirements(base_requirements):
         return requirements
     else:
         requirements = requirements + [
-            "torch>=2.14.0.dev,<2.15.0",
+            "torch>=2.15.0.dev,<2.16.0",
         ]
         if USE_TRT_RTX:
             # TensorRT-RTX ships an aarch64 (SBSA) wheel; mirror get_x86_64_requirements.
@@ -982,7 +995,7 @@ def get_sbsa_requirements(base_requirements):
         # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
         # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
         return requirements + [
-            "torch>=2.14.0.dev,<2.15.0",
+            "torch>=2.15.0.dev,<2.16.0",
             "tensorrt>=11.2.1,<11.3.0",
         ]
 
@@ -994,7 +1007,7 @@ def get_x86_64_requirements(base_requirements):
         return requirements
     else:
         requirements = requirements + [
-            "torch>=2.14.0.dev,<2.15.0",
+            "torch>=2.15.0.dev,<2.16.0",
         ]
         if USE_TRT_RTX:
             return requirements + [

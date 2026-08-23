@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -723,7 +723,7 @@ The code is available in the <a class="reference external" href="https://github.
 <h3>Basic Usage<a class="headerlink" href="#basic-usage" title="Link to this heading">#</a></h3>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--model<span class="w"> </span>meta-llama/Llama-3.2-1B-Instruct<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--prompt<span class="w"> </span><span class="s2">&quot;What is parallel programming?&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--prompt<span class="w"> </span><span class="s2">"What is parallel programming?"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--precision<span class="w"> </span>FP16<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--num_tokens<span class="w"> </span><span class="m">128</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--cache<span class="w"> </span>static_v2<span class="w"> </span><span class="se">\</span>
@@ -751,8 +751,8 @@ python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span>--mode
 python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span>--model<span class="w"> </span>meta-llama/Llama-3.2-1B-Instruct<span class="w"> </span>--benchmark<span class="w"> </span>--enable_pytorch_run
 
 <span class="c1"># Generate the outputs (disable benchmarking) by specifying the number of tokens to generate. Default = 128</span>
-python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span>--model<span class="w"> </span>gpt2<span class="w"> </span>--prompt<span class="w"> </span><span class="s2">&quot;What is parallel programming?&quot;</span><span class="w"> </span>--num_tokens<span class="w"> </span><span class="m">128</span>
-python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span>--model<span class="w"> </span>meta-llama/Llama-3.2-1B-Instruct<span class="w"> </span>--prompt<span class="w"> </span><span class="s2">&quot;What is parallel programming?&quot;</span><span class="w"> </span>--num_tokens<span class="w"> </span><span class="m">128</span>
+python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span>--model<span class="w"> </span>gpt2<span class="w"> </span>--prompt<span class="w"> </span><span class="s2">"What is parallel programming?"</span><span class="w"> </span>--num_tokens<span class="w"> </span><span class="m">128</span>
+python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span>--model<span class="w"> </span>meta-llama/Llama-3.2-1B-Instruct<span class="w"> </span>--prompt<span class="w"> </span><span class="s2">"What is parallel programming?"</span><span class="w"> </span>--num_tokens<span class="w"> </span><span class="m">128</span>
 
 <span class="c1"># Test different caching approaches</span>
 python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span>--model<span class="w"> </span>meta-llama/Llama-3.2-1B-Instruct<span class="w"> </span>--cache<span class="w"> </span>static_v1

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -610,10 +610,10 @@ from transformers import BertModel
 np.random.seed(0)
 torch.manual_seed(0)
 
-model = BertModel.from_pretrained(&quot;bert-base-uncased&quot;, return_dict=False).cuda().eval()
+model = BertModel.from_pretrained("bert-base-uncased", return_dict=False).cuda().eval()
 inputs = [
-    torch.randint(0, 2, (1, 14), dtype=torch.int32).to(&quot;cuda&quot;),
-    torch.randint(0, 2, (1, 14), dtype=torch.int32).to(&quot;cuda&quot;),
+    torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
+    torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
 ]
 
 
@@ -640,17 +640,17 @@ def compile_bert(iterations=3):
 
         start.record()
         compilation_kwargs = {
-            &quot;truncate_double&quot;: True,
-            &quot;min_block_size&quot;: 1,
-            &quot;immutable_weights&quot;: False,
-            &quot;cache_built_engines&quot;: cache_built_engines,
-            &quot;reuse_cached_engines&quot;: reuse_cached_engines,
-            &quot;engine_cache_dir&quot;: &quot;/tmp/torch_trt_bert_engine_cache&quot;,
-            &quot;engine_cache_size&quot;: 1 &lt;&lt; 30,  # 1GB
+            "truncate_double": True,
+            "min_block_size": 1,
+            "immutable_weights": False,
+            "cache_built_engines": cache_built_engines,
+            "reuse_cached_engines": reuse_cached_engines,
+            "engine_cache_dir": "/tmp/torch_trt_bert_engine_cache",
+            "engine_cache_size": 1 &lt;&lt; 30,  # 1GB
         }
         optimized_model = torch.compile(
             model,
-            backend=&quot;torch_tensorrt&quot;,
+            backend="torch_tensorrt",
             options=compilation_kwargs,
         )
         with torch.no_grad():
@@ -659,10 +659,10 @@ def compile_bert(iterations=3):
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
 
-    print(&quot;-----compile bert-----&gt; compilation time:\n&quot;, times, &quot;milliseconds&quot;)
+    print("-----compile bert-----&gt; compilation time:\n", times, "milliseconds")
 
 
-if __name__ == &quot;__main__&quot;:
+if __name__ == "__main__":
     compile_bert()
 </pre></div>
 </div>

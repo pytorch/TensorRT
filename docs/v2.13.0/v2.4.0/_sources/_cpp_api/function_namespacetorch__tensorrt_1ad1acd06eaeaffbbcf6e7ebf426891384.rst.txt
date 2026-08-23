@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1ad1acd06eaeaffbbcf6e7ebf426891384:
+
+Function torch_tensorrt::set_device
+===================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::set_device(const int)
+   :project: Torch-TensorRT

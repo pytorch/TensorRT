@@ -2460,6 +2460,66 @@ class TestLowering(TestCase):
             f"Masked_scatter TRT outputs don't match with the original model. (diff={max_diff})",
         )
 
+    def test_lowering_baddbmm(self):
+        class Baddbmm(torch.nn.Module):
+            def forward(self, bias, batch1, batch2):
+                return torch.ops.aten.baddbmm.default(bias, batch1, batch2)
+
+        self.assertIn(
+            torch.ops.aten.baddbmm.default,
+            get_decompositions(False),
+        )
+
+        unexpected_ops = {torch.ops.aten.baddbmm.default}
+        expected_ops = {torch.ops.aten.bmm.default}
+
+        inputs = [
+            torch.randn(4, 1, 8).cuda(),
+            torch.randn(4, 3, 5).cuda(),
+            torch.randn(4, 5, 8).cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(Baddbmm())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        with torch.no_grad():
+            trt_results = optimized_model(*inputs).detach().cpu()
+            torch_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(torch.max(torch.abs(trt_results - torch_results)))
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"baddbmm TRT outputs don't match with the original model. (diff={max_diff})",
+        )
+
 
 if __name__ == "__main__":
     run_tests()

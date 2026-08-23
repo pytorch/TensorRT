@@ -410,6 +410,12 @@ TEST(Converters, ATenAvgPool3DNoCountPadConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
+// The adaptive pooling converters are implemented with TensorRT plugins, which TensorRT-RTX
+// does not provide, so they are compiled out for RTX builds (see
+// core/conversion/converters/impl/pooling.cpp). Without this guard every test below fails
+// conversion with "Expected converter to be true but got false".
+#ifndef TRT_MAJOR_RTX
+
 TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
@@ -781,3 +787,5 @@ TEST(Converters, ATenAdaptiveMaxPool3DUsingPluginConvertsCorrectly) {
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
+
+#endif // TRT_MAJOR_RTX

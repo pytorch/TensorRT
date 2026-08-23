@@ -5,7 +5,7 @@ Runtime loading is provided by the optional
 ``torch_tensorrt.load(..., format="executorch")``.
 """
 
-import importlib
+import importlib.util
 from typing import TYPE_CHECKING, NoReturn
 
 if TYPE_CHECKING:
@@ -32,8 +32,10 @@ if not _has_executorch_exir():
         "get_edge_compile_config",
         "TensorRTPartitioner",
         "TensorRTBackend",
+        "export",
     ]
 else:
+    from torch_tensorrt.executorch._export import export
     from torch_tensorrt.executorch.backend import TensorRTBackend
     from torch_tensorrt.executorch.partitioner import TensorRTPartitioner
 
@@ -47,4 +49,5 @@ else:
         "get_edge_compile_config",
         "TensorRTPartitioner",
         "TensorRTBackend",
+        "export",
     ]

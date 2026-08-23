@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -489,7 +489,7 @@ document.write(`
 <div class="viewcode-block" id="Input">
 <a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Input</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Defines an input to a module in terms of expected shape, data type and tensor format.</span>
 
 <span class="sd">    Attributes:</span>
@@ -499,11 +499,11 @@ document.write(`
 
 <span class="sd">            .. code-block:: py</span>
 
-<span class="sd">                {&quot;min_shape&quot;: Tuple, &quot;opt_shape&quot;: Tuple, &quot;max_shape&quot;: Tuple}</span>
+<span class="sd">                {"min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple}</span>
 
 <span class="sd">        dtype (torch_tensorrt.dtype): The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)</span>
 <span class="sd">        format (torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">class</span><span class="w"> </span><span class="nc">_ShapeMode</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
         <span class="n">STATIC</span> <span class="o">=</span> <span class="mi">0</span>
@@ -513,7 +513,7 @@ document.write(`
         <span class="kc">None</span>  <span class="c1">#: Is input statically or dynamically shaped</span>
     <span class="p">)</span>
     <span class="n">shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="kc">None</span>  <span class="c1">#: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ &quot;min_shape&quot;: Tuple, &quot;opt_shape&quot;: Tuple, &quot;max_shape&quot;: Tuple }``</span>
+        <span class="kc">None</span>  <span class="c1">#: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``</span>
     <span class="p">)</span>
     <span class="n">dtype</span><span class="p">:</span> <span class="n">dtype</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">dtype</span><span class="o">.</span><span class="n">unknown</span>
@@ -527,7 +527,7 @@ document.write(`
     <span class="n">low_tensor_domain_incl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
     <span class="n">high_tensor_domain_excl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">low_tensor_domain_incl</span> <span class="o">+</span> <span class="n">DOMAIN_OFFSET</span>
     <span class="n">torch_tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
     <span class="n">is_shape_tensor</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">shared_dims</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
         <span class="p">{}</span>
@@ -545,7 +545,7 @@ document.write(`
 <div class="viewcode-block" id="Input.__init__">
 <a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;__init__ Method for torch_tensorrt.Input</span>
+<span class="w">        </span><span class="sd">"""__init__ Method for torch_tensorrt.Input</span>
 
 <span class="sd">        Input accepts one of a few construction patterns</span>
 
@@ -554,172 +554,230 @@ document.write(`
 
 <span class="sd">        Keyword Arguments:</span>
 <span class="sd">            shape (Tuple or List, optional): Static shape of input tensor</span>
-<span class="sd">            min_shape (Tuple or List, optional): Min size of input tensor&#39;s shape range</span>
-<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input&#39;s shape_mode to DYNAMIC</span>
-<span class="sd">            opt_shape (Tuple or List, optional): Opt size of input tensor&#39;s shape range</span>
-<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input&#39;s shape_mode to DYNAMIC</span>
-<span class="sd">            max_shape (Tuple or List, optional): Max size of input tensor&#39;s shape range</span>
-<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input&#39;s shape_mode to DYNAMIC</span>
+<span class="sd">            min_shape (Tuple, List, torch.Size, or NamedTuple, optional): Min size of input tensor's shape range.</span>
+<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.</span>
+<span class="sd">                If a namedtuple is provided, its field names are used as axis names — see the namedtuple shape spec note below.</span>
+<span class="sd">            opt_shape (Tuple, List, torch.Size, or NamedTuple, optional): Opt size of input tensor's shape range.</span>
+<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.</span>
+<span class="sd">                Must be a namedtuple with identical fields to min_shape if min_shape is a namedtuple.</span>
+<span class="sd">            max_shape (Tuple, List, torch.Size, or NamedTuple, optional): Max size of input tensor's shape range.</span>
+<span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC.</span>
+<span class="sd">                Must be a namedtuple with identical fields to min_shape if min_shape is a namedtuple.</span>
 <span class="sd">            dtype (torch.dtype or torch_tensorrt.dtype): Expected data type for input tensor (default: torch_tensorrt.dtype.float32)</span>
 <span class="sd">            format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</span>
 <span class="sd">            tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).</span>
-<span class="sd">                Note: Entering &quot;None&quot; (or not specifying) will set the bound to [0, 2)</span>
+<span class="sd">                Note: Entering "None" (or not specifying) will set the bound to [0, 2)</span>
 <span class="sd">            torch_tensor (torch.Tensor): Holds a corresponding torch tensor with this Input.</span>
-<span class="sd">            name (str, optional): Name of this input in the input nn.Module&#39;s forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.</span>
+<span class="sd">            name (str, optional): Name of this input in the input nn.Module's forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.</span>
+<span class="sd">            shared_dims (Dict[int, str], optional): Maps axis indices to names. Axes with the same name across multiple inputs are exported as a single shared ``torch.export.Dim``. Cannot be combined with a namedtuple min_shape.</span>
+
+<span class="sd">        Note — namedtuple shape spec (shorthand for ``shared_dims``):</span>
+<span class="sd">            Passing a namedtuple as ``min_shape``/``opt_shape``/``max_shape`` is a shorthand</span>
+<span class="sd">            for declaring shared dynamic axes without writing ``shared_dims`` explicitly.</span>
+<span class="sd">            Each field name becomes the axis name; dynamic axes (min != max) with the same</span>
+<span class="sd">            name across inputs are automatically exported as one shared ``torch.export.Dim``.</span>
+<span class="sd">            Static axes (min == max) are ignored. Cannot be combined with ``shared_dims``::</span>
+
+<span class="sd">                from collections import namedtuple</span>
+<span class="sd">                S = namedtuple("shape", ["batch", "seq"])</span>
+<span class="sd">                inputs = [</span>
+<span class="sd">                    torch_tensorrt.Input(min_shape=S(1, 16), opt_shape=S(4, 16), max_shape=S(4, 16),</span>
+<span class="sd">                                         dtype=torch.int64, name="input_ids"),</span>
+<span class="sd">                    torch_tensorrt.Input(min_shape=S(1, 16), opt_shape=S(4, 16), max_shape=S(4, 16),</span>
+<span class="sd">                                         dtype=torch.int64, name="attention_mask"),</span>
+<span class="sd">                ]</span>
+<span class="sd">                # "batch" is dynamic (1→4) on both inputs → one shared Dim("batch")</span>
+<span class="sd">                # "seq" is static (16==16) → no shared dim needed</span>
+
 <span class="sd">        Examples:</span>
 <span class="sd">            - Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)</span>
 <span class="sd">            - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)</span>
 <span class="sd">            - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># Multi optimization profile support. ``profiles`` is validated and</span>
         <span class="c1"># translated into the union ``min_shape`` / ``opt_shape`` / ``max_shape``</span>
         <span class="c1"># kwargs so the regular dynamic-shape path below constructs the Input</span>
         <span class="c1"># unchanged.</span>
-        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;profiles&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"profiles"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_profiles</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
 
         <span class="c1"># Compatibility code for switching over from InputTensorSpec.</span>
         <span class="c1"># Mutually exclusive with `profiles` above (which translates into</span>
         <span class="c1"># min/opt/max kwargs and forbids `shape`/`shape_ranges`).</span>
-        <span class="k">elif</span> <span class="s2">&quot;shape&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="s2">&quot;shape_ranges&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="s2">"shape"</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="s2">"shape_ranges"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
             <span class="k">assert</span> <span class="p">(</span>
-                <span class="nb">len</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">3</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape_ranges"</span><span class="p">])</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape_ranges"</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">3</span>
             <span class="p">)</span>
-            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape&quot;</span><span class="p">]</span>
+            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape"</span><span class="p">]</span>
 
-            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
-            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape_ranges"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape_ranges"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape_ranges"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: &quot;</span>
+                    <span class="s2">"Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "</span>
                     <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
                 <span class="p">)</span>
-            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">]):</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"min_shape"</span><span class="p">,</span> <span class="s2">"opt_shape"</span><span class="p">,</span> <span class="s2">"max_shape"</span><span class="p">]):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Found that both shape (as a positional argument), and one or more of min_shape, opt_shape, max_shape were specified</span><span class="se">\n</span><span class="s2">class Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined&quot;</span>
+                    <span class="s2">"Found that both shape (as a positional argument), and one or more of min_shape, opt_shape, max_shape were specified</span><span class="se">\n</span><span class="s2">class Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined"</span>
                 <span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span>
 
         <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">if</span> <span class="s2">&quot;shape&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span>
-                <span class="nb">all</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="s2">"shape"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span>
+                <span class="nb">all</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"min_shape"</span><span class="p">,</span> <span class="s2">"opt_shape"</span><span class="p">,</span> <span class="s2">"max_shape"</span><span class="p">])</span>
             <span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Missing required arguments for class Input</span><span class="se">\n</span><span class="s2">Either shape or all three of min_shape, opt_shape, max_shape must be defined&quot;</span>
+                    <span class="s2">"Missing required arguments for class Input</span><span class="se">\n</span><span class="s2">Either shape or all three of min_shape, opt_shape, max_shape must be defined"</span>
                 <span class="p">)</span>
-            <span class="k">elif</span> <span class="p">(</span><span class="s2">&quot;shape&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span>
-                <span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="s2">"shape"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span>
+                <span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"min_shape"</span><span class="p">,</span> <span class="s2">"opt_shape"</span><span class="p">,</span> <span class="s2">"max_shape"</span><span class="p">]</span>
             <span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Found that both shape, and one or more of min_shape, opt_shape, max_shape were specified</span><span class="se">\n</span><span class="s2">class Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined&quot;</span>
+                    <span class="s2">"Found that both shape, and one or more of min_shape, opt_shape, max_shape were specified</span><span class="se">\n</span><span class="s2">class Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined"</span>
                 <span class="p">)</span>
 
-            <span class="k">if</span> <span class="s2">&quot;shape&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape&quot;</span><span class="p">]):</span>
+            <span class="k">if</span> <span class="s2">"shape"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape"</span><span class="p">]):</span>
                     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                        <span class="s2">&quot;Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: &quot;</span>
-                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape&quot;</span><span class="p">]))</span>
+                        <span class="s2">"Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "</span>
+                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape"</span><span class="p">]))</span>
                     <span class="p">)</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape&quot;</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape"</span><span class="p">])</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]):</span>
                     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                        <span class="s2">&quot;Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: &quot;</span>
-                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]))</span>
-                        <span class="o">+</span> <span class="s2">&quot; for min_shape&quot;</span>
+                        <span class="s2">"Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "</span>
+                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]))</span>
+                        <span class="o">+</span> <span class="s2">" for min_shape"</span>
                     <span class="p">)</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">]):</span>
                     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                        <span class="s2">&quot;Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: &quot;</span>
-                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]))</span>
-                        <span class="o">+</span> <span class="s2">&quot; for opt_shape&quot;</span>
+                        <span class="s2">"Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "</span>
+                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">]))</span>
+                        <span class="o">+</span> <span class="s2">" for opt_shape"</span>
                     <span class="p">)</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]):</span>
                     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                        <span class="s2">&quot;Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: &quot;</span>
-                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]))</span>
-                        <span class="o">+</span> <span class="s2">&quot; for max_shape&quot;</span>
+                        <span class="s2">"Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "</span>
+                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]))</span>
+                        <span class="o">+</span> <span class="s2">" for max_shape"</span>
                     <span class="p">)</span>
 
                 <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="p">{</span>
-                    <span class="s2">&quot;min_shape&quot;</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]),</span>
-                    <span class="s2">&quot;opt_shape&quot;</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]),</span>
-                    <span class="s2">&quot;max_shape&quot;</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]),</span>
+                    <span class="s2">"min_shape"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]),</span>
+                    <span class="s2">"opt_shape"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">]),</span>
+                    <span class="s2">"max_shape"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]),</span>
                 <span class="p">}</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span>
 
-                <span class="c1"># Warn if min_shape has any 0 dimension (empty tensor) - TensorRT doesn&#39;t support this</span>
+                <span class="c1"># Warn if min_shape has any 0 dimension (empty tensor) - TensorRT doesn't support this</span>
                 <span class="c1"># @apbose: Is this warning necessary?</span>
-                <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">dim</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]):</span>
+                <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">dim</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]):</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;min_shape contains a 0 dimension: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s1">&#39;min_shape&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">. &quot;</span>
-                        <span class="s2">&quot;TensorRT does not support dynamic shapes with min dimension of 0 (empty tensors). &quot;</span>
-                        <span class="s2">&quot;TensorRT will internally clamp min dimensions to 1, which may cause runtime errors &quot;</span>
-                        <span class="s2">&quot;if you try to run inference with empty tensor inputs.&quot;</span>
+                        <span class="sa">f</span><span class="s2">"min_shape contains a 0 dimension: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s1">'min_shape'</span><span class="p">]</span><span class="si">}</span><span class="s2">. "</span>
+                        <span class="s2">"TensorRT does not support dynamic shapes with min dimension of 0 (empty tensors). "</span>
+                        <span class="s2">"TensorRT will internally clamp min dimensions to 1, which may cause runtime errors "</span>
+                        <span class="s2">"if you try to run inference with empty tensor inputs."</span>
                     <span class="p">)</span>
 
-                <span class="k">if</span> <span class="s2">&quot;shared_dims&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shared_dims&quot;</span><span class="p">]:</span>
+                <span class="c1"># Namedtuple shape API: field names encode per-axis dimension names.</span>
+                <span class="c1"># Convert to shared_dims so _tracer.py needs no changes — axes with the</span>
+                <span class="c1"># same name across inputs become one shared torch.export.Dim.</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">],</span> <span class="s2">"_fields"</span><span class="p">):</span>
+                    <span class="n">fields</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
+                        <span class="nb">hasattr</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">],</span> <span class="s2">"_fields"</span><span class="p">)</span>
+                        <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">],</span> <span class="s2">"_fields"</span><span class="p">)</span>
+                    <span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                            <span class="s2">"If min_shape is a namedtuple, opt_shape and max_shape must also be namedtuples"</span>
+                        <span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
+                        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span> <span class="o">==</span> <span class="n">fields</span>
+                        <span class="ow">and</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span> <span class="o">==</span> <span class="n">fields</span>
+                    <span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">"min_shape, opt_shape, max_shape namedtuples must have identical field names"</span>
+                        <span class="p">)</span>
+                    <span class="c1"># Only tag dynamic axes (min != max); static axes need no shared Dim.</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">shared_dims</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="n">i</span><span class="p">:</span> <span class="n">name</span>
+                        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">][</span><span class="n">i</span><span class="p">]</span>
+                    <span class="p">}</span>
+
+                <span class="k">if</span> <span class="s2">"shared_dims"</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shared_dims"</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">],</span> <span class="s2">"_fields"</span><span class="p">):</span>
+                        <span class="c1"># Not allowed:</span>
+                        <span class="c1">#   S = namedtuple('S', ['b', 'c'])</span>
+                        <span class="c1">#   Input(min_shape=S(1,2), opt_shape=S(4,2), max_shape=S(8,2),</span>
+                        <span class="c1">#         shared_dims={0: "b"})   # ← redundant and ambiguous</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">"Cannot specify both a namedtuple min_shape and shared_dims; "</span>
+                            <span class="s2">"use one or the other to name dynamic axes."</span>
+                        <span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">shared_dims</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_shared_dims</span><span class="p">(</span>
-                        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shared_dims&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+                        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shared_dims"</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
                     <span class="p">)</span>
 
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Unexpected number of positional arguments for class Input </span><span class="se">\n</span><span class="s2">    Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="si">}</span><span class="s2"> arguments, expected either zero or a single positional arguments&quot;</span>
+                <span class="sa">f</span><span class="s2">"Unexpected number of positional arguments for class Input </span><span class="se">\n</span><span class="s2">    Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="si">}</span><span class="s2"> arguments, expected either zero or a single positional arguments"</span>
             <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;shared_dims&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">!=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"shared_dims"</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">!=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;shared_dims is only valid for dynamic inputs (min_shape/opt_shape/max_shape); &quot;</span>
-                <span class="s2">&quot;it has no meaning for a statically shaped Input.&quot;</span>
+                <span class="s2">"shared_dims is only valid for dynamic inputs (min_shape/opt_shape/max_shape); "</span>
+                <span class="s2">"it has no meaning for a statically shaped Input."</span>
             <span class="p">)</span>
 
-        <span class="k">if</span> <span class="s2">&quot;dtype&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;dtype&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="s2">"dtype"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"dtype"</span><span class="p">])</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">unknown</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_explicit_set_dtype</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_explicit_set_dtype</span> <span class="o">=</span> <span class="kc">False</span>
 
-        <span class="k">if</span> <span class="s2">&quot;is_shape_tensor&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">is_shape_tensor</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;is_shape_tensor&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">"is_shape_tensor"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">is_shape_tensor</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"is_shape_tensor"</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="s2">&quot;format&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;format&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="s2">"format"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"format"</span><span class="p">])</span>
 
-        <span class="k">if</span> <span class="s2">&quot;tensor_domain&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="n">domain</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;tensor_domain&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">"tensor_domain"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"tensor_domain"</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">domain</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_tensor_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="s2">&quot;torch_tensor&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;torch_tensor&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">"torch_tensor"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"torch_tensor"</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_shape_tensor</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
-                    <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;dtype&quot;</span><span class="p">]</span>
+                    <span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"dtype"</span><span class="p">]</span>
                 <span class="p">)</span>
             <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_tensor</span><span class="p">(</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_tensor</span><span class="p">(</span><span class="s2">"opt_shape"</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_tensor</span><span class="p">()</span>
 
-        <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span></div>
+        <span class="k">if</span> <span class="s2">"name"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_init_from_profiles</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate ``profiles`` and translate them into union shape kwargs.</span>
+<span class="w">        </span><span class="sd">"""Validate ``profiles`` and translate them into union shape kwargs.</span>
 
-<span class="sd">        ``profiles`` (``kwargs[&quot;profiles&quot;]``) is an ordered list of dicts (one per</span>
+<span class="sd">        ``profiles`` (``kwargs["profiles"]``) is an ordered list of dicts (one per</span>
 <span class="sd">        profile); the list index is the TRT optimization-profile index selected at</span>
 <span class="sd">        runtime. Each entry has ``min_shape`` / ``opt_shape`` / ``max_shape``</span>
 <span class="sd">        tuples. This stores the normalized list on ``self.profiles`` and fills</span>
@@ -733,82 +791,82 @@ document.write(`
 <span class="sd">        ``torch.export.Dim`` across inputs. The two compose -- ``shared_dims`` is</span>
 <span class="sd">        left in ``kwargs`` and validated against the union envelope by the regular</span>
 <span class="sd">        dynamic-shape path (a named axis must be dynamic in the union).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">profiles</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;profiles&quot;</span><span class="p">]</span>
+<span class="sd">        """</span>
+        <span class="n">profiles</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"profiles"</span><span class="p">]</span>
         <span class="c1"># ``profiles`` is the only *shape* specifier when used (``shared_dims`` is</span>
         <span class="c1"># an axis-naming modifier, not a shape, so it is allowed alongside).</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Found both a positional shape argument and `profiles`. &quot;</span>
-                <span class="s2">&quot;class Input expects `profiles` to be the only shape specifier when used.&quot;</span>
+                <span class="s2">"Found both a positional shape argument and `profiles`. "</span>
+                <span class="s2">"class Input expects `profiles` to be the only shape specifier when used."</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
             <span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span>
-            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;shape&quot;</span><span class="p">,</span> <span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;shape_ranges&quot;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"shape"</span><span class="p">,</span> <span class="s2">"min_shape"</span><span class="p">,</span> <span class="s2">"opt_shape"</span><span class="p">,</span> <span class="s2">"max_shape"</span><span class="p">,</span> <span class="s2">"shape_ranges"</span><span class="p">]</span>
         <span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;`profiles` is mutually exclusive with `shape` / `min_shape` / &quot;</span>
-                <span class="s2">&quot;`opt_shape` / `max_shape`. Specify only one shape declaration on an Input.&quot;</span>
+                <span class="s2">"`profiles` is mutually exclusive with `shape` / `min_shape` / "</span>
+                <span class="s2">"`opt_shape` / `max_shape`. Specify only one shape declaration on an Input."</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">profiles</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">profiles</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;`profiles` must be a non-empty list of dicts, each with keys &quot;</span>
-                <span class="s2">&quot;&#39;min_shape&#39;, &#39;opt_shape&#39;, &#39;max_shape&#39;. The list index is the optimization-profile &quot;</span>
-                <span class="s2">&quot;index used to select the profile at runtime.&quot;</span>
+                <span class="s2">"`profiles` must be a non-empty list of dicts, each with keys "</span>
+                <span class="s2">"'min_shape', 'opt_shape', 'max_shape'. The list index is the optimization-profile "</span>
+                <span class="s2">"index used to select the profile at runtime."</span>
             <span class="p">)</span>
 
         <span class="n">normalized</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">rank</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">prof</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">profiles</span><span class="p">):</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prof</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
-                <span class="n">k</span> <span class="ow">in</span> <span class="n">prof</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">)</span>
+                <span class="n">k</span> <span class="ow">in</span> <span class="n">prof</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"min_shape"</span><span class="p">,</span> <span class="s2">"opt_shape"</span><span class="p">,</span> <span class="s2">"max_shape"</span><span class="p">)</span>
             <span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> must be a dict with keys &#39;min_shape&#39;, &#39;opt_shape&#39;, &#39;max_shape&#39;&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> must be a dict with keys 'min_shape', 'opt_shape', 'max_shape'"</span>
                 <span class="p">)</span>
 
-            <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"min_shape"</span><span class="p">,</span> <span class="s2">"opt_shape"</span><span class="p">,</span> <span class="s2">"max_shape"</span><span class="p">):</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="n">field_name</span><span class="p">]):</span>
                     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> field &#39;</span><span class="si">{</span><span class="n">field_name</span><span class="si">}</span><span class="s2">&#39; must be a List, &quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot;tuple or torch.Size, found </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="n">field_name</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> field '</span><span class="si">{</span><span class="n">field_name</span><span class="si">}</span><span class="s2">' must be a List, "</span>
+                        <span class="sa">f</span><span class="s2">"tuple or torch.Size, found </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="n">field_name</span><span class="p">])</span><span class="si">}</span><span class="s2">"</span>
                     <span class="p">)</span>
 
-            <span class="n">min_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">])</span>
-            <span class="n">opt_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">])</span>
-            <span class="n">max_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">])</span>
+            <span class="n">min_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">])</span>
+            <span class="n">opt_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">])</span>
+            <span class="n">max_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prof</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">])</span>
 
             <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">opt_shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">max_shape</span><span class="p">)):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> min/opt/max shapes must have the same number &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;of dimensions, found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">opt_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">max_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> min/opt/max shapes must have the same number "</span>
+                    <span class="sa">f</span><span class="s2">"of dimensions, found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">opt_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">max_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
             <span class="k">if</span> <span class="n">rank</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span>
             <span class="k">elif</span> <span class="n">rank</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;All profiles on an Input must have the same number of dimensions. &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.&quot;</span>
+                    <span class="s2">"All profiles on an Input must have the same number of dimensions. "</span>
+                    <span class="sa">f</span><span class="s2">"Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">."</span>
                 <span class="p">)</span>
 
             <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)):</span>
                 <span class="c1"># No min=0 (and TRT requires &gt;= 1).</span>
                 <span class="k">if</span> <span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> min_shape[</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">]=</span><span class="si">{</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2"> is invalid; &quot;</span>
-                        <span class="s2">&quot;every dimension must have min &gt;= 1 (min=0 is not supported).&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> min_shape[</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">]=</span><span class="si">{</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2"> is invalid; "</span>
+                        <span class="s2">"every dimension must have min &gt;= 1 (min=0 is not supported)."</span>
                     <span class="p">)</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">opt_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> requires min &lt;= opt &lt;= max element-wise. &quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot;Got min=</span><span class="si">{</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2">, opt=</span><span class="si">{</span><span class="n">opt_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2">, max=</span><span class="si">{</span><span class="n">max_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2"> at dim </span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">.&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Profile at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> requires min &lt;= opt &lt;= max element-wise. "</span>
+                        <span class="sa">f</span><span class="s2">"Got min=</span><span class="si">{</span><span class="n">min_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2">, opt=</span><span class="si">{</span><span class="n">opt_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2">, max=</span><span class="si">{</span><span class="n">max_shape</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="si">}</span><span class="s2"> at dim </span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">."</span>
                     <span class="p">)</span>
 
             <span class="n">normalized</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                 <span class="p">{</span>
-                    <span class="s2">&quot;min_shape&quot;</span><span class="p">:</span> <span class="n">min_shape</span><span class="p">,</span>
-                    <span class="s2">&quot;opt_shape&quot;</span><span class="p">:</span> <span class="n">opt_shape</span><span class="p">,</span>
-                    <span class="s2">&quot;max_shape&quot;</span><span class="p">:</span> <span class="n">max_shape</span><span class="p">,</span>
+                    <span class="s2">"min_shape"</span><span class="p">:</span> <span class="n">min_shape</span><span class="p">,</span>
+                    <span class="s2">"opt_shape"</span><span class="p">:</span> <span class="n">opt_shape</span><span class="p">,</span>
+                    <span class="s2">"max_shape"</span><span class="p">:</span> <span class="n">max_shape</span><span class="p">,</span>
                 <span class="p">}</span>
             <span class="p">)</span>
 
@@ -819,15 +877,15 @@ document.write(`
         <span class="c1"># specialize at). The regular dynamic-shape path in ``__init__`` consumes</span>
         <span class="c1"># these to set ``self.shape`` and ``shape_mode``.</span>
         <span class="k">assert</span> <span class="n">rank</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="n">union_min</span> <span class="o">=</span> <span class="p">[</span><span class="nb">min</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">][</span><span class="n">d</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">normalized</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">)]</span>
-        <span class="n">union_max</span> <span class="o">=</span> <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">][</span><span class="n">d</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">normalized</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">)]</span>
-        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">union_min</span><span class="p">)</span>
-        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">normalized</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">])</span>
-        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">union_max</span><span class="p">)</span>
+        <span class="n">union_min</span> <span class="o">=</span> <span class="p">[</span><span class="nb">min</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">][</span><span class="n">d</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">normalized</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">)]</span>
+        <span class="n">union_max</span> <span class="o">=</span> <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">][</span><span class="n">d</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">normalized</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">)]</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">union_min</span><span class="p">)</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">normalized</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">"opt_shape"</span><span class="p">])</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">union_max</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">&quot;Input(shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="k">return</span> <span class="s2">"Input(shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
                 <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
                 <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">),</span>
@@ -837,19 +895,19 @@ document.write(`
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
                 <span class="n">profiles_str</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="s2">&quot;, profiles=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="s2">", profiles=</span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                         <span class="p">[</span>
                             <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">prof</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
                             <span class="k">for</span> <span class="n">prof</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiles</span>
                         <span class="p">]</span>
                     <span class="p">)</span>
                     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiles</span>
-                    <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                    <span class="k">else</span> <span class="s2">""</span>
                 <span class="p">)</span>
-                <span class="k">return</span> <span class="s2">&quot;Input(min_shape=</span><span class="si">{}</span><span class="s2">, opt_shape=</span><span class="si">{}</span><span class="s2">, max_shape=</span><span class="si">{}{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
+                <span class="k">return</span> <span class="s2">"Input(min_shape=</span><span class="si">{}</span><span class="s2">, opt_shape=</span><span class="si">{}</span><span class="s2">, max_shape=</span><span class="si">{}{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">],</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">],</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">],</span>
                     <span class="n">profiles_str</span><span class="p">,</span>
                     <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
                     <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">),</span>
@@ -858,10 +916,10 @@ document.write(`
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Input shape is dynamic but shapes are not provided as dictionary (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Input shape is dynamic but shapes are not provided as dictionary (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Unknown input shape mode&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Unknown input shape mode"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__str__</span><span class="p">()</span>
@@ -875,9 +933,9 @@ document.write(`
             <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
             <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
             <span class="n">checks</span> <span class="o">=</span> <span class="p">[</span>
-                <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
-                <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
-                <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
+                <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">],</span>
+                <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"opt_shape"</span><span class="p">],</span>
+                <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">],</span>
                 <span class="n">a</span><span class="o">.</span><span class="n">profiles</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">profiles</span><span class="p">,</span>
                 <span class="n">a</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
                 <span class="n">a</span><span class="o">.</span><span class="n">format</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">format</span><span class="p">,</span>
@@ -899,31 +957,31 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">_parse_shared_dims</span><span class="p">(</span>
         <span class="n">shared_dims</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize the ``shared_dims`` mapping ({axis: name}).</span>
+<span class="w">        </span><span class="sd">"""Validate and normalize the ``shared_dims`` mapping ({axis: name}).</span>
 
 <span class="sd">        Each named axis must be a valid index into the shape and must be</span>
 <span class="sd">        genuinely dynamic (``min != max``); a static axis cannot vary, so naming</span>
 <span class="sd">        it for cross-input sharing is a user error.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shared_dims</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;shared_dims must be a dict of </span><span class="se">{{</span><span class="s2">axis_index: name</span><span class="se">}}</span><span class="s2">, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">shared_dims</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">"shared_dims must be a dict of </span><span class="se">{{</span><span class="s2">axis_index: name</span><span class="se">}}</span><span class="s2">, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">shared_dims</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
-        <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">])</span>
+        <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">])</span>
         <span class="n">parsed</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">axis</span><span class="p">,</span> <span class="n">dim_name</span> <span class="ow">in</span> <span class="n">shared_dims</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">axis</span> <span class="o">&lt;</span> <span class="n">rank</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;shared_dims key </span><span class="si">{</span><span class="n">axis</span><span class="si">!r}</span><span class="s2"> is not a valid axis index for an input of rank </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"shared_dims key </span><span class="si">{</span><span class="n">axis</span><span class="si">!r}</span><span class="s2"> is not a valid axis index for an input of rank </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dim_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">dim_name</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;shared_dims value for axis </span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> must be a non-empty string, got </span><span class="si">{</span><span class="n">dim_name</span><span class="si">!r}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"shared_dims value for axis </span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> must be a non-empty string, got </span><span class="si">{</span><span class="n">dim_name</span><span class="si">!r}</span><span class="s2">"</span>
                 <span class="p">)</span>
-            <span class="k">if</span> <span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span> <span class="o">==</span> <span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">][</span><span class="n">axis</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span> <span class="o">==</span> <span class="n">shape</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">][</span><span class="n">axis</span><span class="p">]:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Axis </span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> named &#39;</span><span class="si">{</span><span class="n">dim_name</span><span class="si">}</span><span class="s2">&#39; is static &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;(min == max == </span><span class="si">{</span><span class="n">shape</span><span class="p">[</span><span class="s1">&#39;min_shape&#39;</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span><span class="si">}</span><span class="s2">); only dynamic axes can be named.&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Axis </span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> named '</span><span class="si">{</span><span class="n">dim_name</span><span class="si">}</span><span class="s2">' is static "</span>
+                    <span class="sa">f</span><span class="s2">"(min == max == </span><span class="si">{</span><span class="n">shape</span><span class="p">[</span><span class="s1">'min_shape'</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span><span class="si">}</span><span class="s2">); only dynamic axes can be named."</span>
                 <span class="p">)</span>
             <span class="n">parsed</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span> <span class="o">=</span> <span class="n">dim_name</span>
         <span class="k">return</span> <span class="n">parsed</span>
@@ -943,7 +1001,7 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">_parse_tensor_domain</span><span class="p">(</span>
         <span class="n">domain</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Produce a tuple of integers which specifies a tensor domain in the interval format: [lo, hi)</span>
 
 <span class="sd">        Args:</span>
@@ -951,7 +1009,7 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A tuple of two int32_t-valid integers</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">domain</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">result_domain</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="n">Input</span><span class="o">.</span><span class="n">low_tensor_domain_incl</span><span class="p">,</span>
@@ -967,22 +1025,22 @@ document.write(`
 
             <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_type_lo</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Expected value for tensor domain low specifier, got </span><span class="si">{</span><span class="n">domain_lo</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Expected value for tensor domain low specifier, got </span><span class="si">{</span><span class="n">domain_lo</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
             <span class="k">elif</span> <span class="ow">not</span> <span class="n">valid_type_hi</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Expected value for tensor domain high specifier, got </span><span class="si">{</span><span class="n">domain_hi</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Expected value for tensor domain high specifier, got </span><span class="si">{</span><span class="n">domain_hi</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
 
             <span class="k">if</span> <span class="n">domain_hi</span> <span class="o">&lt;=</span> <span class="n">domain_lo</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Expected provided integer range to have low tensor domain value &quot;</span>
-                    <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;&lt; high tensor domain value, got invalid range [</span><span class="si">{</span><span class="n">domain_lo</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">domain_hi</span><span class="si">}</span><span class="s2">)&quot;</span>
+                    <span class="s2">"Expected provided integer range to have low tensor domain value "</span>
+                    <span class="o">+</span> <span class="sa">f</span><span class="s2">"&lt; high tensor domain value, got invalid range [</span><span class="si">{</span><span class="n">domain_lo</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">domain_hi</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="p">)</span>
             <span class="n">result_domain</span> <span class="o">=</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">domain_lo</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">domain_hi</span><span class="p">))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Expected 2 values for domain, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">"Expected 2 values for domain, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">result_domain</span>
@@ -992,8 +1050,8 @@ document.write(`
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_tensor</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">disable_memory_format_check</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Input&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Input"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Produce a Input which contains the information of the given PyTorch tensor.</span>
 
 <span class="sd">        Args:</span>
@@ -1002,14 +1060,14 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A Input object.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
             <span class="n">disable_memory_format_check</span>
             <span class="ow">or</span> <span class="n">t</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span><span class="p">)</span>
             <span class="ow">or</span> <span class="n">t</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
         <span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Tensor does not have a supported memory format, supported formats are contiguous or channel_last&quot;</span>
+                <span class="s2">"Tensor does not have a supported memory format, supported formats are contiguous or channel_last"</span>
             <span class="p">)</span>
         <span class="n">frmt</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span>
@@ -1027,8 +1085,8 @@ document.write(`
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_tensors</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">disable_memory_format_check</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;Input&quot;</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">"Input"</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Produce a list of Inputs which contain</span>
 <span class="sd">        the information of all the given PyTorch tensors.</span>
 
@@ -1038,7 +1096,7 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A list of Inputs.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span>
         <span class="k">return</span> <span class="p">[</span>
@@ -1052,7 +1110,7 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">example_tensor</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">optimization_profile_field</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get an example tensor of the shape specified by the Input object</span>
 
 <span class="sd">        Args:</span>
@@ -1060,11 +1118,11 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A PyTorch Tensor</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">optimization_profile_field</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Specified a optimization profile field but the input is static&quot;</span>
+                    <span class="s2">"Specified a optimization profile field but the input is static"</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
@@ -1073,18 +1131,18 @@ document.write(`
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Input shape is dynamic but shapes are not provided as sequence (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Input shape is dynamic but shapes are not provided as sequence (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)"</span>
                     <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">optimization_profile_field</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="k">assert</span> <span class="nb">any</span><span class="p">(</span>
                         <span class="n">optimization_profile_field</span> <span class="o">==</span> <span class="n">field_name</span>
-                        <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"min_shape"</span><span class="p">,</span> <span class="s2">"opt_shape"</span><span class="p">,</span> <span class="s2">"max_shape"</span><span class="p">]</span>
                     <span class="p">)</span>
                 <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s2">&quot;Invalid field name, expected one of min_shape, opt_shape, max_shape&quot;</span>
+                        <span class="s2">"Invalid field name, expected one of min_shape, opt_shape, max_shape"</span>
                     <span class="p">)</span>
 
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
@@ -1093,12 +1151,12 @@ document.write(`
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Input shape is dynamic but shapes are not provided as dictionary (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Input shape is dynamic but shapes are not provided as dictionary (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)"</span>
                     <span class="p">)</span>
 
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Requested an example tensor from a dynamic shaped input but did not specific which profile field to use.&quot;</span>
+                    <span class="s2">"Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."</span>
                 <span class="p">)</span></div>
 </div>
 

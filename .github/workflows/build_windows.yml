@@ -86,6 +86,11 @@ on:
         default: false
         type: boolean
         required: false
+      python-only:
+        description: "Build the PYTHON_ONLY=1 wheel"
+        default: false
+        type: boolean
+        required: false
       build-flavor:
         description: "Caller-defined build flavor used to isolate concurrent builds"
         default: "default"
@@ -141,6 +146,7 @@ jobs:
       CU_VERSION: ${{ matrix.desired_cuda }}
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
       USE_TRT_RTX: ${{ inputs.use-rtx }}
+      PYTHON_ONLY: ${{ inputs.python-only && '1' || '0' }}
     name: build-${{ matrix.build_name }}
     runs-on: ${{ matrix.validation_runner }}
     environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
@@ -228,6 +234,14 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
+      # setup-binary-builds supplies the x64 artifact name. Match Linux by
+      # reserving the unsuffixed name for standard TensorRT and suffixing RTX.
+      - name: Mark x64 Python-only artifact
+        if: ${{ inputs.architecture == 'x64' && inputs.cross-compile == false && inputs.python-only }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_python_only" >> "${GITHUB_ENV}"
+      - name: Mark x64 TensorRT-RTX artifact
+        if: ${{ inputs.architecture == 'x64' && inputs.cross-compile == false && inputs.use-rtx }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
       - name: Export binary-build version for ARM64 cross build
         if: inputs.cross-compile
         working-directory: ${{ inputs.repository }}
@@ -572,8 +586,12 @@ jobs:
           if [[ "${{ inputs.cross-compile }}" == "true" ]]; then
             artifact_cuda_version="cu134"
             artifact_name="${ARTIFACT_NAME/_${CU_VERSION}_/_${artifact_cuda_version}_}"
+            artifact_name="${artifact_name}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}"
           else
-            artifact_name="${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${artifact_cuda_version}_${ARCH}"
+            # Standard and RTX builds share the same Python/CUDA matrix. Include
+            # the backend so their concurrent uploads cannot overwrite or merge
+            # into one artifact that a test from either channel may download.
+            artifact_name="${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${artifact_cuda_version}_${ARCH}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}"
           fi
           echo "ARTIFACT_NAME=${artifact_name}" >> "${GITHUB_ENV}"
       - name: Upload wheel to GitHub
@@ -598,7 +616,7 @@ jobs:
     needs: [build, prepare-upload]
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # if it is the release wheel or tarball, then skip upload to pytorch index(release wheel are uploaded to pypi)
-    if: ${{ inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
+    if: ${{ inputs.python-only == false && inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
@@ -606,7 +624,10 @@ jobs:
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.prepare-upload.outputs.build-matrix }}
       trigger-event: ${{ inputs.trigger-event }}
-      architecture: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
+      # setup-binary-upload builds its artifact name from this input. RTX wheels
+      # use the same suffix as the build and test jobs; keep the actual build
+      # architecture above unchanged.
+      architecture: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}${{ inputs.use-rtx && '_rtx' || '' }}
     secrets:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -643,15 +643,15 @@ torch.utils._pytree.register_constant(
 
 setup_nccl_for_torch_tensorrt()
 
-rank = int(os.environ[&quot;RANK&quot;])
-world_size = int(os.environ[&quot;WORLD_SIZE&quot;])
+rank = int(os.environ["RANK"])
+world_size = int(os.environ["WORLD_SIZE"])
 
 torch.cuda.set_device(0)  # one GPU per node
-dist.init_process_group(&quot;nccl&quot;, rank=rank, world_size=world_size)
+dist.init_process_group("nccl", rank=rank, world_size=world_size)
 torch.manual_seed(0)
 
-device_mesh = init_device_mesh(&quot;cuda&quot;, (world_size,))
-print(f&quot;[Rank {rank}/{world_size}] distributed init OK&quot;, flush=True)
+device_mesh = init_device_mesh("cuda", (world_size,))
+print(f"[Rank {rank}/{world_size}] distributed init OK", flush=True)
 
 
 class ToyModel(nn.Module):
@@ -670,55 +670,55 @@ class ToyModel(nn.Module):
         return x
 
 
-tp_model = ToyModel().to(&quot;cuda&quot;)
+tp_model = ToyModel().to("cuda")
 tp_model = parallelize_module(
     tp_model,
     device_mesh,
     {
-        &quot;in_proj&quot;: ColwiseParallel(input_layouts=Shard(0)),
-        &quot;out_proj&quot;: RowwiseParallel(output_layouts=Shard(0)),
-        &quot;in_proj2&quot;: ColwiseParallel(input_layouts=Shard(0)),
-        &quot;out_proj2&quot;: RowwiseParallel(output_layouts=Shard(0)),
+        "in_proj": ColwiseParallel(input_layouts=Shard(0)),
+        "out_proj": RowwiseParallel(output_layouts=Shard(0)),
+        "in_proj2": ColwiseParallel(input_layouts=Shard(0)),
+        "out_proj2": RowwiseParallel(output_layouts=Shard(0)),
     },
 )
 
-inp = torch.rand(20, 10, device=&quot;cuda&quot;)
+inp = torch.rand(20, 10, device="cuda")
 python_result = tp_model(inp)
-print(f&quot;[Rank {rank}] PyTorch baseline OK, shape={python_result.shape}&quot;, flush=True)
+print(f"[Rank {rank}] PyTorch baseline OK, shape={python_result.shape}", flush=True)
 
 PASSED = []
 FAILED = []
 
-for runtime, use_python in [(&quot;cpp&quot;, False), (&quot;python&quot;, True)]:
+for runtime, use_python in [("cpp", False), ("python", True)]:
     dist.barrier()  # ensure both ranks enter each test together
     try:
         trt_model = torch.compile(
             tp_model,
-            backend=&quot;torch_tensorrt&quot;,
+            backend="torch_tensorrt",
             options={
-                &quot;truncate_long_and_double&quot;: True,
-                &quot;use_python_runtime&quot;: use_python,
-                &quot;min_block_size&quot;: 1,
+                "truncate_long_and_double": True,
+                "use_python_runtime": use_python,
+                "min_block_size": 1,
             },
         )
         output = trt_model(inp)
         std = float((python_result - output).std())
         if std &lt; 0.01:
-            print(f&quot;[Rank {rank}] PASS  {runtime} runtime  (std={std:.6f})&quot;, flush=True)
+            print(f"[Rank {rank}] PASS  {runtime} runtime  (std={std:.6f})", flush=True)
             PASSED.append(runtime)
         else:
             print(
-                f&quot;[Rank {rank}] FAIL  {runtime} runtime  (std={std:.6f} &gt;= 0.01)&quot;,
+                f"[Rank {rank}] FAIL  {runtime} runtime  (std={std:.6f} &gt;= 0.01)",
                 flush=True,
             )
             FAILED.append(runtime)
     except Exception as e:
-        print(f&quot;[Rank {rank}] ERROR {runtime} runtime: {e}&quot;, flush=True)
+        print(f"[Rank {rank}] ERROR {runtime} runtime: {e}", flush=True)
         FAILED.append(runtime)
 
 dist.destroy_process_group()
 
-print(f&quot;[Rank {rank}] Results — passed: {PASSED}  failed: {FAILED}&quot;, flush=True)
+print(f"[Rank {rank}] Results — passed: {PASSED}  failed: {FAILED}", flush=True)
 sys.exit(0 if not FAILED else 1)
 </pre></div>
 </div>

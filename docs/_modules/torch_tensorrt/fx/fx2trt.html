@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -498,7 +498,7 @@ document.write(`
 <span class="n">_LOGGER</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 <span class="n">TRT_INTERPRETER_CALL_PRE_OBSERVER</span><span class="p">:</span> <span class="n">Observer</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span>
-    <span class="n">Observer</span><span class="p">(</span><span class="s2">&quot;TRT_INTERPRETER_CALL_PRE_OBSERVER&quot;</span><span class="p">)</span>
+    <span class="n">Observer</span><span class="p">(</span><span class="s2">"TRT_INTERPRETER_CALL_PRE_OBSERVER"</span><span class="p">)</span>
 <span class="p">)</span>
 
 
@@ -539,8 +539,8 @@ document.write(`
         <span class="n">missing_ops</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate_conversion</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">missing_ops</span><span class="p">:</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                <span class="s2">&quot;Interpretation will fail due to missing operations </span><span class="se">\n</span><span class="s2">&quot;</span>
-                <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">missing_ops</span><span class="p">)</span>
+                <span class="s2">"Interpretation will fail due to missing operations </span><span class="se">\n</span><span class="s2">"</span>
+                <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">missing_ops</span><span class="p">)</span>
             <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">optimization_profiles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
@@ -559,23 +559,23 @@ document.write(`
             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">has_implicit_batch_dimension</span><span class="p">:</span>
                 <span class="k">assert</span> <span class="p">(</span>
                     <span class="n">has_batch_dim</span>
-                <span class="p">),</span> <span class="s2">&quot;It&#39;s required to specify batch dimension when it&#39;s explicit in TensorRT network.&quot;</span>
+                <span class="p">),</span> <span class="s2">"It's required to specify batch dimension when it's explicit in TensorRT network."</span>
 
             <span class="n">dynamic_dims</span> <span class="o">=</span> <span class="n">get_dynamic_dims</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dynamic_dims</span><span class="p">):</span>
                 <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">has_implicit_batch_dimension</span><span class="p">,</span> <span class="p">(</span>
-                    <span class="s2">&quot;Can&#39;t have dynamic dim when &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;batch dim is implicit, got </span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2">.&quot;</span>
+                    <span class="s2">"Can't have dynamic dim when "</span>
+                    <span class="sa">f</span><span class="s2">"batch dim is implicit, got </span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2">."</span>
                 <span class="p">)</span>
                 <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span>
                     <span class="n">shape_ranges</span>
-                <span class="p">),</span> <span class="s2">&quot;shape_ranges must be provided when shape has dynamic dim.&quot;</span>
+                <span class="p">),</span> <span class="s2">"shape_ranges must be provided when shape has dynamic dim."</span>
 
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">optimization_profiles</span><span class="p">:</span>
                     <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape_ranges</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">optimization_profiles</span><span class="p">),</span> <span class="p">(</span>
-                        <span class="s2">&quot;Number of optimization &quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot;profiles </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">optimization_profiles</span><span class="p">)</span><span class="si">}</span><span class="s2"> doesn&#39;t match with the number of shape_range&quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shape_ranges</span><span class="p">)</span><span class="si">}</span><span class="s2"> provided.&quot;</span>
+                        <span class="s2">"Number of optimization "</span>
+                        <span class="sa">f</span><span class="s2">"profiles </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">optimization_profiles</span><span class="p">)</span><span class="si">}</span><span class="s2"> doesn't match with the number of shape_range"</span>
+                        <span class="sa">f</span><span class="s2">" </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shape_ranges</span><span class="p">)</span><span class="si">}</span><span class="s2"> provided."</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">optimization_profiles</span> <span class="o">=</span> <span class="p">[</span>
@@ -586,10 +586,10 @@ document.write(`
                 <span class="k">for</span> <span class="n">shape_range</span> <span class="ow">in</span> <span class="n">shape_ranges</span><span class="p">:</span>
                     <span class="k">assert</span> <span class="p">(</span>
                         <span class="nb">len</span><span class="p">(</span><span class="n">shape_range</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span>
-                    <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Expect three elements in shape_range, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shape_range</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">),</span> <span class="sa">f</span><span class="s2">"Expect three elements in shape_range, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shape_range</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                     <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">shape_range</span><span class="p">),</span> <span class="p">(</span>
-                        <span class="s2">&quot;Expect elements in shape_range&quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="n">shape_range</span><span class="si">}</span><span class="s2"> have the same number of dimension as the provided shape </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="s2">"Expect elements in shape_range"</span>
+                        <span class="sa">f</span><span class="s2">" </span><span class="si">{</span><span class="n">shape_range</span><span class="si">}</span><span class="s2"> have the same number of dimension as the provided shape </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                     <span class="p">)</span>
 
                     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)):</span>
@@ -598,32 +598,32 @@ document.write(`
                                 <span class="n">shape_range</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">shape_range</span><span class="p">[</span><span class="n">j</span> <span class="o">+</span> <span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">]</span>
                                 <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
                             <span class="p">),</span> <span class="p">(</span>
-                                <span class="s2">&quot;Expect dynamic dim&quot;</span>
-                                <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> to have incremental value for shapes in shape_range </span><span class="si">{</span><span class="n">shape_range</span><span class="si">}</span><span class="s2">.&quot;</span>
+                                <span class="s2">"Expect dynamic dim"</span>
+                                <span class="sa">f</span><span class="s2">" </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> to have incremental value for shapes in shape_range </span><span class="si">{</span><span class="n">shape_range</span><span class="si">}</span><span class="s2">."</span>
                             <span class="p">)</span>
                         <span class="k">else</span><span class="p">:</span>
                             <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="n">shape</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">shape_range</span><span class="p">),</span> <span class="p">(</span>
-                                <span class="sa">f</span><span class="s2">&quot;Expect non dynamic dim </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> to be the same&quot;</span>
-                                <span class="sa">f</span><span class="s2">&quot; for all shapes in shape_range </span><span class="si">{</span><span class="n">shape_range</span><span class="si">}</span><span class="s2">.&quot;</span>
+                                <span class="sa">f</span><span class="s2">"Expect non dynamic dim </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> to be the same"</span>
+                                <span class="sa">f</span><span class="s2">" for all shapes in shape_range </span><span class="si">{</span><span class="n">shape_range</span><span class="si">}</span><span class="s2">."</span>
                             <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">assert</span> <span class="p">(</span>
                     <span class="nb">len</span><span class="p">(</span><span class="n">shape_ranges</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
-                <span class="p">),</span> <span class="s2">&quot;shape_ranges are provided for input that doesn&#39;t have dynamic dim.&quot;</span>
+                <span class="p">),</span> <span class="s2">"shape_ranges are provided for input that doesn't have dynamic dim."</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">validate_conversion</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">missing_converter</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_function&quot;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">):</span>
-                <span class="n">missing_converter</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">_get_qualified_name</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_method&quot;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">):</span>
-                <span class="n">missing_converter</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2"> torch.Tensor.</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_module&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_function"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">):</span>
+                <span class="n">missing_converter</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">_get_qualified_name</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_method"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">):</span>
+                <span class="n">missing_converter</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2"> torch.Tensor.</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_module"</span><span class="p">:</span>
                 <span class="n">submod</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fetch_attr</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
-                <span class="n">submod_type</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">submod</span><span class="p">,</span> <span class="s2">&quot;_base_class_origin&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">submod</span><span class="p">))</span>
+                <span class="n">submod_type</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">submod</span><span class="p">,</span> <span class="s2">"_base_class_origin"</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">submod</span><span class="p">))</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">submod_type</span><span class="p">):</span>
-                    <span class="n">missing_converter</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">typename</span><span class="p">(</span><span class="n">submod_type</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">missing_converter</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">typename</span><span class="p">(</span><span class="n">submod_type</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">missing_converter</span>
 
@@ -639,7 +639,7 @@ document.write(`
         <span class="n">profiling_verbosity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">tactic_sources</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TRTInterpreterResult</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Build TensorRT engine with some configs.</span>
 <span class="sd">        Args:</span>
 <span class="sd">            max_batch_size: set accordingly for maximum batch size you will use.</span>
@@ -652,7 +652,7 @@ document.write(`
 <span class="sd">            profiling_verbosity: TensorRT logging level</span>
 <span class="sd">        Return:</span>
 <span class="sd">            TRTInterpreterResult</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">TRT_INTERPRETER_CALL_PRE_OBSERVER</span><span class="o">.</span><span class="n">observe</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">)</span>
 
         <span class="c1"># For float outputs, we set their dtype to fp16 only if lower_precision == LowerPrecision.FP16 and</span>
@@ -665,7 +665,7 @@ document.write(`
         <span class="n">run_module_start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;TRT INetwork construction elapsed time: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">run_module_start_time</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"TRT INetwork construction elapsed time: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">run_module_start_time</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
         <span class="n">build_engine_start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
 
@@ -674,8 +674,8 @@ document.write(`
         <span class="n">builder_config</span><span class="o">.</span><span class="n">max_workspace_size</span> <span class="o">=</span> <span class="n">max_workspace_size</span>
 
         <span class="c1"># Speed up TRT build time in the test environment</span>
-        <span class="k">if</span> <span class="n">trt</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;8.6&quot;</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;TRT_TEST_ENV&quot;</span><span class="p">,</span> <span class="s2">&quot;0&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;1&quot;</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Set TRT optimization level to 0&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">trt</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">"8.6"</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"TRT_TEST_ENV"</span><span class="p">,</span> <span class="s2">"0"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Set TRT optimization level to 0"</span><span class="p">)</span>
             <span class="n">builder_config</span><span class="o">.</span><span class="n">builder_optimization_level</span> <span class="o">=</span> <span class="mi">0</span>
 
         <span class="n">cache</span> <span class="o">=</span> <span class="kc">None</span>
@@ -683,10 +683,10 @@ document.write(`
             <span class="n">cache_file</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">timing_cache</span><span class="p">)</span>
             <span class="n">cache</span> <span class="o">=</span> <span class="n">builder_config</span><span class="o">.</span><span class="n">create_timing_cache</span><span class="p">(</span><span class="n">cache_file</span><span class="o">.</span><span class="n">tobytes</span><span class="p">())</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">cache</span> <span class="o">=</span> <span class="n">builder_config</span><span class="o">.</span><span class="n">create_timing_cache</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="n">builder_config</span><span class="o">.</span><span class="n">create_timing_cache</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="p">)</span>
         <span class="n">builder_config</span><span class="o">.</span><span class="n">set_timing_cache</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">trt</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;8.2&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">trt</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">"8.2"</span><span class="p">:</span>
             <span class="n">builder_config</span><span class="o">.</span><span class="n">profiling_verbosity</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="n">profiling_verbosity</span>
                 <span class="k">if</span> <span class="n">profiling_verbosity</span>
@@ -720,7 +720,7 @@ document.write(`
             <span class="k">else</span> <span class="nb">bytearray</span><span class="p">()</span>
         <span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Build TRT engine elapsed time: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">build_engine_start_time</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"Build TRT engine elapsed time: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">build_engine_start_time</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">TRTInterpreterResult</span><span class="p">(</span>
@@ -729,21 +729,21 @@ document.write(`
 
     <span class="k">def</span><span class="w"> </span><span class="nf">run_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_cur_node_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
-        <span class="c1"># add &quot;_itensor_to_tensor_meta&quot;</span>
+        <span class="c1"># add "_itensor_to_tensor_meta"</span>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">n</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;_itensor_to_tensor_meta&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_itensor_to_tensor_meta</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"_itensor_to_tensor_meta"</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_itensor_to_tensor_meta</span>
         <span class="n">n</span><span class="o">.</span><span class="n">kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
 
         <span class="c1"># run the node</span>
         <span class="n">trt_node</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">run_node</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
 
-        <span class="c1"># remove &quot;_itensor_to_tensor_meta&quot;</span>
+        <span class="c1"># remove "_itensor_to_tensor_meta"</span>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">n</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;_itensor_to_tensor_meta&quot;</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"_itensor_to_tensor_meta"</span><span class="p">]</span>
         <span class="n">n</span><span class="o">.</span><span class="n">kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">trt_node</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_itensor_to_tensor_meta</span><span class="p">[</span><span class="n">trt_node</span><span class="p">]</span> <span class="o">=</span> <span class="n">n</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tensor_meta&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_itensor_to_tensor_meta</span><span class="p">[</span><span class="n">trt_node</span><span class="p">]</span> <span class="o">=</span> <span class="n">n</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tensor_meta"</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">trt_node</span>
 
@@ -771,12 +771,12 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">call_module</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
         <span class="n">submod</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fetch_attr</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
-        <span class="n">submod_type</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">submod</span><span class="p">,</span> <span class="s2">&quot;_base_class_origin&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">submod</span><span class="p">))</span>
+        <span class="n">submod_type</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">submod</span><span class="p">,</span> <span class="s2">"_base_class_origin"</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">submod</span><span class="p">))</span>
         <span class="n">converter</span> <span class="o">=</span> <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">submod_type</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">converter</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Conversion of module of type </span><span class="si">{</span><span class="n">submod_type</span><span class="si">}</span><span class="s2"> not currently supported!&quot;</span>
+                <span class="sa">f</span><span class="s2">"Conversion of module of type </span><span class="si">{</span><span class="n">submod_type</span><span class="si">}</span><span class="s2"> not currently supported!"</span>
             <span class="p">)</span>
 
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cur_node_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -786,7 +786,7 @@ document.write(`
         <span class="n">converter</span> <span class="o">=</span> <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">converter</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Conversion of function </span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">typename</span><span class="p">(</span><span class="n">target</span><span class="p">)</span><span class="si">}</span><span class="s2"> not currently supported!&quot;</span>
+                <span class="sa">f</span><span class="s2">"Conversion of function </span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">typename</span><span class="p">(</span><span class="n">target</span><span class="p">)</span><span class="si">}</span><span class="s2"> not currently supported!"</span>
             <span class="p">)</span>
 
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cur_node_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -798,7 +798,7 @@ document.write(`
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">converter</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Conversion of method </span><span class="si">{</span><span class="n">target</span><span class="si">}</span><span class="s2"> not currently supported!&quot;</span>
+                <span class="sa">f</span><span class="s2">"Conversion of method </span><span class="si">{</span><span class="n">target</span><span class="si">}</span><span class="s2"> not currently supported!"</span>
             <span class="p">)</span>
 
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cur_node_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -815,7 +815,7 @@ document.write(`
 
         <span class="n">layer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">add_cast</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">output_dtype</span><span class="p">)</span>
         <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Cast output </span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2"> from </span><span class="si">{</span><span class="n">output</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"Cast output </span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2"> from </span><span class="si">{</span><span class="n">output</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">layer</span><span class="o">.</span><span class="n">get_output</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
@@ -829,31 +829,31 @@ document.write(`
             <span class="n">outputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">outputs</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;TensorRT requires all outputs to be Tensor!&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"TensorRT requires all outputs to be Tensor!"</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">output</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
             <span class="n">output_tensor_meta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_itensor_to_tensor_meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">output_tensor_meta</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">output_tensor_meta</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">output_bool</span> <span class="o">=</span> <span class="n">output_tensor_meta</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span>
             <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span>
-                <span class="n">op_name</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span>
+                <span class="n">op_name</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"_"</span><span class="p">)</span>
                 <span class="k">for</span> <span class="n">op_name</span> <span class="ow">in</span> <span class="p">(</span>
-                    <span class="s2">&quot;eq&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;gt&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;lt&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;or&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;xor&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;and&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;not&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;ne&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;isinf&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;any&quot;</span><span class="p">,</span>
+                    <span class="s2">"eq"</span><span class="p">,</span>
+                    <span class="s2">"gt"</span><span class="p">,</span>
+                    <span class="s2">"lt"</span><span class="p">,</span>
+                    <span class="s2">"or"</span><span class="p">,</span>
+                    <span class="s2">"xor"</span><span class="p">,</span>
+                    <span class="s2">"and"</span><span class="p">,</span>
+                    <span class="s2">"not"</span><span class="p">,</span>
+                    <span class="s2">"ne"</span><span class="p">,</span>
+                    <span class="s2">"isinf"</span><span class="p">,</span>
+                    <span class="s2">"any"</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="p">):</span>
                 <span class="n">output_bool</span> <span class="o">=</span> <span class="kc">True</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">output_bool</span> <span class="o">=</span> <span class="kc">False</span>
-            <span class="n">name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;output</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"output</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span>
 
             <span class="n">output_dtype</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">if</span> <span class="n">output_bool</span><span class="p">:</span>

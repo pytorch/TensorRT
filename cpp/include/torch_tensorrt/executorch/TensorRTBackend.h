@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  *
  * ExecuTorch backend delegate that runs TensorRT engines serialized by
- * torch_tensorrt. The processed blob uses the standalone TR01 wire format from
+ * torch_tensorrt. The processed blob uses the standalone wire format from
  * py/torch_tensorrt/executorch/serialization.py and is parsed directly here.
  * This runtime path intentionally does not depend on the legacy
  * Torch-TensorRT C++ runtime or libtorch.
@@ -59,6 +59,20 @@ struct EngineHandle {
   std::vector<size_t> cached_output_sizes;
   size_t num_inputs = 0;
   size_t num_outputs = 0;
+  // Per output binding [0..num_outputs): index into input_binding_names of the
+  // input it aliases (in-place KV-cache / user alias), or -1 for a normal output.
+  // Built at init from the blob's aliased_io. The KV buffers are threaded by
+  // ExecuTorch as caller-owned mutable-buffer delegate args (input AND aliased
+  // output): execute() binds each aliased TRT output binding to its aliased
+  // input's caller-provided pointer (in-place) and reflects the result into the
+  // delegate output EValue, which ExecuTorch's write-back copy_ then reads.
+  std::vector<int> output_aliased_input_idx;
+  // Per input binding [0..num_inputs): true if any output aliases this input, so
+  // its in-place (KV/user) update must land in the caller-owned storage. Built at
+  // init from aliased_io; execute() uses it to reject a non-device-resident
+  // aliased input instead of silently staging its update into delegate scratch.
+  std::vector<bool> input_is_alias_target;
+  size_t num_aliased_outputs = 0;
   int device_id = 0;
   bool unified_memory = false;
   std::mutex mu;
@@ -82,41 +96,20 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
       ::executorch::runtime::FreeableBuffer* processed,
       ::executorch::runtime::ArrayRef<::executorch::runtime::CompileSpec> compile_specs) const override;
 
+  // Runs the engine. With an executorch::extension::cuda::CallerStreamGuard active and
+  // no host staging required, this may return while the enqueue is still in flight on
+  // the selected stream, so the caller must keep device buffers alive and unmodified
+  // past return, order any other stream against this one, and synchronize the stream
+  // before reading device-resident outputs. The selected stream must be on the engine's
+  // device, and calls on one handle must not overlap each other or its destruction.
+  // Note that other CUDA delegates sharing the same guard may instead synchronize before
+  // returning, so do not assume results are ready on return from this one.
   ::executorch::runtime::Error execute(
       ::executorch::runtime::BackendExecutionContext& context,
       ::executorch::runtime::DelegateHandle* handle,
       ::executorch::runtime::Span<::executorch::runtime::EValue*> args) const override;
 
   void destroy(::executorch::runtime::DelegateHandle* handle) const override;
-};
-
-// Selects, for the calling thread, the CUDA stream the delegate runs TensorRT on;
-// scope it around execution.
-//
-// Confines inference to a CUDA green context's SM partition when the caller
-// passes a cuGreenCtxStreamCreate stream: confinement rides the stream (the green
-// context need not be current), and cudaStreamPerThread — the no-guard default —
-// is rejected while a green context is current. While active, device-resident
-// outputs are left enqueued on the stream (no end sync) to compose with later GPU
-// work.
-//
-// Contract: the stream is on the engine's device and outlives the guard; a handle
-// is executed by one thread at a time. On the no-end-sync path (guard active, all
-// I/O device-resident) execute() returns with the TensorRT enqueue still in flight
-// on the stream; the delegate itself orders the next execute() on, and the
-// destruction of, that handle after the work completes (via an internal completion
-// event), so the caller need only synchronize the stream before reading
-// device-resident outputs.
-class CudaStreamGuard {
- public:
-  explicit CudaStreamGuard(cudaStream_t stream);
-  ~CudaStreamGuard();
-  CudaStreamGuard(const CudaStreamGuard&) = delete;
-  CudaStreamGuard& operator=(const CudaStreamGuard&) = delete;
-
- private:
-  cudaStream_t prev_stream_;
-  bool prev_set_;
 };
 
 } // namespace executorch_backend

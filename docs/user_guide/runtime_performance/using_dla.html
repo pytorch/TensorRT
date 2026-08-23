@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -554,9 +554,9 @@ document.write(`
 </div>
 <p>Using DLA in a python application</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input</span><span class="o">.</span><span class="n">shape</span><span class="p">)],</span>
-    <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Device</span><span class="p">(</span><span class="s2">&quot;dla:0&quot;</span><span class="p">,</span> <span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
-    <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
+    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input</span><span class="o">.</span><span class="n">shape</span><span class="p">)],</span>
+    <span class="s2">"device"</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Device</span><span class="p">(</span><span class="s2">"dla:0"</span><span class="p">,</span> <span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+    <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
 <span class="p">}</span>
 
 <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scripted_model</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">)</span>

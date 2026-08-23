@@ -64,13 +64,24 @@ jobs:
         chmod +x "${RUNNER_TEMP}/bin/bazel"
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
-        python -m pip install pyyaml executorch
-        # Keep this diagnostic until the native runtime initialization crash is understood.
+        python -m pip install pyyaml "executorch==1.4.1"
+        # Run the check directly so its exit status is the step's exit status.
+        # Wrapping it in `gdb --batch` reports gdb's own status, which is 0
+        # whatever the program does, so a SIGSEGV here was passing.
+        # On failure, re-run under gdb for the backtrace, then fail the step.
         ulimit -c unlimited || true
-        if command -v gdb >/dev/null 2>&1; then
-          gdb --batch -ex "set pagination off" -ex run -ex "thread apply all bt" --args python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend")'
-        else
-          PYTHONFAULTHANDLER=1 python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend")'
+        runtime_check='import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend"); assert runtime.backend_registry.is_available("CudaBackend")'
+        check_status=0
+        PYTHONFAULTHANDLER=1 python -u -X faulthandler -c "${runtime_check}" ||
+          check_status=$?
+        if [[ "${check_status}" -ne 0 ]]; then
+          echo "::error::native runtime check failed with status ${check_status}"
+          if command -v gdb >/dev/null 2>&1; then
+            gdb --batch -ex "set pagination off" -ex run \
+              -ex "thread apply all bt" \
+              --args python -u -X faulthandler -c "${runtime_check}" || true
+          fi
+          exit "${check_status}"
         fi
 
         source tests/py/utils/ci_helpers.sh
@@ -82,7 +93,10 @@ jobs:
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         python examples/torchtrt_executorch_example/export_static_shape.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
+        python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
         .github/scripts/verify-executorch-reference-runner.sh \
-          "${RUNNER_TEMP}/torchtrt-python.pte"
+          "${RUNNER_TEMP}/torchtrt-python.pte" \
+          "${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
         python examples/executorch_reference_runner/load_model.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1

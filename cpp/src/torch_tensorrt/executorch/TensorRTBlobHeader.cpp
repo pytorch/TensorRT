@@ -9,7 +9,10 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 namespace {
 
+// TR02 marks a blob whose metadata carries aliased_io; TR01 is one without. This
+// parser handles aliased_io, so it accepts either.
 constexpr char TENSORRT_MAGIC[4] = {'T', 'R', '0', '1'};
+constexpr char TENSORRT_MAGIC_ALIASED_IO[4] = {'T', 'R', '0', '2'};
 constexpr uint32_t METADATA_OFFSET_FIELD_OFFSET = 4;
 constexpr uint32_t METADATA_SIZE_FIELD_OFFSET = 8;
 constexpr uint32_t ENGINE_OFFSET_FIELD_OFFSET = 12;
@@ -136,6 +139,7 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
 bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   out.input_binding_names.clear();
   out.output_binding_names.clear();
+  out.aliased_io.clear();
   out.hardware_compatible = false;
   out.device_id = 0;
 
@@ -229,6 +233,89 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
     }
   }
 
+  // Optional aliased_io array: [{"output":..,"input":..,"kind":..}, ...].
+  // Absent in older blobs -> leave empty (backward compatible). Mirrors the
+  // io_bindings walk above using the same string helpers.
+  //
+  // Search from pos (past the io_bindings array) so a model input literally
+  // named "aliased_io" isn't matched as the array key.
+  const std::size_t alias_key = json.find("\"aliased_io\"", pos);
+  if (alias_key != std::string::npos) {
+    std::size_t apos = json.find('[', alias_key);
+    if (apos == std::string::npos) {
+      return false;
+    }
+    ++apos;
+    while (true) {
+      apos = skip_ws(json, apos);
+      if (apos >= json.size()) {
+        return false;
+      }
+      if (json[apos] == ']') {
+        ++apos;
+        break;
+      }
+      if (json[apos] == ',') {
+        ++apos;
+        continue;
+      }
+      if (json[apos] != '{') {
+        return false;
+      }
+      ++apos;
+
+      AliasedBinding ab;
+      while (true) {
+        apos = skip_ws(json, apos);
+        if (apos >= json.size()) {
+          return false;
+        }
+        if (json[apos] == '}') {
+          ++apos;
+          break;
+        }
+        if (json[apos] == ',') {
+          ++apos;
+          continue;
+        }
+        std::string key;
+        apos = parse_string(json, apos, key);
+        if (apos == std::string::npos) {
+          return false;
+        }
+        apos = skip_ws(json, apos);
+        if (apos >= json.size() || json[apos] != ':') {
+          return false;
+        }
+        apos = skip_ws(json, apos + 1);
+        if (key == "output") {
+          apos = parse_string(json, apos, ab.output);
+        } else if (key == "input") {
+          apos = parse_string(json, apos, ab.input);
+        } else if (key == "kind") {
+          apos = parse_string(json, apos, ab.kind);
+        } else {
+          apos = skip_value(json, apos);
+        }
+        if (apos == std::string::npos) {
+          return false;
+        }
+      }
+      if (!ab.output.empty() && !ab.input.empty()) {
+        // The current Python serializer always writes "kind" (serialization.py),
+        // and older blobs carry no aliased_io array at all, so this default is
+        // defensive: it only fires for a blob that has an aliased_io entry but
+        // omits "kind". Default to the TRT-enforced kind so init()'s kind
+        // validation treats an absent key the same as the Python runtime rather
+        // than rejecting it as unknown.
+        if (ab.kind.empty()) {
+          ab.kind = "kv_cache_update";
+        }
+        out.aliased_io.push_back(std::move(ab));
+      }
+    }
+  }
+
   return parse_bool_after_key(json, pos, "\"hardware_compatible\"", out.hardware_compatible) &&
       parse_int_after_key(json, pos, "\"device_id\"", out.device_id);
 }
@@ -245,7 +332,8 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   }
 
   const auto* bytes = static_cast<const uint8_t*>(data);
-  if (std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0) {
+  if (std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0 &&
+      std::memcmp(bytes, TENSORRT_MAGIC_ALIASED_IO, sizeof(TENSORRT_MAGIC_ALIASED_IO)) != 0) {
     return false;
   }
 

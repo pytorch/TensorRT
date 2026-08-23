@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -692,18 +692,18 @@ enables <code class="docutils literal notranslate"><span class="pre">weight_quan
 
 <span class="c1"># Custom weight-only INT8 config</span>
 <span class="n">quant_cfg</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;quant_cfg&quot;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">&quot;*weight_quantizer&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;num_bits&quot;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">&quot;axis&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
-        <span class="s2">&quot;*input_quantizer&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>  <span class="c1"># activations stay FP16</span>
-        <span class="s2">&quot;default&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+    <span class="s2">"quant_cfg"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"*weight_quantizer"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"num_bits"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"axis"</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+        <span class="s2">"*input_quantizer"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"enable"</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>  <span class="c1"># activations stay FP16</span>
+        <span class="s2">"default"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"enable"</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
     <span class="p">},</span>
-    <span class="s2">&quot;algorithm&quot;</span><span class="p">:</span> <span class="s2">&quot;max&quot;</span><span class="p">,</span>
+    <span class="s2">"algorithm"</span><span class="p">:</span> <span class="s2">"max"</span><span class="p">,</span>
 <span class="p">}</span>
 
 <span class="n">mtq</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">quant_cfg</span><span class="p">,</span> <span class="n">forward_loop</span><span class="o">=</span><span class="n">calibration_loop</span><span class="p">)</span>
 
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>

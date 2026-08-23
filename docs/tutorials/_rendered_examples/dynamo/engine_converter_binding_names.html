@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -633,7 +633,7 @@ from torch_tensorrt.dynamo._compiler import BindingNameMismatchError
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import tensorrt as trt
 
-DEVICE = torch.device(&quot;cuda&quot;, 0)
+DEVICE = torch.device("cuda", 0)
 </pre></div>
 </div>
 </div>
@@ -669,13 +669,13 @@ _TRT_TO_TORCH_DTYPE = {
 
 
 def run_engine(engine: trt.ICudaEngine, named_inputs: dict) -&gt; dict:
-    &quot;&quot;&quot;Execute an engine via the native TRT Python API.
+    """Execute an engine via the native TRT Python API.
 
     ``named_inputs`` is a {binding_name: contiguous CUDA tensor} dict.
     Returns {binding_name: output tensor}.  Demonstrates that the
     user-supplied binding names are what production C++/Python TRT
     runtime code will bind by.
-    &quot;&quot;&quot;
+    """
     context = engine.create_execution_context()
     for name, tensor in named_inputs.items():
         context.set_input_shape(name, tuple(tensor.shape))
@@ -720,26 +720,26 @@ exported = torch.export.export(two_heads, (x,))
 engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
     exported,
     arg_inputs=(x,),
-    arg_input_binding_names=(&quot;input_image&quot;,),
-    output_binding_names=(&quot;relu_out&quot;, &quot;tanh_out&quot;),
+    arg_input_binding_names=("input_image",),
+    output_binding_names=("relu_out", "tanh_out"),
     require_full_compilation=True,
     min_block_size=1,
     use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
-print(&quot;Case 1 inputs:&quot;, binding_names(engine, trt.TensorIOMode.INPUT))
-print(&quot;Case 1 outputs:&quot;, binding_names(engine, trt.TensorIOMode.OUTPUT))
-# Case 1 inputs: [&#39;input_image&#39;]
-# Case 1 outputs: [&#39;relu_out&#39;, &#39;tanh_out&#39;]
+print("Case 1 inputs:", binding_names(engine, trt.TensorIOMode.INPUT))
+print("Case 1 outputs:", binding_names(engine, trt.TensorIOMode.OUTPUT))
+# Case 1 inputs: ['input_image']
+# Case 1 outputs: ['relu_out', 'tanh_out']
 
 # Run the engine through the native TRT API using the names we requested.
-trt_outs = run_engine(engine, {&quot;input_image&quot;: x.contiguous()})
+trt_outs = run_engine(engine, {"input_image": x.contiguous()})
 with torch.no_grad():
     ref_relu, ref_tanh = two_heads(x)
-torch.testing.assert_close(trt_outs[&quot;relu_out&quot;], ref_relu, rtol=1e-2, atol=1e-2)
-torch.testing.assert_close(trt_outs[&quot;tanh_out&quot;], ref_tanh, rtol=1e-2, atol=1e-2)
-print(&quot;Case 1 native TRT run matches PyTorch.&quot;)
+torch.testing.assert_close(trt_outs["relu_out"], ref_relu, rtol=1e-2, atol=1e-2)
+torch.testing.assert_close(trt_outs["tanh_out"], ref_tanh, rtol=1e-2, atol=1e-2)
+print("Case 1 native TRT run matches PyTorch.")
 </pre></div>
 </div>
 </div>
@@ -762,34 +762,34 @@ positions = torch.randn(2, 3, device=DEVICE, dtype=torch.float16)
 kw_exported = torch.export.export(
     kwarg_only,
     args=(),
-    kwargs={&quot;image&quot;: image, &quot;positions&quot;: positions},
+    kwargs={"image": image, "positions": positions},
 )
 
 engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
     kw_exported,
     arg_inputs=(),
-    kwarg_inputs={&quot;image&quot;: image, &quot;positions&quot;: positions},
-    kwarg_input_binding_names={&quot;image&quot;: &quot;rgb_in&quot;, &quot;positions&quot;: &quot;pos_in&quot;},
-    output_binding_names=&quot;combined&quot;,
+    kwarg_inputs={"image": image, "positions": positions},
+    kwarg_input_binding_names={"image": "rgb_in", "positions": "pos_in"},
+    output_binding_names="combined",
     require_full_compilation=True,
     min_block_size=1,
     use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
-print(&quot;Case 2 inputs:&quot;, sorted(binding_names(engine, trt.TensorIOMode.INPUT)))
-print(&quot;Case 2 outputs:&quot;, binding_names(engine, trt.TensorIOMode.OUTPUT))
-# Case 2 inputs: [&#39;pos_in&#39;, &#39;rgb_in&#39;]
-# Case 2 outputs: [&#39;combined&#39;]
+print("Case 2 inputs:", sorted(binding_names(engine, trt.TensorIOMode.INPUT)))
+print("Case 2 outputs:", binding_names(engine, trt.TensorIOMode.OUTPUT))
+# Case 2 inputs: ['pos_in', 'rgb_in']
+# Case 2 outputs: ['combined']
 
 trt_outs = run_engine(
     engine,
-    {&quot;rgb_in&quot;: image.contiguous(), &quot;pos_in&quot;: positions.contiguous()},
+    {"rgb_in": image.contiguous(), "pos_in": positions.contiguous()},
 )
 with torch.no_grad():
     ref = kwarg_only(image=image, positions=positions)
-torch.testing.assert_close(trt_outs[&quot;combined&quot;], ref, rtol=1e-2, atol=1e-2)
-print(&quot;Case 2 native TRT run matches PyTorch.&quot;)
+torch.testing.assert_close(trt_outs["combined"], ref, rtol=1e-2, atol=1e-2)
+print("Case 2 native TRT run matches PyTorch.")
 </pre></div>
 </div>
 </div>
@@ -805,14 +805,14 @@ print(&quot;Case 2 native TRT run matches PyTorch.&quot;)
     def forward(self, cameras: tuple, bias: torch.Tensor):
         feats = []
         for cam in cameras:
-            feats.append(cam[&quot;rgb&quot;] + cam[&quot;depth&quot;] + bias)
-        return {&quot;primary&quot;: feats[0], &quot;secondary&quot;: feats[1]}
+            feats.append(cam["rgb"] + cam["depth"] + bias)
+        return {"primary": feats[0], "secondary": feats[1]}
 
 
 def _cam():
     return {
-        &quot;rgb&quot;: torch.randn(2, 3, device=DEVICE, dtype=torch.float16),
-        &quot;depth&quot;: torch.randn(2, 3, device=DEVICE, dtype=torch.float16),
+        "rgb": torch.randn(2, 3, device=DEVICE, dtype=torch.float16),
+        "depth": torch.randn(2, 3, device=DEVICE, dtype=torch.float16),
     }
 
 
@@ -826,38 +826,38 @@ engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_
     arg_inputs=(cameras, bias),
     arg_input_binding_names=(
         (
-            {&quot;rgb&quot;: &quot;cam0_rgb&quot;, &quot;depth&quot;: &quot;cam0_depth&quot;},
-            {&quot;rgb&quot;: &quot;cam1_rgb&quot;, &quot;depth&quot;: &quot;cam1_depth&quot;},
+            {"rgb": "cam0_rgb", "depth": "cam0_depth"},
+            {"rgb": "cam1_rgb", "depth": "cam1_depth"},
         ),
-        &quot;global_bias&quot;,
+        "global_bias",
     ),
-    output_binding_names={&quot;primary&quot;: &quot;p_feats&quot;, &quot;secondary&quot;: &quot;s_feats&quot;},
+    output_binding_names={"primary": "p_feats", "secondary": "s_feats"},
     require_full_compilation=True,
     min_block_size=1,
     use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
-print(&quot;Case 3 inputs:&quot;, sorted(binding_names(engine, trt.TensorIOMode.INPUT)))
-print(&quot;Case 3 outputs:&quot;, sorted(binding_names(engine, trt.TensorIOMode.OUTPUT)))
-# Case 3 inputs: [&#39;cam0_depth&#39;, &#39;cam0_rgb&#39;, &#39;cam1_depth&#39;, &#39;cam1_rgb&#39;, &#39;global_bias&#39;]
-# Case 3 outputs: [&#39;p_feats&#39;, &#39;s_feats&#39;]
+print("Case 3 inputs:", sorted(binding_names(engine, trt.TensorIOMode.INPUT)))
+print("Case 3 outputs:", sorted(binding_names(engine, trt.TensorIOMode.OUTPUT)))
+# Case 3 inputs: ['cam0_depth', 'cam0_rgb', 'cam1_depth', 'cam1_rgb', 'global_bias']
+# Case 3 outputs: ['p_feats', 's_feats']
 
 trt_outs = run_engine(
     engine,
     {
-        &quot;cam0_rgb&quot;: cameras[0][&quot;rgb&quot;].contiguous(),
-        &quot;cam0_depth&quot;: cameras[0][&quot;depth&quot;].contiguous(),
-        &quot;cam1_rgb&quot;: cameras[1][&quot;rgb&quot;].contiguous(),
-        &quot;cam1_depth&quot;: cameras[1][&quot;depth&quot;].contiguous(),
-        &quot;global_bias&quot;: bias.contiguous(),
+        "cam0_rgb": cameras[0]["rgb"].contiguous(),
+        "cam0_depth": cameras[0]["depth"].contiguous(),
+        "cam1_rgb": cameras[1]["rgb"].contiguous(),
+        "cam1_depth": cameras[1]["depth"].contiguous(),
+        "global_bias": bias.contiguous(),
     },
 )
 with torch.no_grad():
     ref = camera_tower(cameras, bias)
-torch.testing.assert_close(trt_outs[&quot;p_feats&quot;], ref[&quot;primary&quot;], rtol=1e-2, atol=1e-2)
-torch.testing.assert_close(trt_outs[&quot;s_feats&quot;], ref[&quot;secondary&quot;], rtol=1e-2, atol=1e-2)
-print(&quot;Case 3 native TRT run matches PyTorch.&quot;)
+torch.testing.assert_close(trt_outs["p_feats"], ref["primary"], rtol=1e-2, atol=1e-2)
+torch.testing.assert_close(trt_outs["s_feats"], ref["secondary"], rtol=1e-2, atol=1e-2)
+print("Case 3 native TRT run matches PyTorch.")
 </pre></div>
 </div>
 </div>
@@ -873,14 +873,14 @@ print(&quot;Case 3 native TRT run matches PyTorch.&quot;)
     torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
         exported,
         arg_inputs=(x,),
-        output_binding_names=(&quot;only_one&quot;,),  # wrong arity for the 2-tuple return
+        output_binding_names=("only_one",),  # wrong arity for the 2-tuple return
         require_full_compilation=True,
         min_block_size=1,
         use_python_runtime=False,
         immutable_weights=True,
     )
 except BindingNameMismatchError as err:
-    print(&quot;Caught BindingNameMismatchError as expected.&quot;)
+    print("Caught BindingNameMismatchError as expected.")
     print(str(err).splitlines()[0])
 </pre></div>
 </div>

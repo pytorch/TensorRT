@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -659,17 +659,17 @@ def add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@torch.library.custom_op(&quot;my::add_one&quot;, mutates_args=())  # type: ignore[misc]
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@torch.library.custom_op("my::add_one", mutates_args=())  # type: ignore[misc]
 def add_one(X: torch.Tensor) -&gt; torch.Tensor:
     assert X.is_cuda
     Y = torch.empty_like(X)
     BLOCK_SIZE = 256
-    grid = lambda meta: (triton.cdiv(X.numel(), meta[&quot;BLOCK_SIZE&quot;]),)
+    grid = lambda meta: (triton.cdiv(X.numel(), meta["BLOCK_SIZE"]),)
     add_one_kernel[grid](X, X.numel(), Y, BLOCK_SIZE=BLOCK_SIZE)
     return Y
 
 
-@torch.library.register_fake(&quot;my::add_one&quot;)
+@torch.library.register_fake("my::add_one")
 def _(X: torch.Tensor) -&gt; torch.Tensor:
     return X
 </pre></div>
@@ -685,7 +685,7 @@ def _(X: torch.Tensor) -&gt; torch.Tensor:
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@trtp.register(&quot;my::add_one&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@trtp.register("my::add_one")
 def add_plugin_desc(X: trtp.TensorDesc) -&gt; Tuple[trtp.TensorDesc]:
     # Output has the same shape and dtype as the input.
     return X.like()
@@ -707,28 +707,28 @@ def add_plugin_desc(X: trtp.TensorDesc) -&gt; Tuple[trtp.TensorDesc]:
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@trtp.aot_impl(&quot;my::add_one&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>@trtp.aot_impl("my::add_one")
 def add_plugin_aot_impl(
     X: trtp.TensorDesc, outputs: Tuple[trtp.TensorDesc], tactic: int
 ) -&gt; Tuple[
     Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
 ]:
     # Choose the pointer type based on the input dtype.
-    type_str = &quot;fp32&quot; if X.dtype == trt.float32 else &quot;fp16&quot;
+    type_str = "fp32" if X.dtype == trt.float32 else "fp16"
 
     block_size = 256
     # Compile the Triton kernel to PTX now, at registration time.
-    # ``ASTSource`` describes the kernel&#39;s input types and constexprs without
+    # ``ASTSource`` describes the kernel's input types and constexprs without
     # running it — Triton compiles it to architecture-specific PTX/CUBIN.
     src = triton.compiler.ASTSource(
         fn=add_one_kernel,
         signature={
-            &quot;x_ptr&quot;: f&quot;*{type_str}&quot;,
-            &quot;n_elements&quot;: &quot;i32&quot;,
-            &quot;y_ptr&quot;: f&quot;*{type_str}&quot;,
+            "x_ptr": f"*{type_str}",
+            "n_elements": "i32",
+            "y_ptr": f"*{type_str}",
         },
         constexprs={
-            &quot;BLOCK_SIZE&quot;: block_size,
+            "BLOCK_SIZE": block_size,
         },
     )
     compiled_kernel = triton.compile(src)
@@ -742,7 +742,7 @@ def add_plugin_aot_impl(
     launch_params.block_x = compiled_kernel.metadata.num_warps * 32  # threads per block
     launch_params.shared_mem = compiled_kernel.metadata.shared  # bytes of shared mem
 
-    # ``extra_args`` are scalar arguments appended to the kernel&#39;s argument list at
+    # ``extra_args`` are scalar arguments appended to the kernel's argument list at
     # launch. Here ``n_elements`` is passed as a 32-bit symbolic integer so TRT
     # evaluates it from the actual tensor size at runtime.
     extra_args = trtp.SymIntExprs(1)
@@ -750,7 +750,7 @@ def add_plugin_aot_impl(
 
     return (
         compiled_kernel.metadata.name,  # kernel function name in PTX
-        compiled_kernel.asm[&quot;ptx&quot;],  # PTX source — embedded in TRT engine
+        compiled_kernel.asm["ptx"],  # PTX source — embedded in TRT engine
         launch_params,
         extra_args,
     )
@@ -767,7 +767,7 @@ def add_plugin_aot_impl(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
-    &quot;my::add_one&quot;,
+    "my::add_one",
     supports_dynamic_shapes=False,
     requires_output_allocator=False,
     use_aot_if_available=True,
@@ -792,15 +792,15 @@ def add_plugin_aot_impl(
         return res
 
 
-if __name__ == &quot;__main__&quot;:
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        &quot;--aot&quot;, action=&quot;store_true&quot;, help=&quot;Try to use AOT compilation&quot;, default=False
+        "--aot", action="store_true", help="Try to use AOT compilation", default=False
     )
     args = parser.parse_args()
 
-    my_model = MyModel().to(&quot;cuda&quot;).eval()
-    m = torch.full((64, 64), 2, device=&quot;cuda&quot;, dtype=torch.float)
+    my_model = MyModel().to("cuda").eval()
+    m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
 
     assert my_model(X=m)[0][0] == 3.0
 
@@ -811,14 +811,14 @@ if __name__ == &quot;__main__&quot;:
             inputs=trt_inputs,
             min_block_size=1,
         )
-        print(&quot;Model compiled successfully!&quot;)
-        print(&quot;Running inference with compiled model...&quot;)
+        print("Model compiled successfully!")
+        print("Running inference with compiled model...")
         with torch.no_grad():
             for i in range(10):
                 res = model_trt(m)
-                assert torch.allclose(res, my_model(m)), &quot;Results do not match!&quot;
+                assert torch.allclose(res, my_model(m)), "Results do not match!"
 
-    print(&quot;Inference successful!&quot;)
+    print("Inference successful!")
 </pre></div>
 </div>
 </div>

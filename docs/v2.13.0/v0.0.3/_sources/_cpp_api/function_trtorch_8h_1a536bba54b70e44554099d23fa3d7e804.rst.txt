@@ -1,0 +1,13 @@
+.. _exhale_function_trtorch_8h_1a536bba54b70e44554099d23fa3d7e804:
+
+Function trtorch::ConvertGraphToTRTEngine
+=========================================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::ConvertGraphToTRTEngine(const torch::jit::Module&, std::string, ExtraInfo)

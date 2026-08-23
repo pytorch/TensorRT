@@ -52,6 +52,8 @@ jobs:
   # generate_binary_build_matrix's cancel-in-progress concurrency would otherwise
   # make per-channel calls cancel each other).
   generate-matrix:
+    needs: decide
+    if: needs.decide.result == 'success' && needs.decide.outputs.lane != 'skip'
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
@@ -89,6 +91,7 @@ jobs:
     with:
       lane: python-only
       build-flavor: python-only
+      python-only: true
       name-prefix: "Python-only "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
@@ -100,6 +103,7 @@ jobs:
     with:
       lane: python-only
       build-flavor: python-only-rtx
+      python-only: true
       use-rtx: true
       name-prefix: "Python-only RTX "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}

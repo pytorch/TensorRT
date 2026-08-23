@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -639,12 +639,12 @@ torch.utils._pytree.register_constant(
 )
 
 # One GPU per node; LOCAL_RANK defaults to 0 for plain env-var launch.
-local_rank = int(os.environ.get(&quot;LOCAL_RANK&quot;, 0))
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
 torch.cuda.set_device(local_rank)
-DEVICE = torch.device(f&quot;cuda:{local_rank}&quot;)
+DEVICE = torch.device(f"cuda:{local_rank}")
 
-# 2-hour timeout so TRT engine building doesn&#39;t trigger the NCCL watchdog.
-dist.init_process_group(backend=&quot;nccl&quot;, timeout=datetime.timedelta(hours=2))
+# 2-hour timeout so TRT engine building doesn't trigger the NCCL watchdog.
+dist.init_process_group(backend="nccl", timeout=datetime.timedelta(hours=2))
 rank = dist.get_rank()
 world_size = dist.get_world_size()
 
@@ -662,14 +662,14 @@ from torch.distributed.tensor.parallel import (
 
 logging.basicConfig(
     level=logging.INFO,
-    format=f&quot;[Rank {rank}] %(levelname)s: %(message)s&quot;,
+    format=f"[Rank {rank}] %(levelname)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
-logger.info(f&quot;dist init OK  rank={rank}/{world_size}  device={DEVICE}&quot;)
+logger.info(f"dist init OK  rank={rank}/{world_size}  device={DEVICE}")
 
 
 class ToyModel(nn.Module):
-    &quot;&quot;&quot;MLP based model&quot;&quot;&quot;
+    """MLP based model"""
 
     def __init__(self):
         super().__init__()
@@ -689,66 +689,66 @@ class ToyModel(nn.Module):
 def get_model(device_mesh):
     assert (
         world_size % 2 == 0
-    ), f&quot;TP examples require an even number of GPUs, got {world_size}&quot;
+    ), f"TP examples require an even number of GPUs, got {world_size}"
     model = ToyModel().to(DEVICE)
     parallelize_module(
         module=model,
         device_mesh=device_mesh,
         parallelize_plan={
-            &quot;in_proj&quot;: ColwiseParallel(input_layouts=Shard(0)),
-            &quot;out_proj&quot;: RowwiseParallel(output_layouts=Shard(0)),
-            &quot;in_proj2&quot;: ColwiseParallel(input_layouts=Shard(0)),
-            &quot;out_proj2&quot;: RowwiseParallel(output_layouts=Shard(0)),
+            "in_proj": ColwiseParallel(input_layouts=Shard(0)),
+            "out_proj": RowwiseParallel(output_layouts=Shard(0)),
+            "in_proj2": ColwiseParallel(input_layouts=Shard(0)),
+            "out_proj2": RowwiseParallel(output_layouts=Shard(0)),
         },
     )
-    logger.info(&quot;Model built and sharded across ranks.&quot;)
+    logger.info("Model built and sharded across ranks.")
     return model
 
 
 def compile_torchtrt(model, args):
     model.eval()
 
-    use_fp32_acc = args.precision == &quot;FP16&quot;
+    use_fp32_acc = args.precision == "FP16"
 
-    use_python_runtime = args.mode == &quot;jit_python&quot;
+    use_python_runtime = args.mode == "jit_python"
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_model = torch.compile(
             model,
-            backend=&quot;torch_tensorrt&quot;,
+            backend="torch_tensorrt",
             dynamic=False,
             options={
-                &quot;use_fp32_acc&quot;: use_fp32_acc,
-                &quot;device&quot;: DEVICE,
-                &quot;disable_tf32&quot;: True,
-                &quot;use_python_runtime&quot;: use_python_runtime,
-                &quot;debug&quot;: args.debug,
-                &quot;min_block_size&quot;: 1,
+                "use_fp32_acc": use_fp32_acc,
+                "device": DEVICE,
+                "disable_tf32": True,
+                "use_python_runtime": use_python_runtime,
+                "debug": args.debug,
+                "min_block_size": 1,
             },
         )
     return trt_model
 
 
-if __name__ == &quot;__main__&quot;:
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description=&quot;Tensor Parallel Simple Example (torchrun)&quot;
+        description="Tensor Parallel Simple Example (torchrun)"
     )
     parser.add_argument(
-        &quot;--mode&quot;,
+        "--mode",
         type=str,
-        choices=[&quot;jit_python&quot;, &quot;jit_cpp&quot;, &quot;export&quot;, &quot;load&quot;],
-        default=&quot;jit_python&quot;,
+        choices=["jit_python", "jit_cpp", "export", "load"],
+        default="jit_python",
     )
-    parser.add_argument(&quot;--save-path&quot;, type=str, default=&quot;/tmp/tp_model.ep&quot;)
+    parser.add_argument("--save-path", type=str, default="/tmp/tp_model.ep")
     parser.add_argument(
-        &quot;--precision&quot;,
-        default=&quot;FP16&quot;,
-        choices=[&quot;FP16&quot;, &quot;BF16&quot;, &quot;FP32&quot;],
+        "--precision",
+        default="FP16",
+        choices=["FP16", "BF16", "FP32"],
     )
-    parser.add_argument(&quot;--debug&quot;, action=&quot;store_true&quot;)
+    parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
-    device_mesh = init_device_mesh(&quot;cuda&quot;, (world_size,))
+    device_mesh = init_device_mesh("cuda", (world_size,))
 
     with torch.inference_mode():
         model = get_model(device_mesh)
@@ -757,32 +757,32 @@ if __name__ == &quot;__main__&quot;:
         inp = torch.rand(20, 10, device=DEVICE)
         python_result = model(inp)
 
-        if args.mode == &quot;load&quot;:
-            logger.info(f&quot;Loading from {args.save_path}&quot;)
+        if args.mode == "load":
+            logger.info(f"Loading from {args.save_path}")
             loaded_program = torch_tensorrt.load(args.save_path)
             output = loaded_program.module()(inp)
-            assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
-            logger.info(&quot;Load successful!&quot;)
+            assert (python_result - output).std() &lt; 0.01, "Result mismatch"
+            logger.info("Load successful!")
 
-        elif args.mode in (&quot;jit_python&quot;, &quot;jit_cpp&quot;):
+        elif args.mode in ("jit_python", "jit_cpp"):
             trt_model = compile_torchtrt(model, args)
 
             # Warmup: trigger engine build on all ranks, then barrier so no
             # rank races ahead to the next NCCL collective before others finish.
-            logger.info(&quot;Warming up (triggering TRT engine build)...&quot;)
+            logger.info("Warming up (triggering TRT engine build)...")
             _ = trt_model(inp)
             dist.barrier()
-            logger.info(&quot;All ranks compiled. Running inference...&quot;)
+            logger.info("All ranks compiled. Running inference...")
 
             with torch_tensorrt.distributed.distributed_context(
                 dist.group.WORLD, trt_model
             ) as dist_model:
                 output = dist_model(inp)
 
-            assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
-            logger.info(&quot;JIT compile successful!&quot;)
+            assert (python_result - output).std() &lt; 0.01, "Result mismatch"
+            logger.info("JIT compile successful!")
 
-        elif args.mode == &quot;export&quot;:
+        elif args.mode == "export":
             with torch.inference_mode():
                 exported_program = torch.export.export(model, (inp,), strict=False)
             trt_model = torch_tensorrt.dynamo.compile(
@@ -798,13 +798,13 @@ if __name__ == &quot;__main__&quot;:
             )
             with torch.inference_mode():
                 output = trt_model(inp)
-            assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
+            assert (python_result - output).std() &lt; 0.01, "Result mismatch"
             save_path = torch_tensorrt.save(trt_model, args.save_path, inputs=[inp])
-            logger.info(f&quot;Saved to {save_path}&quot;)
+            logger.info(f"Saved to {save_path}")
             dist.barrier()
 
     dist.destroy_process_group()
-    logger.info(&quot;Done!&quot;)
+    logger.info("Done!")
     # Bypass Python GC — TRT/CUDA destructors can segfault during
     # interpreter shutdown due to unpredictable destruction order.
     os._exit(0)

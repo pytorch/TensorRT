@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -608,27 +608,27 @@ import torch_tensorrt
 from accelerate import PartialState
 from transformers import AutoTokenizer, GPT2LMHeadModel
 
-tokenizer = AutoTokenizer.from_pretrained(&quot;gpt2&quot;)
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
 # Set input prompts for different devices
-prompt1 = &quot;GPT2 is a model developed by.&quot;
-prompt2 = &quot;Llama is a model developed by &quot;
+prompt1 = "GPT2 is a model developed by."
+prompt2 = "Llama is a model developed by "
 
-input_id1 = tokenizer(prompt1, return_tensors=&quot;pt&quot;).input_ids
-input_id2 = tokenizer(prompt2, return_tensors=&quot;pt&quot;).input_ids
+input_id1 = tokenizer(prompt1, return_tensors="pt").input_ids
+input_id2 = tokenizer(prompt2, return_tensors="pt").input_ids
 
 distributed_state = PartialState()
 
 # Import GPT2 model and load to distributed devices
-model = GPT2LMHeadModel.from_pretrained(&quot;gpt2&quot;).eval().to(distributed_state.device)
+model = GPT2LMHeadModel.from_pretrained("gpt2").eval().to(distributed_state.device)
 
 
 # Instantiate model with Torch-TensorRT backend
 model.forward = torch.compile(
     model.forward,
-    backend=&quot;torch_tensorrt&quot;,
+    backend="torch_tensorrt",
     options={
-        &quot;truncate_long_and_double&quot;: True,
+        "truncate_long_and_double": True,
     },
     dynamic=False,
 )

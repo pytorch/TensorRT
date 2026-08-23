@@ -1,0 +1,14 @@
+.. _exhale_function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40:
+
+Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget
+==========================================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_executorch_WeightStreamingBudget.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::executorch_backend::parse_weight_streaming_budget(const void *, std::size_t)
+   :project: Torch-TensorRT

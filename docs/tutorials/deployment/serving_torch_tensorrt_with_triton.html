@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -612,7 +612,7 @@ this demonstration, we will be using a ResNet50 model from Torchhub.</p>
 an account and get the API key from <a class="reference external" href="https://ngc.nvidia.com/setup/">here</a>.
 Sign up and login with your key (follow the instructions
 <a class="reference external" href="https://ngc.nvidia.com/setup/api-key">here</a> after signing up).</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># YY.MM is the yy:mm for the publishing tag for NVIDIA&#39;s Pytorch</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># YY.MM is the yy:mm for the publishing tag for NVIDIA's Pytorch</span>
 <span class="cp"># container; eg. 24.08</span>
 <span class="cp"># NOTE: Use the publishing tag for both the PyTorch container and the Triton Containers</span>
 
@@ -630,17 +630,17 @@ Sign up and login with your key (follow the instructions
 <span class="n">torch</span><span class="p">.</span><span class="n">hub</span><span class="p">.</span><span class="n">_validate_not_a_forked_repo</span><span class="o">=</span><span class="n">lambda</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">,</span><span class="n">c</span><span class="o">:</span><span class="w"> </span><span class="n">True</span>
 
 <span class="cp"># load model</span>
-<span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">hub</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="err">&#39;</span><span class="n">pytorch</span><span class="o">/</span><span class="n">vision</span><span class="o">:</span><span class="n">v0</span><span class="mf">.10.0</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="n">resnet50</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">pretrained</span><span class="o">=</span><span class="n">True</span><span class="p">).</span><span class="n">eval</span><span class="p">().</span><span class="n">to</span><span class="p">(</span><span class="s">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">hub</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="err">'</span><span class="n">pytorch</span><span class="o">/</span><span class="n">vision</span><span class="o">:</span><span class="n">v0</span><span class="mf">.10.0</span><span class="err">'</span><span class="p">,</span><span class="w"> </span><span class="err">'</span><span class="n">resnet50</span><span class="err">'</span><span class="p">,</span><span class="w"> </span><span class="n">pretrained</span><span class="o">=</span><span class="n">True</span><span class="p">).</span><span class="n">eval</span><span class="p">().</span><span class="n">to</span><span class="p">(</span><span class="s">"cuda"</span><span class="p">)</span>
 
 <span class="cp"># Compile with Torch TensorRT;</span>
 <span class="n">trt_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span>
 <span class="w">    </span><span class="n">arg_inputs</span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">))],</span>
 <span class="p">)</span>
 
-<span class="n">ts_trt_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">jit</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">).</span><span class="n">to</span><span class="p">(</span><span class="s">&quot;cuda&quot;</span><span class="p">))</span>
+<span class="n">ts_trt_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">jit</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">).</span><span class="n">to</span><span class="p">(</span><span class="s">"cuda"</span><span class="p">))</span>
 
 <span class="cp"># Save the model</span>
-<span class="n">torch</span><span class="p">.</span><span class="n">jit</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="n">ts_trt_model</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;/triton_example/model_repository/resnet50/1/model.pt&quot;</span><span class="p">)</span>
+<span class="n">torch</span><span class="p">.</span><span class="n">jit</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="n">ts_trt_model</span><span class="p">,</span><span class="w"> </span><span class="s">"/triton_example/model_repository/resnet50/1/model.pt"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>You can run the script with the following command (from <code class="docutils literal notranslate"><span class="pre">//examples/triton</span></code>)</p>
@@ -672,19 +672,19 @@ discuss the simplest possible form of the model repository.</p>
 <p>There are two files that Triton requires to serve the model: the model itself
 and a model configuration file which is typically provided in <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code>.
 For the model we prepared in step 1, the following configuration can be used:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;resnet50&quot;</span>
-<span class="nl">backend</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pytorch&quot;</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">"resnet50"</span>
+<span class="nl">backend</span><span class="p">:</span><span class="w"> </span><span class="s">"pytorch"</span>
 <span class="nl">max_batch_size</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
 <span class="n">input</span><span class="w"> </span><span class="p">[</span>
 <span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;x&quot;</span>
+<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">"x"</span>
 <span class="w">    </span><span class="nl">data_type</span><span class="p">:</span><span class="w"> </span><span class="n">TYPE_FP32</span>
 <span class="w">    </span><span class="nl">dims</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="w"> </span><span class="p">]</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">]</span>
 <span class="n">output</span><span class="w"> </span><span class="p">[</span>
 <span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output0&quot;</span>
+<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">"output0"</span>
 <span class="w">    </span><span class="nl">data_type</span><span class="p">:</span><span class="w"> </span><span class="n">TYPE_FP32</span>
 <span class="w">    </span><span class="nl">dims</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">]</span>
 <span class="w">  </span><span class="p">}</span>
@@ -715,7 +715,7 @@ http client to query the server.</p>
 have one, download an example image to test inference. In this section, we
 will be going over a very basic client. For a variety of more fleshed out
 examples, refer to the <a class="reference external" href="https://github.com/triton-inference-server/client/tree/main/src/python/examples">Triton Client Repository</a></p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">wget</span><span class="w">  </span><span class="o">-</span><span class="n">O</span><span class="w"> </span><span class="n">img1</span><span class="p">.</span><span class="n">jpg</span><span class="w"> </span><span class="s">&quot;https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg&quot;</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">wget</span><span class="w">  </span><span class="o">-</span><span class="n">O</span><span class="w"> </span><span class="n">img1</span><span class="p">.</span><span class="n">jpg</span><span class="w"> </span><span class="s">"https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg"</span>
 </pre></div>
 </div>
 <p>We then need to install dependencies for building a python client. These will
@@ -736,7 +736,7 @@ resize and normalize the query image.</p>
 <span class="n">from</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">.</span><span class="n">utils</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">triton_to_np_dtype</span>
 
 <span class="cp"># preprocessing function</span>
-<span class="n">def</span><span class="w"> </span><span class="n">rn50_preprocess</span><span class="p">(</span><span class="n">img_path</span><span class="o">=</span><span class="s">&quot;/triton_example/img1.jpg&quot;</span><span class="p">)</span><span class="o">:</span>
+<span class="n">def</span><span class="w"> </span><span class="n">rn50_preprocess</span><span class="p">(</span><span class="n">img_path</span><span class="o">=</span><span class="s">"/triton_example/img1.jpg"</span><span class="p">)</span><span class="o">:</span>
 <span class="w">  </span><span class="n">img</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Image</span><span class="p">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span>
 <span class="w">  </span><span class="n">preprocess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transforms</span><span class="p">.</span><span class="n">Compose</span><span class="p">(</span>
 <span class="w">      </span><span class="p">[</span>
@@ -754,26 +754,26 @@ resize and normalize the query image.</p>
 <p>Building a client requires three basic points. Firstly, we setup a connection
 with the Triton Inference Server.</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Setting up client</span>
-<span class="n">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferenceServerClient</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s">&quot;localhost:8000&quot;</span><span class="p">)</span>
+<span class="n">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferenceServerClient</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s">"localhost:8000"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Secondly, we specify the names of the input and output layer(s) of our model. This can be obtained during export and should already be specified in your <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code></p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferInput</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">transformed_img</span><span class="p">.</span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">datatype</span><span class="o">=</span><span class="s">&quot;FP32&quot;</span><span class="p">)</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferInput</span><span class="p">(</span><span class="s">"x"</span><span class="p">,</span><span class="w"> </span><span class="n">transformed_img</span><span class="p">.</span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">datatype</span><span class="o">=</span><span class="s">"FP32"</span><span class="p">)</span>
 <span class="n">inputs</span><span class="p">.</span><span class="n">set_data_from_numpy</span><span class="p">(</span><span class="n">transformed_img</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">)</span>
 
-<span class="n">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferRequestedOutput</span><span class="p">(</span><span class="s">&quot;output0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">,</span><span class="w"> </span><span class="n">class_count</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="n">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferRequestedOutput</span><span class="p">(</span><span class="s">"output0"</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">,</span><span class="w"> </span><span class="n">class_count</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Lastly, we send an inference request to the Triton Inference Server.</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Querying the server</span>
-<span class="n">results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="n">infer</span><span class="p">(</span><span class="n">model_name</span><span class="o">=</span><span class="s">&quot;resnet50&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">inputs</span><span class="p">],</span><span class="w"> </span><span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="n">outputs</span><span class="p">])</span>
-<span class="n">inference_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">results</span><span class="p">.</span><span class="n">as_numpy</span><span class="p">(</span><span class="err">&#39;</span><span class="n">output0</span><span class="err">&#39;</span><span class="p">)</span>
+<span class="n">results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="n">infer</span><span class="p">(</span><span class="n">model_name</span><span class="o">=</span><span class="s">"resnet50"</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">inputs</span><span class="p">],</span><span class="w"> </span><span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="n">outputs</span><span class="p">])</span>
+<span class="n">inference_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">results</span><span class="p">.</span><span class="n">as_numpy</span><span class="p">(</span><span class="err">'</span><span class="n">output0</span><span class="err">'</span><span class="p">)</span>
 <span class="n">print</span><span class="p">(</span><span class="n">inference_output</span><span class="p">[</span><span class="o">:</span><span class="mi">5</span><span class="p">])</span>
 </pre></div>
 </div>
 <p>The output should look like below:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">b</span><span class="err">&#39;</span><span class="mf">12.468750</span><span class="o">:</span><span class="mi">90</span><span class="err">&#39;</span><span class="w"> </span><span class="n">b</span><span class="err">&#39;</span><span class="mf">11.523438</span><span class="o">:</span><span class="mi">92</span><span class="err">&#39;</span><span class="w"> </span><span class="n">b</span><span class="err">&#39;</span><span class="mf">9.664062</span><span class="o">:</span><span class="mi">14</span><span class="err">&#39;</span><span class="w"> </span><span class="n">b</span><span class="err">&#39;</span><span class="mf">8.429688</span><span class="o">:</span><span class="mi">136</span><span class="err">&#39;</span>
-<span class="w"> </span><span class="n">b</span><span class="err">&#39;</span><span class="mf">8.234375</span><span class="o">:</span><span class="mi">11</span><span class="err">&#39;</span><span class="p">]</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">b</span><span class="err">'</span><span class="mf">12.468750</span><span class="o">:</span><span class="mi">90</span><span class="err">'</span><span class="w"> </span><span class="n">b</span><span class="err">'</span><span class="mf">11.523438</span><span class="o">:</span><span class="mi">92</span><span class="err">'</span><span class="w"> </span><span class="n">b</span><span class="err">'</span><span class="mf">9.664062</span><span class="o">:</span><span class="mi">14</span><span class="err">'</span><span class="w"> </span><span class="n">b</span><span class="err">'</span><span class="mf">8.429688</span><span class="o">:</span><span class="mi">136</span><span class="err">'</span>
+<span class="w"> </span><span class="n">b</span><span class="err">'</span><span class="mf">8.234375</span><span class="o">:</span><span class="mi">11</span><span class="err">'</span><span class="p">]</span>
 </pre></div>
 </div>
 <p>The output format here is <code class="docutils literal notranslate"><span class="pre">&lt;confidence_score&gt;:&lt;classification_index&gt;</span></code>.
@@ -782,7 +782,7 @@ To learn how to map these to the label names and more, refer to Triton Inference
 <p>You can try out this client quickly using</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Remember to use the same publishing tag for all steps (e.g. 24.08)</span>
 
-<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">net</span><span class="o">=</span><span class="n">host</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">triton_example</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">tritonserver</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">MM</span><span class="o">-</span><span class="n">py3</span><span class="o">-</span><span class="n">sdk</span><span class="w"> </span><span class="n">bash</span><span class="w"> </span><span class="o">-</span><span class="n">c</span><span class="w"> </span><span class="s">&quot;pip install torchvision &amp;&amp; python /triton_example/client.py&quot;</span>
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">net</span><span class="o">=</span><span class="n">host</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">triton_example</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">tritonserver</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">MM</span><span class="o">-</span><span class="n">py3</span><span class="o">-</span><span class="n">sdk</span><span class="w"> </span><span class="n">bash</span><span class="w"> </span><span class="o">-</span><span class="n">c</span><span class="w"> </span><span class="s">"pip install torchvision &amp;&amp; python /triton_example/client.py"</span>
 </pre></div>
 </div>
 </section>

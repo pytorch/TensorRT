@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -631,18 +631,18 @@ torch.utils._pytree.register_constant(
     torch.distributed.tensor._dtensor_spec.DTensorSpec
 )
 
-parser = argparse.ArgumentParser(description=&quot;Tensor Parallel Simple Example&quot;)
+parser = argparse.ArgumentParser(description="Tensor Parallel Simple Example")
 parser.add_argument(
-    &quot;--mode&quot;,
+    "--mode",
     type=str,
-    choices=[&quot;jit_python&quot;, &quot;jit_cpp&quot;, &quot;export&quot;, &quot;load&quot;],
-    default=&quot;jit_python&quot;,
+    choices=["jit_python", "jit_cpp", "export", "load"],
+    default="jit_python",
 )
-parser.add_argument(&quot;--save-path&quot;, type=str, default=&quot;/tmp/tp_model.ep&quot;)
+parser.add_argument("--save-path", type=str, default="/tmp/tp_model.ep")
 args = parser.parse_args()
 
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
-    &quot;tensor_parallel_simple_example&quot;
+    "tensor_parallel_simple_example"
 )
 import torch_tensorrt
 from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
@@ -655,13 +655,13 @@ from torch.distributed.tensor.parallel import (
     parallelize_module,
 )
 
-&quot;&quot;&quot;
+"""
 This example takes some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
-&quot;&quot;&quot;
+"""
 
 
 class ToyModel(nn.Module):
-    &quot;&quot;&quot;MLP based model&quot;&quot;&quot;
+    """MLP based model"""
 
     def __init__(self):
         super(ToyModel, self).__init__()
@@ -678,14 +678,14 @@ class ToyModel(nn.Module):
         return x
 
 
-logger.info(f&quot;Starting PyTorch TP example on rank {_rank}.&quot;)
+logger.info(f"Starting PyTorch TP example on rank {_rank}.")
 assert (
     _world_size % 2 == 0
-), f&quot;TP examples require even number of GPUs, but got {_world_size} gpus&quot;
+), f"TP examples require even number of GPUs, but got {_world_size} gpus"
 
 
-# # create model and move it to GPU - init&quot;cuda&quot;_mesh has already mapped GPU ids.
-tp_model = ToyModel().to(&quot;cuda&quot;)
+# # create model and move it to GPU - init"cuda"_mesh has already mapped GPU ids.
+tp_model = ToyModel().to("cuda")
 
 
 # Custom parallelization plan for the model
@@ -693,57 +693,57 @@ tp_model = parallelize_module(
     module=tp_model,
     device_mesh=device_mesh,
     parallelize_plan={
-        &quot;in_proj&quot;: ColwiseParallel(input_layouts=Shard(0)),
-        &quot;out_proj&quot;: RowwiseParallel(output_layouts=Shard(0)),
-        &quot;in_proj2&quot;: ColwiseParallel(input_layouts=Shard(0)),
-        &quot;out_proj2&quot;: RowwiseParallel(output_layouts=Shard(0)),
+        "in_proj": ColwiseParallel(input_layouts=Shard(0)),
+        "out_proj": RowwiseParallel(output_layouts=Shard(0)),
+        "in_proj2": ColwiseParallel(input_layouts=Shard(0)),
+        "out_proj2": RowwiseParallel(output_layouts=Shard(0)),
     },
 )
 torch.manual_seed(0)
-inp = torch.rand(20, 10, device=&quot;cuda&quot;)
+inp = torch.rand(20, 10, device="cuda")
 python_result = tp_model(inp)
 
-if args.mode == &quot;load&quot;:
+if args.mode == "load":
     # Load per-rank model: /tmp/tp_model.ep -&gt; /tmp/tp_model_rank0_of_2.ep
-    logger.info(f&quot;Loading from {args.save_path}&quot;)
+    logger.info(f"Loading from {args.save_path}")
     loaded_program = torch_tensorrt.load(args.save_path)
     output = loaded_program.module()(inp)
     dist.barrier()
-    assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
-    logger.info(&quot;Load successful!&quot;)
+    assert (python_result - output).std() &lt; 0.01, "Result mismatch"
+    logger.info("Load successful!")
 
-elif args.mode == &quot;jit_python&quot;:
+elif args.mode == "jit_python":
     trt_model = torch.compile(
         tp_model,
-        backend=&quot;torch_tensorrt&quot;,
+        backend="torch_tensorrt",
         options={
-            &quot;truncate_long_and_double&quot;: True,
-            &quot;use_python_runtime&quot;: True,
-            &quot;min_block_size&quot;: 1,
+            "truncate_long_and_double": True,
+            "use_python_runtime": True,
+            "min_block_size": 1,
         },
     )
     output = trt_model(inp)
     dist.barrier()
 
-    assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
-    logger.info(&quot;JIT compile successful!&quot;)
+    assert (python_result - output).std() &lt; 0.01, "Result mismatch"
+    logger.info("JIT compile successful!")
 
-elif args.mode == &quot;jit_cpp&quot;:
+elif args.mode == "jit_cpp":
     trt_model = torch.compile(
         tp_model,
-        backend=&quot;torch_tensorrt&quot;,
+        backend="torch_tensorrt",
         options={
-            &quot;truncate_long_and_double&quot;: True,
-            &quot;use_python_runtime&quot;: False,
-            &quot;min_block_size&quot;: 1,
+            "truncate_long_and_double": True,
+            "use_python_runtime": False,
+            "min_block_size": 1,
         },
     )
     output = trt_model(inp)
     dist.barrier()
-    assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
-    logger.info(&quot;JIT compile successful!&quot;)
+    assert (python_result - output).std() &lt; 0.01, "Result mismatch"
+    logger.info("JIT compile successful!")
 
-elif args.mode == &quot;export&quot;:
+elif args.mode == "export":
     # Export: torch.export + dynamo.compile - AOT compilation, can save
     exported_program = torch.export.export(tp_model, (inp,), strict=False)
     trt_model = torch_tensorrt.dynamo.compile(
@@ -756,15 +756,15 @@ elif args.mode == &quot;export&quot;:
     )
     output = trt_model(inp)
     dist.barrier()
-    assert (python_result - output).std() &lt; 0.01, &quot;Result mismatch&quot;
+    assert (python_result - output).std() &lt; 0.01, "Result mismatch"
 
     # Save per-rank: /tmp/tp_model.ep -&gt; /tmp/tp_model_rank0_of_2.ep
     save_path = torch_tensorrt.save(trt_model, args.save_path, inputs=[inp])
-    logger.info(f&quot;Saved to {save_path}&quot;)
+    logger.info(f"Saved to {save_path}")
     dist.barrier()
 
 cleanup_distributed_env()
-logger.info(&quot;Done!&quot;)
+logger.info("Done!")
 </pre></div>
 </div>
 </div>

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -654,8 +654,8 @@ still applies in that case.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">compiled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">,</span>
     <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">cache_k</span><span class="p">,</span> <span class="n">cache_v</span><span class="p">,</span> <span class="n">x</span><span class="p">],</span>
-    <span class="n">mutated_inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;cache_k&quot;</span><span class="p">:</span> <span class="s2">&quot;cache_k_out&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;cache_v&quot;</span><span class="p">:</span> <span class="s2">&quot;cache_v_out&quot;</span><span class="p">},</span>
+    <span class="n">mutated_inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">"cache_k"</span><span class="p">:</span> <span class="s2">"cache_k_out"</span><span class="p">,</span>
+                    <span class="s2">"cache_v"</span><span class="p">:</span> <span class="s2">"cache_v_out"</span><span class="p">},</span>
 <span class="p">)</span>
 
 <span class="c1"># cache_k and cache_v are mutated in place; out[2] is the real output.</span>
@@ -871,7 +871,7 @@ positional <code class="docutils literal notranslate"><span class="pre">std::vec
 <code class="docutils literal notranslate"><span class="pre">ABI_VERSION</span></code>. The change is additive: one new index, one new field,
 one ABI bump.</p>
 <p>In <code class="docutils literal notranslate"><span class="pre">core/runtime/runtime.h</span></code>:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">ABI_VERSION</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;10&quot;</span><span class="p">;</span><span class="w">  </span><span class="c1">// bumped from &quot;9&quot;</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">ABI_VERSION</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"10"</span><span class="p">;</span><span class="w">  </span><span class="c1">// bumped from "9"</span>
 
 <span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">ABI_TARGET_IDX</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
@@ -907,7 +907,7 @@ primary constructor:</p>
 </li>
 <li><p><strong>``__obj_flatten__()`` (line 484)</strong> gains a corresponding tuple so
 Python introspection sees the new field:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="p">(</span><span class="s">&quot;aliased_io&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">serialized_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">]),</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="p">(</span><span class="s">"aliased_io"</span><span class="p">,</span><span class="w"> </span><span class="n">serialized_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">]),</span>
 </pre></div>
 </div>
 </li>
@@ -932,7 +932,7 @@ module buffer:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">StreamingKV</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">register_buffer</span><span class="p">(</span><span class="s2">&quot;cache_k&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">S_MAX</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">register_buffer</span><span class="p">(</span><span class="s2">"cache_k"</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">S_MAX</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_k</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cache_k</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">t</span><span class="p">:</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">x_k</span>

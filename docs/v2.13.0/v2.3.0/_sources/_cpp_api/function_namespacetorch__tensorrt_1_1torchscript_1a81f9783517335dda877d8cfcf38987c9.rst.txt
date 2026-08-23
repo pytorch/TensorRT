@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1_1torchscript_1a81f9783517335dda877d8cfcf38987c9:
+
+Function torch_tensorrt::torchscript::embed_engine_in_new_module
+================================================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::torchscript::embed_engine_in_new_module(const std::string&, Device, const std::vector<std::string>&, const std::vector<std::string>&)
+   :project: Torch-TensorRT

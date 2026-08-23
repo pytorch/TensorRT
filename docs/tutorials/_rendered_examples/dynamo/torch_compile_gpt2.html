@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=969d8bf3"></script>
+    <script src="../../../_static/documentation_options.js?v=8ba44963"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -534,7 +534,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>MAX_LENGTH = 32
-DEVICE = torch.device(&quot;cuda:0&quot;)
+DEVICE = torch.device("cuda:0")
 </pre></div>
 </div>
 </div>
@@ -547,13 +547,13 @@ DEVICE = torch.device(&quot;cuda:0&quot;)
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>with torch.no_grad():
-    tokenizer = AutoTokenizer.from_pretrained(&quot;gpt2&quot;)
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
     model = (
         AutoModelForCausalLM.from_pretrained(
-            &quot;gpt2&quot;,
+            "gpt2",
             pad_token_id=tokenizer.eos_token_id,
             use_cache=False,
-            attn_implementation=&quot;eager&quot;,
+            attn_implementation="eager",
         )
         .to(DEVICE)
         .eval()
@@ -569,9 +569,9 @@ DEVICE = torch.device(&quot;cuda:0&quot;)
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>prompt = &quot;I enjoy walking with my cute dog&quot;
-model_inputs = tokenizer(prompt, return_tensors=&quot;pt&quot;)
-input_ids = model_inputs[&quot;input_ids&quot;].to(DEVICE)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>prompt = "I enjoy walking with my cute dog"
+model_inputs = tokenizer(prompt, return_tensors="pt")
+input_ids = model_inputs["input_ids"].to(DEVICE)
 </pre></div>
 </div>
 </div>
@@ -602,11 +602,11 @@ specialization</a></p>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>torch._dynamo.mark_dynamic(input_ids, 1, min=2, max=1023)
 model.forward = torch.compile(
     model.forward,
-    backend=&quot;tensorrt&quot;,
+    backend="tensorrt",
     dynamic=None,
     options={
-        &quot;disable_tf32&quot;: True,
-        &quot;min_block_size&quot;: 1,
+        "disable_tf32": True,
+        "min_block_size": 1,
     },
 )
 </pre></div>
@@ -635,12 +635,12 @@ model.forward = torch.compile(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(
-    &quot;Pytorch model generated text: &quot;,
+    "Pytorch model generated text: ",
     tokenizer.decode(pyt_gen_tokens[0], skip_special_tokens=True),
 )
-print(&quot;=============================&quot;)
+print("=============================")
 print(
-    &quot;TensorRT model generated text: &quot;,
+    "TensorRT model generated text: ",
     tokenizer.decode(trt_gen_tokens[0], skip_special_tokens=True),
 )
 </pre></div>
@@ -651,11 +651,11 @@ print(
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>&quot;&quot;&quot;
-Pytorch model generated text:  I enjoy walking with my cute dog, but I&#39;m not sure if I&#39;ll ever be able to walk with my dog. I&#39;m not sure if I&#39;ll
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>"""
+Pytorch model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll
 =============================
-TensorRT model generated text:  I enjoy walking with my cute dog, but I&#39;m not sure if I&#39;ll ever be able to walk with my dog. I&#39;m not sure if I&#39;ll
-&quot;&quot;&quot;
+TensorRT model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll
+"""
 </pre></div>
 </div>
 </div>

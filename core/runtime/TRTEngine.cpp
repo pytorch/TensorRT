@@ -583,20 +583,20 @@ FlattenedState TRTEngine::__obj_flatten__() {
       std::tuple("aliased_io", serialized_info[ALIASED_IO_IDX]));
 }
 
-std::vector<std::string> TRTEngine::serialize() {
-  // Serialize TensorRT engine
-  auto serialized_trt_engine = make_trt(this->cuda_engine->serialize());
-
-  // Adding device info related meta data to the serialized file
-  auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
-
+std::vector<std::string> TRTEngine::serialize_metadata_only() {
+  // Nothing here touches the ICudaEngine: each field is a member or a cheap string
+  // encoding of one. ENGINE_IDX is deliberately left empty, so a caller that needs
+  // the engine must use serialize() or serialized_engine_tensor().
+  // rank/world_size are runtime facts (may differ at load time); not serialized.
+  // RuntimeSettings are intentionally NOT serialized: they're per-engine, in-memory
+  // initialization values, not part of the engine's identity.
   std::vector<std::string> serialized_info;
   serialized_info.resize(SERIALIZATION_LEN);
 
   serialized_info[ABI_TARGET_IDX] = ABI_VERSION;
   serialized_info[NAME_IDX] = this->name;
   serialized_info[DEVICE_IDX] = this->device_info.serialize();
-  serialized_info[ENGINE_IDX] = base64_encode(trt_engine);
+  serialized_info[ENGINE_IDX] = "";
   serialized_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(this->in_binding_names);
   serialized_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(this->out_binding_names);
   serialized_info[HW_COMPATIBLE_IDX] = this->hardware_compatible ? "1" : "0";
@@ -607,9 +607,34 @@ std::vector<std::string> TRTEngine::serialize() {
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
   serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = this->requires_native_multidevice ? "1" : "0";
   serialized_info[ALIASED_IO_IDX] = serialize_aliased_io(this->aliased_io);
-  // rank/world_size are runtime facts (may differ at load time); not serialized.
-  // RuntimeSettings are intentionally NOT serialized: they're per-engine, in-memory
-  // initialization values, not part of the engine's identity.
+
+  return serialized_info;
+}
+
+at::Tensor TRTEngine::serialized_engine_tensor() {
+  // Wraps TensorRT's buffer instead of copying it: an engine can be multiple GB, and
+  // at::empty + memcpy would hold that buffer and its copy at the same time. The
+  // captured shared_ptr keeps the IHostMemory alive for exactly as long as the
+  // tensor's storage points into it. The storage is therefore not resizable.
+  auto serialized_trt_engine = make_trt(this->cuda_engine->serialize());
+  auto size = static_cast<int64_t>(serialized_trt_engine->size());
+  void* data = serialized_trt_engine->data();
+  return at::from_blob(
+      data,
+      {size},
+      [holder = std::move(serialized_trt_engine)](void*) mutable { holder.reset(); },
+      at::TensorOptions().dtype(at::kByte).device(at::kCPU));
+}
+
+std::vector<std::string> TRTEngine::serialize() {
+  // Same record as serialize_metadata_only() with the engine filled in. Delegates
+  // rather than repeating the field list, so a newly added field cannot land in one
+  // and be silently missing from the other.
+  auto serialized_info = serialize_metadata_only();
+
+  auto serialized_trt_engine = make_trt(this->cuda_engine->serialize());
+  auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
+  serialized_info[ENGINE_IDX] = base64_encode(trt_engine);
 
   return serialized_info;
 }
@@ -797,19 +822,35 @@ bool TRTEngine::bind_nccl_comm() {
   // When group_name is empty (e.g. engine loaded from a serialized
   // ExportedProgram where the Python TorchTensorRTModule wrapper was
   // inlined and set_group_name() was never called), auto-resolve the
-  // process group from the c10d registry.  PyTorch assigns sequential
-  // numeric names ("0", "1", ...) to process groups; probe until we
-  // find one with an NCCL backend.
+  // process group from the c10d registry.
   if (this->group_name.empty() && this->requires_native_multidevice) {
-    // PyTorch assigns sequential numeric names ("0", "1", ...) to process
-    // groups.  Collect every group that has an NCCL backend; we can only
-    // auto-resolve when there is exactly one — if there are several (TP+DP,
-    // Megatron 4-D parallelism, etc.) we cannot know which group this engine
-    // belongs to and the caller must pin it explicitly.
+    // PyTorch assigns numeric names ("0", "1", ...) via a monotonically
+    // increasing group_count counter:
+    //   - init_process_group()                      → always numeric
+    //   - new_group(use_local_synchronization=False) → numeric (default)
+    //   - new_group(use_local_synchronization=True)  → hashed name, but
+    //     still increments group_count, leaving a gap in numeric names
+    //     (e.g. "0", gap at "1", "2" for the next new_group()).
+    //
+    // In PyTorch 2.x, resolve_process_group throws c10::Error for missing
+    // group names instead of returning nullptr (previous behaviour). We catch
+    // and continue (not break) so gaps from use_local_synchronization=True
+    // don't stop us from finding numeric groups beyond the gap.
+    //
+    // We collect all numeric groups with an NCCL backend. Auto-resolution
+    // is only possible when exactly one is found. If multiple exist (e.g.
+    // world group + TP subgroup in a TP+DP setup), we cannot know which
+    // group this engine's collectives belong to — the caller must pin
+    // explicitly via distributed_context(group, model).
     std::vector<std::string> nccl_groups;
     for (int i = 0; i < 20; ++i) {
       auto candidate = std::to_string(i);
-      auto probe = c10d::resolve_process_group(candidate);
+      c10::intrusive_ptr<c10d::ProcessGroup> probe;
+      try {
+        probe = c10d::resolve_process_group(candidate);
+      } catch (const c10::Error&) {
+        continue; // gap in numeric names — keep probing
+      }
       if (probe != nullptr && probe->getBackendType() == c10d::ProcessGroup::BackendType::NCCL) {
         nccl_groups.push_back(candidate);
       }
@@ -842,7 +883,14 @@ bool TRTEngine::bind_nccl_comm() {
 
   // Soft-return when the process group isn't available yet (e.g. at engine
   // construction time when the caller hasn't called dist.init_process_group()).
-  auto pg = c10d::resolve_process_group(this->group_name);
+  // resolve_process_group throws c10::Error in newer PyTorch when the group
+  // doesn't exist (previously returned nullptr) — treat the exception as absent.
+  c10::intrusive_ptr<c10d::ProcessGroup> pg;
+  try {
+    pg = c10d::resolve_process_group(this->group_name);
+  } catch (const c10::Error&) {
+    pg = nullptr;
+  }
   if (pg == nullptr) {
     LOG_DEBUG("ProcessGroup '" << this->group_name << "' not yet registered in c10d; NCCL bind deferred.");
     return false;

@@ -1,0 +1,13 @@
+.. _exhale_function_trtorch_8h_1a3eace458ae9122f571fabfc9ef1b9e3a:
+
+Function trtorch::CompileGraph
+==============================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::CompileGraph(const torch::jit::Module&, CompileSpec)
