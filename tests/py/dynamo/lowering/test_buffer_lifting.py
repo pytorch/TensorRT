@@ -35,6 +35,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
     assert_predicted_kv_aliased,
+    hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
 )
@@ -774,6 +775,54 @@ class TestPredictedKvAssertion(TestCase):
         self.assertIn("min_block_size=1", message)
 
 
+class TestHiddenCopybackOutputs(TestCase):
+    """``hide_copyback_outputs`` splits what the graph returns from what ``forward``
+    returns: the trailing copy-back values stay on the output node so the exporters
+    keep finding them and dead-code elimination cannot reach them, while the caller
+    sees the arity of the model that was compiled."""
+
+    @staticmethod
+    def _two_output_gm():
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        doubled = graph.call_function(torch.mul, args=(x, 2))
+        graph.output((x, doubled))
+        return torch.fx.GraphModule(torch.nn.Module(), graph)
+
+    def test_hidden_output_leaves_the_graph_untouched(self):
+        gm = self._two_output_gm()
+        hide_copyback_outputs(gm, 1)
+
+        x = torch.arange(3, dtype=torch.float32)
+        self.assertEqual(gm(x), (x,))
+        output_node = next(n for n in gm.graph.nodes if n.op == "output")
+        self.assertEqual(len(output_node.args[0]), 2)
+        # Nothing is dead, so eliminate_dead_code cannot take the hidden value.
+        gm.graph.eliminate_dead_code()
+        self.assertEqual(len(output_node.args[0]), 2)
+
+    def test_hiding_nothing_is_a_no_op(self):
+        gm = self._two_output_gm()
+        hide_copyback_outputs(gm, 0)
+        x = torch.arange(3, dtype=torch.float32)
+        self.assertEqual(len(gm(x)), 2)
+
+    def test_graph_consumers_still_see_the_hidden_value(self):
+        """Only the call boundary is narrowed. A non-strict ``torch.export`` runs a
+        GraphModule through ``fx.Interpreter``, which reads the output node, so a
+        retrace carries the copy-back value into the program even though the module
+        stopped returning it -- and the exporter downstream has something to
+        reclassify. Both retrace paths are non-strict; a caller who exports the
+        compiled module with ``strict=True`` gets the module called instead and loses
+        the hidden values."""
+        gm = self._two_output_gm()
+        hide_copyback_outputs(gm, 1)
+
+        x = torch.arange(3, dtype=torch.float32)
+        self.assertEqual(len(gm(x)), 1)
+        self.assertEqual(len(torch.fx.Interpreter(gm).run(x)), 2)
+
+
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
 class TestCompileSeam(TestCase):
     """End-to-end coverage of the wire between the two halves of the design.
@@ -839,9 +888,10 @@ class TestCompileSeam(TestCase):
         # ExportedProgram verifier rejects the BUFFER_MUTATION downstream.
         self.assertIn("state", dict(trt_gm.named_buffers()))
 
-        # The copy-back value is a real trailing output carrying the post-write
-        # buffer, not a stale read.
-        outs = trt_gm(x)
+        # The copy-back value is a real trailing graph output carrying the post-write
+        # buffer, not a stale read. It is hidden from the module's return, so read it
+        # the way anything that walks the graph does.
+        outs = torch.fx.Interpreter(trt_gm).run(x)
         self.assertIsInstance(outs, (tuple, list))
         self.assertEqual(len(outs), 2)
         self.assertTrue(torch.allclose(outs[-1].float().cpu(), x.cpu()))
@@ -874,6 +924,170 @@ class TestCompileSeam(TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "did not alias them"):
             self._compile(model, args, min_block_size=5)
+
+    def test_compile_hides_the_copyback_value_from_the_return(self):
+        """A copy-back value is carried on the graph output for the exporters, and
+        nothing between ``compile()`` and the ExecuTorch runtime writes it into the
+        buffer. Returning it would report an in-process mutation that did not
+        happen, so the compiled module keeps the arity of the model it came from
+        while the graph keeps the value."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                return self.state.sum()
+
+        x = torch.arange(8, dtype=torch.float32).cuda()
+        model = M().cuda().eval()
+        trt_gm = self._compile(model, (x,), min_block_size=1)
+
+        self.assertEqual(trt_gm.meta.get("_copyback_mutation_buffers"), ["state"])
+        eager = model(x.clone())
+        out = trt_gm(x)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].shape, eager.shape)
+
+        # Still on the output node, where the exporters read it and dead-code
+        # elimination cannot reach it.
+        output_node = next(n for n in trt_gm.graph.nodes if n.op == "output")
+        self.assertEqual(len(output_node.args[0]), 2)
+
+    def test_compile_hides_copyback_beside_an_engine_aliased_kv_buffer(self):
+        """One module holding both kinds of mutated buffer at once.
+
+        ``hide_copyback_outputs`` truncates the last *N* values of the return, so it
+        is right only while the copy-back values really are the trailing ones. Two
+        mechanisms append outputs: lift appends the copy-back values last, and the
+        interpreter appends an aliased output per KV write inside each submodule.
+        The second is truncated at the submodule boundary and must never reach the
+        outer graph, else the *N* counted here would take a KV output and leave a
+        copy-back value in the return. Each mechanism is covered alone; this is the
+        intersection."""
+
+        def _model():
+            class M(torch.nn.Module):
+                def __init__(self):
+                    super().__init__()
+                    self.register_buffer("k", torch.zeros(1, 4, 16, 8).cuda())
+                    self.register_buffer("state", torch.zeros(8).cuda())
+
+                def forward(self, x_kv, x_state):
+                    self.k[:, :, 3:4, :] = x_kv
+                    self.state.add_(x_state)
+                    return self.k.sum() + self.state.sum()
+
+            return M().cuda().eval()
+
+        args = (
+            torch.full((1, 4, 1, 8), 2.0).cuda(),
+            torch.arange(8, dtype=torch.float32).cuda(),
+        )
+        eager = _model()
+        with torch.no_grad():
+            expected = eager(*args).clone()
+            expected_k = eager.k.clone()
+            expected_state = eager.state.clone()
+
+        trt_gm = self._compile(_model(), args, min_block_size=1)
+
+        # The KV write is aliased in the engine; only the other buffer is copy-back.
+        self.assertEqual(trt_gm.meta.get("_copyback_mutation_buffers"), ["state"])
+        aliased = aliased_input_bindings(
+            getattr(sub, "aliased_io", None) for _name, sub in trt_gm.named_children()
+        )
+        self.assertEqual(aliased, {"buf_k"})
+
+        out = trt_gm(*args)
+        self.assertEqual(len(out), 1)
+        self.assertTrue(torch.allclose(out[0].cpu(), expected.cpu(), atol=1e-3))
+        # Aliased, so the engine wrote the cache in place.
+        self.assertTrue(torch.allclose(trt_gm.k.cpu(), expected_k.cpu(), atol=1e-3))
+
+        # The graph keeps exactly one more value than the return, and it is the
+        # copy-back buffer's new contents rather than a KV output.
+        output_node = next(n for n in trt_gm.graph.nodes if n.op == "output")
+        self.assertEqual(len(output_node.args[0]), 2)
+        outs = torch.fx.Interpreter(trt_gm).run(*args)
+        self.assertEqual(len(outs), 2)
+        self.assertTrue(
+            torch.allclose(outs[-1].float().cpu(), expected_state.cpu(), atol=1e-3)
+        )
+
+    def test_saved_program_declares_the_hidden_copyback_mutation(self):
+        """Hiding the value from the return must not hide it from the exporter: the
+        saved program still has to carry the BUFFER_MUTATION that tells the
+        ExecuTorch runtime to write the buffer back."""
+        import tempfile
+
+        import torch_tensorrt
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                return self.state.sum()
+
+        x = torch.arange(8, dtype=torch.float32).cuda()
+        trt_gm = self._compile(M().cuda().eval(), (x,), min_block_size=1)
+
+        with tempfile.TemporaryDirectory() as directory:
+            # Both exporters have to see the value the module stopped returning.
+            for retrace in (False, True):
+                path = f"{directory}/program_{retrace}.ep"
+                torch_tensorrt.save(
+                    trt_gm,
+                    path,
+                    output_format="exported_program",
+                    retrace=retrace,
+                    arg_inputs=(x,) if retrace else None,
+                )
+                loaded = torch.export.load(path)
+                # The user output has to survive alongside the declaration. An
+                # exporter that never saw the hidden value declares the buffer
+                # mutation out of the user output instead, which passes a check for
+                # the mutation alone and leaves the program returning nothing.
+                self.assertEqual(
+                    [
+                        (spec.kind.name, spec.target)
+                        for spec in loaded.graph_signature.output_specs
+                    ],
+                    [("BUFFER_MUTATION", "state"), ("USER_OUTPUT", None)],
+                    f"retrace={retrace}",
+                )
+                # And the module the caller still holds returns what it did before.
+                self.assertEqual(len(trt_gm(x)), 1, f"retrace={retrace}")
+
+    def test_retracing_exporter_sees_the_hidden_copyback_value(self):
+        """``dynamo._exporter.export`` without the legacy exporter re-traces, and it
+        is the retrace, not the module's return, that has to carry the hidden value.
+        It does: the export is non-strict, so the GraphModule is interpreted off its
+        output node and the value enters the program with nothing exposing it first.
+        The declaration pass downstream then reclassifies it as the mutation."""
+        from torch_tensorrt.dynamo._exporter import export as exporter_export
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                return self.state.sum()
+
+        x = torch.arange(8, dtype=torch.float32).cuda()
+        trt_gm = self._compile(M().cuda().eval(), (x,), min_block_size=1)
+
+        exported = exporter_export(trt_gm, arg_inputs=(x,), use_legacy_exporter=False)
+        # Undeclared at this layer -- the copy-back value is still a user output --
+        # but it must be there for the declaration pass to reclassify.
+        self.assertEqual(len(exported.graph_signature.output_specs), 2)
 
     def test_compile_does_not_cross_check_a_dryrun(self):
         """A dryrun returns before any engine is built, so every prediction is absent

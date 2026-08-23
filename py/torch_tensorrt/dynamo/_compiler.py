@@ -47,6 +47,7 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
     assert_predicted_kv_aliased,
+    hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
 )
@@ -882,6 +883,12 @@ def compile(
         # serializable by torch_tensorrt.save / torch.export (no external
         # Python wrapper that would be lost on a round-trip).
         trt_gm = inline_lifted_buffers_into_gm(trt_gm, lifted_buffers)
+    # A copy-back value stays on the output node, where the exporters read it and
+    # where dead-code elimination cannot reach it, but nothing between here and the
+    # ExecuTorch runtime writes it into the buffer. Returning it would report a
+    # mutation the caller cannot act on, so the compiled module keeps the arity of
+    # the model it was compiled from.
+    hide_copyback_outputs(trt_gm, len(_copyback_mutation_buffers))
     return trt_gm
 
 

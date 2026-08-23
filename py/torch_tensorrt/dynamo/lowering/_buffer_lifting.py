@@ -42,6 +42,15 @@ right correctness tradeoff — the alternative is silently losing the write — 
 is why the classifier routes a cache write to engine aliasing instead, and why a
 model that unexpectedly lands in copy-back comes out slow rather than wrong.
 ``gm.meta['_copyback_mutation_buffers']`` lists which buffers are paying it.
+
+What copy-back does *not* do: update the buffer in process. The value re-attached as
+a graph output is only carried to whatever serializes the module, which declares it a
+BUFFER_MUTATION for the ExecuTorch runtime to apply after the delegate returns. Nothing
+between ``compile()`` and that runtime writes it anywhere, so a compiled module called
+directly from PyTorch leaves its buffer at the value it was compiled with. The
+re-attached value is therefore hidden from the compiled module's return
+(:func:`hide_copyback_outputs`) rather than handed back as an extra output that would
+read like a mutation the caller can rely on.
 """
 
 from __future__ import annotations
@@ -436,6 +445,47 @@ def lift_mutated_buffers(
     )
 
     return new_gm, lifted
+
+
+class _HiddenCopybackOutputs(torch.fx.graph.CodeGen):  # type: ignore[misc]
+    """Generate a ``forward`` that stops short of the trailing copy-back values.
+
+    The values stay on the graph's output node; only the generated ``forward`` stops
+    early. Everything that reads the graph rather than calling the module still sees
+    them -- the exporters, dead-code elimination, and the ``torch.fx.Interpreter``
+    that a *non-strict* ``torch.export`` runs a GraphModule through, so a retrace
+    keeps them too. Non-strict is what both retrace paths get: ``_compile.save``
+    passes ``strict=False`` and ``dynamo._exporter.export`` takes the default, which
+    is ``False``. A caller who exports the compiled module themselves with
+    ``strict=True`` gets the module called rather than interpreted, and the hidden
+    values do not reach the program. ``_TorchTensorRTModule.forward`` does the same
+    with the aliased outputs the interpreter appends: the engine produces them, the
+    caller never sees them.
+    """
+
+    def __init__(self, num_hidden: int) -> None:
+        super().__init__()
+        self.num_hidden = num_hidden
+
+    def generate_output(self, output_args: Any, *args: Any, **kwargs: Any) -> str:
+        if self.num_hidden and isinstance(output_args, (list, tuple)):
+            output_args = output_args[: len(output_args) - self.num_hidden]
+            # descs, when the caller passes it, is one entry per untruncated output.
+            kwargs.pop("descs", None)
+        return str(super().generate_output(output_args, *args, **kwargs))
+
+
+def hide_copyback_outputs(gm: torch.fx.GraphModule, num_hidden: int) -> None:
+    """Drop the last ``num_hidden`` graph outputs from what ``gm`` returns.
+
+    They remain outputs of the graph, so the exporters still find them and declare
+    them BUFFER_MUTATIONs; see the module docstring for why they are not the
+    caller's to see.
+    """
+    if num_hidden <= 0:
+        return
+    gm.graph.set_codegen(_HiddenCopybackOutputs(num_hidden))
+    gm.recompile()
 
 
 def inline_lifted_buffers_into_gm(
