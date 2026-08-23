@@ -70,6 +70,16 @@ import tensorrt as trt  # isort: skip
 logger = logging.getLogger(__name__)
 
 
+def _current_serialized_platform() -> str:
+    """Return the current platform using the engine-metadata representation."""
+    platform = Platform.current_platform()
+    return (
+        platform._to_serialized_rt_platform()
+        if ENABLED_FEATURES.torch_tensorrt_runtime
+        else str(platform)
+    )
+
+
 class _InputBindingInfo(NamedTuple):
     name: str
     expected_type: torch.dtype
@@ -541,7 +551,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 "Torch-TensorRT cannot verify that the engine matches the loaded TensorRT runtime platform."
             )
 
-        current_platform = str(Platform.current_platform())
+        current_platform = _current_serialized_platform()
         if self.serialized_target_platform != current_platform:
             raise RuntimeError(
                 "TensorRT engine was not built to target the loaded TensorRT runtime platform "

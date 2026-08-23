@@ -6,6 +6,7 @@ from unittest import mock
 import torch
 import torch_tensorrt as torchtrt
 import torch_tensorrt._enums as torchtrt_enums
+from torch_tensorrt.dynamo.runtime._TRTEngine import _current_serialized_platform
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 
@@ -66,6 +67,11 @@ class TestPlatform(unittest.TestCase):
         py_plat_str = torchtrt.Platform.current_platform()._to_serialized_rt_platform()
         cpp_plat_str = torch.ops.tensorrt.get_current_platform()
         self.assertEqual(py_plat_str, cpp_plat_str)
+
+    def test_engine_platform_check_uses_serialized_platform_token(self):
+        self.assertEqual(
+            _current_serialized_platform(), torch.ops.tensorrt.get_current_platform()
+        )
 
     def test_current_platform_detects_windows_arm64_runtime(self):
         with mock.patch.object(
