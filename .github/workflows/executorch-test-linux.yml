@@ -63,7 +63,10 @@ jobs:
         chmod +x "${RUNNER_TEMP}/bin/bazel"
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
-        python -m pip install pyyaml "executorch==1.4.1"
+        # ExecuTorch's CUDA wheels live on the matching nightly index.
+        python -m pip install pyyaml \
+          --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+          "executorch==1.5.0.dev20260822"
         # The standard wheel build packages the matching runtime wheel in its
         # artifact alongside torch_tensorrt*.whl; install it after the shared
         # core-wheel installer has selected the matrix-matched core wheel.

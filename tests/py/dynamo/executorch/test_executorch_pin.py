@@ -8,6 +8,10 @@ that site produces. See the comment above EXECUTORCH_REQUIREMENT in setup.py. Re
 right spelling per role is the point: installable metadata that pins exactly would reject a
 compatible patch release, and a build input that takes a range could resolve an ExecuTorch
 the artifact was not compiled against.
+
+Agreeing with the file is necessary but not sufficient, so the last test closes the gap the
+other two leave: they only prove the repository is self-consistent, which it would be even
+if the wheel and the commit named two different ExecuTorch trees.
 """
 
 import ast
@@ -16,6 +20,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 VERSIONS = REPO_ROOT / "dev_dep_versions.yml"
@@ -75,12 +81,22 @@ def _wants_range(path: str, number: int) -> bool:
     return False
 
 
+def _release_line(version: str) -> tuple[str, str]:
+    """Split a pin into its major and minor, for either a release or a nightly.
+
+    ``1.4.1`` and ``1.5.0.dev20260822`` both belong to the release line their first two
+    fields name, so the range a site gets is derived from those and nothing else. Splitting
+    on every dot instead assumes three fields and raises on the nightly form.
+    """
+    major, minor = version.split(".")[:2]
+    return major, minor
+
+
 def _expected(path: str, number: int, version: str) -> str:
     if not _wants_range(path, number):
         return f"executorch=={version}"
 
-    # Assumes X.Y.Z, which is what ExecuTorch releases and what this file records.
-    major, minor, _ = version.split(".")
+    major, minor = _release_line(version)
     return f"executorch>={version},<{major}.{int(minor) + 1}"
 
 
@@ -148,7 +164,7 @@ def test_derived_requirements_match_the_pin() -> None:
     # setup.py and tests/ci/runner.py build their requirement from the pin, so the search
     # above cannot see them. Check the strings they produce instead.
     version = _versions()["__executorch_version__"]
-    major, minor, _ = version.split(".")
+    major, minor = _release_line(version)
     expected = f"executorch>={version},<{major}.{int(minor) + 1}"
 
     assert _setup_py_requirement(version) == expected
@@ -167,6 +183,60 @@ def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
 
     assert _setup_py_requirement(version) == expected
     assert _runner_requirement(tmp_path) == expected
+
+
+def test_the_pinned_commit_is_the_pinned_wheels_own_source() -> None:
+    """The two pins must name one ExecuTorch, not two that happen to be close.
+
+    ``__executorch_version__`` selects the wheel the delegate is built to sit alongside, and
+    ``__executorch_commit__`` selects the tree it compiles from. Nothing about the two strings
+    forces them to agree, and a mismatch is invisible: both pins look plausible, the build
+    succeeds, and the delegate is compiled from one ExecuTorch while running against another.
+    Every published wheel records the commit it was built from, so the pairing is checkable
+    rather than a convention.
+
+    Skipped rather than failed whenever the installed wheel is not the one the pin names — not
+    installed at all, a different member of a floating range, or built without git provenance.
+    None of those say anything about whether the two pins agree, and this file stays readable
+    offline.
+    """
+    versions = _versions()
+    expected_commit = versions["__executorch_commit__"]
+    expected_version = versions["__executorch_version__"]
+
+    try:
+        from executorch.version import __version__ as installed_version
+        from executorch.version import git_version as installed_commit
+    except ImportError:
+        pytest.skip("executorch is not installed, so the pinned wheel cannot be read")
+
+    if installed_commit is None:
+        # ExecuTorch records this as Optional[str] and writes None when it is built outside a
+        # git checkout. Such a wheel carries no provenance to compare, which is not the pins
+        # disagreeing.
+        pytest.skip(
+            f"the installed ExecuTorch {installed_version} records no source commit, "
+            "so the pairing cannot be checked against it"
+        )
+
+    # The wheel carries a local version label naming its CUDA build (`+cu132`), which the pin
+    # deliberately omits so one pin serves every CUDA row. Compare the part they share.
+    if installed_version.split("+")[0] != expected_version:
+        # A different member of the same range, not a mismatch to report. The range sites
+        # deliberately float, and while the pin names a dev build the nightly channel gains a
+        # newer member daily, so any environment that installed through a range arrives here
+        # with a wheel this check cannot speak about. Only the wheel the pin names carries the
+        # commit the pin should agree with, so anything else is no evidence either way.
+        pytest.skip(
+            f"the installed ExecuTorch is {installed_version}, not the pinned "
+            f"{expected_version}, so its commit says nothing about whether the pins agree"
+        )
+
+    assert installed_commit == expected_commit, (
+        f"ExecuTorch {installed_version} was built from {installed_commit}, but "
+        f"__executorch_commit__ pins {expected_commit}. The delegate would compile against "
+        "one ExecuTorch and link another."
+    )
 
 
 def test_every_source_commit_matches_the_pin() -> None:

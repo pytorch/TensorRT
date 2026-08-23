@@ -208,6 +208,10 @@ else:
 # runtime API is not stable across minor releases, and an unbounded floor would resolve a future
 # minor against a backend built for this one. Patch releases stay allowed because they come off the
 # same release branch; the exact pin belongs in the runtime package, which does derive it.
+# The floor currently names a dev build, because the runtime split the delegate needs does not
+# exist in any ExecuTorch release yet: 1.4.1 ships no shared libraries and no CUDA wheel at all.
+# That also makes this range prefer a release as soon as one exists, since 1.5.0 sorts above
+# every 1.5.0.devN, so nothing here changes on the day it ships.
 _executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
 EXECUTORCH_REQUIREMENT = (
     f"executorch>={__executorch_version__},"
