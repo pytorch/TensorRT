@@ -17,6 +17,10 @@ on:
         description: "Test against TensorRT-RTX"
         type: boolean
         default: false
+      python-only:
+        description: "Build and test the PYTHON_ONLY=1 wheel"
+        type: boolean
+        default: false
       build-flavor:
         description: "Unique build flavor used to isolate workflow concurrency"
         required: true
@@ -101,6 +105,7 @@ jobs:
       # Build the RTX wheel when requested (matches the original RTX-windows
       # entry); empty params + use-rtx=false for the standard build.
       use-rtx: ${{ inputs.use-rtx }}
+      python-only: ${{ inputs.python-only }}
       build-flavor: ${{ inputs.build-flavor }}
       wheel-build-params: ${{ inputs.use-rtx && '--use-rtx' || '' }}
       timeout: 120
@@ -137,6 +142,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       use-rtx: ${{ inputs.use-rtx }}
+      python-only: ${{ inputs.python-only }}
       # vc_env_helper.bat sets the MSVC env, then runs the manifest runner; the
       # inner `python -m pytest` it spawns inherits that env.
       script: |

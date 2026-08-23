@@ -42,6 +42,10 @@ on:
         description: "Script that sets Domain-Specific Environment Variables"
         default: ""
         type: string
+      python-only:
+        description: "Build the PYTHON_ONLY=1 wheel"
+        default: false
+        type: boolean
       package-name:
         description: "Name of the actual python package that is imported in the smoke test"
         default: ""
@@ -263,6 +267,9 @@ jobs:
       # Standard and RTX wheels are built for the same Python/CUDA/architecture
       # matrix entries. Keep their GitHub artifact names distinct so consumers
       # cannot download an RTX wheel for a standard-TensorRT job.
+      - name: Mark Python-only artifact
+        if: ${{ inputs.python-only }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_python_only" >> "${GITHUB_ENV}"
       - name: Mark TensorRT-RTX artifact
         if: ${{ inputs.use-rtx }}
         run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"

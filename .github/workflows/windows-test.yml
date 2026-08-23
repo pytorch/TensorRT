@@ -47,6 +47,10 @@ on:
         description: "Whether to use TensorRT-RTX"
         default: false
         type: boolean
+      python-only:
+        description: "Whether to download the PYTHON_ONLY=1 wheel"
+        default: false
+        type: boolean
 jobs:
   test:
     strategy:
@@ -64,7 +68,7 @@ jobs:
       # Keep this in sync with build_windows.yml. RTX follows Linux's convention
       # of appending `_rtx` after the architecture suffix, preventing either
       # channel from downloading the other's concurrently-built wheel.
-      DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_win_amd64${{ inputs.use-rtx && '_rtx' || '' }}
+      DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_win_amd64${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}
     name: ${{ inputs.job-name }}-${{ matrix.tensorrt.version }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
     runs-on: ${{ matrix.validation_runner }}
     defaults:
@@ -108,6 +112,9 @@ jobs:
       # The default matrix entries have matrix.tensorrt == '', so their
       # download branch uses ARTIFACT_NAME rather than DOWNLOAD_ARTIFACT_NAME.
       # Keep it aligned with the RTX build artifact.
+      - name: Mark Python-only artifact
+        if: ${{ inputs.python-only }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_python_only" >> "${GITHUB_ENV}"
       - name: Mark TensorRT-RTX artifact
         if: ${{ inputs.use-rtx }}
         run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
