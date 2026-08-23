@@ -62,6 +62,11 @@ on:
         default: false
         type: boolean
         required: false
+      python-only:
+        description: "Whether to download the PYTHON_ONLY=1 wheel"
+        default: false
+        type: boolean
+        required: false
       runner:
         description: "Override the runner label (e.g. linux.g4dn.12xlarge.nvidia.gpu for multi-GPU jobs). Defaults to matrix.validation_runner."
         default: ""
@@ -88,7 +93,7 @@ jobs:
       RUNNER_TEST_RESULTS_DIR: /tmp/test_results
       ARCH: ${{ inputs.architecture }}
       USE_TRT_RTX: ${{ inputs.use-rtx }}
-      DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}${{ inputs.use-rtx && '_rtx' || '' }}
+      DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}
     name: ${{ inputs.job-name }}-${{ matrix.tensorrt.version }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
     runs-on: ${{ inputs.runner != '' && inputs.runner || matrix.validation_runner }}
     container:
@@ -127,6 +132,9 @@ jobs:
       # The default matrix entries have matrix.tensorrt == '', so their
       # download branch uses ARTIFACT_NAME rather than DOWNLOAD_ARTIFACT_NAME.
       # Keep it aligned with the RTX build artifact.
+      - name: Mark Python-only artifact
+        if: ${{ inputs.python-only }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_python_only" >> "${GITHUB_ENV}"
       - name: Mark TensorRT-RTX artifact
         if: ${{ inputs.use-rtx }}
         run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
