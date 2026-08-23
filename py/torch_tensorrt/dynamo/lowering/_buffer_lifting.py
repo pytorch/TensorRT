@@ -147,10 +147,14 @@ def _kv_write_will_alias(
     predicates -- and, for ``slice_scatter``, the converter's own derivation of
     the arguments those predicates take (:func:`resolve_slice_scatter_write`), since
     a divergence there mis-predicts just as effectively as a divergence in the
-    predicate. A ``slice_scatter`` / ``index_copy`` that is not eligible is
-    lowered to a non-aliasing scatter, so its write-back is kept as a
-    BUFFER_MUTATION output (copy-back) rather than dropped. Imports are local to
-    avoid a lowering<->conversion import cycle.
+    predicate. Returning ``False`` routes the write to copy-back, which is right
+    whatever the converter goes on to do with it: it lowers most ineligible writes
+    to a non-aliasing scatter, returns the source outright for a full overwrite, and
+    raises for the rest (a ``slice_scatter`` with dynamic bounds or a bad ``dim``, an
+    ``index_copy`` its fallback cannot express). The first two both have a write-back
+    to preserve -- for a full overwrite the source *is* the buffer's new contents --
+    and the ones that raise never get as far as needing one.
+    Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
         return False
@@ -187,10 +191,11 @@ def _kv_write_will_alias(
 
         # Any status other than OK is a case in which the converter returns or
         # raises before it reaches _kv_eligible, so nothing aliases the cache.
-        # Returning False keeps the copy_. A full overwrite needs that: it returns
-        # the source, emits no KV layer, and its write still has to be copied back.
-        # The other two statuses raise out of the converter, so the compile aborts
-        # and nothing is copied back at all.
+        # Returning False routes the write to copy-back -- the copy_ is erased
+        # either way, and the new value is re-attached as a graph output instead. A
+        # full overwrite needs that: it returns the source, emits no KV layer, and
+        # its write still has to be recorded. The other two statuses raise out of the
+        # converter, so the compile aborts and the output is never reached.
         dim = args[2] if len(args) > 2 else 0
         start, end, _step, status = resolve_slice_scatter_write(
             tuple(cache_shape),
@@ -342,10 +347,11 @@ def lift_mutated_buffers(
     I/O (an eligible ``slice_scatter`` / ``index_copy``, per
     :func:`_kv_write_will_alias`) relies on that engine aliasing for its
     write-back, so nothing further is added. Every other mutation -- a non-KV
-    buffer, or a ``slice_scatter`` / ``index_copy`` that fails eligibility and is
-    lowered to a non-aliasing scatter -- has no engine aliasing, so its new value
-    is re-appended as a graph output ("copy-back") and its buffer name recorded,
-    in output order, in ``gm.meta['_copyback_mutation_buffers']`` -- the
+    buffer, or a ``slice_scatter`` / ``index_copy`` that fails eligibility, whether
+    the converter then lowers it to a non-aliasing scatter, returns the source, or
+    raises -- has no engine aliasing, so its new value is re-appended as a graph
+    output ("copy-back") and its buffer name recorded, in output order, in
+    ``gm.meta['_copyback_mutation_buffers']`` -- the
     downstream exporters (``create_trt_exp_program`` /
     ``_declare_aliased_kv_mutations_on_ep``) read that list to reclassify those
     outputs as BUFFER_MUTATIONs. Copy-back is correct but not free; see the module

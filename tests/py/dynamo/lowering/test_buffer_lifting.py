@@ -339,8 +339,9 @@ class TestCopyBackClassification(TestCase):
     lowers to an ``IKVCacheUpdateLayer`` with in-place aliased I/O) relies on that
     engine aliasing and is NOT recorded for copy-back. Every other mutation --
     including a ``slice_scatter`` / ``index_copy`` that fails the converter's
-    eligibility (wrong rank/dim/shape) and is lowered to a non-aliasing scatter --
-    has no engine aliasing, so its new value is re-appended as a trailing graph
+    eligibility (wrong rank/dim/shape), whichever of the converter's ineligible
+    paths it then takes -- a non-aliasing scatter, an outright return of the source,
+    or a raise -- has no engine aliasing, so its new value is re-appended as a trailing graph
     output and its buffer name recorded in
     ``gm.meta['_copyback_mutation_buffers']`` for the exporters to reclassify as
     a BUFFER_MUTATION.
