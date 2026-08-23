@@ -90,6 +90,50 @@ def _write_op_is_torch_executed(
     )
 
 
+def _reads_the_cache_as_a_network_input(cache_node: torch.fx.Node) -> bool:
+    """Whether the converter will see this write's cache argument as a network input.
+
+    A lifted buffer is a placeholder, and ``emit_kv_cache_update_layer`` aliases the
+    cache only when the argument it is handed is one -- anything else has no input
+    binding name and the converter falls back to a plain scatter.
+
+    One rewrite stands between this classification and the converter:
+    ``remove_input_alias_fixing_clones``, an ATEN lowering pass inside
+    ``post_lowering``, erases a ``clone`` whose placeholder has no other user, which
+    is the shape ``clone -> scatter -> copy_`` leaves behind once lifting has erased
+    the ``copy_``. The converter then does see a direct network input and does emit
+    the KV layer, so this has to predict what the converter will be handed rather
+    than what is in the graph now. Getting it wrong in that direction is worse than
+    a lost write-back: the write is filed copy-back, its value is re-attached as a
+    trailing graph output, and the engine aliases the cache anyway -- so the runtime
+    truncates that output as an engine side effect while the outer graph still reads
+    it, and every call raises ``IndexError``.
+
+    The pass's own condition is reproduced exactly, sole user and all: a placeholder
+    with another reader keeps its clone, the converter sees a ``call_function``, and
+    nothing aliases.
+
+    Predicting the peel is not free. A cloned cache write is classified KV, so if no
+    engine goes on to claim it -- at the *default* ``min_block_size=5`` a small
+    model's subgraph often does not -- ``assert_predicted_kv_aliased`` fails the
+    compile rather than leaving the buffer at its compile-time value. A loud failure
+    beats a silently stale buffer, and this failure is reachable at the default
+    ``min_block_size``, not only at ``min_block_size=1``.
+    """
+    if cache_node.op == "placeholder":
+        return True
+    if not (
+        cache_node.op == "call_function"
+        and cache_node.target is torch.ops.aten.clone.default
+        and cache_node.args
+        and isinstance(cache_node.args[0], torch.fx.Node)
+        and cache_node.args[0].op == "placeholder"
+    ):
+        return False
+    users = list(cache_node.args[0].users)
+    return len(users) == 1 and users[0] is cache_node
+
+
 def _kv_write_will_alias(
     value_node: object,
     cache_shape: Tuple[int, ...],
@@ -121,7 +165,9 @@ def _kv_write_will_alias(
     # The KV layer aliases the cache only if it is a direct network input; after
     # lifting, the mutated buffer is a placeholder the write op reads from.
     if not (
-        args and isinstance(args[0], torch.fx.Node) and args[0].op == "placeholder"
+        args
+        and isinstance(args[0], torch.fx.Node)
+        and _reads_the_cache_as_a_network_input(args[0])
     ):
         return False
 
@@ -184,8 +230,9 @@ def assert_predicted_kv_aliased(
     settings: Optional[CompilationSettings] = None,
     *,
     engines_built: bool = True,
+    copyback_bindings: Iterable[str] = (),
 ) -> None:
-    """Ground-truth check for the KV predictions :func:`_kv_write_will_alias` made.
+    """Ground-truth check on both directions of the classification.
 
     Each write ``lift_mutated_buffers`` classified as KV-aliased had its ``copy_``
     dropped in the expectation that the engine would alias it in place. If the
@@ -194,6 +241,13 @@ def assert_predicted_kv_aliased(
     appears in a compiled engine's ``aliased_io``, and raise loudly otherwise.
     Keyed on the ``buf_*`` binding name, which is stable across the later buffer
     rename and is what ``aliased_io`` records on the input side.
+
+    The other direction fails just as badly and is not the same check. A write filed
+    copy-back has its new value re-attached as a trailing graph output; if the engine
+    aliases that buffer anyway, the runtime truncates the aliased output as an engine
+    side effect while the outer graph still reads it, and the module raises on every
+    call. So ``copyback_bindings`` -- the input bindings of the writes filed
+    copy-back -- must be absent from ``aliased_io``.
 
     ``aliased_in`` is the ground truth, supplied by the caller because the two entry
     points hold it in different shapes: :func:`compile` reads it off the compiled
@@ -206,13 +260,15 @@ def assert_predicted_kv_aliased(
     converter takes ``dryrun`` too but never acts on it and builds either way, so it
     keeps the default.
     """
-    if not predicted_kv_bindings:
+    copyback_bindings = list(copyback_bindings)
+    if not predicted_kv_bindings and not copyback_bindings:
         return
     if not engines_built:
         logger.debug(
-            "no engines were built, so the predicted-KV aliasing check for "
-            "%s has nothing to verify against and is skipped",
+            "no engines were built, so the aliasing cross-check for predicted-KV "
+            "%s and copy-back %s has nothing to verify against and is skipped",
             predicted_kv_bindings,
+            copyback_bindings,
         )
         return
     missing = [b for b in predicted_kv_bindings if b not in aliased_in]
@@ -229,6 +285,21 @@ def assert_predicted_kv_aliased(
             f"did not alias them (absent from aliased_io): {missing}. Their "
             "write-back would be silently dropped. The classification runs before "
             f"partitioning, so this means {cause}."
+        )
+
+    unexpected = [b for b in copyback_bindings if b in aliased_in]
+    if unexpected:
+        # What raising here prevents: the runtime treats an aliased output as an
+        # engine side effect and does not return it, so the surrounding graph reads
+        # past the end of the results and the module raises on every call.
+        raise RuntimeError(
+            "lift_mutated_buffers classified these buffer writes as copy-back (not "
+            "engine-aliased) and re-attached their new values as trailing graph "
+            "outputs, but the compiled engine aliased them in place anyway (present "
+            f"in aliased_io): {unexpected}. The classification runs before lowering, "
+            "so a lowering pass rewrote the write into a form the converter could "
+            "alias after all -- remove_input_alias_fixing_clones erasing a clone of "
+            "the cache is the known case."
         )
 
 
@@ -307,12 +378,14 @@ def lift_mutated_buffers(
     # eligibility predicates (not the op target alone), so a non-aliasable
     # slice_scatter / index_copy falls to copy-back rather than being dropped.
     # index_put has no aliasing converter, so it always falls to copy-back too.
-    copyback: List[Tuple[torch.fx.Node, str]] = []  # (new_value_node, buffer_name)
+    # (new_value_node, buffer_name, input_binding_name)
+    copyback: List[Tuple[torch.fx.Node, str, str]] = []
     # Input-binding names of writes predicted to alias (KV). compile() asserts each
-    # actually appears in the engine's aliased_io, turning a mis-prediction into a
-    # loud error instead of a silently dropped write-back. The binding name (buf_*)
-    # is the stable key: it survives the buffer renaming inline does later, and it
-    # is exactly what aliased_io records on the input side.
+    # actually appears in the engine's aliased_io, and that no copy-back binding
+    # does, turning either mis-prediction into a loud error instead of a silently
+    # dropped write-back or a module that raises on every call. The binding name
+    # (buf_*) is the stable key: it survives the buffer renaming inline does later,
+    # and it is exactly what aliased_io records on the input side.
     predicted_kv_bindings: set[str] = set()
 
     for copy_node, get_attr_node in mutation_pairs:
@@ -374,14 +447,20 @@ def lift_mutated_buffers(
         # KV writes rely on engine-level aliasing, so the trailing copy_ is
         # redundant and dropped. Other (non-KV) mutations have no aliasing:
         # record their new value so we can re-attach it as a copy-back
-        # BUFFER_MUTATION output below, then drop the (now input-target) copy_.
+        # BUFFER_MUTATION output below.
+        #
+        # Drop the (now input-target) copy_ first, so the classification reads the
+        # graph the lowering passes and the partitioner will read. The copy_ is the
+        # last reader of the buffer placeholder in the ordinary write-only shape, and
+        # whether it is still there decides whether a clone of the cache survives
+        # into conversion.
         new_value = copy_node.args[1] if len(copy_node.args) > 1 else None
+        gm.graph.erase_node(copy_node)
         if isinstance(new_value, torch.fx.Node):
             if _kv_write_will_alias(new_value, tuple(buffer_tensor.shape), settings):
                 predicted_kv_bindings.add(replacement.name)
             else:
-                copyback.append((new_value, buffer_name))
-        gm.graph.erase_node(copy_node)
+                copyback.append((new_value, buffer_name, replacement.name))
 
         # Erase the now-unused get_attr.
         if not get_attr_node.users:
@@ -392,17 +471,20 @@ def lift_mutated_buffers(
     # Appended in order; recorded so create_trt_exp_program / _declare can tag the
     # corresponding engine outputs as BUFFER_MUTATION (copy-back) downstream.
     copyback_buffers: List[str] = []
+    copyback_bindings: List[str] = []
     if copyback:
         output_node = next(n for n in gm.graph.nodes if n.op == "output")
         out_args = list(output_node.args[0])
-        out_args.extend(nv for nv, _ in copyback)
+        out_args.extend(nv for nv, _, _ in copyback)
         output_node.args = (tuple(out_args),)
-        copyback_buffers = [buf for _, buf in copyback]
+        copyback_buffers = [buf for _, buf, _ in copyback]
+        copyback_bindings = sorted({binding for _, _, binding in copyback})
 
     gm.graph.lint()
 
     if not lifted:
         gm.meta["_copyback_mutation_buffers"] = copyback_buffers
+        gm.meta["_copyback_bindings"] = copyback_bindings
         gm.meta["_predicted_kv_bindings"] = sorted(predicted_kv_bindings)
         return gm, []
 
@@ -435,6 +517,7 @@ def lift_mutated_buffers(
                 pass
     new_gm.recompile()
     new_gm.meta["_copyback_mutation_buffers"] = copyback_buffers
+    new_gm.meta["_copyback_bindings"] = copyback_bindings
     new_gm.meta["_predicted_kv_bindings"] = sorted(predicted_kv_bindings)
 
     logger.debug(

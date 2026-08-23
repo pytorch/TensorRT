@@ -820,6 +820,7 @@ def compile(
     # reflects the new placeholders.
     gm, lifted_buffers = lift_mutated_buffers(gm, settings)
     _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
+    _copyback_bindings = gm.meta.get("_copyback_bindings", [])
     _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
     if lifted_buffers:
         # Append each lifted buffer as an engine input AFTER the user inputs.
@@ -863,10 +864,12 @@ def compile(
     )
     if _copyback_mutation_buffers:
         trt_gm.meta["_copyback_mutation_buffers"] = _copyback_mutation_buffers
-    # Ground-truth check: every write lift classified as KV (engine-aliased, so its
-    # copy_ was dropped) must actually appear in a compiled engine's aliased_io,
-    # else its write-back would be silently lost -- fail loudly instead. A dryrun
-    # returns before conversion, so there is no ground truth to check against.
+    # Ground-truth check on both directions of the classification: every write lift
+    # called KV (engine-aliased, so its copy_ was dropped) must appear in a compiled
+    # engine's aliased_io or its write-back is silently lost, and no write lift
+    # called copy-back may appear there or the trailing output it added is one the
+    # runtime truncates while the graph still reads it. Fail loudly for either. A
+    # dryrun returns before conversion, so there is no ground truth to check against.
     assert_predicted_kv_aliased(
         aliased_input_bindings(
             getattr(sub, "aliased_io", None) for _name, sub in trt_gm.named_children()
@@ -874,6 +877,7 @@ def compile(
         _predicted_kv_bindings,
         settings,
         engines_built=not settings.dryrun,
+        copyback_bindings=_copyback_bindings,
     )
     if lifted_buffers:
         # Inline buffers into the compiled gm as get_attr nodes + registered

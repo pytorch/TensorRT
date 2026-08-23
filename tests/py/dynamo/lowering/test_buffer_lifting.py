@@ -663,6 +663,104 @@ class TestSliceScatterDerivationIsShared(TestCase):
         )
 
 
+class TestCacheMustReachTheConverterAsANetworkInput(TestCase):
+    """``emit_kv_cache_update_layer`` aliases the cache only when it is handed a
+    network input, so the classifier has to predict what the converter will be handed
+    -- after ``post_lowering``, not what the graph holds at classification time.
+
+    Both directions are damaging. Reading the cache through an op that survives means
+    no KV layer, so a write called KV loses its write-back. A ``clone`` that
+    ``remove_input_alias_fixing_clones`` then erases means the KV layer *is* emitted,
+    so a write called copy-back adds a trailing output the runtime truncates as an
+    engine side effect while the outer graph still reads it.
+    """
+
+    CACHE = (2, 4, 16, 8)
+    SRC = (2, 4, 1, 8)
+
+    @classmethod
+    def _classify(cls, build_cache_arg, extra_reader=False):
+        """Route a KV-eligible ``slice_scatter`` whose cache argument is whatever
+        ``build_cache_arg`` returns through the predictor."""
+        from torch_tensorrt.dynamo.lowering._buffer_lifting import _kv_write_will_alias
+
+        graph = torch.fx.Graph()
+        buffer = graph.placeholder("buf_cache")
+        buffer.meta["val"] = torch.empty(cls.CACHE, device="meta")
+        cache_arg = build_cache_arg(graph, buffer)
+        if extra_reader:
+            graph.call_function(torch.ops.aten.sum.default, args=(buffer,))
+        src = graph.placeholder("src")
+        src.meta["val"] = torch.empty(cls.SRC, device="meta")
+        node = graph.call_function(
+            torch.ops.aten.slice_scatter.default, args=(cache_arg, src, 2, 3, 4)
+        )
+        return _kv_write_will_alias(node, cls.CACHE)
+
+    def test_direct_placeholder_is_kv(self):
+        self.assertTrue(self._classify(lambda _graph, buffer: buffer))
+
+    def test_clone_of_a_sole_use_placeholder_is_kv(self):
+        """``clone -> scatter -> copy_`` is the ordinary shape when the post-write
+        cache is read in the same forward. Lifting erases the ``copy_``, leaving the
+        clone as the placeholder's only user, which is exactly the condition
+        ``remove_input_alias_fixing_clones`` erases it under -- so the converter does
+        see a network input and does alias."""
+        self.assertTrue(
+            self._classify(
+                lambda graph, buffer: graph.call_function(
+                    torch.ops.aten.clone.default, args=(buffer,)
+                )
+            )
+        )
+
+    def test_clone_of_a_shared_placeholder_is_not_kv(self):
+        """``remove_input_alias_fixing_clones`` only erases a clone that is its
+        placeholder's sole user, so a cache something else also reads keeps its clone
+        and the converter never sees a network input."""
+        self.assertFalse(
+            self._classify(
+                lambda graph, buffer: graph.call_function(
+                    torch.ops.aten.clone.default, args=(buffer,)
+                ),
+                extra_reader=True,
+            )
+        )
+
+    def test_clone_of_a_non_placeholder_is_not_kv(self):
+        self.assertFalse(
+            self._classify(
+                lambda graph, buffer: graph.call_function(
+                    torch.ops.aten.clone.default,
+                    args=(
+                        graph.call_function(
+                            torch.ops.aten.mul.Tensor, args=(buffer, 1.0)
+                        ),
+                    ),
+                )
+            )
+        )
+
+    def test_cache_read_through_another_op_is_not_kv(self):
+        """Nothing erases an arbitrary op between the placeholder and the write, so
+        the converter is handed a ``call_function`` with no input binding name, falls
+        back to a plain scatter, and aliases nothing. Without this the shape and dim
+        alone say KV-eligible and the write-back is dropped for an aliasing that never
+        happens."""
+        self.assertFalse(
+            self._classify(
+                lambda graph, buffer: graph.call_function(
+                    torch.ops.aten.mul.Tensor, args=(buffer, 1.0)
+                )
+            )
+        )
+
+    def test_cache_read_from_a_get_attr_is_not_kv(self):
+        """An unlifted buffer is a ``get_attr``, which constant-folds into the engine
+        rather than becoming an input binding."""
+        self.assertFalse(self._classify(lambda graph, _buffer: graph.get_attr("cache")))
+
+
 class _FakeEngine:
     """Stand-in for a compiled TRT submodule exposing an ``aliased_io`` map."""
 
@@ -759,6 +857,36 @@ class TestPredictedKvAssertion(TestCase):
                 ["buf_k_cache"],
                 CompilationSettings(dryrun=True),
             )
+
+    def test_raises_when_a_copyback_write_is_aliased(self):
+        """The other direction. A copy-back write carries its new value as a trailing
+        graph output; if the engine aliases that buffer anyway the runtime truncates
+        the output as a side effect while the outer graph still reads it, and the
+        module raises on every call. ``predicted_kv_bindings`` is empty in that case,
+        so the KV direction returns at its early exit and sees nothing."""
+        gm = _FakeGM(
+            {"_run_on_acc_0": _FakeEngine({"output1": ("buf_k", "kv_cache_update")})}
+        )
+        with self.assertRaisesRegex(RuntimeError, "aliased them in place anyway"):
+            assert_predicted_kv_aliased(
+                self._aliased_in(gm), [], copyback_bindings=["buf_k"]
+            )
+
+    def test_passes_when_a_copyback_write_is_not_aliased(self):
+        gm = _FakeGM(
+            {"_run_on_acc_0": _FakeEngine({"output1": ("buf_k", "kv_cache_update")})}
+        )
+        assert_predicted_kv_aliased(
+            self._aliased_in(gm), ["buf_k"], copyback_bindings=["buf_state"]
+        )
+
+    def test_no_engines_built_does_not_raise_for_copyback_either(self):
+        assert_predicted_kv_aliased(
+            self._aliased_in(_FakeGM({})),
+            [],
+            copyback_bindings=["buf_k"],
+            engines_built=False,
+        )
 
     def test_message_names_min_block_size(self):
         """The classification runs before partitioning, so the usual cause is the
@@ -1088,6 +1216,63 @@ class TestCompileSeam(TestCase):
         # Undeclared at this layer -- the copy-back value is still a user output --
         # but it must be there for the declaration pass to reclassify.
         self.assertEqual(len(exported.graph_signature.output_specs), 2)
+
+    @staticmethod
+    def _cloned_cache_model():
+        """Clone, scatter, write back -- the ordinary shape when the post-write cache
+        is also read in the same forward."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("k", torch.zeros(1, 2, 16, 4).cuda())
+
+            def forward(self, x):
+                k = self.k.clone()
+                k[:, :, 3:4, :] = x
+                self.k.copy_(k)
+                return k.sum(dim=-1)
+
+        return M().cuda().eval(), (torch.full((1, 2, 1, 4), 3.0).cuda(),)
+
+    def test_compile_runs_a_cloned_cache_write_and_writes_it_back(self):
+        """``remove_input_alias_fixing_clones`` erases the clone after
+        classification, so the converter emits the KV layer whatever the classifier
+        decided. Classified copy-back, the module raised ``IndexError`` on every call
+        -- the trailing output the runtime truncates as an engine side effect while
+        the outer graph still reads it."""
+        model, args = self._cloned_cache_model()
+        with torch.no_grad():
+            expected = model(*args).clone()
+            expected_cache = model.k.clone()
+
+        trt_gm = self._compile(*self._cloned_cache_model(), min_block_size=1)
+
+        self.assertEqual(trt_gm.meta.get("_copyback_mutation_buffers", []), [])
+        aliased = aliased_input_bindings(
+            getattr(sub, "aliased_io", None) for _name, sub in trt_gm.named_children()
+        )
+        self.assertEqual(aliased, {"buf_k"})
+
+        out = trt_gm(*args)
+        self.assertEqual(len(out), 1)
+        self.assertTrue(torch.allclose(out[0].cpu(), expected.cpu(), atol=1e-3))
+        self.assertTrue(torch.allclose(trt_gm.k.cpu(), expected_cache.cpu(), atol=1e-3))
+
+    def test_compile_raises_when_a_copyback_write_is_aliased(self):
+        """The backstop for the next divergence between what the classifier predicts
+        and what the converter emits, whatever that turns out to be. Standing in for
+        it by making the classifier file everything copy-back: the engine aliases the
+        cache anyway, and the compile has to say so rather than hand back a module
+        that raises ``IndexError`` on every call."""
+        from torch_tensorrt.dynamo.lowering import _buffer_lifting
+
+        model, args = self._cloned_cache_model()
+        with mock.patch.object(
+            _buffer_lifting, "_kv_write_will_alias", lambda *a, **k: False
+        ):
+            with self.assertRaisesRegex(RuntimeError, "aliased them in place anyway"):
+                self._compile(model, args, min_block_size=1)
 
     def test_compile_does_not_cross_check_a_dryrun(self):
         """A dryrun returns before any engine is built, so every prediction is absent
