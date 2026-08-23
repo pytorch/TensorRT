@@ -66,6 +66,10 @@ if [[ ${PLATFORM} == win32 ]]; then
 else
     # The nightly channel is needed because this glob also matches the ExecuTorch runtime wheel,
     # whose install_requires names an ExecuTorch dev build that is published only there.
+    # Hardcoded rather than ${CHANNEL} like the lines above: a .dev wheel exists on no other
+    # channel, so deriving it would break this install on exactly the test and release runs the
+    # index was added for. It is an extra index, not a replacement, and torch is already
+    # force-reinstalled from ${INDEX_URL} above, so the pinned torch is not at risk from it.
     python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl --use-deprecated=legacy-resolver \
         --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}"
 fi
