@@ -1054,7 +1054,19 @@ def test_serialized_engine_rejects_copyback_buffers():
             min_block_size=1,
         )
     # The offending buffer has to be named, or the user cannot act on the error.
-    assert "state" in str(excinfo.value)
+    # Matched in its rendered form: a bare "state" also matches "stateless",
+    # "state_dict" and "statement".
+    assert "['state']" in str(excinfo.value)
+    # The remedy the message gives is deliberately not asserted here. `compile()`
+    # alone does not perform the write-back -- it leaves the value on the graph for
+    # an exporter to reclassify -- so the advice has to be "compile *and save*", and
+    # whether that works is what makes the wording true or false. Pinning the words
+    # would break on a correct reword and pass on a differently wrong one. What holds
+    # the advice to account is following it end to end:
+    # `test_executorch_export_declares_copyback_for_every_source_shape` below, and
+    # `test_buffer_lifting.py::TestCompileSeam`'s
+    # `test_saved_program_declares_the_hidden_copyback_mutation`, which compiles,
+    # saves, and asserts the BUFFER_MUTATION arrives.
 
 
 @pytest.mark.unit

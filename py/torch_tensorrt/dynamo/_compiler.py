@@ -2120,16 +2120,19 @@ def convert_exported_program_to_serialized_trt_engine(
         # Read before lowering: `gm` is replaced below and the meta does not follow it.
         predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
         # A write the engine cannot alias in place is classified as copy-back: its
-        # new value is appended as an extra engine output and the buffer is updated
-        # afterwards. This entry point reports neither which output carries which
-        # buffer nor performs that update, so the caller has no way to complete it.
+        # new value is appended as an extra engine output, and whatever loads the
+        # serialized program copies that output into the buffer afterwards. This
+        # entry point returns engine bytes and no program, so it neither reports
+        # which output carries which buffer nor gives the copy anywhere to be
+        # declared, and the caller has no way to complete it.
         copyback_buffers = gm.meta.get("_copyback_mutation_buffers", [])
         if copyback_buffers:
             raise RuntimeError(
                 "convert_exported_program_to_serialized_trt_engine cannot express the "
                 f"write-back for mutable buffer(s) {copyback_buffers}: the engine "
                 "cannot alias them in place, so the buffers would never update. Use "
-                "torch_tensorrt.dynamo.compile, which performs the write-back itself."
+                "torch_tensorrt.dynamo.compile and save the result, which declares "
+                "the buffer mutation for the runtime to apply."
             )
         if lifted_buffers:
             buffer_tensors = [t for _, _, t in lifted_buffers]
