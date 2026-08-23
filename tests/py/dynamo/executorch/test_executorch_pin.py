@@ -186,6 +186,15 @@ def test_derived_requirements_match_the_pin() -> None:
     assert _runner_requirement(REPO_ROOT) == f"executorch=={version}"
 
 
+def test_the_runner_follows_the_row_s_cuda_version() -> None:
+    # The executorch suite is nightly-only, and the nightly matrix runs cu132 rows as well as
+    # cu130 ones, so a fixed channel would install a CUDA 13.0 ExecuTorch into a CUDA 13.2 job.
+    # PRs pin to cu130, which is why this cannot be caught by watching PR CI.
+    source = (REPO_ROOT / "tests/ci/runner.py").read_text(encoding="utf-8")
+    assert 'os.environ.get("CU_VERSION", "cu130")' in source
+    assert "nightly/cu130" not in source, "the channel is hardcoded again"
+
+
 def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
     # The upper bound is a version, not a decimal: 1.9 has to become 1.10, not 1.1.
     # Spelled through a variable because the search above reads this file too, and a
