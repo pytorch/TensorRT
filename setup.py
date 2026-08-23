@@ -72,6 +72,7 @@ def load_dep_info():
     global __tensorrt_version__
     global __tensorrt_rtx_version__
     global __tensorrt_llm_version__
+    global __executorch_version__
     with open("dev_dep_versions.yml", "r") as stream:
         versions = yaml.safe_load(stream)
         if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
@@ -83,6 +84,7 @@ def load_dep_info():
         __tensorrt_version__ = versions["__tensorrt_version__"]
         __tensorrt_rtx_version__ = versions["__tensorrt_rtx_version__"]
         __tensorrt_llm_version__ = versions["__tensorrt_llm_version__"]
+        __executorch_version__ = versions["__executorch_version__"]
 
 
 load_dep_info()
@@ -206,7 +208,11 @@ else:
 # runtime API is not stable across minor releases, and an unbounded floor would resolve a future
 # minor against a backend built for this one. Patch releases stay allowed because they come off the
 # same release branch; the exact pin belongs in the runtime package, which does derive it.
-EXECUTORCH_REQUIREMENT = "executorch>=1.4.1,<1.5"
+_executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
+EXECUTORCH_REQUIREMENT = (
+    f"executorch>={__executorch_version__},"
+    f"<{_executorch_major}.{int(_executorch_minor) + 1}"
+)
 # TODO: Enable this once the runtime wheel is published to the PyTorch index.
 # EXECUTORCH_RUNTIME_REQUIREMENT = (
 #     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
