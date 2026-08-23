@@ -46,6 +46,7 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
+    assert_no_kv_alias_markers_survived,
     assert_predicted_kv_aliased,
     hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
@@ -822,6 +823,7 @@ def compile(
     _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
     _copyback_bindings = gm.meta.get("_copyback_bindings", [])
     _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
+    _no_kv_alias_writes = gm.meta.get("_no_kv_alias_writes", [])
     if lifted_buffers:
         # Append each lifted buffer as an engine input AFTER the user inputs.
         # Buffer tensors live on the gm's state; prepare an Input spec for
@@ -840,6 +842,12 @@ def compile(
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
+
+    # The marker is what keeps a re-routed write out of the engine's aliased_io, and
+    # it rides on node.meta through every pass above. Read it back before conversion
+    # so a pass that dropped it is named here rather than surfacing as a module that
+    # raises on every call.
+    assert_no_kv_alias_markers_survived(gm, _no_kv_alias_writes)
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:

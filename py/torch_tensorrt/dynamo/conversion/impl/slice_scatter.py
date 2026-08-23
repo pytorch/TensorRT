@@ -290,8 +290,17 @@ def slice_scatter(
 
     update_len = end - start
 
-    # KV fast path.
-    kv_out = try_emit_kv_cache_update(ctx, name, input, src, dim, start, update_len)
+    # KV fast path, unless the write carries _trt_no_kv_alias: the classifier already
+    # filed it copy-back and re-attached its value as a graph output, and a buffer
+    # that is both copy-back and engine-aliased raises on every call.
+    kv_forbidden = ctx.current_node is not None and ctx.current_node.meta.get(
+        "_trt_no_kv_alias"
+    )
+    kv_out = (
+        None
+        if kv_forbidden
+        else try_emit_kv_cache_update(ctx, name, input, src, dim, start, update_len)
+    )
     if kv_out is not None:
         return kv_out
 

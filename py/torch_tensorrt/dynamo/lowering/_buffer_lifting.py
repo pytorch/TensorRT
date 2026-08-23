@@ -327,6 +327,42 @@ def assert_predicted_kv_aliased(
         )
 
 
+def assert_no_kv_alias_markers_survived(
+    gm: torch.fx.GraphModule, marked_writes: Iterable[str]
+) -> None:
+    """Check that lowering carried each ``_trt_no_kv_alias`` marker through to
+    conversion.
+
+    The marker is the only thing stopping the converter from aliasing a write that
+    :func:`lift_mutated_buffers` deliberately filed copy-back, and it travels on
+    ``node.meta`` through every pass in ``post_lowering``. A pass that rebuilds the
+    node without its ``meta`` would drop it silently and the module would raise on
+    every call, so the markers are read back here, where the fault can still be named.
+
+    Called with the lowered graph and ``gm.meta['_no_kv_alias_writes']`` as recorded
+    before lowering. A marked write is a graph output by then, so it cannot be
+    eliminated; missing means rewritten.
+    """
+    marked = list(marked_writes)
+    if not marked:
+        return
+    by_name = {node.name: node for node in gm.graph.nodes}
+    lost = [
+        name
+        for name in marked
+        if name not in by_name or not by_name[name].meta.get("_trt_no_kv_alias")
+    ]
+    if lost:
+        raise RuntimeError(
+            "lift_mutated_buffers marked these buffer writes as copy-back-only "
+            "(node.meta['_trt_no_kv_alias']) so the converter would not alias them, "
+            f"but the marker did not survive lowering: {lost}. A pass in "
+            "post_lowering rebuilt or replaced the node without carrying its meta "
+            "over. Without the marker the engine aliases a buffer whose new value "
+            "is also a graph output, and the compiled module raises on every call."
+        )
+
+
 def lift_mutated_buffers(
     gm: torch.fx.GraphModule,
     settings: Optional[CompilationSettings] = None,
@@ -363,6 +399,20 @@ def lift_mutated_buffers(
     ``_declare_aliased_kv_mutations_on_ep``) read that list to reclassify those
     outputs as BUFFER_MUTATIONs. Copy-back is correct but not free; see the module
     docstring for what each such buffer costs per call.
+
+    One aliasable write is routed to copy-back anyway: one whose result nothing else
+    consumes. Erasing its ``copy_`` leaves it dead, and dead-code elimination takes it
+    before any engine can alias it. Copy-back makes it live again, so it needs the
+    converter to leave it alone -- ``node.meta['_trt_no_kv_alias']`` on the write node
+    says so, and :func:`assert_no_kv_alias_markers_survived` re-reads the markers after
+    lowering.
+
+    That marker goes on the write *node* while the classification is per *buffer*, so
+    one value node written back into two buffers would put the two in conflict: the
+    node marked on one buffer's behalf while the other buffer's write is predicted KV.
+    ``torch.export`` rejects that shape with ``SpecViolationError`` before the
+    classifier sees it, so it is a constraint on what can arrive here rather than a
+    case to guard against.
     """
     # Find all aten.copy_(get_attr_X, _) calls. The first arg's target is
     # the buffer name. Some EPs emit copy_.default, others copy_.
@@ -412,6 +462,9 @@ def lift_mutated_buffers(
     # (buf_*) is the stable key: it survives the buffer renaming inline does later,
     # and it is exactly what aliased_io records on the input side.
     predicted_kv_bindings: set[str] = set()
+    # Names of the write nodes marked _trt_no_kv_alias below. Read back after
+    # lowering by :func:`assert_no_kv_alias_markers_survived`.
+    no_kv_alias_writes: List[str] = []
 
     for copy_node, get_attr_node in mutation_pairs:
         buffer_name = get_attr_node.target
@@ -482,7 +535,24 @@ def lift_mutated_buffers(
         new_value = copy_node.args[1] if len(copy_node.args) > 1 else None
         gm.graph.erase_node(copy_node)
         if isinstance(new_value, torch.fx.Node):
-            if _kv_write_will_alias(new_value, tuple(buffer_tensor.shape), settings):
+            will_alias = _kv_write_will_alias(
+                new_value, tuple(buffer_tensor.shape), settings
+            )
+            if will_alias and not new_value.users:
+                # The copy_ was this write's only consumer, so it is now dead and
+                # dead-code elimination will take it before any engine sees it --
+                # leaving the prediction unfulfilled and the write-back lost. Copy-back
+                # revives it, because the value is re-attached as a graph output, but
+                # then the converter would alias a buffer that is also copy-back and
+                # the module would raise on every call. Marking the write forbids the
+                # aliasing, which is what makes the copy-back route available at all.
+                # Both eligibility checks read the marker: impl.slice_scatter off
+                # ctx.current_node, aten_ops_converters._index_copy_kv_eligible off
+                # the node it is handed.
+                new_value.meta["_trt_no_kv_alias"] = True
+                no_kv_alias_writes.append(new_value.name)
+                will_alias = False
+            if will_alias:
                 predicted_kv_bindings.add(replacement.name)
             else:
                 copyback.append((new_value, buffer_name, replacement.name))
@@ -511,6 +581,7 @@ def lift_mutated_buffers(
         gm.meta["_copyback_mutation_buffers"] = copyback_buffers
         gm.meta["_copyback_bindings"] = copyback_bindings
         gm.meta["_predicted_kv_bindings"] = sorted(predicted_kv_bindings)
+        gm.meta["_no_kv_alias_writes"] = no_kv_alias_writes
         return gm, []
 
     # ExportedProgram.module() produces a GraphModule whose forward is
@@ -544,6 +615,7 @@ def lift_mutated_buffers(
     new_gm.meta["_copyback_mutation_buffers"] = copyback_buffers
     new_gm.meta["_copyback_bindings"] = copyback_bindings
     new_gm.meta["_predicted_kv_bindings"] = sorted(predicted_kv_bindings)
+    new_gm.meta["_no_kv_alias_writes"] = no_kv_alias_writes
 
     logger.debug(
         "Lifted %d mutated buffer(s) to placeholders: %s; copy-back buffers: %s",

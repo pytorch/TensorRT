@@ -1149,6 +1149,11 @@ def _index_copy_kv_eligible(
     ``lowering/_buffer_lifting.py`` runs before that and passes the node lowering
     will leave behind, which is not always ``node.args[0]``.
     """
+    # That same classifier marks a write it filed copy-back rather than KV, and its
+    # value is a graph output by now. Aliasing it as well would hand the runtime an
+    # output it keeps to itself while the graph still reads it.
+    if node.meta.get("_trt_no_kv_alias"):
+        return False
     if len(node.args) < 4:
         return False
     if input_node is None:
