@@ -275,16 +275,28 @@ def assert_predicted_kv_aliased(
     if missing:
         cause = "the write did not end up inside a TensorRT engine"
         if settings is not None:
-            cause += (
-                f", most often because min_block_size ({settings.min_block_size}) "
-                "rejected the subgraph it landed in; min_block_size=1 rules that out"
-            )
+            if settings.min_block_size > 1:
+                cause += (
+                    f", most often because min_block_size "
+                    f"({settings.min_block_size}) rejected the subgraph it landed "
+                    "in; min_block_size=1 rules that out"
+                )
+            else:
+                # The sibling branch's remedy is the value already in force here, so
+                # naming min_block_size at all would read as "1 rejected the
+                # subgraph; set it to 1" -- the value blamed and the value
+                # recommended being the same is no remedy the reader can act on.
+                # Name the cause instead.
+                cause += (
+                    ", most often because a converter or a capability validator "
+                    "rejected the op"
+                )
         raise RuntimeError(
             "lift_mutated_buffers classified these buffer writes as KV-cache "
             "(engine-aliased) and dropped their copy_, but the compiled engine "
             f"did not alias them (absent from aliased_io): {missing}. Their "
             "write-back would be silently dropped. The classification runs before "
-            f"partitioning, so this means {cause}."
+            f"lowering and partitioning, so: {cause}."
         )
 
     unexpected = [b for b in copyback_bindings if b in aliased_in]

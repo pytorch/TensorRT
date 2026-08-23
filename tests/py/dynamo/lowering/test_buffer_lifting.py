@@ -902,6 +902,20 @@ class TestPredictedKvAssertion(TestCase):
         self.assertIn("min_block_size (5)", message)
         self.assertIn("min_block_size=1", message)
 
+    def test_message_does_not_offer_min_block_size_1_when_it_is_already_1(self):
+        """The remedy has to be one the reader can act on, and at ``min_block_size=1``
+        blaming the value and recommending it are the same sentence. So this branch
+        names the cause and mentions ``min_block_size`` nowhere."""
+        with self.assertRaises(RuntimeError) as caught:
+            assert_predicted_kv_aliased(
+                self._aliased_in(_FakeGM({})),
+                ["buf_k_cache"],
+                CompilationSettings(min_block_size=1),
+            )
+        message = str(caught.exception)
+        self.assertIn("a converter or a capability validator rejected the op", message)
+        self.assertNotIn("min_block_size", message)
+
 
 class TestHiddenCopybackOutputs(TestCase):
     """``hide_copyback_outputs`` splits what the graph returns from what ``forward``
